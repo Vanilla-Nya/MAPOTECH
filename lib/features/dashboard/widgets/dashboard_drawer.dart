@@ -3,15 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 
-/// Returns true if [url] is from a domain that allows CORS access from localhost/web.
 bool _isCorsafeUrl(String url) {
   if (url.isEmpty) return false;
-  return url.contains('supabase.co') ||
-      url.contains('supabase.in') ||
-      url.startsWith('https://images.unsplash.com') ||
-      url.startsWith('https://picsum.photos') ||
-      url.startsWith('https://lh3.googleusercontent.com') ||
-      url.startsWith('https://avatars.githubusercontent.com');
+  return url.startsWith('http://') || url.startsWith('https://');
 }
 
 class DrawerMenuItem {

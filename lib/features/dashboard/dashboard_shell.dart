@@ -30,16 +30,9 @@ import 'package:mapotech/features/apotek/dashboard/frontend/apotek_pesanan.dart'
 import 'package:mapotech/features/apotek/dashboard/frontend/apotek_laporan.dart';
 import 'package:mapotech/shared/widgets/segera_hadir_mockup.dart';
 
-/// Returns true if the [url] is from a domain that allows CORS access
-/// from localhost/web. External hospital servers typically block CORS.
 bool _isCorsafeUrl(String url) {
   if (url.isEmpty) return false;
-  return url.contains('supabase.co') ||
-      url.contains('supabase.in') ||
-      url.startsWith('https://images.unsplash.com') ||
-      url.startsWith('https://picsum.photos') ||
-      url.startsWith('https://lh3.googleusercontent.com') ||
-      url.startsWith('https://avatars.githubusercontent.com');
+  return url.startsWith('http://') || url.startsWith('https://');
 }
 
 /// The unified interior shell shown when the user is logged in.
