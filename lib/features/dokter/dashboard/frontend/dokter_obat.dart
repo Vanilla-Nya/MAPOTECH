@@ -1,0 +1,2609 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:mapotech/features/landing/landing_page_data.dart';
+import 'package:mapotech/shared/widgets/custom_button.dart';
+
+// ─── Data Models ─────────────────────────────────────────────────────────────
+
+class BatchModel {
+  final String batchNo;
+  final int stok;
+  final String expDate;
+  final String lokasi;
+  final double hargaBeli;
+  final double hargaJual;
+
+  const BatchModel({
+    required this.batchNo,
+    required this.stok,
+    required this.expDate,
+    required this.lokasi,
+    required this.hargaBeli,
+    required this.hargaJual,
+  });
+
+  BatchModel copyWith({
+    String? batchNo,
+    int? stok,
+    String? expDate,
+    String? lokasi,
+    double? hargaBeli,
+    double? hargaJual,
+  }) {
+    return BatchModel(
+      batchNo: batchNo ?? this.batchNo,
+      stok: stok ?? this.stok,
+      expDate: expDate ?? this.expDate,
+      lokasi: lokasi ?? this.lokasi,
+      hargaBeli: hargaBeli ?? this.hargaBeli,
+      hargaJual: hargaJual ?? this.hargaJual,
+    );
+  }
+}
+
+class OpnameLog {
+  final String batchNo;
+  final int stokSistem;
+  final int stokFisik;
+  final int selisih;
+  final String date;
+
+  const OpnameLog({
+    required this.batchNo,
+    required this.stokSistem,
+    required this.stokFisik,
+    required this.selisih,
+    required this.date,
+  });
+}
+
+class ObatModel {
+  final String id;
+  final String nama;
+  final String jenis;
+  final String sku;
+  final double hargaSatuan;
+  final int totalStok;
+  final String status; // 'Tersedia' or 'Stok Minim'
+  final Color avatarBg;
+  final List<BatchModel> batches;
+  final List<OpnameLog> opnameLogs;
+
+  const ObatModel({
+    required this.id,
+    required this.nama,
+    required this.jenis,
+    required this.sku,
+    required this.hargaSatuan,
+    required this.totalStok,
+    required this.status,
+    required this.avatarBg,
+    required this.batches,
+    this.opnameLogs = const [],
+  });
+
+  ObatModel copyWith({
+    String? id,
+    String? nama,
+    String? jenis,
+    String? sku,
+    double? hargaSatuan,
+    int? totalStok,
+    String? status,
+    Color? avatarBg,
+    List<BatchModel>? batches,
+    List<OpnameLog>? opnameLogs,
+  }) {
+    return ObatModel(
+      id: id ?? this.id,
+      nama: nama ?? this.nama,
+      jenis: jenis ?? this.jenis,
+      sku: sku ?? this.sku,
+      hargaSatuan: hargaSatuan ?? this.hargaSatuan,
+      totalStok: totalStok ?? this.totalStok,
+      status: status ?? this.status,
+      avatarBg: avatarBg ?? this.avatarBg,
+      batches: batches ?? this.batches,
+      opnameLogs: opnameLogs ?? this.opnameLogs,
+    );
+  }
+}
+
+// ─── Riverpod State Provider ──────────────────────────────────────────────────
+
+class DokterObatListNotifier extends StateNotifier<List<ObatModel>> {
+  DokterObatListNotifier() : super(_initialDrugs);
+
+  static final List<ObatModel> _initialDrugs = [
+    const ObatModel(
+      id: 'OBAT-001',
+      nama: 'Prednison',
+      jenis: 'Umum',
+      sku: 'SKU-ec279',
+      hargaSatuan: 0.0,
+      totalStok: 0,
+      status: 'Stok Minim',
+      avatarBg: Color(0xFF3498DB),
+      batches: [
+        BatchModel(batchNo: 'B260526-001', stok: 0, expDate: '12 / 12 / 2027', lokasi: 'Rak A-1', hargaBeli: 0.0, hargaJual: 0.0)
+      ],
+    ),
+    const ObatModel(
+      id: 'OBAT-002',
+      nama: 'Degirol',
+      jenis: 'Dequalinium Chloride',
+      sku: 'SKU-4d3b2',
+      hargaSatuan: 5000.0,
+      totalStok: 200,
+      status: 'Tersedia',
+      avatarBg: Color(0xFF3498DB),
+      batches: [
+        BatchModel(batchNo: 'B260526-002', stok: 200, expDate: '24 / 09 / 2028', lokasi: 'Rak A-2', hargaBeli: 3500.0, hargaJual: 5000.0)
+      ],
+    ),
+    const ObatModel(
+      id: 'OBAT-003',
+      nama: 'Paracetamol',
+      jenis: 'Paracetamol',
+      sku: 'SKU-f24c1',
+      hargaSatuan: 1000.0,
+      totalStok: 9980,
+      status: 'Tersedia',
+      avatarBg: Color(0xFFB577F2),
+      batches: [
+        BatchModel(batchNo: 'B260526-003', stok: 9980, expDate: '18 / 02 / 2029', lokasi: 'Rak B-1', hargaBeli: 600.0, hargaJual: 1000.0)
+      ],
+    ),
+    const ObatModel(
+      id: 'OBAT-004',
+      nama: 'Cetirizine',
+      jenis: 'Cetirizine HCl',
+      sku: 'SKU-b4336',
+      hargaSatuan: 100.0,
+      totalStok: 1000,
+      status: 'Tersedia',
+      avatarBg: Color(0xFF48C9B0),
+      batches: [
+        BatchModel(batchNo: 'B260526-004', stok: 1000, expDate: '10 / 08 / 2028', lokasi: 'Rak B-2', hargaBeli: 50.0, hargaJual: 100.0)
+      ],
+    ),
+    const ObatModel(
+      id: 'OBAT-005',
+      nama: 'Omeprazol',
+      jenis: 'Omeprazol',
+      sku: 'SKU-c15ae',
+      hargaSatuan: 1000.0,
+      totalStok: 100,
+      status: 'Tersedia',
+      avatarBg: Color(0xFF27AE60),
+      batches: [
+        BatchModel(batchNo: 'B260526-005', stok: 100, expDate: '01 / 01 / 2028', lokasi: 'Rak C-1', hargaBeli: 700.0, hargaJual: 1000.0)
+      ],
+    ),
+    const ObatModel(
+      id: 'OBAT-006',
+      nama: 'Prednison',
+      jenis: 'Prednison',
+      sku: 'SKU-475f7',
+      hargaSatuan: 100.0,
+      totalStok: 100,
+      status: 'Tersedia',
+      avatarBg: Color(0xFF48C9B0),
+      batches: [
+        BatchModel(batchNo: 'B260526-006', stok: 100, expDate: '14 / 04 / 2028', lokasi: 'Rak C-2', hargaBeli: 50.0, hargaJual: 100.0)
+      ],
+    ),
+    const ObatModel(
+      id: 'OBAT-007',
+      nama: 'B komplek',
+      jenis: 'Vitamin B Kompleks',
+      sku: 'SKU-9103e',
+      hargaSatuan: 100.0,
+      totalStok: 4990,
+      status: 'Tersedia',
+      avatarBg: Color(0xFF3498DB),
+      batches: [
+        BatchModel(batchNo: 'B260526-007', stok: 4990, expDate: '30 / 11 / 2028', lokasi: 'Rak D-1', hargaBeli: 40.0, hargaJual: 100.0)
+      ],
+    ),
+    const ObatModel(
+      id: 'OBAT-008',
+      nama: 'Amoxicillin 500mg',
+      jenis: 'Amoxicillin',
+      sku: 'SKU-46ca6',
+      hargaSatuan: 200.0,
+      totalStok: 1000,
+      status: 'Tersedia',
+      avatarBg: Color(0xFFB577F2),
+      batches: [
+        BatchModel(batchNo: 'B260526-008', stok: 1000, expDate: '15 / 05 / 2028', lokasi: 'Rak D-2', hargaBeli: 110.0, hargaJual: 200.0)
+      ],
+    ),
+    const ObatModel(
+      id: 'OBAT-009',
+      nama: 'Cefadroxil',
+      jenis: 'Cefadroxil',
+      sku: 'SKU-f6869',
+      hargaSatuan: 100.0,
+      totalStok: 1000,
+      status: 'Tersedia',
+      avatarBg: Color(0xFF3498DB),
+      batches: [
+        BatchModel(batchNo: 'B260526-009', stok: 1000, expDate: '02 / 10 / 2028', lokasi: 'Rak E-1', hargaBeli: 50.0, hargaJual: 100.0)
+      ],
+    ),
+    const ObatModel(
+      id: 'OBAT-010',
+      nama: 'Ciprofloxacin 500',
+      jenis: 'Ciprofloxacin',
+      sku: 'SKU-012b2',
+      hargaSatuan: 500.0,
+      totalStok: 100,
+      status: 'Tersedia',
+      avatarBg: Color(0xFFB577F2),
+      batches: [
+        BatchModel(batchNo: 'B260526-010', stok: 100, expDate: '09 / 12 / 2027', lokasi: 'Rak E-2', hargaBeli: 280.0, hargaJual: 500.0)
+      ],
+    ),
+  ];
+
+  void addDrug(ObatModel drug) {
+    state = [...state, drug];
+  }
+
+  void updateDrug(ObatModel updated) {
+    state = [
+      for (final drug in state)
+        if (drug.id == updated.id) updated else drug
+    ];
+  }
+
+  void deleteDrug(String id) {
+    state = state.where((drug) => drug.id != id).toList();
+  }
+}
+
+final dokterObatListProvider =
+    StateNotifierProvider<DokterObatListNotifier, List<ObatModel>>((ref) {
+  return DokterObatListNotifier();
+});
+
+// ─── Dokter Obat View ────────────────────────────────────────────────────────
+
+class DokterObat extends ConsumerStatefulWidget {
+  const DokterObat({super.key});
+
+  @override
+  ConsumerState<DokterObat> createState() => _DokterObatState();
+}
+
+class _DokterObatState extends ConsumerState<DokterObat> {
+  String _searchQuery = '';
+  String _activeFilter = 'Semua'; // 'Semua', 'Stok Minim', 'Hampir Kadaluarsa'
+  int _currentPage = 1;
+  final int _rowsPerPage = 10;
+
+  @override
+  Widget build(BuildContext context) {
+    final state = ref.watch(landingPageProvider);
+    final allDrugs = ref.watch(dokterObatListProvider);
+
+    final isDark = state.appearance == 'dark';
+    final isRev = state.appearance == 'rev';
+    final cardBgColor = isDark ? const Color(0xFF161619) : Colors.white;
+    final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
+    final subtitleColor = isDark ? Colors.grey[400]! : const Color(0xFF6F6A8A);
+    final borderColor = isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2);
+    final themeAccent = isRev ? const Color(0xFFB577F2) : const Color(0xFF48C9B0);
+    final purpleAccent = const Color(0xFFB577F2);
+
+    // Apply Filter & Search
+    List<ObatModel> filteredDrugs = allDrugs.where((o) {
+      final query = _searchQuery.toLowerCase();
+      final matchQuery = o.nama.toLowerCase().contains(query) ||
+          o.sku.toLowerCase().contains(query) ||
+          o.jenis.toLowerCase().contains(query) ||
+          o.batches.any((b) => b.batchNo.toLowerCase().contains(query));
+
+      if (!matchQuery) return false;
+
+      if (_activeFilter == 'Stok Minim') {
+        return o.status == 'Stok Minim';
+      } else if (_activeFilter == 'Hampir Kadaluarsa') {
+        // Mock nearly expired logic
+        return o.batches.any((b) => b.expDate.contains('2027'));
+      }
+      return true;
+    }).toList();
+
+    // Counts for filters
+    final stokMinimCount = allDrugs.where((o) => o.status == 'Stok Minim').length;
+    final hampirExpCount = allDrugs.where((o) => o.batches.any((b) => b.expDate.contains('2027'))).length;
+
+    // Pagination
+    final totalDataCount = filteredDrugs.length;
+    final totalPages = (totalDataCount / _rowsPerPage).ceil();
+    final startIndex = (_currentPage - 1) * _rowsPerPage;
+    final endIndex = (startIndex + _rowsPerPage) > totalDataCount ? totalDataCount : (startIndex + _rowsPerPage);
+    final paginatedDrugs = filteredDrugs.sublist(startIndex, endIndex);
+
+    final isMobile = MediaQuery.of(context).size.width < 768;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // ─── Header Banner ───────────────────────────────────
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Data Obat',
+                    style: GoogleFonts.outfit(
+                      fontSize: isMobile ? 22 : 28,
+                      fontWeight: FontWeight.w900,
+                      color: textColor,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Kelola stok, lacak batch, dan pantau tanggal kedaluwarsa.',
+                    style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      color: subtitleColor,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            CustomButton(
+              text: 'Tambah Obat',
+              icon: Icons.add_rounded,
+              primaryColor: purpleAccent,
+              textColor: Colors.white,
+              height: 44,
+              onPressed: () => _showAddDrugModal(context, isDark),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 24),
+
+        // ─── Controls (Search & Filters) ───────────────────────
+        isMobile
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildSearchField(isDark, textColor, subtitleColor, borderColor),
+                  const SizedBox(height: 12),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _buildFilterChip('Semua Obat', _activeFilter == 'Semua', () => setState(() { _activeFilter = 'Semua'; _currentPage = 1; }), purpleAccent, subtitleColor, cardBgColor, borderColor, count: allDrugs.length),
+                        const SizedBox(width: 8),
+                        _buildFilterChip('Stok Minim', _activeFilter == 'Stok Minim', () => setState(() { _activeFilter = 'Stok Minim'; _currentPage = 1; }), Colors.redAccent, subtitleColor, cardBgColor, borderColor, count: stokMinimCount, icon: Icons.warning_amber_rounded),
+                        const SizedBox(width: 8),
+                        _buildFilterChip('Hampir Kedaluwarsa', _activeFilter == 'Hampir Kadaluarsa', () => setState(() { _activeFilter = 'Hampir Kadaluarsa'; _currentPage = 1; }), Colors.amber[700]!, subtitleColor, cardBgColor, borderColor, count: hampirExpCount, icon: Icons.access_time_rounded),
+                      ],
+                    ),
+                  ),
+                ],
+              )
+            : Row(
+                children: [
+                  Expanded(
+                    child: _buildSearchField(isDark, textColor, subtitleColor, borderColor),
+                  ),
+                  const SizedBox(width: 16),
+                  _buildFilterChip('Semua Obat', _activeFilter == 'Semua', () => setState(() { _activeFilter = 'Semua'; _currentPage = 1; }), purpleAccent, subtitleColor, cardBgColor, borderColor, count: allDrugs.length),
+                  const SizedBox(width: 8),
+                  _buildFilterChip('Stok Minim', _activeFilter == 'Stok Minim', () => setState(() { _activeFilter = 'Stok Minim'; _currentPage = 1; }), Colors.redAccent, subtitleColor, cardBgColor, borderColor, count: stokMinimCount, icon: Icons.warning_amber_rounded),
+                  const SizedBox(width: 8),
+                  _buildFilterChip('Hampir Kedaluwarsa', _activeFilter == 'Hampir Kadaluarsa', () => setState(() { _activeFilter = 'Hampir Kadaluarsa'; _currentPage = 1; }), Colors.amber[700]!, subtitleColor, cardBgColor, borderColor, count: hampirExpCount, icon: Icons.access_time_rounded),
+                ],
+              ),
+
+        const SizedBox(height: 20),
+
+        // ─── Table Container ───────────────────────────────────
+        Container(
+          decoration: BoxDecoration(
+            color: cardBgColor,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: borderColor),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.01),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              )
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Table Headers
+              Container(
+                color: isDark ? const Color(0xFF1E1E22) : const Color(0xFFF8FAFC),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                child: Row(
+                  children: [
+                    Expanded(flex: 3, child: _buildTableHeaderText('NAMA OBAT', subtitleColor)),
+                    Expanded(flex: 2, child: _buildTableHeaderText('SKU / BARCODE', subtitleColor)),
+                    Expanded(flex: 2, child: _buildTableHeaderText('HARGA SATUAN', subtitleColor)),
+                    Expanded(flex: 2, child: _buildTableHeaderText('TOTAL STOK', subtitleColor)),
+                    Expanded(flex: 2, child: _buildTableHeaderText('STATUS', subtitleColor)),
+                  ],
+                ),
+              ),
+
+              // Rows
+              filteredDrugs.isEmpty
+                  ? _buildEmptyState(isDark, cardBgColor, borderColor, textColor, subtitleColor)
+                  : ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: paginatedDrugs.length,
+                      separatorBuilder: (context, index) => Divider(color: borderColor, height: 1),
+                      itemBuilder: (context, index) {
+                        final drug = paginatedDrugs[index];
+                        return _buildDrugRow(context, drug, isDark, cardBgColor, borderColor, textColor, subtitleColor, themeAccent);
+                      },
+                    ),
+
+              // Pagination Footer
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                decoration: BoxDecoration(
+                  border: Border(top: BorderSide(color: borderColor)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      totalDataCount == 0
+                          ? 'Menampilkan 0 data'
+                          : 'Menampilkan ${startIndex + 1} hingga $endIndex dari $totalDataCount data',
+                      style: GoogleFonts.outfit(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: subtitleColor,
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        _buildPaginationBtn('Sebelumnya', _currentPage > 1, () {
+                          setState(() {
+                            _currentPage--;
+                          });
+                        }, cardBgColor, borderColor, subtitleColor),
+                        const SizedBox(width: 8),
+                        _buildPaginationBtn('Berikutnya', _currentPage < totalPages, () {
+                          setState(() {
+                            _currentPage++;
+                          });
+                        }, cardBgColor, borderColor, subtitleColor),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ─── UI Helper Methods ─────────────────────────────────────────────────────
+
+  Widget _buildSearchField(
+      bool isDark, Color textColor, Color subtitleColor, Color borderColor) {
+    return Container(
+      height: 44,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E22) : const Color(0xFFF1EEFA),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderColor),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
+          Icon(Icons.search_rounded, size: 18, color: subtitleColor),
+          const SizedBox(width: 10),
+          Expanded(
+            child: TextField(
+              onChanged: (val) {
+                setState(() {
+                  _searchQuery = val;
+                  _currentPage = 1;
+                });
+              },
+              style: GoogleFonts.outfit(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: textColor,
+              ),
+              decoration: InputDecoration(
+                hintText: 'Cari nama, SKU, atau ID batch...',
+                hintStyle: GoogleFonts.outfit(
+                  fontSize: 12,
+                  color: subtitleColor.withOpacity(0.5),
+                ),
+                border: InputBorder.none,
+                isDense: true,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(
+    String label,
+    bool isSelected,
+    VoidCallback onTap,
+    Color activeColor,
+    Color subtitleColor,
+    Color cardBg,
+    Color border, {
+    int count = 0,
+    IconData? icon,
+  }) {
+    final bg = isSelected ? activeColor.withOpacity(0.12) : cardBg;
+    final fg = isSelected ? activeColor : subtitleColor;
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          height: 38,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: isSelected ? activeColor : border),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 14, color: fg),
+                const SizedBox(width: 6),
+              ],
+              Text(
+                label,
+                style: GoogleFonts.outfit(
+                  fontSize: 11,
+                  fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
+                  color: fg,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: isSelected ? activeColor.withOpacity(0.2) : border,
+                  borderRadius: BorderRadius.circular(100),
+                ),
+                child: Text(
+                  count.toString(),
+                  style: GoogleFonts.outfit(
+                    fontSize: 8,
+                    fontWeight: FontWeight.bold,
+                    color: fg,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTableHeaderText(String title, Color col) {
+    return Text(
+      title,
+      style: GoogleFonts.outfit(
+        fontSize: 9,
+        fontWeight: FontWeight.w900,
+        color: col,
+        letterSpacing: 0.5,
+      ),
+    );
+  }
+
+  Widget _buildDrugRow(
+    BuildContext context,
+    ObatModel drug,
+    bool isDark,
+    Color cardBg,
+    Color border,
+    Color text,
+    Color subtitle,
+    Color accent,
+  ) {
+    final initials = drug.nama.isNotEmpty ? drug.nama[0].toUpperCase() : 'O';
+    final String formattedPrice = drug.hargaSatuan == 0 ? 'Rp 0' : 'Rp ${_formatPrice(drug.hargaSatuan)}';
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () => _showDrugDetailModal(context, drug, isDark),
+        child: Container(
+          color: Colors.transparent,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: Row(
+            children: [
+              // Drug Name + Avatar
+              Expanded(
+                flex: 3,
+                child: Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: drug.avatarBg.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        initials,
+                        style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                          color: drug.avatarBg,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            drug.nama,
+                            style: GoogleFonts.outfit(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
+                              color: text,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            drug.jenis,
+                            style: GoogleFonts.outfit(
+                              fontSize: 9.5,
+                              color: subtitle,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // SKU
+              Expanded(
+                flex: 2,
+                child: Text(
+                  drug.sku,
+                  style: GoogleFonts.outfit(fontSize: 11, color: subtitle, fontWeight: FontWeight.bold),
+                ),
+              ),
+
+              // Price
+              Expanded(
+                flex: 2,
+                child: Text(
+                  formattedPrice,
+                  style: GoogleFonts.outfit(fontSize: 12, color: text, fontWeight: FontWeight.w900),
+                ),
+              ),
+
+              // Stock
+              Expanded(
+                flex: 2,
+                child: Text(
+                  '${_formatStock(drug.totalStok)} Tablet',
+                  style: GoogleFonts.outfit(fontSize: 12, color: text, fontWeight: FontWeight.w900),
+                ),
+              ),
+
+              // Status Badge
+              Expanded(
+                flex: 2,
+                child: Row(
+                  children: [
+                    _buildStatusBadge(drug.status),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusBadge(String status) {
+    final isMinim = status == 'Stok Minim';
+    final bg = isMinim ? Colors.redAccent.withOpacity(0.1) : const Color(0xFFB577F2).withOpacity(0.1);
+    final fg = isMinim ? Colors.redAccent : const Color(0xFFB577F2);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(100),
+      ),
+      child: Text(
+        status,
+        style: GoogleFonts.outfit(
+          fontSize: 8.5,
+          fontWeight: FontWeight.w900,
+          color: fg,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPaginationBtn(
+    String text,
+    bool isEnabled,
+    VoidCallback onTap,
+    Color bg,
+    Color border,
+    Color subtitle,
+  ) {
+    return OutlinedButton(
+      onPressed: isEnabled ? onTap : null,
+      style: OutlinedButton.styleFrom(
+        side: BorderSide(color: isEnabled ? border : border.withOpacity(0.5)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      ),
+      child: Text(
+        text,
+        style: GoogleFonts.outfit(
+          fontSize: 10.5,
+          fontWeight: FontWeight.w900,
+          color: isEnabled ? subtitle : subtitle.withOpacity(0.4),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(
+      bool isDark, Color cardBg, Color border, Color text, Color subtitle) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 64),
+      child: Column(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: subtitle.withOpacity(0.08),
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: Icon(Icons.medication_liquid_rounded, size: 20, color: subtitle),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Obat tidak ditemukan',
+            style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w900, color: text),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            'Sesuaikan kata kunci pencarian Anda.',
+            style: GoogleFonts.outfit(fontSize: 10.5, color: subtitle, fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Modal: Detail Obat & Stock Opname ──────────────────────────────────────
+
+  void _showDrugDetailModal(BuildContext context, ObatModel drug, bool isDark) {
+    final purple = const Color(0xFFB577F2);
+    final green = const Color(0xFF27AE60);
+    final cardBg = isDark ? const Color(0xFF161619) : Colors.white;
+    final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
+    final subtitleColor = isDark ? Colors.grey[400]! : const Color(0xFF6F6A8A);
+    final borderColor = isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2);
+    final sectionBg = isDark ? const Color(0xFF1E1E22) : const Color(0xFFFBF9FF);
+    final itemBg = isDark ? const Color(0xFF252528) : const Color(0xFFF1EEFA);
+
+    // Form inputs for Stock Opname (indexed by batchNo)
+    final Map<String, TextEditingController> opnameControllers = {};
+    for (final batch in drug.batches) {
+      opnameControllers[batch.batchNo] = TextEditingController();
+    }
+
+    final isMobile = MediaQuery.of(context).size.width < 650;
+
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.4),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          return Dialog(
+            insetPadding: EdgeInsets.symmetric(
+              horizontal: isMobile ? 12 : (MediaQuery.of(context).size.width - 550) / 2,
+              vertical: 36,
+            ),
+            backgroundColor: Colors.transparent,
+            child: Container(
+              width: 550,
+              constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.9),
+              decoration: BoxDecoration(
+                color: cardBg,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.15),
+                    blurRadius: 40,
+                    offset: const Offset(0, 16),
+                  )
+                ],
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // --- Header ---
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 16, 16),
+                    color: isDark ? const Color(0xFF1A1A1E) : const Color(0xFFF8F5FF),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: purple.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          alignment: Alignment.center,
+                          child: Icon(Icons.info_outline_rounded, color: purple, size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Detail Obat',
+                            style: GoogleFonts.outfit(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w900,
+                              color: textColor,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded, size: 18),
+                          onPressed: () => Navigator.of(ctx).pop(),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // --- Scrollable Content ---
+                  Flexible(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // 1. INFORMASI OBAT Card
+                          _buildModalSectionHeader('INFORMASI OBAT', purple),
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: sectionBg,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: borderColor),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 48,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    color: drug.avatarBg.withOpacity(0.12),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    drug.nama.isNotEmpty ? drug.nama[0] : 'O',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w900,
+                                      color: drug.avatarBg,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        drug.nama,
+                                        style: GoogleFonts.outfit(
+                                            fontSize: 15, fontWeight: FontWeight.w900, color: textColor),
+                                      ),
+                                      Text(
+                                        drug.jenis,
+                                        style: GoogleFonts.outfit(
+                                            fontSize: 10, color: subtitleColor, fontWeight: FontWeight.bold),
+                                      ),
+                                      const SizedBox(height: 10),
+                                      Row(
+                                        children: [
+                                          _buildDetailGridCell('SKU / BARCODE', drug.sku, subtitleColor, textColor),
+                                          const SizedBox(width: 20),
+                                          _buildDetailGridCell('HARGA SATUAN', drug.hargaSatuan == 0 ? 'Rp 0' : 'Rp ${_formatPrice(drug.hargaSatuan)}', subtitleColor, textColor),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        children: [
+                                          _buildDetailGridCell('TOTAL STOK', '${_formatStock(drug.totalStok)} Tablet', subtitleColor, textColor),
+                                          const SizedBox(width: 20),
+                                          Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text('STATUS', style: GoogleFonts.outfit(fontSize: 7.5, fontWeight: FontWeight.w900, color: subtitleColor, letterSpacing: 0.5)),
+                                              const SizedBox(height: 3),
+                                              _buildStatusBadge(drug.status),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 20),
+
+                          // 2. BATCH & STOK section
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              _buildModalSectionHeader('BATCH & STOK', purple),
+                              TextButton.icon(
+                                icon: const Icon(Icons.add_rounded, size: 12),
+                                label: Text(
+                                  'TAMBAH BATCH BARU',
+                                  style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: purple),
+                                ),
+                                onPressed: () {
+                                  _showRestockModal(context, drug, isDark, onRestockSuccess: (updatedDrug) {
+                                    setDialogState(() {
+                                      drug = updatedDrug;
+                                      // Reinitialize opname controller for new batches
+                                      for (final batch in drug.batches) {
+                                        opnameControllers.putIfAbsent(batch.batchNo, () => TextEditingController());
+                                      }
+                                    });
+                                    // Refresh parent
+                                    ref.read(dokterObatListProvider.notifier).updateDrug(drug);
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          ListView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: drug.batches.length,
+                            itemBuilder: (context, i) {
+                              final batch = drug.batches[i];
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: cardBg,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: borderColor),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text('BATCH NO.', style: GoogleFonts.outfit(fontSize: 7.5, fontWeight: FontWeight.w900, color: subtitleColor)),
+                                        Text(batch.batchNo, style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.bold, color: textColor)),
+                                      ],
+                                    ),
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text('LOKASI', style: GoogleFonts.outfit(fontSize: 7.5, fontWeight: FontWeight.w900, color: subtitleColor)),
+                                        Text(batch.lokasi.isEmpty ? '-' : batch.lokasi, style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.bold, color: textColor)),
+                                      ],
+                                    ),
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text('KEDALUWARSA', style: GoogleFonts.outfit(fontSize: 7.5, fontWeight: FontWeight.w900, color: subtitleColor)),
+                                        Text(batch.expDate, style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.bold, color: textColor)),
+                                      ],
+                                    ),
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      children: [
+                                        Text('STOK', style: GoogleFonts.outfit(fontSize: 7.5, fontWeight: FontWeight.w900, color: subtitleColor)),
+                                        Text('${_formatStock(batch.stok)} Tab', style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.w900, color: textColor)),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+
+                          const SizedBox(height: 20),
+
+                          // 3. OPNAME STOK form
+                          _buildModalSectionHeader('OPNAME STOK', purple),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Masukkan jumlah stok fisik hasil penghitungan di lapangan.',
+                            style: GoogleFonts.outfit(fontSize: 10.5, color: subtitleColor, fontWeight: FontWeight.w500),
+                          ),
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: cardBg,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: borderColor),
+                            ),
+                            child: Column(
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(flex: 3, child: _buildOpnameHeader('BATCH NO.', subtitleColor)),
+                                    Expanded(flex: 2, child: _buildOpnameHeader('STOK SISTEM', subtitleColor)),
+                                    Expanded(flex: 2, child: _buildOpnameHeader('STOK FISIK', subtitleColor)),
+                                    Expanded(flex: 2, child: _buildOpnameHeader('SELISIH', subtitleColor)),
+                                  ],
+                                ),
+                                const Divider(height: 16),
+                                ...drug.batches.map((batch) {
+                                  final controller = opnameControllers[batch.batchNo]!;
+                                  return Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 6),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          flex: 3,
+                                          child: Text(batch.batchNo, style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: textColor)),
+                                        ),
+                                        Expanded(
+                                          flex: 2,
+                                          child: Text('${batch.stok}', style: GoogleFonts.outfit(fontSize: 11, color: textColor, fontWeight: FontWeight.bold)),
+                                        ),
+                                        Expanded(
+                                          flex: 2,
+                                          child: Container(
+                                            height: 32,
+                                            margin: const EdgeInsets.only(right: 8),
+                                            child: TextField(
+                                              controller: controller,
+                                              keyboardType: TextInputType.number,
+                                              onChanged: (val) {
+                                                setDialogState(() {});
+                                              },
+                                              style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: textColor),
+                                              decoration: InputDecoration(
+                                                hintText: '0',
+                                                hintStyle: GoogleFonts.outfit(fontSize: 11, color: subtitleColor.withOpacity(0.4)),
+                                                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                                                filled: true,
+                                                fillColor: itemBg,
+                                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: BorderSide(color: borderColor)),
+                                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: BorderSide(color: borderColor)),
+                                                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: BorderSide(color: purple)),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        Expanded(
+                                          flex: 2,
+                                          child: Builder(
+                                            builder: (context) {
+                                              final inputVal = int.tryParse(controller.text) ?? batch.stok;
+                                              final difference = inputVal - batch.stok;
+                                              final Color diffCol = difference == 0 ? textColor : (difference > 0 ? green : Colors.redAccent);
+                                              final prefix = difference > 0 ? '+' : '';
+                                              return Text(
+                                                '$prefix$difference',
+                                                style: GoogleFonts.outfit(fontSize: 11, color: diffCol, fontWeight: FontWeight.w900),
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }),
+                                const SizedBox(height: 16),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.start,
+                                  children: [
+                                    ElevatedButton.icon(
+                                      icon: const Icon(Icons.check_rounded, size: 14),
+                                      label: Text('Simpan Opname', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900)),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: purple,
+                                        foregroundColor: Colors.white,
+                                        elevation: 0,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                      ),
+                                      onPressed: () {
+                                        // Process Opname
+                                        List<BatchModel> updatedBatches = [];
+                                        List<OpnameLog> newLogs = List.from(drug.opnameLogs);
+                                        int totalNewStock = 0;
+
+                                        for (final batch in drug.batches) {
+                                          final controller = opnameControllers[batch.batchNo]!;
+                                          final parsedFisik = int.tryParse(controller.text) ?? batch.stok;
+                                          final selisih = parsedFisik - batch.stok;
+
+                                          updatedBatches.add(batch.copyWith(stok: parsedFisik));
+                                          totalNewStock += parsedFisik;
+
+                                          if (selisih != 0) {
+                                            newLogs.add(OpnameLog(
+                                              batchNo: batch.batchNo,
+                                              stokSistem: batch.stok,
+                                              stokFisik: parsedFisik,
+                                              selisih: selisih,
+                                              date: '26 Mei 2026',
+                                            ));
+                                          }
+                                        }
+
+                                        final updatedDrug = drug.copyWith(
+                                          batches: updatedBatches,
+                                          totalStok: totalNewStock,
+                                          status: totalNewStock <= 5 ? 'Stok Minim' : 'Tersedia',
+                                          opnameLogs: newLogs,
+                                        );
+
+                                        setDialogState(() {
+                                          drug = updatedDrug;
+                                          // Clear controllers inputs
+                                          for (final controller in opnameControllers.values) {
+                                            controller.clear();
+                                          }
+                                        });
+
+                                        ref.read(dokterObatListProvider.notifier).updateDrug(drug);
+                                        _showSuccessSnackBar(context, 'Hasil stok opname berhasil disimpan!');
+                                      },
+                                    ),
+                                    const SizedBox(width: 8),
+                                    OutlinedButton(
+                                      style: OutlinedButton.styleFrom(
+                                        side: BorderSide(color: borderColor),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                      ),
+                                      child: Text('Reset', style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor, fontWeight: FontWeight.bold)),
+                                      onPressed: () {
+                                        setDialogState(() {
+                                          for (final controller in opnameControllers.values) {
+                                            controller.clear();
+                                          }
+                                        });
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 20),
+
+                          // 4. RIWAYAT OPNAME section
+                          _buildModalSectionHeader('RIWAYAT OPNAME', purple),
+                          const SizedBox(height: 8),
+                          drug.opnameLogs.isEmpty
+                              ? Text(
+                                  'Belum ada riwayat opname untuk obat ini.',
+                                  style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor, fontStyle: FontStyle.italic, fontWeight: FontWeight.w500),
+                                )
+                              : ListView.builder(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  itemCount: drug.opnameLogs.length,
+                                  itemBuilder: (context, idx) {
+                                    final log = drug.opnameLogs[idx];
+                                    final Color diffCol = log.selisih > 0 ? green : Colors.redAccent;
+                                    final sign = log.selisih > 0 ? '+' : '';
+                                    return Container(
+                                      margin: const EdgeInsets.only(bottom: 6),
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      decoration: BoxDecoration(
+                                        color: itemBg,
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(log.date, style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor, fontWeight: FontWeight.bold)),
+                                          Text('Batch ${log.batchNo}', style: GoogleFonts.outfit(fontSize: 10, color: textColor, fontWeight: FontWeight.bold)),
+                                          Text('Sistem: ${log.stokSistem} | Fisik: ${log.stokFisik}', style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor)),
+                                          Text(
+                                            'Selisih: $sign${log.selisih}',
+                                            style: GoogleFonts.outfit(fontSize: 10, color: diffCol, fontWeight: FontWeight.w900),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+
+                          const SizedBox(height: 20),
+
+                          // 5. AKSI section
+                          _buildModalSectionHeader('AKSI', purple),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              ElevatedButton.icon(
+                                icon: const Icon(Icons.sync_rounded, size: 14),
+                                label: Text('Restock', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: purple,
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                ),
+                                onPressed: () {
+                                  _showRestockModal(context, drug, isDark, onRestockSuccess: (updatedDrug) {
+                                    setDialogState(() {
+                                      drug = updatedDrug;
+                                    });
+                                    ref.read(dokterObatListProvider.notifier).updateDrug(drug);
+                                  });
+                                },
+                              ),
+                              const SizedBox(width: 8),
+                              OutlinedButton.icon(
+                                icon: const Icon(Icons.sell_outlined, size: 14),
+                                label: Text('Ubah Harga', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900)),
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide(color: borderColor),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                ),
+                                onPressed: () {
+                                  _showPriceUpdateDialog(context, drug, isDark, onPriceUpdate: (updatedDrug) {
+                                    setDialogState(() {
+                                      drug = updatedDrug;
+                                    });
+                                    ref.read(dokterObatListProvider.notifier).updateDrug(drug);
+                                  });
+                                },
+                              ),
+                              const Spacer(),
+                              OutlinedButton.icon(
+                                icon: const Icon(Icons.delete_outline_rounded, size: 14),
+                                label: Text('Hapus Obat', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900)),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.redAccent,
+                                  side: const BorderSide(color: Colors.redAccent),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                ),
+                                onPressed: () {
+                                  _showDeleteConfirm(context, drug);
+                                },
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // --- Footer ---
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      border: Border(top: BorderSide(color: borderColor)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: borderColor),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          ),
+                          child: Text(
+                            'Tutup',
+                            style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor, fontWeight: FontWeight.w900),
+                          ),
+                          onPressed: () => Navigator.of(ctx).pop(),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildModalSectionHeader(String label, Color color) {
+    return Row(
+      children: [
+        Container(
+          width: 3,
+          height: 12,
+          margin: const EdgeInsets.only(right: 6),
+          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(10)),
+        ),
+        Text(
+          label,
+          style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: color, letterSpacing: 0.5),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDetailGridCell(String label, String value, Color subtitleCol, Color textCol) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.outfit(fontSize: 7.5, fontWeight: FontWeight.w900, color: subtitleCol, letterSpacing: 0.5),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: GoogleFonts.outfit(fontSize: 11.5, color: textCol, fontWeight: FontWeight.bold),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildOpnameHeader(String text, Color col) {
+    return Text(
+      text,
+      style: GoogleFonts.outfit(fontSize: 7.5, fontWeight: FontWeight.w900, color: col),
+    );
+  }
+
+  // ─── Sub-Modal: Restock ───────────────────────────────────────────────────
+
+  void _showRestockModal(
+    BuildContext context,
+    ObatModel drug,
+    bool isDark, {
+    required Function(ObatModel) onRestockSuccess,
+  }) {
+    final purple = const Color(0xFFB577F2);
+    final cardBg = isDark ? const Color(0xFF161619) : Colors.white;
+    final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
+    final subtitleColor = isDark ? Colors.grey[400]! : const Color(0xFF6F6A8A);
+    final borderColor = isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2);
+    final inputBg = isDark ? const Color(0xFF1E1E22) : const Color(0xFFF6F8FA);
+
+    final formKey = GlobalKey<FormState>();
+    final stockController = TextEditingController(text: '0');
+    final batchController = TextEditingController(text: 'B260526-${100 + drug.batches.length * 12}');
+    final expController = TextEditingController();
+    final locationController = TextEditingController();
+    final totalBuyController = TextEditingController();
+    final sellPriceController = TextEditingController(text: drug.hargaSatuan.toInt().toString());
+
+    double hargaBeliSatuanVal = 0.0;
+
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.4),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          return Dialog(
+            insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 36),
+            backgroundColor: Colors.transparent,
+            child: Container(
+              width: 440,
+              decoration: BoxDecoration(
+                color: cardBg,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.15),
+                    blurRadius: 40,
+                    offset: const Offset(0, 16),
+                  )
+                ],
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // --- Header ---
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                      color: isDark ? const Color(0xFF1A1A1E) : const Color(0xFFF8F5FF),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 38,
+                            height: 38,
+                            decoration: BoxDecoration(
+                              color: purple.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            alignment: Alignment.center,
+                            child: Icon(Icons.sync_rounded, color: purple, size: 20),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Restock',
+                                  style: GoogleFonts.outfit(
+                                      fontSize: 15, fontWeight: FontWeight.w900, color: textColor),
+                                ),
+                                Text(
+                                  'Tambah batch kedaluwarsa baru untuk ${drug.nama}.',
+                                  style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded, size: 18),
+                            onPressed: () => Navigator.of(ctx).pop(),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // --- Scrollable Form ---
+                    Flexible(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      _buildFormFieldLabel('Jumlah Stok Masuk (Tablet)', textColor),
+                                      _buildTextInput(
+                                        stockController,
+                                        '0',
+                                        Icons.add_box_outlined,
+                                        inputBg,
+                                        borderColor,
+                                        textColor,
+                                        subtitleColor,
+                                        keyboardType: TextInputType.number,
+                                        onChanged: (val) {
+                                          final stock = double.tryParse(val) ?? 0;
+                                          final total = double.tryParse(totalBuyController.text) ?? 0;
+                                          setDialogState(() {
+                                            hargaBeliSatuanVal = stock > 0 ? (total / stock) : 0.0;
+                                          });
+                                        },
+                                        validator: (v) => (int.tryParse(v ?? '') ?? 0) <= 0
+                                            ? 'Wajib diisi (> 0)'
+                                            : null,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      _buildFormFieldLabel('Tanggal Kedaluwarsa', textColor),
+                                      _buildDateInput(
+                                        ctx,
+                                        expController,
+                                        'Pilih tanggal...',
+                                        inputBg,
+                                        borderColor,
+                                        textColor,
+                                        subtitleColor,
+                                        setDialogState,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildFormFieldLabel('Nomor Batch', textColor),
+                                _buildTextInput(
+                                  batchController,
+                                  'Bxxxxxx...',
+                                  Icons.tag_rounded,
+                                  inputBg,
+                                  borderColor,
+                                  textColor,
+                                  subtitleColor,
+                                  validator: (v) => v!.isEmpty ? 'Nomor batch wajib' : null,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildFormFieldLabel('Lokasi Penyimpanan', textColor),
+                                _buildTextInput(
+                                  locationController,
+                                  'cth. Rak A-1',
+                                  Icons.location_on_outlined,
+                                  inputBg,
+                                  borderColor,
+                                  textColor,
+                                  subtitleColor,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      _buildFormFieldLabel('Total Harga Beli', textColor),
+                                      _buildTextInput(
+                                        totalBuyController,
+                                        'Rp 0',
+                                        Icons.attach_money_rounded,
+                                        inputBg,
+                                        borderColor,
+                                        textColor,
+                                        subtitleColor,
+                                        keyboardType: TextInputType.number,
+                                        onChanged: (val) {
+                                          final total = double.tryParse(val) ?? 0;
+                                          final stock = double.tryParse(stockController.text) ?? 0;
+                                          setDialogState(() {
+                                            hargaBeliSatuanVal = stock > 0 ? (total / stock) : 0.0;
+                                          });
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      _buildFormFieldLabel('Harga Beli Satuan (Hasil Kalkulasi)', textColor),
+                                      Container(
+                                        height: 44,
+                                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                                        decoration: BoxDecoration(
+                                          color: isDark ? const Color(0xFF1E1E22) : const Color(0xFFECEFF2),
+                                          borderRadius: BorderRadius.circular(10),
+                                          border: Border.all(color: borderColor),
+                                        ),
+                                        alignment: Alignment.centerLeft,
+                                        child: Text(
+                                          'Rp ${hargaBeliSatuanVal.toInt()}',
+                                          style: GoogleFonts.outfit(
+                                              fontSize: 12, fontWeight: FontWeight.w900, color: subtitleColor),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildFormFieldLabel('Harga Jual Satuan', textColor),
+                                _buildTextInput(
+                                  sellPriceController,
+                                  'Rp 0',
+                                  Icons.attach_money_rounded,
+                                  inputBg,
+                                  borderColor,
+                                  textColor,
+                                  subtitleColor,
+                                  keyboardType: TextInputType.number,
+                                  validator: (v) => v!.isEmpty ? 'Harga jual wajib diisi' : null,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // --- Bottom Actions ---
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        border: Border(top: BorderSide(color: borderColor)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              side: BorderSide(color: borderColor),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            ),
+                            child: Text('Batal', style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor, fontWeight: FontWeight.bold)),
+                            onPressed: () => Navigator.of(ctx).pop(),
+                          ),
+                          const SizedBox(width: 12),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: purple,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                            ),
+                            child: Text('Tambah Stok', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900)),
+                            onPressed: () {
+                              if (formKey.currentState!.validate()) {
+                                final stockIn = int.parse(stockController.text);
+                                final priceSell = double.parse(sellPriceController.text);
+                                final priceBuyTotal = double.tryParse(totalBuyController.text) ?? 0.0;
+                                final buyUnitPrice = stockIn > 0 ? (priceBuyTotal / stockIn) : 0.0;
+
+                                final newBatch = BatchModel(
+                                  batchNo: batchController.text,
+                                  stok: stockIn,
+                                  expDate: expController.text.isEmpty ? '26 / 05 / 2028' : expController.text,
+                                  lokasi: locationController.text.isEmpty ? 'Rak A-1' : locationController.text,
+                                  hargaBeli: buyUnitPrice,
+                                  hargaJual: priceSell,
+                                );
+
+                                final updatedBatches = List<BatchModel>.from(drug.batches)..add(newBatch);
+                                final newTotalStock = drug.totalStok + stockIn;
+
+                                final updatedDrug = drug.copyWith(
+                                  batches: updatedBatches,
+                                  totalStok: newTotalStock,
+                                  hargaSatuan: priceSell,
+                                  status: newTotalStock <= 5 ? 'Stok Minim' : 'Tersedia',
+                                );
+
+                                Navigator.of(ctx).pop();
+                                onRestockSuccess(updatedDrug);
+                                _showSuccessSnackBar(context, 'Stok obat berhasil ditambahkan!');
+                              }
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // ─── Modal: Tambah Obat Baru ──────────────────────────────────────────────
+
+  void _showAddDrugModal(BuildContext context, bool isDark) {
+    final purple = const Color(0xFFB577F2);
+    final cardBg = isDark ? const Color(0xFF161619) : Colors.white;
+    final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
+    final subtitleColor = isDark ? Colors.grey[400]! : const Color(0xFF6F6A8A);
+    final borderColor = isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2);
+    final inputBg = isDark ? const Color(0xFF1E1E22) : const Color(0xFFF6F8FA);
+
+    final formKey = GlobalKey<FormState>();
+    final kfaController = TextEditingController();
+    final nameController = TextEditingController();
+    final skuController = TextEditingController();
+    final batchController = TextEditingController(text: 'B260526-656');
+    final initialStockController = TextEditingController(text: '0');
+    final buyPriceController = TextEditingController(text: '0');
+    final sellPriceController = TextEditingController(text: '0');
+    final expController = TextEditingController();
+    final locationController = TextEditingController();
+
+    String typeSelection = 'Pilih Jenis / Generic';
+    String unitSelection = 'Pilih Satuan';
+    double hargaBeliSatuanVal = 0.0;
+
+    final List<Map<String, dynamic>> kfaCatalog = [
+      {'nama': 'Paracetamol 500mg', 'jenis': 'Generik', 'satuan': 'Tablet', 'sku': '8993601452'},
+      {'nama': 'Amoxicillin 500mg', 'jenis': 'Generik', 'satuan': 'Tablet', 'sku': '8994503212'},
+      {'nama': 'Omeprazole 20mg', 'jenis': 'Generik', 'satuan': 'Kapsul', 'sku': '8991204562'},
+      {'nama': 'Ibuprofen 400mg', 'jenis': 'Generik', 'satuan': 'Tablet', 'sku': '8997801234'},
+      {'nama': 'Degirol Lozenges', 'jenis': 'Paten', 'satuan': 'Tablet', 'sku': '8994630211'},
+    ];
+
+    final isMobile = MediaQuery.of(context).size.width < 650;
+
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.4),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          return Dialog(
+            insetPadding: EdgeInsets.symmetric(
+              horizontal: isMobile ? 12 : (MediaQuery.of(context).size.width - 600) / 2,
+              vertical: 24,
+            ),
+            backgroundColor: Colors.transparent,
+            child: Container(
+              width: 600,
+              constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.92),
+              decoration: BoxDecoration(
+                color: cardBg,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.15),
+                    blurRadius: 40,
+                    offset: const Offset(0, 16),
+                  )
+                ],
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // --- Header ---
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                      color: isDark ? const Color(0xFF1A1A1E) : const Color(0xFFF8F5FF),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 38,
+                            height: 38,
+                            decoration: BoxDecoration(
+                              color: purple.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            alignment: Alignment.center,
+                            child: Icon(Icons.add_box_outlined, color: purple, size: 20),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Tambah Obat Baru',
+                                  style: GoogleFonts.outfit(
+                                      fontSize: 15, fontWeight: FontWeight.w900, color: textColor),
+                                ),
+                                Text(
+                                  'Isi data obat beserta informasi batch awal.',
+                                  style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded, size: 18),
+                            onPressed: () => Navigator.of(ctx).pop(),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // --- Form Scroll Panel ---
+                    Flexible(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // CARI DARI KATALOG SATUSEHAT KFA (Opcional)
+                            _buildModalSectionHeader('CARI DARI KATALOG SATUSEHAT KFA', purple),
+                            const SizedBox(height: 3),
+                            Text(
+                              'Opsional — isi otomatis nama, bentuk & kode KFA',
+                              style: GoogleFonts.outfit(fontSize: 9, color: subtitleColor, fontWeight: FontWeight.w600),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Container(
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      color: inputBg,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: borderColor),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.search_rounded, size: 16, color: subtitleColor),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: TextField(
+                                            controller: kfaController,
+                                            style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: textColor),
+                                            decoration: InputDecoration(
+                                              hintText: 'cth. Paracetamol, Amoxicillin...',
+                                              hintStyle: GoogleFonts.outfit(fontSize: 11.5, color: subtitleColor.withOpacity(0.4)),
+                                              border: InputBorder.none,
+                                              isDense: true,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                OutlinedButton(
+                                  style: OutlinedButton.styleFrom(
+                                    side: BorderSide(color: borderColor),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  ),
+                                  child: Text('Cari KFA', style: GoogleFonts.outfit(fontSize: 11, color: purple, fontWeight: FontWeight.w900)),
+                                  onPressed: () {
+                                    final query = kfaController.text.toLowerCase();
+                                    if (query.isNotEmpty) {
+                                      final match = kfaCatalog.firstWhere(
+                                        (e) => e['nama'].toLowerCase().contains(query),
+                                        orElse: () => <String, dynamic>{},
+                                      );
+                                      if (match.isNotEmpty) {
+                                        setDialogState(() {
+                                          nameController.text = match['nama'];
+                                          skuController.text = 'SKU-${match['sku']}';
+                                          typeSelection = match['jenis'];
+                                          unitSelection = match['satuan'];
+                                        });
+                                        _showSuccessSnackBar(context, 'Data KFA berhasil terintegrasi!');
+                                      } else {
+                                        _showSuccessSnackBar(context, 'Kata kunci KFA tidak cocok.');
+                                      }
+                                    }
+                                  },
+                                ),
+                              ],
+                            ),
+
+                            const SizedBox(height: 20),
+
+                            // INFORMASI UMUM
+                            _buildModalSectionHeader('INFORMASI UMUM', purple),
+                            const SizedBox(height: 10),
+
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildFormFieldLabel('Nama Obat', textColor),
+                                _buildTextInput(
+                                  nameController,
+                                  'cth. Paracetamol 500mg',
+                                  Icons.medication_outlined,
+                                  inputBg,
+                                  borderColor,
+                                  textColor,
+                                  subtitleColor,
+                                  validator: (v) => v!.isEmpty ? 'Nama obat wajib diisi' : null,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      _buildFormFieldLabel('SKU / Barcode', textColor),
+                                      _buildTextInput(
+                                        skuController,
+                                        'cth. 8993601452',
+                                        Icons.qr_code_scanner_rounded,
+                                        inputBg,
+                                        borderColor,
+                                        textColor,
+                                        subtitleColor,
+                                        validator: (v) => v!.isEmpty ? 'SKU wajib' : null,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      _buildFormFieldLabel('Jenis', textColor),
+                                      Container(
+                                        height: 44,
+                                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                                        decoration: BoxDecoration(
+                                          color: inputBg,
+                                          borderRadius: BorderRadius.circular(10),
+                                          border: Border.all(color: borderColor),
+                                        ),
+                                        child: DropdownButtonHideUnderline(
+                                          child: DropdownButton<String>(
+                                            value: typeSelection == 'Pilih Jenis / Generic' ? null : typeSelection,
+                                            hint: Text(typeSelection, style: GoogleFonts.outfit(fontSize: 12, color: subtitleColor.withOpacity(0.5))),
+                                            dropdownColor: cardBg,
+                                            icon: Icon(Icons.arrow_drop_down_rounded, color: subtitleColor),
+                                            isExpanded: true,
+                                            style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: textColor),
+                                            items: ['Generik', 'Paten', 'Umum'].map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
+                                            onChanged: (val) {
+                                              if (val != null) {
+                                                setDialogState(() {
+                                                  typeSelection = val;
+                                                });
+                                              }
+                                            },
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildFormFieldLabel('Satuan', textColor),
+                                Container(
+                                  height: 44,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                                  decoration: BoxDecoration(
+                                    color: inputBg,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: borderColor),
+                                  ),
+                                  child: DropdownButtonHideUnderline(
+                                    child: DropdownButton<String>(
+                                      value: unitSelection == 'Pilih Satuan' ? null : unitSelection,
+                                      hint: Text(unitSelection, style: GoogleFonts.outfit(fontSize: 12, color: subtitleColor.withOpacity(0.5))),
+                                      dropdownColor: cardBg,
+                                      icon: Icon(Icons.arrow_drop_down_rounded, color: subtitleColor),
+                                      isExpanded: true,
+                                      style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: textColor),
+                                      items: ['Tablet', 'Kapsul', 'Botol', 'Tube', 'Pcs'].map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
+                                      onChanged: (val) {
+                                        if (val != null) {
+                                          setDialogState(() {
+                                            unitSelection = val;
+                                          });
+                                        }
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+
+                            const SizedBox(height: 20),
+
+                            // BATCH AWAL
+                            _buildModalSectionHeader('BATCH AWAL', purple),
+                            const SizedBox(height: 10),
+
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      _buildFormFieldLabel('Nomor Batch', textColor),
+                                      _buildTextInput(
+                                        batchController,
+                                        'Bxxxxxx...',
+                                        Icons.tag_rounded,
+                                        inputBg,
+                                        borderColor,
+                                        textColor,
+                                        subtitleColor,
+                                        validator: (v) => v!.isEmpty ? 'Nomor batch wajib' : null,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      _buildFormFieldLabel('Stok Awal', textColor),
+                                      _buildTextInput(
+                                        initialStockController,
+                                        '0',
+                                        Icons.add_box_outlined,
+                                        inputBg,
+                                        borderColor,
+                                        textColor,
+                                        subtitleColor,
+                                        keyboardType: TextInputType.number,
+                                        onChanged: (val) {
+                                          final stock = double.tryParse(val) ?? 0;
+                                          final total = double.tryParse(buyPriceController.text) ?? 0;
+                                          setDialogState(() {
+                                            hargaBeliSatuanVal = stock > 0 ? (total / stock) : 0.0;
+                                          });
+                                        },
+                                        validator: (v) => v!.isEmpty ? 'Wajib' : null,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      _buildFormFieldLabel('Total Harga Beli (Modal)', textColor),
+                                      _buildTextInput(
+                                        buyPriceController,
+                                        'Rp 0',
+                                        Icons.attach_money_rounded,
+                                        inputBg,
+                                        borderColor,
+                                        textColor,
+                                        subtitleColor,
+                                        keyboardType: TextInputType.number,
+                                        onChanged: (val) {
+                                          final total = double.tryParse(val) ?? 0;
+                                          final stock = double.tryParse(initialStockController.text) ?? 0;
+                                          setDialogState(() {
+                                            hargaBeliSatuanVal = stock > 0 ? (total / stock) : 0.0;
+                                          });
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      _buildFormFieldLabel('Harga Beli Satuan (Hasil Kalkulasi)', textColor),
+                                      Container(
+                                        height: 44,
+                                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                                        decoration: BoxDecoration(
+                                          color: isDark ? const Color(0xFF1E1E22) : const Color(0xFFECEEF2),
+                                          borderRadius: BorderRadius.circular(10),
+                                          border: Border.all(color: borderColor),
+                                        ),
+                                        alignment: Alignment.centerLeft,
+                                        child: Text(
+                                          'Rp ${hargaBeliSatuanVal.toInt()}',
+                                          style: GoogleFonts.outfit(
+                                              fontSize: 12, fontWeight: FontWeight.w900, color: subtitleColor),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      _buildFormFieldLabel('Harga Jual Satuan', textColor),
+                                      _buildTextInput(
+                                        sellPriceController,
+                                        'Rp 0',
+                                        Icons.attach_money_rounded,
+                                        inputBg,
+                                        borderColor,
+                                        textColor,
+                                        subtitleColor,
+                                        keyboardType: TextInputType.number,
+                                        validator: (v) => v!.isEmpty ? 'Harga jual wajib diisi' : null,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      _buildFormFieldLabel('Tanggal Kedaluwarsa', textColor),
+                                      _buildDateInput(
+                                        ctx,
+                                        expController,
+                                        'Pilih tanggal...',
+                                        inputBg,
+                                        borderColor,
+                                        textColor,
+                                        subtitleColor,
+                                        setDialogState,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildFormFieldLabel('Lokasi Penyimpanan', textColor),
+                                _buildTextInput(
+                                  locationController,
+                                  'cth. Shelf A-01',
+                                  Icons.location_on_outlined,
+                                  inputBg,
+                                  borderColor,
+                                  textColor,
+                                  subtitleColor,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // --- Bottom Actions ---
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        border: Border(top: BorderSide(color: borderColor)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              side: BorderSide(color: borderColor),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            ),
+                            child: Text('Batal', style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor, fontWeight: FontWeight.bold)),
+                            onPressed: () => Navigator.of(ctx).pop(),
+                          ),
+                          const SizedBox(width: 12),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: purple,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                            ),
+                            child: Text('Simpan Obat', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900)),
+                            onPressed: () {
+                              if (formKey.currentState!.validate()) {
+                                if (typeSelection == 'Pilih Jenis / Generic' || unitSelection == 'Pilih Satuan') {
+                                  _showSuccessSnackBar(context, 'Harap pilih jenis dan satuan obat!');
+                                  return;
+                                }
+
+                                final stok = int.parse(initialStockController.text);
+                                final priceSell = double.parse(sellPriceController.text);
+                                final priceBuyTotal = double.tryParse(buyPriceController.text) ?? 0.0;
+                                final buyUnitPrice = stok > 0 ? (priceBuyTotal / stok) : 0.0;
+
+                                final initialBatch = BatchModel(
+                                  batchNo: batchController.text,
+                                  stok: stok,
+                                  expDate: expController.text.isEmpty ? '26 / 05 / 2028' : expController.text,
+                                  lokasi: locationController.text.isEmpty ? 'Shelf A-01' : locationController.text,
+                                  hargaBeli: buyUnitPrice,
+                                  hargaJual: priceSell,
+                                );
+
+                                final randomId = 'OBAT-${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}';
+                                final newDrug = ObatModel(
+                                  id: randomId,
+                                  nama: nameController.text,
+                                  jenis: typeSelection,
+                                  sku: skuController.text,
+                                  hargaSatuan: priceSell,
+                                  totalStok: stok,
+                                  status: stok <= 5 ? 'Stok Minim' : 'Tersedia',
+                                  avatarBg: typeSelection == 'Generik' ? const Color(0xFF48C9B0) : const Color(0xFFB577F2),
+                                  batches: [initialBatch],
+                                );
+
+                                Navigator.of(ctx).pop();
+                                ref.read(dokterObatListProvider.notifier).addDrug(newDrug);
+                                _showSuccessSnackBar(context, 'Obat baru berhasil disimpan!');
+                              }
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // ─── Modal Sub-Actions (Price Update & Delete Confirm) ─────────────────────
+
+  void _showPriceUpdateDialog(
+    BuildContext context,
+    ObatModel drug,
+    bool isDark, {
+    required Function(ObatModel) onPriceUpdate,
+  }) {
+    final purple = const Color(0xFFB577F2);
+    final cardBg = isDark ? const Color(0xFF161619) : Colors.white;
+    final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
+    final subtitleColor = isDark ? Colors.grey[400]! : const Color(0xFF6F6A8A);
+    final borderColor = isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2);
+    final inputBg = isDark ? const Color(0xFF1E1E22) : const Color(0xFFF6F8FA);
+
+    final formKey = GlobalKey<FormState>();
+    final controller = TextEditingController(text: drug.hargaSatuan.toInt().toString());
+
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.3),
+      builder: (ctx) => AlertDialog(
+        backgroundColor: cardBg,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Ubah Harga Satuan',
+          style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w900, color: textColor),
+        ),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Perbarui harga jual eceran satuan untuk ${drug.nama}.',
+                style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 14),
+              _buildTextInput(
+                controller,
+                'Rp 0',
+                Icons.attach_money_rounded,
+                inputBg,
+                borderColor,
+                textColor,
+                subtitleColor,
+                keyboardType: TextInputType.number,
+                validator: (v) => v!.isEmpty ? 'Harga wajib diisi' : null,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text('Batal', style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor, fontWeight: FontWeight.w900)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: purple,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () {
+              if (formKey.currentState!.validate()) {
+                final newPrice = double.parse(controller.text);
+                final updatedDrug = drug.copyWith(hargaSatuan: newPrice);
+                Navigator.of(ctx).pop();
+                onPriceUpdate(updatedDrug);
+                _showSuccessSnackBar(context, 'Harga obat berhasil diperbarui!');
+              }
+            },
+            child: Text('Simpan', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteConfirm(BuildContext context, ObatModel drug) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.3),
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Hapus Data Obat',
+          style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w900, color: const Color(0xFF1B0C3C)),
+        ),
+        content: Text(
+          'Apakah Anda yakin ingin menghapus data obat ${drug.nama}? Tindakan ini tidak dapat dibatalkan.',
+          style: GoogleFonts.outfit(fontSize: 11.5, color: const Color(0xFF6F6A8A), fontWeight: FontWeight.w500),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text('Batal', style: GoogleFonts.outfit(fontSize: 11, color: const Color(0xFF6F6A8A), fontWeight: FontWeight.w900)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () {
+              // Delete drug
+              ref.read(dokterObatListProvider.notifier).deleteDrug(drug.id);
+              // Pop confirm dialog
+              Navigator.of(ctx).pop();
+              // Pop detail modal
+              Navigator.of(context).pop();
+              _showSuccessSnackBar(context, 'Data obat berhasil dihapus.');
+            },
+            child: Text('Ya, Hapus', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Input Helper Widgets ──────────────────────────────────────────────────
+
+  Widget _buildFormFieldLabel(String title, Color textCol) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6, left: 4),
+      child: Text(
+        title,
+        style: GoogleFonts.outfit(
+          fontSize: 9.5,
+          fontWeight: FontWeight.w900,
+          color: textCol.withOpacity(0.85),
+          letterSpacing: 0.2,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextInput(
+    TextEditingController controller,
+    String hint,
+    IconData icon,
+    Color bg,
+    Color border,
+    Color text,
+    Color subtitle, {
+    bool obscureText = false,
+    TextInputType keyboardType = TextInputType.text,
+    int maxLines = 1,
+    String? Function(String?)? validator,
+    Function(String)? onChanged,
+  }) {
+    return TextFormField(
+      controller: controller,
+      obscureText: obscureText,
+      keyboardType: keyboardType,
+      maxLines: maxLines,
+      validator: validator,
+      onChanged: onChanged,
+      style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: text),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: GoogleFonts.outfit(fontSize: 11.5, color: subtitle.withOpacity(0.4)),
+        prefixIcon: Icon(icon, size: 16, color: subtitle),
+        filled: true,
+        fillColor: bg,
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: text.withOpacity(0.3), width: 1.5),
+        ),
+        errorStyle: GoogleFonts.outfit(fontSize: 9, height: 0.8),
+      ),
+    );
+  }
+
+  Widget _buildDateInput(
+    BuildContext context,
+    TextEditingController controller,
+    String hint,
+    Color bg,
+    Color border,
+    Color text,
+    Color subtitle,
+    StateSetter setDialogState,
+  ) {
+    return InkWell(
+      onTap: () async {
+        final date = await showDatePicker(
+          context: context,
+          initialDate: DateTime.now().add(const Duration(days: 365)),
+          firstDate: DateTime.now(),
+          lastDate: DateTime.now().add(const Duration(days: 3650)),
+          builder: (context, child) {
+            return Theme(
+              data: Theme.of(context).copyWith(
+                colorScheme: const ColorScheme.light(
+                  primary: Color(0xFFB577F2),
+                  onPrimary: Colors.white,
+                  onSurface: Color(0xFF1B0C3C),
+                ),
+              ),
+              child: child!,
+            );
+          },
+        );
+        if (date != null) {
+          setDialogState(() {
+            controller.text = '${date.day.toString().padLeft(2, '0')} / ${date.month.toString().padLeft(2, '0')} / ${date.year}';
+          });
+        }
+      },
+      child: IgnorePointer(
+        child: _buildTextInput(
+          controller,
+          hint,
+          Icons.calendar_month_outlined,
+          bg,
+          border,
+          text,
+          subtitle,
+          validator: (v) => v!.isEmpty ? 'Wajib' : null,
+        ),
+      ),
+    );
+  }
+
+  void _showSuccessSnackBar(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: const Color(0xFF27AE60),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(24),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle_outline_rounded, color: Colors.white, size: 20),
+            const SizedBox(width: 10),
+            Text(
+              message,
+              style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatPrice(double value) {
+    final str = value.toInt().toString();
+    final buffer = StringBuffer();
+    int count = 0;
+    for (int i = str.length - 1; i >= 0; i--) {
+      buffer.write(str[i]);
+      count++;
+      if (count % 3 == 0 && i > 0) {
+        buffer.write('.');
+      }
+    }
+    return buffer.toString().split('').reversed.join('');
+  }
+
+  String _formatStock(int stock) {
+    final str = stock.toString();
+    final buffer = StringBuffer();
+    int count = 0;
+    for (int i = str.length - 1; i >= 0; i--) {
+      buffer.write(str[i]);
+      count++;
+      if (count % 3 == 0 && i > 0) {
+        buffer.write('.');
+      }
+    }
+    return buffer.toString().split('').reversed.join('');
+  }
+}
