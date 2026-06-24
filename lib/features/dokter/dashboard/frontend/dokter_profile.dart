@@ -2172,6 +2172,37 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
               clipBehavior: Clip.none,
               alignment: Alignment.bottomCenter,
               children: [
+                if (_avatarUrl.isNotEmpty && ref.watch(landingPageProvider).blurProfileEffectEnabled)
+                  Positioned.fill(
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(20),
+                        topRight: Radius.circular(20),
+                      ),
+                      child: ImageFiltered(
+                        imageFilter: ImageFilter.blur(sigmaX: 15.0, sigmaY: 15.0),
+                        child: Image.network(
+                          _avatarUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => const SizedBox(),
+                        ),
+                      ),
+                    ),
+                  ),
+                if (_avatarUrl.isNotEmpty && ref.watch(landingPageProvider).blurProfileEffectEnabled)
+                  Positioned.fill(
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(20),
+                        topRight: Radius.circular(20),
+                      ),
+                      child: Container(
+                        color: isDark
+                            ? Colors.black.withOpacity(0.4)
+                            : tealColor.withOpacity(0.15),
+                      ),
+                    ),
+                  ),
                 // Sticking out Avatar
                 Positioned(
                   bottom: -40,

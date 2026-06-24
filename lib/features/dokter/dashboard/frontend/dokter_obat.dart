@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/widgets/custom_button.dart';
+import 'package:mapotech/shared/supabase_service.dart';
+import 'dart:math';
+
 
 // ─── Data Models ─────────────────────────────────────────────────────────────
 
@@ -110,157 +113,191 @@ class ObatModel {
   }
 }
 
+// ─── Helpers & Mapping Functions ──────────────────────────────────────────────
+
+String _generateUuidV4() {
+  final random = Random.secure();
+  final values = List<int>.generate(16, (i) => random.nextInt(256));
+  values[6] = (values[6] & 0x0f) | 0x40; // version 4
+  values[8] = (values[8] & 0x3f) | 0x80; // variant
+  final buffer = StringBuffer();
+  for (var i = 0; i < 16; i++) {
+    if (i == 4 || i == 6 || i == 8 || i == 10) buffer.write('-');
+    buffer.write(values[i].toRadixString(16).padLeft(2, '0'));
+  }
+  return buffer.toString();
+}
+
+String _formatUiDateToDb(String uiDate) {
+  try {
+    final parts = uiDate.split('/').map((p) => p.trim()).toList();
+    if (parts.length == 3) {
+      final day = parts[0].padLeft(2, '0');
+      final month = parts[1].padLeft(2, '0');
+      final year = parts[2];
+      return '$year-$month-$day';
+    }
+  } catch (_) {}
+  return uiDate;
+}
+
+ObatModel _mapDbToObatModel(Map<String, dynamic> m) {
+  final id = m['id']?.toString() ?? '';
+  final nama = m['medicine_name']?.toString() ?? '';
+  final jenis = m['medicine_form']?.toString() ?? '';
+  final sku = m['barcode']?.toString() ?? m['id']?.toString() ?? '';
+  
+  final dbBatches = m['detail_medicine'] as List<dynamic>? ?? [];
+  final List<BatchModel> batches = [];
+  int totalStok = 0;
+  double latestSellPrice = 0.0;
+  
+  for (final b in dbBatches) {
+    final batchMap = b as Map<String, dynamic>;
+    final batchNo = batchMap['batch_no']?.toString() ?? '';
+    final stok = int.tryParse(batchMap['stock_batch']?.toString() ?? '0') ?? 0;
+    
+    String expDate = batchMap['expierd_date']?.toString() ?? '';
+    if (expDate.isNotEmpty && expDate.contains('-')) {
+      final parts = expDate.split('-');
+      if (parts.length == 3) {
+        expDate = '${parts[2]} / ${parts[1]} / ${parts[0]}';
+      }
+    }
+    
+    final lokasi = batchMap['location']?.toString() ?? 'Shelf A-01';
+    final hargaBeli = double.tryParse(batchMap['buy_price']?.toString() ?? '0') ?? 0.0;
+    final hargaJual = double.tryParse(batchMap['sell_price']?.toString() ?? '0') ?? 0.0;
+    
+    batches.add(BatchModel(
+      batchNo: batchNo,
+      stok: stok,
+      expDate: expDate,
+      lokasi: lokasi,
+      hargaBeli: hargaBeli,
+      hargaJual: hargaJual,
+    ));
+    totalStok += stok;
+    if (hargaJual > 0) {
+      latestSellPrice = hargaJual;
+    }
+  }
+  
+  if (latestSellPrice == 0.0) {
+    latestSellPrice = double.tryParse(m['het_price']?.toString() ?? '0') ?? 0.0;
+  }
+  
+  return ObatModel(
+    id: id,
+    nama: nama,
+    jenis: jenis,
+    sku: sku,
+    hargaSatuan: latestSellPrice,
+    totalStok: totalStok,
+    status: totalStok <= 5 ? 'Stok Minim' : 'Tersedia',
+    avatarBg: jenis.toLowerCase().contains('generik') ? const Color(0xFF48C9B0) : const Color(0xFFB577F2),
+    batches: batches,
+  );
+}
+
 // ─── Riverpod State Provider ──────────────────────────────────────────────────
 
+
 class DokterObatListNotifier extends StateNotifier<List<ObatModel>> {
-  DokterObatListNotifier() : super(_initialDrugs);
+  final _db = SupabaseService();
+  String? _currentDoctorId;
 
-  static final List<ObatModel> _initialDrugs = [
-    const ObatModel(
-      id: 'OBAT-001',
-      nama: 'Prednison',
-      jenis: 'Umum',
-      sku: 'SKU-ec279',
-      hargaSatuan: 0.0,
-      totalStok: 0,
-      status: 'Stok Minim',
-      avatarBg: Color(0xFF3498DB),
-      batches: [
-        BatchModel(batchNo: 'B260526-001', stok: 0, expDate: '12 / 12 / 2027', lokasi: 'Rak A-1', hargaBeli: 0.0, hargaJual: 0.0)
-      ],
-    ),
-    const ObatModel(
-      id: 'OBAT-002',
-      nama: 'Degirol',
-      jenis: 'Dequalinium Chloride',
-      sku: 'SKU-4d3b2',
-      hargaSatuan: 5000.0,
-      totalStok: 200,
-      status: 'Tersedia',
-      avatarBg: Color(0xFF3498DB),
-      batches: [
-        BatchModel(batchNo: 'B260526-002', stok: 200, expDate: '24 / 09 / 2028', lokasi: 'Rak A-2', hargaBeli: 3500.0, hargaJual: 5000.0)
-      ],
-    ),
-    const ObatModel(
-      id: 'OBAT-003',
-      nama: 'Paracetamol',
-      jenis: 'Paracetamol',
-      sku: 'SKU-f24c1',
-      hargaSatuan: 1000.0,
-      totalStok: 9980,
-      status: 'Tersedia',
-      avatarBg: Color(0xFFB577F2),
-      batches: [
-        BatchModel(batchNo: 'B260526-003', stok: 9980, expDate: '18 / 02 / 2029', lokasi: 'Rak B-1', hargaBeli: 600.0, hargaJual: 1000.0)
-      ],
-    ),
-    const ObatModel(
-      id: 'OBAT-004',
-      nama: 'Cetirizine',
-      jenis: 'Cetirizine HCl',
-      sku: 'SKU-b4336',
-      hargaSatuan: 100.0,
-      totalStok: 1000,
-      status: 'Tersedia',
-      avatarBg: Color(0xFF48C9B0),
-      batches: [
-        BatchModel(batchNo: 'B260526-004', stok: 1000, expDate: '10 / 08 / 2028', lokasi: 'Rak B-2', hargaBeli: 50.0, hargaJual: 100.0)
-      ],
-    ),
-    const ObatModel(
-      id: 'OBAT-005',
-      nama: 'Omeprazol',
-      jenis: 'Omeprazol',
-      sku: 'SKU-c15ae',
-      hargaSatuan: 1000.0,
-      totalStok: 100,
-      status: 'Tersedia',
-      avatarBg: Color(0xFF27AE60),
-      batches: [
-        BatchModel(batchNo: 'B260526-005', stok: 100, expDate: '01 / 01 / 2028', lokasi: 'Rak C-1', hargaBeli: 700.0, hargaJual: 1000.0)
-      ],
-    ),
-    const ObatModel(
-      id: 'OBAT-006',
-      nama: 'Prednison',
-      jenis: 'Prednison',
-      sku: 'SKU-475f7',
-      hargaSatuan: 100.0,
-      totalStok: 100,
-      status: 'Tersedia',
-      avatarBg: Color(0xFF48C9B0),
-      batches: [
-        BatchModel(batchNo: 'B260526-006', stok: 100, expDate: '14 / 04 / 2028', lokasi: 'Rak C-2', hargaBeli: 50.0, hargaJual: 100.0)
-      ],
-    ),
-    const ObatModel(
-      id: 'OBAT-007',
-      nama: 'B komplek',
-      jenis: 'Vitamin B Kompleks',
-      sku: 'SKU-9103e',
-      hargaSatuan: 100.0,
-      totalStok: 4990,
-      status: 'Tersedia',
-      avatarBg: Color(0xFF3498DB),
-      batches: [
-        BatchModel(batchNo: 'B260526-007', stok: 4990, expDate: '30 / 11 / 2028', lokasi: 'Rak D-1', hargaBeli: 40.0, hargaJual: 100.0)
-      ],
-    ),
-    const ObatModel(
-      id: 'OBAT-008',
-      nama: 'Amoxicillin 500mg',
-      jenis: 'Amoxicillin',
-      sku: 'SKU-46ca6',
-      hargaSatuan: 200.0,
-      totalStok: 1000,
-      status: 'Tersedia',
-      avatarBg: Color(0xFFB577F2),
-      batches: [
-        BatchModel(batchNo: 'B260526-008', stok: 1000, expDate: '15 / 05 / 2028', lokasi: 'Rak D-2', hargaBeli: 110.0, hargaJual: 200.0)
-      ],
-    ),
-    const ObatModel(
-      id: 'OBAT-009',
-      nama: 'Cefadroxil',
-      jenis: 'Cefadroxil',
-      sku: 'SKU-f6869',
-      hargaSatuan: 100.0,
-      totalStok: 1000,
-      status: 'Tersedia',
-      avatarBg: Color(0xFF3498DB),
-      batches: [
-        BatchModel(batchNo: 'B260526-009', stok: 1000, expDate: '02 / 10 / 2028', lokasi: 'Rak E-1', hargaBeli: 50.0, hargaJual: 100.0)
-      ],
-    ),
-    const ObatModel(
-      id: 'OBAT-010',
-      nama: 'Ciprofloxacin 500',
-      jenis: 'Ciprofloxacin',
-      sku: 'SKU-012b2',
-      hargaSatuan: 500.0,
-      totalStok: 100,
-      status: 'Tersedia',
-      avatarBg: Color(0xFFB577F2),
-      batches: [
-        BatchModel(batchNo: 'B260526-010', stok: 100, expDate: '09 / 12 / 2027', lokasi: 'Rak E-2', hargaBeli: 280.0, hargaJual: 500.0)
-      ],
-    ),
-  ];
+  DokterObatListNotifier() : super([]);
 
-  void addDrug(ObatModel drug) {
-    state = [...state, drug];
+  Future<void> loadMedicines(String doctorId) async {
+    _currentDoctorId = doctorId;
+    try {
+      final dbMedicines = await _db.fetchDoctorMedicinesWithBatches(doctorId);
+      final List<ObatModel> loaded = [];
+      for (final m in dbMedicines) {
+        loaded.add(_mapDbToObatModel(m));
+      }
+      state = loaded;
+    } catch (e) {
+      print('Error loading doctor medicines: $e');
+    }
   }
 
-  void updateDrug(ObatModel updated) {
-    state = [
-      for (final drug in state)
-        if (drug.id == updated.id) updated else drug
-    ];
+  Future<void> addDrug(ObatModel drug) async {
+    final doctorId = _currentDoctorId ?? '8f93471a-74f8-486b-8e85-4002dc44c11c';
+    try {
+      final initialBatch = drug.batches.isNotEmpty
+          ? {
+              'batch_no': drug.batches.first.batchNo,
+              'stock_batch': drug.batches.first.stok.toString(),
+              'buy_price': drug.batches.first.hargaBeli.toString(),
+              'sell_price': drug.batches.first.hargaJual.toString(),
+              'location': drug.batches.first.lokasi,
+              'expierd_date': _formatUiDateToDb(drug.batches.first.expDate),
+            }
+          : {
+              'batch_no': 'B260526-656',
+              'stock_batch': '0',
+              'buy_price': '0',
+              'sell_price': '0',
+              'location': 'Shelf A-01',
+              'expierd_date': '2028-05-26',
+            };
+
+      await _db.addDoctorMedicine(
+        doctorId: doctorId,
+        medicineId: drug.id,
+        name: drug.nama,
+        form: drug.jenis,
+        barcode: drug.sku,
+        sellPrice: drug.hargaSatuan,
+        initialBatch: initialBatch,
+      );
+      state = [...state, drug];
+    } catch (e) {
+      print('Error adding medicine to DB: $e');
+      state = [...state, drug];
+    }
   }
 
-  void deleteDrug(String id) {
-    state = state.where((drug) => drug.id != id).toList();
+  Future<void> updateDrug(ObatModel updated) async {
+    try {
+      final dbBatches = updated.batches.map((b) => {
+        'batch_no': b.batchNo,
+        'stock_batch': b.stok.toString(),
+        'buy_price': b.hargaBeli.toString(),
+        'sell_price': b.hargaJual.toString(),
+        'location': b.lokasi,
+        'expierd_date': _formatUiDateToDb(b.expDate),
+      }).toList();
+
+      await _db.updateDoctorMedicine(
+        medicineId: updated.id,
+        sellPrice: updated.hargaSatuan,
+        batches: dbBatches,
+      );
+
+      state = [
+        for (final drug in state)
+          if (drug.id == updated.id) updated else drug
+      ];
+    } catch (e) {
+      print('Error updating medicine in DB: $e');
+      state = [
+        for (final drug in state)
+          if (drug.id == updated.id) updated else drug
+      ];
+    }
+  }
+
+  Future<void> deleteDrug(String id) async {
+    try {
+      await _db.deleteDoctorMedicine(id);
+      state = state.where((drug) => drug.id != id).toList();
+    } catch (e) {
+      print('Error deleting medicine in DB: $e');
+      state = state.where((drug) => drug.id != id).toList();
+    }
   }
 }
 
@@ -283,6 +320,19 @@ class _DokterObatState extends ConsumerState<DokterObat> {
   String _activeFilter = 'Semua'; // 'Semua', 'Stok Minim', 'Hampir Kadaluarsa'
   int _currentPage = 1;
   final int _rowsPerPage = 10;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final userState = ref.read(landingPageProvider).loggedInUser;
+      final userId = userState?['id']?.toString();
+      final doctorId = (userId == 'mock-id-1234567890' || userId == null)
+          ? '8f93471a-74f8-486b-8e85-4002dc44c11c'
+          : userId;
+      ref.read(dokterObatListProvider.notifier).loadMedicines(doctorId);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -2285,7 +2335,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                   hargaJual: priceSell,
                                 );
 
-                                final randomId = 'OBAT-${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}';
+                                final randomId = _generateUuidV4();
                                 final newDrug = ObatModel(
                                   id: randomId,
                                   nama: nameController.text,

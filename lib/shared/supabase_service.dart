@@ -316,7 +316,7 @@ class SupabaseService {
   // Fetch patient queue entries from the database
   Future<List<Map<String, dynamic>>> fetchPatientQueues(String patientId) async {
     try {
-      final queues = await _get('queue?select=*&id_patient=eq.$patientId', schema: 'private_doctor');
+      final queues = await _get('v_queues?select=*&id_patient=eq.$patientId', schema: 'public');
       return queues.map((q) => q as Map<String, dynamic>).toList();
     } catch (_) {
       return [];
@@ -328,7 +328,7 @@ class SupabaseService {
     if (queueIds.isEmpty) return [];
     try {
       final ids = queueIds.map((id) => Uri.encodeComponent(id)).join(',');
-      final encounters = await _get('clinical_encounters?select=*&id_queue=in.($ids)', schema: 'private_doctor');
+      final encounters = await _get('v_clinical_encounters?select=*&id_queue=in.($ids)', schema: 'public');
       return encounters.map((e) => e as Map<String, dynamic>).toList();
     } catch (_) {
       return [];
@@ -375,7 +375,7 @@ class SupabaseService {
   // Fetch all queues
   Future<List<Map<String, dynamic>>> fetchAllQueues() async {
     try {
-      final queues = await _get('queue?select=*', schema: 'private_doctor');
+      final queues = await _get('v_queues?select=*', schema: 'public');
       return queues.map((q) => q as Map<String, dynamic>).toList();
     } catch (_) {
       return [];
@@ -385,7 +385,7 @@ class SupabaseService {
   // Fetch all clinical encounters
   Future<List<Map<String, dynamic>>> fetchAllClinicalEncounters() async {
     try {
-      final encounters = await _get('clinical_encounters?select=*', schema: 'private_doctor');
+      final encounters = await _get('v_clinical_encounters?select=*', schema: 'public');
       return encounters.map((e) => e as Map<String, dynamic>).toList();
     } catch (_) {
       return [];
@@ -402,4 +402,317 @@ class SupabaseService {
       return [];
     }
   }
+
+  // Fetch assistants for a doctor
+  Future<List<Map<String, dynamic>>> fetchDoctorAssistants(String doctorId) async {
+    try {
+      final rows = await _get(
+        'user_detail_doctor_assistant?select=*,user:id(name,email,nik,phone_number)&doctor_id=eq.$doctorId',
+        schema: 'public',
+      );
+      
+      final List<Map<String, dynamic>> assistants = [];
+      for (final row in rows) {
+        final rowMap = Map<String, dynamic>.from(row as Map);
+        final userMap = rowMap['user'] != null ? Map<String, dynamic>.from(rowMap['user'] as Map) : null;
+        if (userMap != null) {
+          assistants.add({
+            'id': rowMap['id'],
+            'doctor_id': rowMap['doctor_id'],
+            'nama': userMap['name'] ?? '',
+            'email': userMap['email'] ?? '',
+            'nik': userMap['nik'] ?? '',
+            'telepon': userMap['phone_number'] ?? '',
+            'sip': rowMap['sip'] ?? '-',
+            'peran': rowMap['peran'] ?? 'Perawat',
+            'is_bertugas': rowMap['is_bertugas'] ?? true,
+            'permissions': List<String>.from(rowMap['permissions'] ?? []),
+          });
+        }
+      }
+      return assistants;
+    } catch (e) {
+      throw Exception('Gagal mengambil daftar asisten: $e');
+    }
+  }
+
+  // Create an assistant
+  Future<void> addDoctorAssistant({
+    required String doctorId,
+    required String assistantId,
+    required String name,
+    required String email,
+    required String nik,
+    required String phone,
+    required String sip,
+    required String peran,
+    required List<String> permissions,
+  }) async {
+    try {
+      // 1. Fetch doctor's instance_id from user_role
+      String? instanceId;
+      final doctorRoles = await _get('user_role?select=id_instance&id_user=eq.$doctorId', schema: 'public');
+      if (doctorRoles.isNotEmpty) {
+        instanceId = (doctorRoles.first as Map<String, dynamic>)['id_instance'] as String?;
+      }
+
+      // 2. Insert into public.user
+      final userData = {
+        'id': assistantId,
+        'name': name,
+        'email': email.isEmpty || email == '-' ? null : email,
+        'nik': nik,
+        'phone_number': phone,
+        'role': 'asisten_dokter',
+      };
+      await _post('user', userData, schema: 'public');
+
+      // 3. Insert into public.user_role
+      final roleData = {
+        'id_user': assistantId,
+        'id_role': 4, // 4 is 'assistant'
+        'type': 'assistant',
+        if (instanceId != null) 'id_instance': instanceId,
+      };
+      await _post('user_role', roleData, schema: 'public');
+
+      // 4. Insert into public.user_detail_doctor_assistant
+      final assistantData = {
+        'id': assistantId,
+        'doctor_id': doctorId,
+        'sip': sip,
+        'peran': peran,
+        'is_bertugas': true,
+        'permissions': permissions,
+      };
+      await _post('user_detail_doctor_assistant', assistantData, schema: 'public');
+    } catch (e) {
+      throw Exception('Gagal mendaftarkan asisten: $e');
+    }
+  }
+
+  // Delete assistant
+  Future<void> deleteDoctorAssistant(String assistantId) async {
+    try {
+      await _delete('user_detail_doctor_assistant?id=eq.$assistantId', schema: 'public');
+      await _delete('user_role?id_user=eq.$assistantId', schema: 'public');
+      await _delete('user?id=eq.$assistantId', schema: 'public');
+    } catch (e) {
+      throw Exception('Gagal menghapus asisten: $e');
+    }
+  }
+
+  // Update duty status
+  Future<void> updateDoctorAssistantDuty(String assistantId, bool isBertugas) async {
+    try {
+      await _patch(
+        'user_detail_doctor_assistant?id=eq.$assistantId',
+        {'is_bertugas': isBertugas},
+        schema: 'public',
+      );
+    } catch (e) {
+      throw Exception('Gagal memperbarui status tugas: $e');
+    }
+  }
+
+  // Update permissions
+  Future<void> updateDoctorAssistantPermissions(String assistantId, List<String> permissions) async {
+    try {
+      await _patch(
+        'user_detail_doctor_assistant?id=eq.$assistantId',
+        {'permissions': permissions},
+        schema: 'public',
+      );
+    } catch (e) {
+      throw Exception('Gagal memperbarui izin akses: $e');
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  // DOCTOR'S MEDICINE (OBAT) - private_doctor schema
+  // ─────────────────────────────────────────────────────────────────
+
+  // Fetch doctor's medicines with their batches
+  Future<List<Map<String, dynamic>>> fetchDoctorMedicinesWithBatches(String doctorId) async {
+    try {
+      final safeDoctorId = Uri.encodeComponent(doctorId);
+      final medicines = await _get(
+        'v_doctor_medicines_with_batches?select=*&id_doctor=eq.$safeDoctorId&is_deleted=eq.0',
+        schema: 'public',
+      );
+      return medicines.map((m) => m as Map<String, dynamic>).toList();
+    } catch (e) {
+      throw Exception('Gagal mengambil daftar obat dokter: $e');
+    }
+  }
+
+  // Soft delete doctor's medicine
+  Future<void> deleteDoctorMedicine(String medicineId) async {
+    try {
+      await _post(
+        'rpc/delete_doctor_medicine',
+        {'p_medicine_id': medicineId},
+        schema: 'public',
+      );
+    } catch (e) {
+      throw Exception('Gagal menghapus obat dokter: $e');
+    }
+  }
+
+  // Insert a new doctor medicine and its initial batch
+  Future<void> addDoctorMedicine({
+    required String doctorId,
+    required String medicineId,
+    required String name,
+    required String form,
+    required String? barcode,
+    required double sellPrice,
+    required Map<String, dynamic> initialBatch,
+  }) async {
+    try {
+      final rpcData = {
+        'p_doctor_id': doctorId,
+        'p_medicine_id': medicineId,
+        'p_name': name,
+        'p_form': form,
+        'p_barcode': barcode ?? '',
+        'p_sell_price': sellPrice,
+        'p_initial_batch': initialBatch,
+      };
+      await _post('rpc/add_doctor_medicine', rpcData, schema: 'public');
+    } catch (e) {
+      throw Exception('Gagal menambahkan obat dokter baru: $e');
+    }
+  }
+
+  // Update doctor medicine details and upsert its batches
+  Future<void> updateDoctorMedicine({
+    required String medicineId,
+    required double sellPrice,
+    required List<Map<String, dynamic>> batches,
+  }) async {
+    try {
+      final rpcData = {
+        'p_medicine_id': medicineId,
+        'p_sell_price': sellPrice,
+        'p_batches': batches,
+      };
+      await _post('rpc/update_doctor_medicine', rpcData, schema: 'public');
+    } catch (e) {
+      throw Exception('Gagal memperbarui obat dokter: $e');
+    }
+  }
+
+  // Fetch financial transactions for the doctor from the view
+  Future<List<Map<String, dynamic>>> fetchDoctorFinancialTransactions(String doctorId) async {
+    try {
+      final safeDoctorId = Uri.encodeComponent(doctorId);
+      final txs = await _get(
+        'v_doctor_financial_transactions?select=*&doctor_id=eq.$safeDoctorId&order=created_at.desc',
+        schema: 'public',
+      );
+      return txs.map((t) => t as Map<String, dynamic>).toList();
+    } catch (e) {
+      throw Exception('Gagal mengambil daftar transaksi keuangan dokter: $e');
+    }
+  }
+
+  // Insert a new manual expense transaction for the doctor
+  Future<void> addDoctorExpense({
+    required String doctorId,
+    required double amount,
+    required String description,
+    required String category,
+  }) async {
+    try {
+      final rpcData = {
+        'p_doctor_id': doctorId,
+        'p_amount': amount,
+        'p_description': description,
+        'p_category': category,
+      };
+      await _post('rpc/add_doctor_expense', rpcData, schema: 'public');
+    } catch (e) {
+      throw Exception('Gagal mencatat pengeluaran baru: $e');
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  // DOCTOR'S QUEUE (ANTRIAN) - public schema view & RPCs
+  // ─────────────────────────────────────────────────────────────────
+
+  // Fetch all queue details for a doctor
+  Future<List<Map<String, dynamic>>> fetchDoctorQueues(String doctorId) async {
+    try {
+      final safeDoctorId = Uri.encodeComponent(doctorId);
+      final queues = await _get(
+        'v_doctor_queue_details?select=*&id_doctor=eq.$safeDoctorId&order=date_queue.desc,created_at.asc',
+        schema: 'public',
+      );
+      return queues.map((q) => q as Map<String, dynamic>).toList();
+    } catch (e) {
+      throw Exception('Gagal mengambil daftar antrian: $e');
+    }
+  }
+
+  // Update a queue status
+  Future<void> updateQueueStatus(String queueId, String status) async {
+    try {
+      final rpcData = {
+        'p_queue_id': queueId,
+        'p_status': status,
+      };
+      await _post('rpc/update_queue_status', rpcData, schema: 'public');
+    } catch (e) {
+      throw Exception('Gagal memperbarui status antrian: $e');
+    }
+  }
+
+  // Create a new queue entry (and guest patient if applicable)
+  Future<void> addDoctorQueue({
+    required String doctorId,
+    required String? patientId, // Null if walk-in guest
+    required String noQueue,
+    required String patientType,
+    required DateTime dateQueue,
+    String? guestName,
+    String? guestNik,
+    String? guestPhone,
+    DateTime? guestBirthDate,
+    String? guestGender,
+    String? guestAddress,
+  }) async {
+    try {
+      final rpcData = {
+        'p_doctor_id': doctorId,
+        'p_patient_id': patientId,
+        'p_no_queue': noQueue,
+        'p_patient_type': patientType,
+        'p_date_queue': dateQueue.toIso8601String().substring(0, 10),
+        'p_guest_name': guestName,
+        'p_guest_nik': guestNik,
+        'p_guest_phone': guestPhone,
+        'p_guest_birth_date': guestBirthDate?.toIso8601String().substring(0, 10),
+        'p_guest_gender': guestGender,
+        'p_guest_address': guestAddress,
+      };
+      await _post('rpc/add_doctor_queue', rpcData, schema: 'public');
+    } catch (e) {
+      throw Exception('Gagal menambahkan antrian baru: $e');
+    }
+  }
+
+  // Delete/Cancel a queue entry
+  Future<void> deleteQueue(String queueId) async {
+    try {
+      final rpcData = {
+        'p_queue_id': queueId,
+      };
+      await _post('rpc/delete_doctor_queue', rpcData, schema: 'public');
+    } catch (e) {
+      throw Exception('Gagal menghapus antrian: $e');
+    }
+  }
 }
+
+

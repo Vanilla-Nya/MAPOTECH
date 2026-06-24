@@ -114,7 +114,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
 
     // Also update the queue status to 'Memproses...' in the state notifier if it is 'Menunggu'
     if (queue.status == 'Menunggu') {
-      ref.read(dokterAntrianListProvider.notifier).updateAntrianStatus(queue.no, 'Memproses...');
+      ref.read(dokterAntrianListProvider.notifier).updateAntrianStatus(queue.id, 'Memproses...');
     }
   }
 
@@ -156,7 +156,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
     final patient = _activePatient;
     if (queue != null && patient != null) {
       // Transition queue status to 'Pembayaran' (since it goes to cashier next)
-      ref.read(dokterAntrianListProvider.notifier).updateAntrianStatus(queue.no, 'Pembayaran');
+      ref.read(dokterAntrianListProvider.notifier).updateAntrianStatus(queue.id, 'Pembayaran');
 
       // Show beautiful success toast
       ScaffoldMessenger.of(context).showSnackBar(

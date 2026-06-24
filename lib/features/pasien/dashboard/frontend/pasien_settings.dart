@@ -30,39 +30,81 @@ class PasienSettings extends ConsumerWidget {
           subtitle: 'Perbarui pengaturan tema dan bahasa akun Pasien Anda.',
           textColor: textColor,
           subtitleColor: subtitleColor,
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SettingsChip(
-                label: 'Light',
-                icon: Icons.sunny,
-                isSelected: state.appearance == 'light',
-                onTap: () => notifier.updateAppearance('light'),
-                purple: purple,
-                teal: teal,
-                isDark: isDark,
-                borderColor: borderColor,
+              Row(
+                children: [
+                  SettingsChip(
+                    label: 'Light',
+                    icon: Icons.sunny,
+                    isSelected: state.appearance == 'light',
+                    onTap: () => notifier.updateAppearance('light'),
+                    purple: purple,
+                    teal: teal,
+                    isDark: isDark,
+                    borderColor: borderColor,
+                  ),
+                  const SizedBox(width: 10),
+                  SettingsChip(
+                    label: 'Dark',
+                    icon: Icons.nightlight_round,
+                    isSelected: state.appearance == 'dark',
+                    onTap: () => notifier.updateAppearance('dark'),
+                    purple: purple,
+                    teal: teal,
+                    isDark: isDark,
+                    borderColor: borderColor,
+                  ),
+                  const SizedBox(width: 10),
+                  SettingsChip(
+                    label: 'REV',
+                    icon: Icons.palette_rounded,
+                    isSelected: state.appearance == 'rev',
+                    onTap: () => notifier.updateAppearance('rev'),
+                    purple: purple,
+                    teal: teal,
+                    isDark: isDark,
+                    borderColor: borderColor,
+                  ),
+                ],
               ),
-              const SizedBox(width: 10),
-              SettingsChip(
-                label: 'Dark',
-                icon: Icons.nightlight_round,
-                isSelected: state.appearance == 'dark',
-                onTap: () => notifier.updateAppearance('dark'),
-                purple: purple,
-                teal: teal,
-                isDark: isDark,
-                borderColor: borderColor,
-              ),
-              const SizedBox(width: 10),
-              SettingsChip(
-                label: 'REV',
-                icon: Icons.palette_rounded,
-                isSelected: state.appearance == 'rev',
-                onTap: () => notifier.updateAppearance('rev'),
-                purple: purple,
-                teal: teal,
-                isDark: isDark,
-                borderColor: borderColor,
+              const SizedBox(height: 20),
+              const Divider(),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Efek Blur Foto Profil',
+                          style: GoogleFonts.outfit(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                            color: textColor,
+                          ),
+                        ),
+                        Text(
+                          'Tampilkan foto profil yang diblur sebagai latar belakang di Profil, App Bar, dan Drawer',
+                          style: GoogleFonts.outfit(
+                            fontSize: 10,
+                            color: subtitleColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Switch(
+                    value: state.blurProfileEffectEnabled,
+                    activeColor: purple,
+                    onChanged: (val) {
+                      notifier.setBlurProfileEffect(val);
+                    },
+                  ),
+                ],
               ),
             ],
           ),

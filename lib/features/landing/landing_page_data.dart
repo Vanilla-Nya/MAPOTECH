@@ -91,6 +91,7 @@ class LandingPageState {
   final String? loggedInName;
   final Map<String, dynamic>? loggedInUser;
   final int drawerSize; // 0: Collapsed, 1: Expanded, 2: Full-screen
+  final bool blurProfileEffectEnabled;
 
   const LandingPageState({
     required this.activeTab,
@@ -101,6 +102,7 @@ class LandingPageState {
     this.loggedInName,
     this.loggedInUser,
     this.drawerSize = 1,
+    this.blurProfileEffectEnabled = true,
   });
 
   LandingPageState copyWith({
@@ -112,6 +114,7 @@ class LandingPageState {
     String? loggedInName,
     Map<String, dynamic>? loggedInUser,
     int? drawerSize,
+    bool? blurProfileEffectEnabled,
   }) {
     return LandingPageState(
       activeTab: activeTab ?? this.activeTab,
@@ -122,6 +125,7 @@ class LandingPageState {
       loggedInName: loggedInName ?? this.loggedInName,
       loggedInUser: loggedInUser ?? this.loggedInUser,
       drawerSize: drawerSize ?? this.drawerSize,
+      blurProfileEffectEnabled: blurProfileEffectEnabled ?? this.blurProfileEffectEnabled,
     );
   }
 }
@@ -136,7 +140,8 @@ class LandingPageNotifier extends StateNotifier<LandingPageState> {
             loggedInRole: null,
             loggedInName: null,
             loggedInUser: null,
-            drawerSize: 1));
+            drawerSize: 1,
+            blurProfileEffectEnabled: true));
 
   static String _detectSystemLanguage() {
     try {
@@ -200,6 +205,10 @@ class LandingPageNotifier extends StateNotifier<LandingPageState> {
 
   void updateAppearance(String value) {
     state = state.copyWith(appearance: value);
+  }
+
+  void setBlurProfileEffect(bool enabled) {
+    state = state.copyWith(blurProfileEffectEnabled: enabled);
   }
 
   // --- THEME COLOR GETTERS ---

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
+import 'dart:ui' as ui;
 
 bool _isCorsafeUrl(String url) {
   if (url.isEmpty) return false;
@@ -116,7 +117,6 @@ class DashboardDrawer extends ConsumerWidget {
               duration: const Duration(milliseconds: 200),
               child: showLabels
                   ? Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: state.appearance == 'rev'
@@ -134,102 +134,155 @@ class DashboardDrawer extends ConsumerWidget {
                           ),
                         ],
                       ),
-                      child: Row(
+                      clipBehavior: Clip.antiAlias,
+                      child: Stack(
                         children: [
-                          Container(
-                            width: 40,
-                            height: 40,
-                            decoration: const BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
+                          if (state.loggedInUser?['avatar_url'] != null &&
+                              (state.loggedInUser!['avatar_url'] as String).isNotEmpty &&
+                              state.blurProfileEffectEnabled)
+                            Positioned.fill(
+                              child: ShaderMask(
+                                shaderCallback: (rect) {
+                                  return const LinearGradient(
+                                    begin: Alignment.centerLeft,
+                                    end: Alignment.centerRight,
+                                    colors: [Colors.black, Colors.transparent],
+                                    stops: [0.0, 0.8],
+                                  ).createShader(rect);
+                                },
+                                blendMode: BlendMode.dstIn,
+                                child: ImageFiltered(
+                                  imageFilter: ui.ImageFilter.blur(sigmaX: 15.0, sigmaY: 15.0),
+                                  child: Image.network(
+                                    state.loggedInUser!['avatar_url'] as String,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => const SizedBox(),
+                                  ),
+                                ),
+                              ),
                             ),
-                            child: ClipOval(
-                              child: Stack(
-                                children: [
-                                  if (state.loggedInUser?['avatar_url'] != null &&
-                                      (state.loggedInUser!['avatar_url'] as String).isNotEmpty &&
-                                      _isCorsafeUrl(state.loggedInUser!['avatar_url'] as String))
-                                    Image.network(
-                                      state.loggedInUser!['avatar_url'] as String,
-                                      fit: BoxFit.cover,
-                                      width: 40,
-                                      height: 40,
-                                      errorBuilder: (_, __, ___) => Center(
-                                        child: Text(
-                                          avatarInitials,
-                                          style: GoogleFonts.outfit(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w900,
-                                            color: themeAccent,
+                          if (state.loggedInUser?['avatar_url'] != null &&
+                              (state.loggedInUser!['avatar_url'] as String).isNotEmpty &&
+                              state.blurProfileEffectEnabled)
+                            Positioned.fill(
+                              child: ShaderMask(
+                                shaderCallback: (rect) {
+                                  return const LinearGradient(
+                                    begin: Alignment.centerLeft,
+                                    end: Alignment.centerRight,
+                                    colors: [Colors.black, Colors.transparent],
+                                    stops: [0.0, 0.8],
+                                  ).createShader(rect);
+                                },
+                                blendMode: BlendMode.dstIn,
+                                child: Container(
+                                  color: isDark
+                                      ? Colors.black.withOpacity(0.4)
+                                      : themeAccent.withOpacity(0.15),
+                                ),
+                              ),
+                            ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                            child: Row(
+                              children: [
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: const BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: ClipOval(
+                                  child: Stack(
+                                    children: [
+                                      if (state.loggedInUser?['avatar_url'] != null &&
+                                          (state.loggedInUser!['avatar_url'] as String).isNotEmpty &&
+                                          _isCorsafeUrl(state.loggedInUser!['avatar_url'] as String))
+                                        Image.network(
+                                          state.loggedInUser!['avatar_url'] as String,
+                                          fit: BoxFit.cover,
+                                          width: 40,
+                                          height: 40,
+                                          errorBuilder: (_, __, ___) => Center(
+                                            child: Text(
+                                              avatarInitials,
+                                              style: GoogleFonts.outfit(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w900,
+                                                color: themeAccent,
+                                              ),
+                                            ),
+                                          ),
+                                        )
+                                      else
+                                        Center(
+                                          child: Text(
+                                            avatarInitials,
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w900,
+                                              color: themeAccent,
+                                            ),
+                                          ),
+                                        ),
+                                      Positioned(
+                                        bottom: 0,
+                                        right: 0,
+                                        child: Container(
+                                          width: 10,
+                                          height: 10,
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF48C9B0),
+                                            shape: BoxShape.circle,
+                                            border: Border.all(color: Colors.white, width: 1.5),
                                           ),
                                         ),
                                       ),
-                                    )
-                                  else
-                                    Center(
-                                      child: Text(
-                                        avatarInitials,
-                                        style: GoogleFonts.outfit(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w900,
-                                          color: themeAccent,
-                                        ),
-                                      ),
-                                    ),
-                                  Positioned(
-                                    bottom: 0,
-                                    right: 0,
-                                    child: Container(
-                                      width: 10,
-                                      height: 10,
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF48C9B0),
-                                        shape: BoxShape.circle,
-                                        border: Border.all(color: Colors.white, width: 1.5),
-                                      ),
-                                    ),
+                                    ],
                                   ),
-                                ],
+                                ),
                               ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  avatarName,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w900,
-                                    color: Colors.white,
-                                  ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      avatarName,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w900,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    Text(
+                                      avatarRoleLabel,
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 8,
+                                        fontWeight: FontWeight.w900,
+                                        color: Colors.white.withOpacity(0.7),
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                Text(
-                                  avatarRoleLabel,
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 8,
-                                    fontWeight: FontWeight.w900,
-                                    color: Colors.white.withOpacity(0.7),
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                              ],
-                            ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.open_in_full_rounded, size: 14, color: Colors.white),
+                                onPressed: () {
+                                  notifier.toggleFullScreenDrawer();
+                                },
+                                visualDensity: VisualDensity.compact,
+                              ),
+                            ],
                           ),
-                          IconButton(
-                            icon: const Icon(Icons.open_in_full_rounded, size: 14, color: Colors.white),
-                            onPressed: () {
-                              notifier.toggleFullScreenDrawer();
-                            },
-                            visualDensity: VisualDensity.compact,
-                          ),
-                        ],
-                      ),
-                    )
+                        ),
+                      ],
+                    ),
+                  )
                   : Center(
                       child: InkWell(
                         onTap: () => notifier.setDrawerSize(1),
@@ -433,12 +486,6 @@ class FullScreenDrawerOverlay extends ConsumerWidget {
           // Header Panel
           Container(
             width: double.infinity,
-            padding: EdgeInsets.only(
-              top: MediaQuery.of(context).padding.top + 20,
-              bottom: 24,
-              left: 24,
-              right: 24,
-            ),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: titleGradient,
@@ -454,112 +501,180 @@ class FullScreenDrawerOverlay extends ConsumerWidget {
                 )
               ],
             ),
-            child: Row(
+            clipBehavior: Clip.antiAlias,
+            child: Stack(
               children: [
-                InkWell(
-                  onTap: () {
-                    notifier.setDrawerSize(1);
-                  },
-                  borderRadius: BorderRadius.circular(100),
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.18),
-                      shape: BoxShape.circle,
+                if (state.loggedInUser?['avatar_url'] != null &&
+                    (state.loggedInUser!['avatar_url'] as String).isNotEmpty &&
+                    state.blurProfileEffectEnabled)
+                  Positioned.fill(
+                    child: ShaderMask(
+                      shaderCallback: (rect) {
+                        return const LinearGradient(
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black,
+                            Colors.black,
+                            Colors.transparent,
+                          ],
+                          stops: [0.0, 0.25, 0.75, 1.0],
+                        ).createShader(rect);
+                      },
+                      blendMode: BlendMode.dstIn,
+                      child: ImageFiltered(
+                        imageFilter: ui.ImageFilter.blur(sigmaX: 15.0, sigmaY: 15.0),
+                        child: Image.network(
+                          state.loggedInUser!['avatar_url'] as String,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const SizedBox(),
+                        ),
+                      ),
                     ),
-                    alignment: Alignment.center,
-                    child: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                if (state.loggedInUser?['avatar_url'] != null &&
+                    (state.loggedInUser!['avatar_url'] as String).isNotEmpty &&
+                    state.blurProfileEffectEnabled)
+                  Positioned.fill(
+                    child: ShaderMask(
+                      shaderCallback: (rect) {
+                        return const LinearGradient(
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black,
+                            Colors.black,
+                            Colors.transparent,
+                          ],
+                          stops: [0.0, 0.25, 0.75, 1.0],
+                        ).createShader(rect);
+                      },
+                      blendMode: BlendMode.dstIn,
+                      child: Container(
+                        color: isDark
+                            ? Colors.black.withOpacity(0.4)
+                            : themeAccent.withOpacity(0.15),
+                      ),
+                    ),
+                  ),
+                Padding(
+                  padding: EdgeInsets.only(
+                    top: MediaQuery.of(context).padding.top + 20,
+                    bottom: 24,
+                    left: 24,
+                    right: 24,
+                  ),
+                  child: Row(
                     children: [
-                      Text(
-                        avatarName,
-                        style: GoogleFonts.outfit(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
+                      InkWell(
+                        onTap: () {
+                          notifier.setDrawerSize(1);
+                        },
+                        borderRadius: BorderRadius.circular(100),
+                        child: Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.18),
+                            shape: BoxShape.circle,
+                          ),
+                          alignment: Alignment.center,
+                          child: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              avatarName,
+                              style: GoogleFonts.outfit(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                              ),
+                            ),
+                            Text(
+                              avatarRoleLabel,
+                              style: GoogleFonts.outfit(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white.withOpacity(0.75),
+                                letterSpacing: 1.0,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                _buildTranslucentBadge(Icons.calendar_today_rounded, 'Selasa, 26 Mei 2026'),
+                                const SizedBox(width: 8),
+                                _buildTranslucentBadge(Icons.access_time_rounded, '13.52'),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: const BoxDecoration(
                           color: Colors.white,
+                          shape: BoxShape.circle,
                         ),
-                      ),
-                      Text(
-                        avatarRoleLabel,
-                        style: GoogleFonts.outfit(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white.withOpacity(0.75),
-                          letterSpacing: 1.0,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          _buildTranslucentBadge(Icons.calendar_today_rounded, 'Selasa, 26 Mei 2026'),
-                          const SizedBox(width: 8),
-                          _buildTranslucentBadge(Icons.access_time_rounded, '13.52'),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
-                  child: ClipOval(
-                    child: Stack(
-                      children: [
-                        if (state.loggedInUser?['avatar_url'] != null &&
-                            (state.loggedInUser!['avatar_url'] as String).isNotEmpty &&
-                            _isCorsafeUrl(state.loggedInUser!['avatar_url'] as String))
-                          Image.network(
-                            state.loggedInUser!['avatar_url'] as String,
-                            fit: BoxFit.cover,
-                            width: 56,
-                            height: 56,
-                            errorBuilder: (_, __, ___) => Center(
-                              child: Text(
-                                avatarInitials,
-                                style: GoogleFonts.outfit(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w900,
-                                  color: themeAccent,
+                        child: ClipOval(
+                          child: Stack(
+                            children: [
+                              if (state.loggedInUser?['avatar_url'] != null &&
+                                  (state.loggedInUser!['avatar_url'] as String).isNotEmpty &&
+                                  _isCorsafeUrl(state.loggedInUser!['avatar_url'] as String))
+                                Image.network(
+                                  state.loggedInUser!['avatar_url'] as String,
+                                  fit: BoxFit.cover,
+                                  width: 56,
+                                  height: 56,
+                                  errorBuilder: (_, __, ___) => Center(
+                                    child: Text(
+                                      avatarInitials,
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w900,
+                                        color: themeAccent,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              else
+                                Center(
+                                  child: Text(
+                                    avatarInitials,
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w900,
+                                      color: themeAccent,
+                                    ),
+                                  ),
+                                ),
+                              Positioned(
+                                bottom: 2,
+                                right: 2,
+                                child: Container(
+                                  width: 12,
+                                  height: 12,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF48C9B0),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.white, width: 2.0),
+                                  ),
                                 ),
                               ),
-                            ),
-                          )
-                        else
-                          Center(
-                            child: Text(
-                              avatarInitials,
-                              style: GoogleFonts.outfit(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w900,
-                                color: themeAccent,
-                              ),
-                            ),
-                          ),
-                        Positioned(
-                          bottom: 2,
-                          right: 2,
-                          child: Container(
-                            width: 12,
-                            height: 12,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF48C9B0),
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 2.0),
-                            ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ],

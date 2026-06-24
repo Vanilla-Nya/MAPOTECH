@@ -4,13 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
+import 'package:mapotech/shared/supabase_service.dart';
 
 class BukuKasEntry {
   final String id;
   final String tanggal;
   final String waktu;
   final String deskripsi;
-  final String kategori; // 'Konsultasi', 'Farmasi', 'Obat & Medis', 'Operasional', 'Gaji', 'Lain-lain'
+  final String kategori; // 'Konsultasi', 'Farmasi', 'Obat & Medis', 'Operasional', 'Gaji Staff', 'Lain-lain'
   final String tipe; // 'Pemasukan' or 'Pengeluaran'
   final String metode; // 'Cash', 'QRIS', 'BPJS', or '-'
   final double jumlah;
@@ -43,6 +44,9 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
   BukuKasEntry? _selectedEntry;
   bool _showExpenseWizard = false;
   bool _isExporting = false;
+  bool _isLoading = true;
+
+  final _db = SupabaseService();
 
   // Add expense controllers
   final _expDescController = TextEditingController();
@@ -52,86 +56,120 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
   @override
   void initState() {
     super.initState();
-    // Pre-populate with premium initial mock ledger entries
-    _ledger.addAll([
-      const BukuKasEntry(
-        id: 'TRX-2026-0501',
-        tanggal: '26 Mei 2026',
-        waktu: '19:42',
-        deskripsi: 'Pemeriksaan RME - Agus Afdholi Umar',
-        kategori: 'Konsultasi',
-        tipe: 'Pemasukan',
-        metode: 'Cash',
-        jumlah: 150000,
-        status: 'Lunas',
-      ),
-      const BukuKasEntry(
-        id: 'TRX-2026-0502',
-        tanggal: '26 Mei 2026',
-        waktu: '14:15',
-        deskripsi: 'Pemeriksaan RME - Alfon Soetanto',
-        kategori: 'Konsultasi',
-        tipe: 'Pemasukan',
-        metode: 'QRIS',
-        jumlah: 220000,
-        status: 'Lunas',
-      ),
-      const BukuKasEntry(
-        id: 'TRX-2026-0503',
-        tanggal: '25 Mei 2026',
-        waktu: '11:30',
-        deskripsi: 'Pemeriksaan RME - Alvin',
-        kategori: 'Konsultasi',
-        tipe: 'Pemasukan',
-        metode: 'BPJS',
-        jumlah: 120000,
-        status: 'Selesai',
-      ),
-      const BukuKasEntry(
-        id: 'OUT-2026-0501',
-        tanggal: '24 Mei 2026',
-        waktu: '09:00',
-        deskripsi: 'Restock Batch Paracetamol & Prednison',
-        kategori: 'Obat & Medis',
-        tipe: 'Pengeluaran',
-        metode: '-',
-        jumlah: 450000,
-        status: '-',
-      ),
-      const BukuKasEntry(
-        id: 'OUT-2026-0502',
-        tanggal: '22 Mei 2026',
-        waktu: '17:00',
-        deskripsi: 'Pembayaran Utilitas Listrik & Wifi Klinik',
-        kategori: 'Operasional',
-        tipe: 'Pengeluaran',
-        metode: '-',
-        jumlah: 350000,
-        status: '-',
-      ),
-      const BukuKasEntry(
-        id: 'TRX-2026-0504',
-        tanggal: '20 Mei 2026',
-        waktu: '10:00',
-        deskripsi: 'Pemeriksaan RME - Belinda Anastasia Jenifer',
-        kategori: 'Konsultasi',
-        tipe: 'Pemasukan',
-        metode: 'Cash',
-        jumlah: 180000,
-        status: 'Lunas',
-      ),
-      const BukuKasEntry(
-        id: 'OUT-2026-0503',
-        tanggal: '18 Mei 2026',
-        waktu: '08:30',
-        deskripsi: 'Pembelian Syringe, Jarum & Alcohol Swab',
-        kategori: 'Obat & Medis',
-        tipe: 'Pengeluaran',
-        metode: '-',
-        jumlah: 150000,
-        status: '-',
-      ),
-    ]);
+    _loadTransactions();
+  }
+
+  Future<void> _loadTransactions() async {
+    setState(() => _isLoading = true);
+    try {
+      final userState = ref.read(landingPageProvider);
+      final doctorId = userState.loggedInUser?['id'];
+      if (doctorId != null) {
+        final txs = await _db.fetchDoctorFinancialTransactions(doctorId);
+        final List<BukuKasEntry> loaded = [];
+        for (final tx in txs) {
+          loaded.add(_mapDbToBukuKasEntry(tx));
+        }
+        setState(() {
+          _ledger.clear();
+          _ledger.addAll(loaded);
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _ledger.clear();
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading transactions: $e');
+      setState(() => _isLoading = false);
+      _showWarningDialog('Gagal Memuat Data', 'Gagal mengambil riwayat pembukuan dari database.');
+    }
+  }
+
+  BukuKasEntry _mapDbToBukuKasEntry(Map<String, dynamic> db) {
+    final String id = db['id']?.toString() ?? '';
+    
+    // Parse tanggal & waktu
+    String tanggal = '-';
+    String waktu = '-';
+    try {
+      if (db['created_at'] != null) {
+        final dt = DateTime.parse(db['created_at'].toString()).toLocal();
+        tanggal = _formatDateToIndonesian(dt);
+        waktu = '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+      }
+    } catch (_) {}
+
+    final String deskripsi = db['description']?.toString() ?? '-';
+    
+    // Map transaction type
+    final String type = db['transaction_type']?.toString() ?? 'expense';
+    final String tipe = type == 'expense' ? 'Pengeluaran' : 'Pemasukan';
+    
+    // Map category
+    String dbCategory = db['category']?.toString() ?? '';
+    String kategori = 'Lain-lain';
+    if (dbCategory.isNotEmpty) {
+      if (dbCategory == 'Insurance Claim' || dbCategory == 'Service') {
+        kategori = 'Konsultasi';
+      } else if (dbCategory == 'Inventory') {
+        kategori = 'Obat & Medis';
+      } else if (dbCategory == 'Gaji' || dbCategory == 'Gaji Staff') {
+        kategori = 'Gaji Staff';
+      } else {
+        kategori = dbCategory;
+      }
+    } else {
+      final sourceType = db['source_type']?.toString() ?? '';
+      if (sourceType == 'inventory') {
+        kategori = 'Obat & Medis';
+      } else if (sourceType == 'clinical_encounter') {
+        kategori = 'Konsultasi';
+      } else {
+        kategori = 'Lain-lain';
+      }
+    }
+
+    // Determine payment method using patient_type from view, or parse from description.
+    String metode = '-';
+    if (tipe == 'Pemasukan') {
+      final patientType = db['patient_type']?.toString();
+      final descLower = deskripsi.toLowerCase();
+      if (patientType == 'BPJS' || descLower.contains('bpjs') || descLower.contains('klaim')) {
+        metode = 'BPJS';
+      } else if (descLower.contains('qris')) {
+        metode = 'QRIS';
+      } else {
+        // Fallback: deterministic alternate using id
+        final charCode = id.isNotEmpty ? id.codeUnitAt(id.length - 1) : 0;
+        metode = (charCode % 2 == 0) ? 'Cash' : 'QRIS';
+      }
+    }
+
+    final double jumlah = double.tryParse(db['amount']?.toString() ?? '0') ?? 0.0;
+    final String status = tipe == 'Pemasukan' ? 'Lunas' : '-';
+
+    return BukuKasEntry(
+      id: id,
+      tanggal: tanggal,
+      waktu: waktu,
+      deskripsi: deskripsi,
+      kategori: kategori,
+      tipe: tipe,
+      metode: metode,
+      jumlah: jumlah,
+      status: status,
+    );
+  }
+
+  String _formatDateToIndonesian(DateTime dt) {
+    final months = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+    return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
   }
 
   @override
@@ -141,7 +179,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
     super.dispose();
   }
 
-  void _saveExpense() {
+  void _saveExpense() async {
     final desc = _expDescController.text.trim();
     final amt = double.tryParse(_expAmountController.text) ?? 0.0;
     if (desc.isEmpty) {
@@ -153,47 +191,51 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
       return;
     }
 
-    final randNo = Random().nextInt(900) + 100;
-    final now = DateTime.now();
-    final timeStr = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    setState(() => _isLoading = true);
 
-    setState(() {
-      _ledger.insert(
-        0,
-        BukuKasEntry(
-          id: 'OUT-2026-05$randNo',
-          tanggal: '26 Mei 2026',
-          waktu: timeStr,
-          deskripsi: desc,
-          kategori: _expCategory,
-          tipe: 'Pengeluaran',
-          metode: '-',
-          jumlah: amt,
-          status: '-',
+    try {
+      final userState = ref.read(landingPageProvider);
+      final doctorId = userState.loggedInUser?['id'];
+      if (doctorId == null) {
+        throw Exception('Doctor ID tidak ditemukan. Harap login kembali.');
+      }
+
+      await _db.addDoctorExpense(
+        doctorId: doctorId,
+        amount: amt,
+        description: desc,
+        category: _expCategory,
+      );
+
+      await _loadTransactions();
+
+      setState(() {
+        _showExpenseWizard = false;
+        _expDescController.clear();
+        _expAmountController.clear();
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.redAccent,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          content: Row(
+            children: [
+              const Icon(Icons.outbox_rounded, color: Colors.white, size: 18),
+              const SizedBox(width: 10),
+              Text(
+                'Pengeluaran "$desc" sebesar Rp ${amt.toInt()} berhasil dicatat.',
+                style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+            ],
+          ),
         ),
       );
-      _showExpenseWizard = false;
-      _expDescController.clear();
-      _expAmountController.clear();
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: Colors.redAccent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        content: Row(
-          children: [
-            const Icon(Icons.outbox_rounded, color: Colors.white, size: 18),
-            const SizedBox(width: 10),
-            Text(
-              'Pengeluaran "$desc" sebesar Rp ${amt.toInt()} berhasil dicatat.',
-              style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
-            ),
-          ],
-        ),
-      ),
-    );
+    } catch (e) {
+      setState(() => _isLoading = false);
+      _showWarningDialog('Gagal Menyimpan', 'Terjadi kesalahan saat menyimpan pengeluaran: $e');
+    }
   }
 
   void _showWarningDialog(String title, String message) {
@@ -620,6 +662,19 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
         // E. DETAILED INVOICE MODAL
         if (_selectedEntry != null)
           _buildInvoiceModal(cardBg, textColor, subtitleColor, borderColor, inputBg, purple, activeGreen),
+
+        // F. LOADING OVERLAY
+        if (_isLoading)
+          Positioned.fill(
+            child: Container(
+              color: Colors.black.withOpacity(0.15),
+              child: const Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFB577F2)),
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }

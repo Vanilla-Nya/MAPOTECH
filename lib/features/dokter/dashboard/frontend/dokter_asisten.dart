@@ -3,6 +3,29 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/widgets/custom_button.dart';
+import 'package:mapotech/shared/supabase_service.dart';
+import 'dart:math';
+
+// ─── UUID Generation Helper ──────────────────────────────────────────────────
+
+String _generateUuidV4() {
+  final random = Random.secure();
+  final values = List<int>.generate(16, (i) => random.nextInt(256));
+  
+  // Set version to 4
+  values[6] = (values[6] & 0x0f) | 0x40;
+  // Set variant to 10xx
+  values[8] = (values[8] & 0x3f) | 0x80;
+  
+  final buffer = StringBuffer();
+  for (var i = 0; i < 16; i++) {
+    if (i == 4 || i == 6 || i == 8 || i == 10) {
+      buffer.write('-');
+    }
+    buffer.write(values[i].toRadixString(16).padLeft(2, '0'));
+  }
+  return buffer.toString();
+}
 
 // ─── Data Models ─────────────────────────────────────────────────────────────
 
@@ -61,74 +84,116 @@ class AsistenModel {
 // ─── Riverpod State Provider ──────────────────────────────────────────────────
 
 class DokterAsistenListNotifier extends StateNotifier<List<AsistenModel>> {
-  DokterAsistenListNotifier() : super(_initialAssistants);
+  final String doctorId;
+  final SupabaseService _db = SupabaseService();
+  bool _isLoading = false;
+  bool get isLoading => _isLoading;
 
-  static final List<AsistenModel> _initialAssistants = [
-    const AsistenModel(
-      id: 'AST-20260526-0001',
-      nama: 'Siti Aminah, A.Md.Kep.',
-      email: 'siti.aminah@gmail.com',
-      nik: '3511084206980002',
-      sip: '503/1204/SIP.P/430.301/2025',
-      peran: 'Perawat',
-      telepon: '081299887766',
-      isBertugas: true,
-      permissions: ['Rekam Medis (EMR)', 'Pemeriksaan Awal'],
-      avatarBg: Color(0xFF48C9B0), // Mint accent
-    ),
-    const AsistenModel(
-      id: 'AST-20260515-0002',
-      nama: 'Budi Santoso',
-      email: 'budi.s@gmail.com',
-      nik: '3511081512960003',
-      sip: '-',
-      peran: 'Front Desk',
-      telepon: '085344332211',
-      isBertugas: true,
-      permissions: ['Registrasi & Antrian', 'Billing / Kasir'],
-      avatarBg: Color(0xFFB577F2), // Purple accent
-    ),
-    const AsistenModel(
-      id: 'AST-20260510-0003',
-      nama: 'Riska Amalia, S.Kep.',
-      email: 'riska.amalia@gmail.com',
-      nik: '3511085208990001',
-      sip: '503/0088/SIP.P/430.301/2026',
-      peran: 'Perawat',
-      telepon: '087811223344',
-      isBertugas: false,
-      permissions: ['Rekam Medis (EMR)', 'Stok Obat'],
-      avatarBg: Color(0xFF48C9B0), // Mint accent
-    ),
-  ];
-
-  void addAsisten(AsistenModel asisten) {
-    state = [...state, asisten];
+  DokterAsistenListNotifier(this.doctorId) : super([]) {
+    loadAssistants();
   }
 
-  void toggleDuty(String id) {
-    state = [
-      for (final a in state)
-        if (a.id == id) a.copyWith(isBertugas: !a.isBertugas) else a
-    ];
+  Future<void> loadAssistants() async {
+    _isLoading = true;
+    try {
+      final dbAssistants = await _db.fetchDoctorAssistants(doctorId);
+      state = dbAssistants.map((da) {
+        final roles = da['permissions'] as List<dynamic>? ?? [];
+        return AsistenModel(
+          id: da['id'] as String,
+          nama: da['nama'] as String,
+          email: da['email'] as String? ?? '-',
+          nik: da['nik'] as String,
+          sip: da['sip'] as String? ?? '-',
+          peran: da['peran'] as String? ?? 'Perawat',
+          telepon: da['telepon'] as String? ?? '-',
+          isBertugas: da['is_bertugas'] as bool? ?? true,
+          permissions: roles.map((r) => r.toString()).toList(),
+          avatarBg: da['peran'] == 'Perawat'
+              ? const Color(0xFF48C9B0)
+              : (da['peran'] == 'Front Desk' ? const Color(0xFFB577F2) : const Color(0xFFF39C12)),
+        );
+      }).toList();
+    } catch (e) {
+      debugPrint('Error loading assistants: $e');
+    } finally {
+      _isLoading = false;
+      if (mounted) {
+        state = List.from(state);
+      }
+    }
   }
 
-  void removeAsisten(String id) {
-    state = state.where((a) => a.id != id).toList();
+  Future<void> addAsisten(AsistenModel asisten) async {
+    try {
+      await _db.addDoctorAssistant(
+        doctorId: doctorId,
+        assistantId: asisten.id,
+        name: asisten.nama,
+        email: asisten.email,
+        nik: asisten.nik,
+        phone: asisten.telepon,
+        sip: asisten.sip,
+        peran: asisten.peran,
+        permissions: asisten.permissions,
+      );
+      await loadAssistants();
+    } catch (e) {
+      debugPrint('Error adding assistant: $e');
+      rethrow;
+    }
   }
 
-  void updatePermissions(String id, List<String> permissions) {
-    state = [
-      for (final a in state)
-        if (a.id == id) a.copyWith(permissions: permissions) else a
-    ];
+  Future<void> toggleDuty(String id) async {
+    try {
+      final assistant = state.firstWhere((a) => a.id == id);
+      final nextDuty = !assistant.isBertugas;
+
+      // Optimistic UI response
+      state = [
+        for (final a in state)
+          if (a.id == id) a.copyWith(isBertugas: nextDuty) else a
+      ];
+
+      await _db.updateDoctorAssistantDuty(id, nextDuty);
+    } catch (e) {
+      debugPrint('Error toggling duty: $e');
+      await loadAssistants();
+    }
+  }
+
+  Future<void> removeAsisten(String id) async {
+    try {
+      await _db.deleteDoctorAssistant(id);
+      await loadAssistants();
+    } catch (e) {
+      debugPrint('Error removing assistant: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updatePermissions(String id, List<String> permissions) async {
+    try {
+      // Optimistic update
+      state = [
+        for (final a in state)
+          if (a.id == id) a.copyWith(permissions: permissions) else a
+      ];
+      await _db.updateDoctorAssistantPermissions(id, permissions);
+    } catch (e) {
+      debugPrint('Error updating permissions: $e');
+      await loadAssistants();
+    }
   }
 }
 
 final dokterAsistenListProvider =
     StateNotifierProvider<DokterAsistenListNotifier, List<AsistenModel>>((ref) {
-  return DokterAsistenListNotifier();
+  final userState = ref.watch(landingPageProvider).loggedInUser;
+  final doctorId = userState?['id']?.toString() ?? '8f93471a-74f8-486b-8e85-4002dc44c11c';
+  return DokterAsistenListNotifier(doctorId);
 });
+
 
 // ─── Dokter Asisten View ───────────────────────────────────────────────────────
 
@@ -146,6 +211,7 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
   Widget build(BuildContext context) {
     final state = ref.watch(landingPageProvider);
     final allAssistants = ref.watch(dokterAsistenListProvider);
+    final isLoading = ref.watch(dokterAsistenListProvider.notifier).isLoading;
 
     final isDark = state.appearance == 'dark';
     final cardBgColor = isDark ? const Color(0xFF161619) : Colors.white;
@@ -241,7 +307,14 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
         const SizedBox(height: 24),
 
         // ── Assistant Cards Grid ──────────────────────────────────────────
-        if (filteredAssistants.isEmpty)
+        if (isLoading && allAssistants.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 80),
+            child: Center(
+              child: CircularProgressIndicator(),
+            ),
+          )
+        else if (filteredAssistants.isEmpty)
           Container(
             padding: const EdgeInsets.symmetric(vertical: 60),
             alignment: Alignment.center,
@@ -641,14 +714,29 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
             TextButton(
               child: Text('Hapus', style: GoogleFonts.outfit(fontSize: 12, color: Colors.redAccent, fontWeight: FontWeight.w700)),
               onPressed: () {
-                ref.read(dokterAsistenListProvider.notifier).removeAsisten(a.id);
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Asisten ${a.nama} berhasil dihapus.', style: GoogleFonts.outfit(fontSize: 12)),
-                    backgroundColor: Colors.redAccent,
-                  ),
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (context) => const Center(child: CircularProgressIndicator()),
                 );
+                ref.read(dokterAsistenListProvider.notifier).removeAsisten(a.id).then((_) {
+                  Navigator.pop(context); // Pop loading indicator
+                  Navigator.pop(context); // Pop confirm dialog
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Asisten ${a.nama} berhasil dihapus.', style: GoogleFonts.outfit(fontSize: 12)),
+                      backgroundColor: Colors.redAccent,
+                    ),
+                  );
+                }).catchError((err) {
+                  Navigator.pop(context); // Pop loading indicator
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Gagal menghapus asisten: $err', style: GoogleFonts.outfit(fontSize: 12)),
+                      backgroundColor: Colors.redAccent,
+                    ),
+                  );
+                });
               },
             ),
           ],
@@ -863,9 +951,9 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                                 return;
                               }
 
-                              final currentCount = ref.read(dokterAsistenListProvider).length;
+                              final newId = _generateUuidV4();
                               final newAsisten = AsistenModel(
-                                id: 'AST-20260526-${(currentCount + 1).toString().padLeft(4, '0')}',
+                                id: newId,
                                 nama: name,
                                 email: email.isEmpty ? '-' : email,
                                 nik: nik,
@@ -879,15 +967,30 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                                     : (selectedRole == 'Front Desk' ? const Color(0xFFB577F2) : const Color(0xFFF39C12)),
                               );
 
-                              ref.read(dokterAsistenListProvider.notifier).addAsisten(newAsisten);
-                              Navigator.pop(context);
-
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Asisten $name berhasil didaftarkan!', style: GoogleFonts.outfit(fontSize: 12)),
-                                  backgroundColor: const Color(0xFF48C9B0),
-                                ),
+                              showDialog(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (context) => const Center(child: CircularProgressIndicator()),
                               );
+
+                              ref.read(dokterAsistenListProvider.notifier).addAsisten(newAsisten).then((_) {
+                                Navigator.pop(context); // Pop loading spinner
+                                Navigator.pop(context); // Pop add dialog
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Asisten $name berhasil didaftarkan!', style: GoogleFonts.outfit(fontSize: 12)),
+                                    backgroundColor: const Color(0xFF48C9B0),
+                                  ),
+                                );
+                              }).catchError((err) {
+                                Navigator.pop(context); // Pop loading spinner
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Gagal mendaftarkan asisten: $err', style: GoogleFonts.outfit(fontSize: 12)),
+                                    backgroundColor: Colors.redAccent,
+                                  ),
+                                );
+                              });
                             },
                             primaryColor: purple,
                             textColor: Colors.white,

@@ -4,10 +4,12 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/features/dokter/dashboard/frontend/dokter_pasien.dart'; // To access registered patients
 import 'package:mapotech/shared/widgets/custom_button.dart';
+import 'package:mapotech/shared/supabase_service.dart';
 
 // ─── Data Models ─────────────────────────────────────────────────────────────
 
 class AntrianModel {
+  final String id;
   final String no;
   final String nama;
   final String nik;
@@ -15,8 +17,16 @@ class AntrianModel {
   final String waktu;
   final String status; // 'Menunggu', 'Memproses...', 'Pembayaran', 'Selesai'
   final Color avatarBg;
+  final DateTime? dateQueue;
+  final String? patientId;
+  final String? guestPatientId;
+  final String? guestPhone;
+  final DateTime? guestBirthDate;
+  final String? guestGender;
+  final String? guestAddress;
 
   const AntrianModel({
+    this.id = '',
     required this.no,
     required this.nama,
     required this.nik,
@@ -24,9 +34,17 @@ class AntrianModel {
     required this.waktu,
     required this.status,
     required this.avatarBg,
+    this.dateQueue,
+    this.patientId,
+    this.guestPatientId,
+    this.guestPhone,
+    this.guestBirthDate,
+    this.guestGender,
+    this.guestAddress,
   });
 
   AntrianModel copyWith({
+    String? id,
     String? no,
     String? nama,
     String? nik,
@@ -34,8 +52,16 @@ class AntrianModel {
     String? waktu,
     String? status,
     Color? avatarBg,
+    DateTime? dateQueue,
+    String? patientId,
+    String? guestPatientId,
+    String? guestPhone,
+    DateTime? guestBirthDate,
+    String? guestGender,
+    String? guestAddress,
   }) {
     return AntrianModel(
+      id: id ?? this.id,
       no: no ?? this.no,
       nama: nama ?? this.nama,
       nik: nik ?? this.nik,
@@ -43,6 +69,13 @@ class AntrianModel {
       waktu: waktu ?? this.waktu,
       status: status ?? this.status,
       avatarBg: avatarBg ?? this.avatarBg,
+      dateQueue: dateQueue ?? this.dateQueue,
+      patientId: patientId ?? this.patientId,
+      guestPatientId: guestPatientId ?? this.guestPatientId,
+      guestPhone: guestPhone ?? this.guestPhone,
+      guestBirthDate: guestBirthDate ?? this.guestBirthDate,
+      guestGender: guestGender ?? this.guestGender,
+      guestAddress: guestAddress ?? this.guestAddress,
     );
   }
 }
@@ -50,27 +83,148 @@ class AntrianModel {
 // ─── Riverpod State Provider ──────────────────────────────────────────────────
 
 class DokterAntrianListNotifier extends StateNotifier<List<AntrianModel>> {
-  DokterAntrianListNotifier() : super([]); // Starts empty matching Screenshot 1
+  final String doctorId;
+  final SupabaseService _db = SupabaseService();
+  bool _isLoading = false;
+  bool get isLoading => _isLoading;
 
-  void addAntrian(AntrianModel antrian) {
-    state = [...state, antrian];
-  }
-
-  void updateAntrianStatus(String queueNo, String newStatus) {
-    state = [
-      for (final item in state)
-        if (item.no == queueNo) item.copyWith(status: newStatus) else item
+  Color _getAvatarColor(String name) {
+    final colors = [
+      const Color(0xFFB577F2), // Purple
+      const Color(0xFF48C9B0), // Teal
+      const Color(0xFFF39C12), // Orange
+      const Color(0xFF3498DB), // Blue
+      const Color(0xFFE74C3C), // Red
     ];
+    if (name.isEmpty) return colors[0];
+    return colors[name.codeUnitAt(0) % colors.length];
   }
 
-  void deleteAntrian(String queueNo) {
-    state = state.where((item) => item.no != queueNo).toList();
+  String _formatTime(DateTime dt) {
+    final hr = dt.hour;
+    final min = dt.minute.toString().padLeft(2, '0');
+    final period = hr >= 12 ? 'PM' : 'AM';
+    final displayHr = hr > 12 ? hr - 12 : (hr == 0 ? 12 : hr);
+    return '${displayHr.toString().padLeft(2, '0')}:$min $period';
+  }
+
+  DokterAntrianListNotifier(this.doctorId) : super([]) {
+    loadQueues();
+  }
+
+  Future<void> loadQueues() async {
+    _isLoading = true;
+    try {
+      final dbQueues = await _db.fetchDoctorQueues(doctorId);
+      
+      state = dbQueues.where((q) => q['status'] != 'cancelled').map((q) {
+        String uiStatus = 'Menunggu';
+        final dbStatus = q['status']?.toString() ?? 'waiting';
+        if (dbStatus == 'processing') {
+          uiStatus = 'Memproses...';
+        } else if (dbStatus == 'payment') {
+          uiStatus = 'Pembayaran';
+        } else if (dbStatus == 'done') {
+          uiStatus = 'Selesai';
+        }
+
+        DateTime? parsedDate;
+        if (q['date_queue'] != null) {
+          parsedDate = DateTime.tryParse(q['date_queue'].toString());
+        }
+
+        DateTime? createdAt;
+        if (q['created_at'] != null) {
+          createdAt = DateTime.tryParse(q['created_at'].toString())?.toLocal();
+        }
+
+        final patientName = q['patient_name']?.toString() ?? 'Pasien Tanpa Nama';
+
+        return AntrianModel(
+          id: q['id'] as String,
+          no: q['no_queue']?.toString() ?? '-',
+          nama: patientName,
+          nik: q['patient_nik']?.toString() ?? '-',
+          tipe: q['patient_type']?.toString() ?? 'Umum',
+          waktu: createdAt != null ? _formatTime(createdAt) : (q['created_at']?.toString() ?? '-'),
+          status: uiStatus,
+          avatarBg: _getAvatarColor(patientName),
+          dateQueue: parsedDate,
+          patientId: q['id_patient'] as String?,
+          guestPatientId: q['id_guest_patient'] as String?,
+        );
+      }).toList();
+    } catch (e) {
+      debugPrint('Error loading queues: $e');
+    } finally {
+      _isLoading = false;
+      if (mounted) {
+        state = List.from(state);
+      }
+    }
+  }
+
+  Future<void> addAntrian(AntrianModel antrian) async {
+    try {
+      await _db.addDoctorQueue(
+        doctorId: doctorId,
+        patientId: antrian.patientId,
+        noQueue: antrian.no,
+        patientType: antrian.tipe,
+        dateQueue: antrian.dateQueue ?? DateTime.now(),
+        guestName: antrian.patientId == null ? antrian.nama : null,
+        guestNik: antrian.patientId == null ? antrian.nik : null,
+        guestPhone: antrian.guestPhone ?? '-',
+        guestBirthDate: antrian.guestBirthDate,
+        guestGender: antrian.guestGender ?? 'Laki-laki',
+        guestAddress: antrian.guestAddress ?? 'Walk-in',
+      );
+      await loadQueues();
+    } catch (e) {
+      debugPrint('Error adding queue: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updateAntrianStatus(String queueId, String newStatus) async {
+    try {
+      String dbStatus = 'waiting';
+      if (newStatus == 'Memproses...') {
+        dbStatus = 'processing';
+      } else if (newStatus == 'Pembayaran') {
+        dbStatus = 'payment';
+      } else if (newStatus == 'Selesai') {
+        dbStatus = 'done';
+      }
+
+      state = [
+        for (final item in state)
+          if (item.id == queueId) item.copyWith(status: newStatus) else item
+      ];
+
+      await _db.updateQueueStatus(queueId, dbStatus);
+    } catch (e) {
+      debugPrint('Error updating queue status: $e');
+      await loadQueues();
+    }
+  }
+
+  Future<void> deleteAntrian(String queueId) async {
+    try {
+      state = state.where((item) => item.id != queueId).toList();
+      await _db.deleteQueue(queueId);
+    } catch (e) {
+      debugPrint('Error deleting queue: $e');
+      await loadQueues();
+    }
   }
 }
 
 final dokterAntrianListProvider =
     StateNotifierProvider<DokterAntrianListNotifier, List<AntrianModel>>((ref) {
-  return DokterAntrianListNotifier();
+  final userState = ref.watch(landingPageProvider).loggedInUser;
+  final doctorId = userState?['id']?.toString() ?? '8f93471a-74f8-486b-8e85-4002dc44c11c';
+  return DokterAntrianListNotifier(doctorId);
 });
 
 // ─── Dokter Antrian View ──────────────────────────────────────────────────────
@@ -86,6 +240,28 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
   String _searchQuery = '';
   String _activeFilter = 'Semua'; // 'Semua', 'Menunggu', 'Memproses...', 'Pembayaran', 'Selesai'
   int _quota = 20;
+  DateTime _selectedDate = DateTime(2026, 5, 26);
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() => _fetchQueues());
+  }
+
+  Future<void> _fetchQueues() async {
+    if (mounted) setState(() => _isLoading = true);
+    await ref.read(dokterAntrianListProvider.notifier).loadQueues();
+    if (mounted) setState(() => _isLoading = false);
+  }
+
+  String _formatDateToIndonesian(DateTime dt) {
+    final months = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+    return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -103,6 +279,13 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
 
     // Filter
     List<AntrianModel> filteredQueues = queues.where((q) {
+      final qDate = q.dateQueue;
+      final matchDate = qDate != null &&
+          qDate.year == _selectedDate.year &&
+          qDate.month == _selectedDate.month &&
+          qDate.day == _selectedDate.day;
+      if (!matchDate) return false;
+
       final query = _searchQuery.toLowerCase();
       final matchQuery = q.nama.toLowerCase().contains(query) ||
           q.no.toLowerCase().contains(query) ||
@@ -117,10 +300,21 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
     }).toList();
 
     // Metric Counts
-    final activeQueue = queues.firstWhere((q) => q.status == 'Memproses...', orElse: () => const AntrianModel(no: '', nama: '— Memproses...', nik: '', tipe: '', waktu: '', status: '', avatarBg: Colors.grey));
-    final waitingCount = queues.where((q) => q.status == 'Menunggu').length;
+    final dateQueues = queues.where((q) {
+      final qDate = q.dateQueue;
+      return qDate != null &&
+          qDate.year == _selectedDate.year &&
+          qDate.month == _selectedDate.month &&
+          qDate.day == _selectedDate.day;
+    }).toList();
+
+    final activeQueue = dateQueues.firstWhere(
+      (q) => q.status == 'Memproses...',
+      orElse: () => const AntrianModel(no: '', nama: '— Memproses...', nik: '', tipe: '', waktu: '', status: '', avatarBg: Colors.grey),
+    );
+    final waitingCount = dateQueues.where((q) => q.status == 'Menunggu').length;
     final estimatedWait = waitingCount * 15;
-    final remainingQuota = _quota - queues.length;
+    final remainingQuota = _quota - dateQueues.length;
 
     final isMobile = MediaQuery.of(context).size.width < 768;
 
@@ -137,7 +331,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                     style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w900, color: textColor),
                   ),
                   Text(
-                    'Data untuk tanggal: 26 Mei 2026',
+                    'Data untuk tanggal: ${_formatDateToIndonesian(_selectedDate)}',
                     style: GoogleFonts.outfit(fontSize: 11, color: purpleAccent, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 12),
@@ -167,7 +361,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                           children: [
                             const TextSpan(text: 'Data untuk tanggal: '),
                             TextSpan(
-                              text: '26 Mei 2026',
+                              text: _formatDateToIndonesian(_selectedDate),
                               style: GoogleFonts.outfit(fontSize: 12, color: purpleAccent, fontWeight: FontWeight.w900),
                             ),
                           ],
@@ -430,19 +624,28 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                 ),
               ),
 
-              // Rows / Empty State
-              filteredQueues.isEmpty
-                  ? _buildEmptyState(cardBgColor, borderColor, textColor, subtitleColor)
-                  : ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: filteredQueues.length,
-                      separatorBuilder: (context, index) => Divider(color: borderColor, height: 1),
-                      itemBuilder: (context, index) {
-                        final antrian = filteredQueues[index];
-                        return _buildQueueRow(context, antrian, isDark, cardBgColor, borderColor, textColor, subtitleColor);
-                      },
-                    ),
+              // Rows / Empty State / Loading State
+              _isLoading
+                  ? const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(48.0),
+                        child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFB577F2)),
+                        ),
+                      ),
+                    )
+                  : filteredQueues.isEmpty
+                      ? _buildEmptyState(cardBgColor, borderColor, textColor, subtitleColor)
+                      : ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: filteredQueues.length,
+                          separatorBuilder: (context, index) => Divider(color: borderColor, height: 1),
+                          itemBuilder: (context, index) {
+                            final antrian = filteredQueues[index];
+                            return _buildQueueRow(context, antrian, isDark, cardBgColor, borderColor, textColor, subtitleColor);
+                          },
+                        ),
             ],
           ),
         ),
@@ -453,23 +656,51 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
   // ─── UI Widgets Helper ─────────────────────────────────────────────────────
 
   Widget _buildDatePickerBtn(bool isDark, Color textColor, Color borderColor) {
-    return Container(
-      height: 40,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E22) : Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: borderColor),
-      ),
-      child: Row(
-        children: [
-          Text(
-            '26 / 05 / 2026',
-            style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: textColor),
-          ),
-          const SizedBox(width: 8),
-          Icon(Icons.calendar_month_outlined, size: 14, color: textColor.withOpacity(0.6)),
-        ],
+    return InkWell(
+      onTap: () async {
+        final date = await showDatePicker(
+          context: context,
+          initialDate: _selectedDate,
+          firstDate: DateTime(2020),
+          lastDate: DateTime(2030),
+          builder: (context, child) {
+            return Theme(
+              data: Theme.of(context).copyWith(
+                colorScheme: ColorScheme.light(
+                  primary: const Color(0xFFB577F2),
+                  onPrimary: Colors.white,
+                  onSurface: textColor,
+                ),
+              ),
+              child: child!,
+            );
+          },
+        );
+        if (date != null) {
+          setState(() {
+            _selectedDate = date;
+          });
+        }
+      },
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        height: 40,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E1E22) : Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: borderColor),
+        ),
+        child: Row(
+          children: [
+            Text(
+              '${_selectedDate.day.toString().padLeft(2, '0')} / ${_selectedDate.month.toString().padLeft(2, '0')} / ${_selectedDate.year}',
+              style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: textColor),
+            ),
+            const SizedBox(width: 8),
+            Icon(Icons.calendar_month_outlined, size: 14, color: textColor.withOpacity(0.6)),
+          ],
+        ),
       ),
     );
   }
@@ -1162,6 +1393,19 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                                     final currentNik = foundPatient != null ? foundPatient!.nik : specNikController.text;
                                     final currentAvatar = foundPatient != null ? foundPatient!.avatarBg : purple;
 
+                                    DateTime? specDob;
+                                    try {
+                                      if (specDobController.text.isNotEmpty) {
+                                        final parts = specDobController.text.split('/');
+                                        if (parts.length == 3) {
+                                          final month = int.parse(parts[0].trim());
+                                          final day = int.parse(parts[1].trim());
+                                          final year = int.parse(parts[2].trim());
+                                          specDob = DateTime(year, month, day);
+                                        }
+                                      }
+                                    } catch (_) {}
+
                                     final newAntrian = AntrianModel(
                                       no: queueNoController.text,
                                       nama: currentName,
@@ -1170,6 +1414,12 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                                       waktu: timeController.text,
                                       status: 'Menunggu',
                                       avatarBg: currentAvatar,
+                                      dateQueue: _selectedDate,
+                                      patientId: foundPatient?.id,
+                                      guestPhone: specPhoneController.text.isNotEmpty ? specPhoneController.text : null,
+                                      guestBirthDate: specDob,
+                                      guestGender: specGender != '— Pilih —' ? specGender : null,
+                                      guestAddress: 'Walk-in',
                                     );
 
                                     ref.read(dokterAntrianListProvider.notifier).addAntrian(newAntrian);
@@ -1613,7 +1863,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: purple, foregroundColor: Colors.white, elevation: 0),
               onPressed: () {
-                ref.read(dokterAntrianListProvider.notifier).updateAntrianStatus(queue.no, 'Memproses...');
+                ref.read(dokterAntrianListProvider.notifier).updateAntrianStatus(queue.id, 'Memproses...');
                 Navigator.of(ctx).pop();
                 _showSuccessSnackBar(context, 'Sesi pemeriksaan ${queue.nama} dimulai.');
               },
@@ -1623,7 +1873,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo, foregroundColor: Colors.white, elevation: 0),
               onPressed: () {
-                ref.read(dokterAntrianListProvider.notifier).updateAntrianStatus(queue.no, 'Pembayaran');
+                ref.read(dokterAntrianListProvider.notifier).updateAntrianStatus(queue.id, 'Pembayaran');
                 Navigator.of(ctx).pop();
                 _showSuccessSnackBar(context, 'Pemeriksaan selesai, pasien diarahkan ke pembayaran.');
               },
@@ -1633,7 +1883,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF27AE60), foregroundColor: Colors.white, elevation: 0),
               onPressed: () {
-                ref.read(dokterAntrianListProvider.notifier).updateAntrianStatus(queue.no, 'Selesai');
+                ref.read(dokterAntrianListProvider.notifier).updateAntrianStatus(queue.id, 'Selesai');
                 Navigator.of(ctx).pop();
                 _showSuccessSnackBar(context, 'Pembayaran berhasil, transaksi ditutup.');
               },
@@ -1642,7 +1892,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
           OutlinedButton(
             style: OutlinedButton.styleFrom(foregroundColor: Colors.redAccent, side: const BorderSide(color: Colors.redAccent)),
             onPressed: () {
-              ref.read(dokterAntrianListProvider.notifier).deleteAntrian(queue.no);
+              ref.read(dokterAntrianListProvider.notifier).deleteAntrian(queue.id);
               Navigator.of(ctx).pop();
               _showSuccessSnackBar(context, 'Antrean pasien dihapus.');
             },
