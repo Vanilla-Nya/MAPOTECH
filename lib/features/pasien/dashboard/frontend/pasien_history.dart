@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:mapotech/shared/widgets/skeleton_loading.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/widgets/empty_state_widget.dart';
 import 'package:mapotech/shared/supabase_service.dart';
@@ -295,7 +296,9 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
     final tabBgColor = isDark ? const Color(0xFF161619) : const Color(0xFFF3F0FA);
 
     return _isLoading
-        ? Center(child: CircularProgressIndicator(color: themeAccent))
+        ? const SkeletonScope(
+            child: SkeletonHistoryList(),
+          )
         : Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:mapotech/shared/widgets/skeleton_loading.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/supabase_service.dart';
 
@@ -170,7 +171,9 @@ class _PasienPrescriptionState extends ConsumerState<PasienPrescription> {
     final purpleAccent = const Color(0xFFB577F2);
 
     return _isLoading
-        ? Center(child: CircularProgressIndicator(color: purpleAccent))
+        ? const SkeletonScope(
+            child: SkeletonHistoryList(isPrescription: true),
+          )
         : RefreshIndicator(
             onRefresh: _loadPrescriptionsFromDatabase,
             color: purpleAccent,

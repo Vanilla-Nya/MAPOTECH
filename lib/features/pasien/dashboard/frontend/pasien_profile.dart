@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:mapotech/shared/widgets/skeleton_loading.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/widgets/profile_widgets.dart';
 import 'package:mapotech/shared/supabase_service.dart';
@@ -185,7 +186,9 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
     final qrToken = _patientDetail?['qr_token'] ?? user?['id'] ?? 'TOKEN-MOCK-123';
 
     return _isLoading
-        ? Center(child: CircularProgressIndicator(color: purple))
+        ? const SkeletonScope(
+            child: SkeletonProfile(isDoctor: false),
+          )
         : Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [

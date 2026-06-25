@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:mapotech/shared/widgets/skeleton_loading.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/widgets/custom_button.dart';
 import 'package:mapotech/shared/supabase_service.dart';
@@ -308,11 +309,8 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
 
         // ── Assistant Cards Grid ──────────────────────────────────────────
         if (isLoading && allAssistants.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 80),
-            child: Center(
-              child: CircularProgressIndicator(),
-            ),
+          const SkeletonScope(
+            child: SkeletonAssistantGrid(),
           )
         else if (filteredAssistants.isEmpty)
           Container(

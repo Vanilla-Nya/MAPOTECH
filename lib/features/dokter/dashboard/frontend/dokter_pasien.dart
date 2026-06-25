@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:mapotech/shared/widgets/skeleton_loading.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/widgets/custom_button.dart';
 import 'package:mapotech/shared/supabase_service.dart';
@@ -41,6 +42,40 @@ class PasienModel {
     this.satusehatId,
     this.avatarUrl,
   });
+
+  PasienModel copyWith({
+    String? id,
+    String? nama,
+    String? email,
+    String? nik,
+    String? tempatLahir,
+    String? tanggalLahir,
+    String? jenisKelamin,
+    String? telepon,
+    String? alamat,
+    String? umur,
+    Color? avatarBg,
+    List<String>? history,
+    String? satusehatId,
+    String? avatarUrl,
+  }) {
+    return PasienModel(
+      id: id ?? this.id,
+      nama: nama ?? this.nama,
+      email: email ?? this.email,
+      nik: nik ?? this.nik,
+      tempatLahir: tempatLahir ?? this.tempatLahir,
+      tanggalLahir: tanggalLahir ?? this.tanggalLahir,
+      jenisKelamin: jenisKelamin ?? this.jenisKelamin,
+      telepon: telepon ?? this.telepon,
+      alamat: alamat ?? this.alamat,
+      umur: umur ?? this.umur,
+      avatarBg: avatarBg ?? this.avatarBg,
+      history: history ?? this.history,
+      satusehatId: satusehatId ?? this.satusehatId,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+    );
+  }
 }
 
 // ─── Riverpod State Provider ──────────────────────────────────────────────────
@@ -315,11 +350,8 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
 
         // ─── Patient Card Grid ─────────────────────────────────
         ref.watch(dokterPasienListProvider.notifier).isLoading && allPatients.isEmpty
-            ? Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(40.0),
-                  child: CircularProgressIndicator(color: themeAccent),
-                ),
+            ? const SkeletonScope(
+                child: SkeletonPatientGrid(),
               )
             : filteredPatients.isEmpty
                 ? _buildEmptyState(

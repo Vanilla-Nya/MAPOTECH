@@ -92,6 +92,8 @@ class LandingPageState {
   final Map<String, dynamic>? loggedInUser;
   final int drawerSize; // 0: Collapsed, 1: Expanded, 2: Full-screen
   final bool blurProfileEffectEnabled;
+  final bool satusehatAutoSync;
+  final Set<String> syncedTransactions;
 
   const LandingPageState({
     required this.activeTab,
@@ -103,6 +105,8 @@ class LandingPageState {
     this.loggedInUser,
     this.drawerSize = 1,
     this.blurProfileEffectEnabled = true,
+    this.satusehatAutoSync = true,
+    this.syncedTransactions = const {},
   });
 
   LandingPageState copyWith({
@@ -115,6 +119,8 @@ class LandingPageState {
     Map<String, dynamic>? loggedInUser,
     int? drawerSize,
     bool? blurProfileEffectEnabled,
+    bool? satusehatAutoSync,
+    Set<String>? syncedTransactions,
   }) {
     return LandingPageState(
       activeTab: activeTab ?? this.activeTab,
@@ -126,6 +132,8 @@ class LandingPageState {
       loggedInUser: loggedInUser ?? this.loggedInUser,
       drawerSize: drawerSize ?? this.drawerSize,
       blurProfileEffectEnabled: blurProfileEffectEnabled ?? this.blurProfileEffectEnabled,
+      satusehatAutoSync: satusehatAutoSync ?? this.satusehatAutoSync,
+      syncedTransactions: syncedTransactions ?? this.syncedTransactions,
     );
   }
 }
@@ -141,7 +149,9 @@ class LandingPageNotifier extends StateNotifier<LandingPageState> {
             loggedInName: null,
             loggedInUser: null,
             drawerSize: 1,
-            blurProfileEffectEnabled: true));
+            blurProfileEffectEnabled: true,
+            satusehatAutoSync: true,
+            syncedTransactions: const {}));
 
   static String _detectSystemLanguage() {
     try {
@@ -209,6 +219,14 @@ class LandingPageNotifier extends StateNotifier<LandingPageState> {
 
   void setBlurProfileEffect(bool enabled) {
     state = state.copyWith(blurProfileEffectEnabled: enabled);
+  }
+
+  void setSatusehatAutoSync(bool val) {
+    state = state.copyWith(satusehatAutoSync: val);
+  }
+
+  void markTransactionSynced(String id) {
+    state = state.copyWith(syncedTransactions: {...state.syncedTransactions, id});
   }
 
   // --- THEME COLOR GETTERS ---

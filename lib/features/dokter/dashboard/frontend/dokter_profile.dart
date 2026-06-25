@@ -13,6 +13,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/supabase_service.dart';
+import 'package:mapotech/shared/widgets/skeleton_loading.dart';
 import 'web_map_widget.dart';
 import 'package:image/image.dart' as img;
 
@@ -2047,11 +2048,8 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
         : const Color(0xFFB577F2);
 
     if (_isLoading) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(80.0),
-          child: CircularProgressIndicator(color: tealColor),
-        ),
+      return const SkeletonScope(
+        child: SkeletonProfile(isDoctor: true),
       );
     }
 

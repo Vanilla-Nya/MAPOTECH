@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:mapotech/shared/widgets/skeleton_loading.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/widgets/custom_button.dart';
 import 'package:mapotech/shared/supabase_service.dart';
@@ -174,11 +175,8 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
     final nik = user?['nik'] ?? '3511081208000003';
 
     return _isLoading
-        ? SizedBox(
-            height: 300,
-            child: Center(
-              child: CircularProgressIndicator(color: const Color(0xFFB577F2)),
-            ),
+        ? const SkeletonScope(
+            child: SkeletonDashboard(),
           )
         : Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,

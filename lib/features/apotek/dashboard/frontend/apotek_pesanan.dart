@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:mapotech/shared/widgets/skeleton_loading.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/supabase_service.dart';
 
@@ -189,7 +190,9 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
     final filteredOrders = _orders.where((o) => o.status == _activeTab).toList();
 
     return _isLoading
-        ? Center(child: CircularProgressIndicator(color: themeAccent))
+        ? const SkeletonScope(
+            child: SkeletonApotekDashboard(type: 'orders'),
+          )
         : Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [

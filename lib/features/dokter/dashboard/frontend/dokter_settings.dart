@@ -13,7 +13,6 @@ class DokterSettings extends ConsumerStatefulWidget {
 }
 
 class _DokterSettingsState extends ConsumerState<DokterSettings> {
-  bool _syncOnSave = true;
   String _satuSehatStatus = 'TERHUBUNG (ID KLINIK VALID)';
   bool _isTestingSS = false;
 
@@ -191,12 +190,10 @@ class _DokterSettingsState extends ConsumerState<DokterSettings> {
                       ),
                     ),
                     Switch(
-                      value: _syncOnSave,
+                      value: state.satusehatAutoSync,
                       activeColor: teal,
                       onChanged: (val) {
-                        setState(() {
-                          _syncOnSave = val;
-                        });
+                        notifier.setSatusehatAutoSync(val);
                       },
                     ),
                   ],

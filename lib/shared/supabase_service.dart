@@ -713,6 +713,89 @@ class SupabaseService {
       throw Exception('Gagal menghapus antrian: $e');
     }
   }
+
+  // Fetch clinical encounters directly or with in-memory fallback
+  Future<List<Map<String, dynamic>>> fetchDoctorClinicalEncounters(String doctorId) async {
+    try {
+      final safeDoctorId = Uri.encodeComponent(doctorId);
+      final res = await _get(
+        'clinical_encounters?select=*,queue!inner(id,id_doctor,patient_type,id_patient,id_guest_patient)&queue.id_doctor=eq.$safeDoctorId&order=created_at.desc',
+        schema: 'private_doctor',
+      );
+      final list = res.map((e) => e as Map<String, dynamic>).toList();
+      if (list.isNotEmpty) return list;
+    } catch (_) {}
+
+    // Fallback: chunked in-memory join
+    try {
+      final queues = await fetchDoctorQueues(doctorId);
+      if (queues.isEmpty) return [];
+      final queueIds = queues.map((q) => q['id']?.toString()).whereType<String>().toList();
+      
+      List<Map<String, dynamic>> allEncounters = [];
+      const chunkSize = 50;
+      for (var i = 0; i < queueIds.length; i += chunkSize) {
+        final chunk = queueIds.sublist(i, min(i + chunkSize, queueIds.length));
+        final encounters = await fetchClinicalEncounters(chunk);
+        allEncounters.addAll(encounters);
+      }
+      return allEncounters;
+    } catch (err) {
+      throw Exception('Gagal mengambil data sinkronisasi SatuSehat: $err');
+    }
+  }
+
+  // Fetch encounter details (vitals, anamnesis, diagnosis, medicines) in parallel
+  Future<Map<String, dynamic>> fetchEncounterDetails(String encounterId) async {
+    try {
+      final futures = await Future.wait<dynamic>([
+        // 1. Vitals
+        client
+            .schema('private_doctor')
+            .from('vital_signs')
+            .select()
+            .eq('id_clinical_ecounter', encounterId)
+            .maybeSingle(),
+        // 2. Anamnesis (complaint, exam)
+        client
+            .schema('private_doctor')
+            .from('anamnesis_ecounter')
+            .select()
+            .eq('id_clinical_ecounter', encounterId)
+            .maybeSingle(),
+        // 3. ICD-10 Diagnosis
+        client
+            .schema('private_doctor')
+            .from('icdx_ecounter')
+            .select()
+            .eq('id_clinical_ecounters', encounterId),
+        // 4. Inventory Medicines
+        client
+            .schema('private_doctor')
+            .from('medicine_ecounter')
+            .select('*, detail_medicine(*, medicine(*))')
+            .eq('id_clinical_encounters', encounterId),
+        // 5. Electronic Prescriptions (and their items)
+        client
+            .schema('private_doctor')
+            .from('electronic_prescriptions')
+            .select('*, electronic_prescription_items(*)')
+            .eq('id_clinical_encounter', encounterId)
+            .maybeSingle(),
+      ]);
+
+      return {
+        'vitals': futures[0] as Map<String, dynamic>?,
+        'anamnesis': futures[1] as Map<String, dynamic>?,
+        'diagnosis': (futures[2] as List<dynamic>?)?.map((e) => e as Map<String, dynamic>).toList() ?? [],
+        'inventory_items': (futures[3] as List<dynamic>?)?.map((e) => e as Map<String, dynamic>).toList() ?? [],
+        'prescription': futures[4] as Map<String, dynamic>?,
+      };
+    } catch (e) {
+      throw Exception('Gagal mengambil rincian rekam medis: $e');
+    }
+  }
 }
+
 
 

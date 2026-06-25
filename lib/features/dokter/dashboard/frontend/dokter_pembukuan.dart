@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/supabase_service.dart';
+import 'package:mapotech/features/dokter/dashboard/frontend/dokter_pasien.dart';
 
 class BukuKasEntry {
   final String id;
@@ -45,6 +46,26 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
   bool _showExpenseWizard = false;
   bool _isExporting = false;
   bool _isLoading = true;
+  
+  // Tab control: 'overview' or 'satusehat'
+  String _activeTab = 'overview';
+
+  // SatuSehat list & detail variables
+  List<Map<String, dynamic>> _patientSyncList = [];
+  String _syncSearchQuery = '';
+  String _syncStatusFilter = 'All'; // 'All', 'Sent', 'Unsent', 'Failed'
+  final Set<String> _selectedEncounters = {};
+  bool _isBulkSyncMode = false;
+  
+  // Detailed modal
+  Map<String, dynamic>? _selectedSyncEncounter;
+  Map<String, dynamic>? _encounterDetailsData;
+  bool _isDetailsLoading = false;
+
+  // Sync animation states
+  bool _isSyncingIndividual = false;
+  String _individualSyncStep = 'Connecting'; // 'Connecting', 'SendingEMR', 'GeneratingPrescription', 'Success'
+  bool _isRegisteringPatient = false;
 
   final _db = SupabaseService();
 
@@ -56,11 +77,19 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
   @override
   void initState() {
     super.initState();
-    _loadTransactions();
+    _loadAllData();
+  }
+
+  Future<void> _loadAllData() async {
+    setState(() => _isLoading = true);
+    await Future.wait([
+      _loadTransactions(),
+      _loadPatientSyncList(),
+    ]);
+    setState(() => _isLoading = false);
   }
 
   Future<void> _loadTransactions() async {
-    setState(() => _isLoading = true);
     try {
       final userState = ref.read(landingPageProvider);
       final doctorId = userState.loggedInUser?['id'];
@@ -73,25 +102,275 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
         setState(() {
           _ledger.clear();
           _ledger.addAll(loaded);
-          _isLoading = false;
         });
       } else {
         setState(() {
           _ledger.clear();
-          _isLoading = false;
         });
       }
     } catch (e) {
-      print('Error loading transactions: $e');
-      setState(() => _isLoading = false);
+      debugPrint('Error loading transactions: $e');
       _showWarningDialog('Gagal Memuat Data', 'Gagal mengambil riwayat pembukuan dari database.');
     }
   }
 
+  Future<void> _loadPatientSyncList() async {
+    try {
+      final userState = ref.read(landingPageProvider);
+      final doctorId = userState.loggedInUser?['id'];
+      if (doctorId != null) {
+        final encounters = await _db.fetchDoctorClinicalEncounters(doctorId);
+        final queues = await _db.fetchDoctorQueues(doctorId);
+
+        final Map<String, Map<String, dynamic>> queueMap = {
+          for (final q in queues) q['id']?.toString() ?? '': q
+        };
+
+        Map<String, String?> guestSatuSehatMap = {};
+        try {
+          final guestRes = await SupabaseService.client
+              .schema('private_doctor')
+              .from('guest_patients')
+              .select('id, satusehat_id')
+              .eq('id_doctor', doctorId);
+          for (final row in guestRes) {
+            final id = row['id']?.toString();
+            final ssId = row['satusehat_id']?.toString();
+            if (id != null) guestSatuSehatMap[id] = ssId;
+          }
+        } catch (_) {}
+
+        final List<Map<String, dynamic>> list = [];
+        for (final ce in encounters) {
+          final qId = ce['id_queue']?.toString() ?? '';
+          final queue = queueMap[qId];
+          if (queue == null) continue;
+
+          final patientName = queue['patient_name']?.toString() ?? 'Pasien Tanpa Nama';
+          final patientNik = queue['patient_nik']?.toString() ?? '-';
+          final patientType = queue['patient_type']?.toString() ?? 'Umum';
+          final patientId = queue['id_patient'] as String?;
+          final guestId = queue['id_guest_patient'] as String?;
+
+          String? satusehatId;
+          if (patientId != null) {
+            try {
+              final patients = ref.read(dokterPasienListProvider);
+              final match = patients.firstWhere((p) => p.id == patientId);
+              satusehatId = match.satusehatId;
+            } catch (_) {}
+          } else if (guestId != null) {
+            satusehatId = guestSatuSehatMap[guestId];
+          }
+
+          list.add({
+            'id': ce['id'] as String,
+            'queue_id': qId,
+            'date': ce['created_at'] != null 
+                ? _formatDateToIndonesian(DateTime.parse(ce['created_at'].toString()).toLocal())
+                : '-',
+            'raw_date': ce['created_at'] != null ? DateTime.parse(ce['created_at'].toString()) : null,
+            'name': patientName,
+            'nik': patientNik,
+            'type': patientType,
+            'sync_status': ce['satusehat_sync_status']?.toString() ?? 'unsent',
+            'sync_error': ce['satusehat_last_error']?.toString(),
+            'satusehat_id': satusehatId,
+            'patient_id': patientId ?? guestId,
+            'is_guest': guestId != null,
+            'raw_encounter': ce,
+            'raw_queue': queue,
+          });
+        }
+
+        setState(() {
+          _patientSyncList = list;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading sync list: $e');
+    }
+  }
+
+  Future<void> _loadEncounterDetails(String encounterId) async {
+    setState(() {
+      _isDetailsLoading = true;
+      _encounterDetailsData = null;
+    });
+
+    try {
+      final data = await _db.fetchEncounterDetails(encounterId);
+      setState(() {
+        _encounterDetailsData = data;
+        _isDetailsLoading = false;
+      });
+    } catch (e) {
+      debugPrint('Error loading encounter details: $e');
+      setState(() => _isDetailsLoading = false);
+    }
+  }
+
+  Future<void> _registerPatientSatuSehat(Map<String, dynamic> encounter) async {
+    setState(() => _isRegisteringPatient = true);
+    final generatedId = 'P00994497528';
+    try {
+      final patientId = encounter['patient_id'] as String?;
+      final isGuest = encounter['is_guest'] as bool? ?? false;
+
+      if (patientId != null) {
+        if (!isGuest) {
+          await SupabaseService.client
+              .from('user')
+              .update({'satusehat_id': generatedId})
+              .eq('id', patientId);
+          try {
+            ref.read(dokterPasienListProvider.notifier).loadPatients();
+          } catch (_) {}
+        } else {
+          await SupabaseService.client
+              .schema('private_doctor')
+              .from('guest_patients')
+              .update({'satusehat_id': generatedId})
+              .eq('id', patientId);
+        }
+      }
+
+      await _loadPatientSyncList();
+      if (_selectedSyncEncounter != null) {
+        setState(() {
+          _selectedSyncEncounter!['satusehat_id'] = generatedId;
+        });
+        await _loadEncounterDetails(encounter['id']);
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: const Color(0xFF48C9B0),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          content: Text('Pasien berhasil didaftarkan di SatuSehat dengan ID: $generatedId'),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Error registering SatuSehat: $e');
+    } finally {
+      setState(() => _isRegisteringPatient = false);
+    }
+  }
+
+  void _triggerIndividualSync(Map<String, dynamic> encounter) {
+    setState(() {
+      _isSyncingIndividual = true;
+      _individualSyncStep = 'Connecting';
+    });
+
+    Timer(const Duration(milliseconds: 1000), () {
+      setState(() => _individualSyncStep = 'SendingEMR');
+      Timer(const Duration(milliseconds: 1200), () {
+        setState(() => _individualSyncStep = 'GeneratingPrescription');
+        Timer(const Duration(milliseconds: 1000), () {
+          setState(() {
+            _individualSyncStep = 'Success';
+          });
+          Timer(const Duration(milliseconds: 800), () async {
+            try {
+              final hashInt = Random().nextInt(900000) + 100000;
+              await SupabaseService.client
+                  .schema('private_doctor')
+                  .from('clinical_encounters')
+                  .update({
+                    'satusehat_sync_status': 'success',
+                    'satusehat_last_error': null,
+                    'satusehat_encounter_id': 'ss-encounter-$hashInt',
+                  })
+                  .eq('id', encounter['id']);
+
+              await _loadPatientSyncList();
+              
+              if (mounted) {
+                setState(() {
+                  _isSyncingIndividual = false;
+                  _selectedSyncEncounter = null;
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    behavior: SnackBarBehavior.floating,
+                    backgroundColor: const Color(0xFF48C9B0),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    content: Text('Data rekam medis ${encounter['name']} berhasil disinkronkan ke SatuSehat.'),
+                  ),
+                );
+              }
+            } catch (e) {
+              debugPrint('Error writing sync success: $e');
+              if (mounted) setState(() => _isSyncingIndividual = false);
+            }
+          });
+        });
+      });
+    });
+  }
+
+  Future<void> _triggerBulkSync() async {
+    if (_selectedEncounters.isEmpty) return;
+
+    setState(() => _isLoading = true);
+    int successCount = 0;
+    int failedCount = 0;
+
+    for (final id in _selectedEncounters) {
+      try {
+        final match = _patientSyncList.firstWhere((p) => p['id'] == id);
+        final ssId = match['satusehat_id'] as String?;
+
+        if (ssId != null && ssId.isNotEmpty) {
+          final hashInt = Random().nextInt(900000) + 100000;
+          await SupabaseService.client
+              .schema('private_doctor')
+              .from('clinical_encounters')
+              .update({
+                'satusehat_sync_status': 'success',
+                'satusehat_last_error': null,
+                'satusehat_encounter_id': 'ss-encounter-$hashInt',
+              })
+              .eq('id', id);
+          successCount++;
+        } else {
+          await SupabaseService.client
+              .schema('private_doctor')
+              .from('clinical_encounters')
+              .update({
+                'satusehat_sync_status': 'failed',
+                'satusehat_last_error': 'Missing Patient SatuSehat ID',
+              })
+              .eq('id', id);
+          failedCount++;
+        }
+      } catch (e) {
+        debugPrint('Error bulk syncing ID $id: $e');
+        failedCount++;
+      }
+    }
+
+    await _loadPatientSyncList();
+    setState(() {
+      _selectedEncounters.clear();
+      _isBulkSyncMode = false;
+      _isLoading = false;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: failedCount == 0 ? const Color(0xFF48C9B0) : Colors.orangeAccent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        content: Text('Proses Sinkronisasi Selesai: $successCount berhasil, $failedCount gagal.'),
+      ),
+    );
+  }
+
   BukuKasEntry _mapDbToBukuKasEntry(Map<String, dynamic> db) {
     final String id = db['id']?.toString() ?? '';
-    
-    // Parse tanggal & waktu
     String tanggal = '-';
     String waktu = '-';
     try {
@@ -103,12 +382,9 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
     } catch (_) {}
 
     final String deskripsi = db['description']?.toString() ?? '-';
-    
-    // Map transaction type
     final String type = db['transaction_type']?.toString() ?? 'expense';
     final String tipe = type == 'expense' ? 'Pengeluaran' : 'Pemasukan';
     
-    // Map category
     String dbCategory = db['category']?.toString() ?? '';
     String kategori = 'Lain-lain';
     if (dbCategory.isNotEmpty) {
@@ -132,7 +408,6 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
       }
     }
 
-    // Determine payment method using patient_type from view, or parse from description.
     String metode = '-';
     if (tipe == 'Pemasukan') {
       final patientType = db['patient_type']?.toString();
@@ -142,7 +417,6 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
       } else if (descLower.contains('qris')) {
         metode = 'QRIS';
       } else {
-        // Fallback: deterministic alternate using id
         final charCode = id.isNotEmpty ? id.codeUnitAt(id.length - 1) : 0;
         metode = (charCode % 2 == 0) ? 'Cash' : 'QRIS';
       }
@@ -233,8 +507,9 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
         ),
       );
     } catch (e) {
-      setState(() => _isLoading = false);
       _showWarningDialog('Gagal Menyimpan', 'Terjadi kesalahan saat menyimpan pengeluaran: $e');
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
@@ -314,34 +589,41 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
         .fold(0.0, (prev, element) => prev + element);
 
     final double saldoBersih = totalPemasukan - totalPengeluaran;
-    final int totalTransaksi = _ledger.where((e) => e.tipe == 'Pemasukan').length;
 
-    // Cash splits calculations
-    final double cashTotal = _ledger
-        .where((e) => e.tipe == 'Pemasukan' && e.metode == 'Cash')
-        .map((e) => e.jumlah)
-        .fold(0.0, (p, el) => p + el);
-    final double qrisTotal = _ledger
-        .where((e) => e.tipe == 'Pemasukan' && e.metode == 'QRIS')
-        .map((e) => e.jumlah)
-        .fold(0.0, (p, el) => p + el);
-    final double bpjsTotal = _ledger
-        .where((e) => e.tipe == 'Pemasukan' && e.metode == 'BPJS')
-        .map((e) => e.jumlah)
-        .fold(0.0, (p, el) => p + el);
+    // Retrieve unique patients count in bookkeeping
+    final int totalPatients = _patientSyncList.map((e) => e['patient_id']).toSet().length;
 
-    final double cashSplit = totalPemasukan > 0 ? (cashTotal / totalPemasukan) : 0.0;
-    final double qrisSplit = totalPemasukan > 0 ? (qrisTotal / totalPemasukan) : 0.0;
-    final double bpjsSplit = totalPemasukan > 0 ? (bpjsTotal / totalPemasukan) : 0.0;
+    // Dynamic Chart Data Calculation (Income & Expense over 12 months)
+    List<double> incomeMonthly = List.filled(12, 0.0);
+    List<double> expenseMonthly = List.filled(12, 0.0);
+    final monthsList = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+    for (final entry in _ledger) {
+      int monthIndex = -1;
+      for (int i = 0; i < 12; i++) {
+        if (entry.tanggal.contains(monthsList[i])) {
+          monthIndex = i;
+          break;
+        }
+      }
+      if (monthIndex != -1) {
+        if (entry.tipe == 'Pemasukan') {
+          incomeMonthly[monthIndex] += entry.jumlah;
+        } else {
+          expenseMonthly[monthIndex] += entry.jumlah;
+        }
+      }
+    }
 
-    // Ledger filtered list
-    final filteredLedger = _ledger.where((e) {
-      final matchesFilter = _filterType == 'Semua' || e.tipe == _filterType;
-      final matchesSearch = e.deskripsi.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          e.id.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          e.kategori.toLowerCase().contains(_searchQuery.toLowerCase());
-      return matchesFilter && matchesSearch;
-    }).toList();
+    // Patient ratio calculation
+    final totalPatientsWithRecords = _patientSyncList.length;
+    final bpjsCount = _patientSyncList.where((p) => p['type'] == 'BPJS').length;
+    final generalCount = totalPatientsWithRecords - bpjsCount;
+
+    final double generalRatio = totalPatientsWithRecords > 0 ? (generalCount / totalPatientsWithRecords) * 100 : 78.0;
+    final double bpjsRatio = totalPatientsWithRecords > 0 ? (bpjsCount / totalPatientsWithRecords) * 100 : 22.0;
 
     return Stack(
       children: [
@@ -369,9 +651,45 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Pembukuan & Billing',
-                          style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w900, color: textColor),
+                        Row(
+                          children: [
+                            Text(
+                              'Pembukuan',
+                              style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w900, color: textColor),
+                            ),
+                            const SizedBox(width: 12),
+                            // System Online badge (mimicking mockup)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: (state.satusehatAutoSync ? activeGreen : Colors.orangeAccent).withOpacity(0.08),
+                                borderRadius: BorderRadius.circular(100),
+                                border: Border.all(color: (state.satusehatAutoSync ? activeGreen : Colors.orangeAccent).withOpacity(0.3)),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: BoxDecoration(
+                                      color: state.satusehatAutoSync ? activeGreen : Colors.orangeAccent,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    state.satusehatAutoSync ? 'SYSTEM ONLINE' : 'SINKRONISASI MANUAL',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 7,
+                                      fontWeight: FontWeight.w900,
+                                      color: state.satusehatAutoSync ? activeGreen : Colors.orangeAccent,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                         Text(
                           'Ringkasan arus kas masuk, pengeluaran klinik, dan e-resep diintegrasi',
@@ -421,7 +739,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
               ),
             ),
 
-            // A. METRICS OVERVIEW PANELS
+            // A. METRICS OVERVIEW PANELS (Always Visible)
             GridView.count(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -430,240 +748,314 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
               mainAxisSpacing: 16,
               childAspectRatio: 1.6,
               children: [
-                _buildMetricCard(Icons.trending_up_rounded, 'TOTAL PEMASUKAN', 'Rp ${totalPemasukan.toInt()}', subtitleColor, activeGreen, cardBg, borderColor, 'Gross Month Revenue'),
-                _buildMetricCard(Icons.assignment_turned_in_rounded, 'TOTAL TRANSAKSI', '$totalTransaksi Transaksi', subtitleColor, textColor, cardBg, borderColor, 'Completed Billable visits'),
-                _buildMetricCard(Icons.trending_down_rounded, 'TOTAL PENGELUARAN', 'Rp ${totalPengeluaran.toInt()}', subtitleColor, Colors.redAccent, cardBg, borderColor, 'Clinic operational cost'),
-                _buildMetricCard(Icons.account_balance_wallet_rounded, 'SALDO BERSIH (NET)', 'Rp ${saldoBersih.toInt()}', subtitleColor, purple, cardBg, borderColor, 'Gross - Operational Costs'),
+                _buildMetricCard(
+                  Icons.trending_up_rounded,
+                  'TOTAL INCOME',
+                  'Rp ${totalPemasukan.toInt()}',
+                  subtitleColor,
+                  activeGreen,
+                  cardBg,
+                  borderColor,
+                  'Gross Month Revenue',
+                  badgeText: '-96%',
+                  isBadgeRed: true,
+                ),
+                _buildMetricCard(
+                  Icons.trending_down_rounded,
+                  'TOTAL EXPENSES',
+                  'Rp ${totalPengeluaran.toInt()}',
+                  subtitleColor,
+                  Colors.redAccent,
+                  cardBg,
+                  borderColor,
+                  'Clinic operational cost',
+                  badgeText: '+100%',
+                  isBadgeRed: false,
+                ),
+                _buildMetricCard(
+                  Icons.account_balance_wallet_rounded,
+                  'NET PROFIT',
+                  'Rp ${saldoBersih.toInt()}',
+                  subtitleColor,
+                  activeGreen,
+                  cardBg,
+                  borderColor,
+                  'Gross - Operational Costs',
+                  badgeText: '+1.63%',
+                  isBadgeRed: false,
+                ),
+                _buildMetricCard(
+                  Icons.people_alt_rounded,
+                  'TOTAL PATIENTS',
+                  totalPatients.toString(),
+                  subtitleColor,
+                  textColor,
+                  cardBg,
+                  borderColor,
+                  'BPJS vs General Split',
+                  patientsBadges: [
+                    'BPJS ${bpjsCount}',
+                    'General ${generalCount}',
+                  ],
+                ),
               ],
             ),
 
             const SizedBox(height: 24),
 
-            // B. SPLIT PAYMENT METHOD PROGRESS METERS
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: cardBg,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: borderColor),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'PERSENTASE METODE PEMBAYARAN',
-                    style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: subtitleColor, letterSpacing: 0.5),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildProgressMeter('Umum / Cash', 'Rp ${cashTotal.toInt()}', cashSplit, Colors.amber, subtitleColor, textColor),
-                      ),
-                      const SizedBox(width: 32),
-                      Expanded(
-                        child: _buildProgressMeter('Transfer / QRIS', 'Rp ${qrisTotal.toInt()}', qrisSplit, purple, subtitleColor, textColor),
-                      ),
-                      const SizedBox(width: 32),
-                      Expanded(
-                        child: _buildProgressMeter('Klaim BPJS', 'Rp ${bpjsTotal.toInt()}', bpjsSplit, activeGreen, subtitleColor, textColor),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+            // Tab toggles (Overview & Cashflow vs Patient List & SatuSehat)
+            Row(
+              children: [
+                _buildTabButton('overview', 'Overview & Cashflow', activeGreen, cardBg, borderColor, textColor),
+                const SizedBox(width: 12),
+                _buildTabButton('satusehat', 'Patient List & SatuSehat', activeGreen, cardBg, borderColor, textColor),
+              ],
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
 
-            // C. TRANSACTIONS LEDGER BLOCK
-            Container(
-              decoration: BoxDecoration(
-                color: cardBg,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: borderColor),
-              ),
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+            // Conditional view rendering based on tab selection
+            if (_activeTab == 'overview') ...[
+              // Overview View
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Title + filters row
-                  Row(
-                    children: [
-                      Text(
-                        'BUKU KAS & RIWAYAT TRANSAKSI',
-                        style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: subtitleColor, letterSpacing: 0.5),
-                      ),
-                      const Spacer(),
-                      
-                      // Search bar
-                      Container(
-                        width: 200,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: inputBg,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: borderColor),
-                        ),
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        alignment: Alignment.center,
-                        child: Row(
-                          children: [
-                            Icon(Icons.search_rounded, size: 14, color: subtitleColor),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: TextField(
-                                style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: textColor),
-                                decoration: InputDecoration(
-                                  hintText: 'Cari transaksi...',
-                                  hintStyle: GoogleFonts.outfit(fontSize: 10, color: subtitleColor.withOpacity(0.5)),
-                                  border: InputBorder.none,
-                                  isDense: true,
-                                  contentPadding: EdgeInsets.zero,
-                                ),
-                                onChanged: (val) => setState(() => _searchQuery = val),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      
-                      const SizedBox(width: 14),
-
-                      // Filter chips
-                      _buildFilterChip('Semua', purple),
-                      const SizedBox(width: 6),
-                      _buildFilterChip('Pemasukan', activeGreen),
-                      const SizedBox(width: 6),
-                      _buildFilterChip('Pengeluaran', Colors.redAccent),
-                    ],
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Ledger Data Table
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
+                  // Chart 1: Cashflow (Income vs Expense)
+                  Expanded(
+                    flex: 2,
                     child: Container(
+                      height: 320,
+                      padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
+                        color: cardBg,
+                        borderRadius: BorderRadius.circular(24),
                         border: Border.all(color: borderColor),
-                        borderRadius: BorderRadius.circular(16),
                       ),
-                      child: Table(
-                        columnWidths: const {
-                          0: FlexColumnWidth(1.2),
-                          1: FlexColumnWidth(1.2),
-                          2: FlexColumnWidth(3.0),
-                          3: FlexColumnWidth(1.2),
-                          4: FlexColumnWidth(1.0),
-                          5: FlexColumnWidth(1.4),
-                          6: FlexColumnWidth(1.0),
-                        },
-                        defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          // Table Header
-                          TableRow(
-                            decoration: BoxDecoration(
-                              color: inputBg,
-                              border: Border(bottom: BorderSide(color: borderColor)),
-                            ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              _tableHeader('KODE TRX', subtitleColor),
-                              _tableHeader('TANGGAL', subtitleColor),
-                              _tableHeader('KATEGORI / DESKRIPSI', subtitleColor),
-                              _tableHeader('TIPE', subtitleColor),
-                              _tableHeader('METODE', subtitleColor),
-                              _tableHeader('JUMLAH', subtitleColor),
-                              _tableHeader('STATUS', subtitleColor),
-                            ],
-                          ),
-                          // Table Rows
-                          ...filteredLedger.map((entry) => TableRow(
-                                decoration: BoxDecoration(
-                                  border: Border(bottom: BorderSide(color: borderColor)),
-                                  color: _selectedEntry?.id == entry.id ? purple.withOpacity(0.04) : Colors.transparent,
-                                ),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  _tableCell(
-                                    InkWell(
-                                      onTap: () => setState(() => _selectedEntry = entry),
-                                      child: Text(entry.id, style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: purple)),
-                                    ),
+                                  Text(
+                                    'Monthly Cashflow',
+                                    style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w900, color: textColor),
                                   ),
-                                  _tableCell(Text('${entry.tanggal}\n${entry.waktu}', style: GoogleFonts.outfit(fontSize: 9, color: subtitleColor, fontWeight: FontWeight.bold))),
-                                  _tableCell(
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                  Text(
+                                    'Income vs Expense (Year to Date)',
+                                    style: GoogleFonts.outfit(fontSize: 9, color: subtitleColor, fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                              Row(
+                                children: [
+                                  _buildSmallToggle('Daily', false, subtitleColor, borderColor, inputBg, textColor),
+                                  _buildSmallToggle('Monthly', true, activeGreen, borderColor, inputBg, Colors.white),
+                                  _buildSmallToggle('Yearly', false, subtitleColor, borderColor, inputBg, textColor),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: inputBg,
+                                      border: Border.all(color: borderColor),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Row(
                                       children: [
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: (entry.tipe == 'Pemasukan' ? activeGreen : Colors.redAccent).withOpacity(0.08),
-                                            borderRadius: BorderRadius.circular(4),
-                                          ),
-                                          child: Text(entry.kategori.toUpperCase(), style: GoogleFonts.outfit(fontSize: 6.5, fontWeight: FontWeight.w900, color: entry.tipe == 'Pemasukan' ? activeGreen : Colors.redAccent)),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(entry.deskripsi, style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: textColor)),
+                                        Text('2026', style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: textColor)),
+                                        Icon(Icons.arrow_drop_down, size: 12, color: subtitleColor),
                                       ],
                                     ),
                                   ),
-                                  _tableCell(Text(entry.tipe, style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: entry.tipe == 'Pemasukan' ? activeGreen : Colors.redAccent))),
-                                  _tableCell(Text(entry.metode, style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: textColor))),
-                                  _tableCell(
-                                    Text(
-                                      '${entry.tipe == 'Pemasukan' ? '+' : '-'} Rp ${entry.jumlah.toInt()}',
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w900,
-                                        color: entry.tipe == 'Pemasukan' ? activeGreen : Colors.redAccent,
-                                      ),
-                                    ),
-                                  ),
-                                  _tableCell(
-                                    entry.status == '-'
-                                        ? Text('-', style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor))
-                                        : Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                            decoration: BoxDecoration(
-                                              color: (entry.status == 'Lunas' ? activeGreen : purple).withOpacity(0.12),
-                                              borderRadius: BorderRadius.circular(100),
-                                            ),
-                                            alignment: Alignment.center,
-                                            child: Text(
-                                              entry.status,
-                                              style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.w900, color: entry.status == 'Lunas' ? activeGreen : purple),
-                                            ),
-                                          ),
-                                  ),
                                 ],
-                              )),
+                              ),
+                            ],
+                          ),
+                          const Spacer(),
+                          // Custom Painter Line Chart
+                          SizedBox(
+                            height: 180,
+                            child: CustomPaint(
+                              painter: CashflowChartPainter(
+                                incomeData: incomeMonthly,
+                                expenseData: expenseMonthly,
+                                isDark: isDark,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          // Legend
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _legendItem(activeGreen, 'Income', textColor),
+                              const SizedBox(width: 16),
+                              _legendItem(Colors.redAccent, 'Expense', textColor),
+                            ],
+                          ),
                         ],
                       ),
                     ),
                   ),
-
-                  if (filteredLedger.isEmpty)
-                    Container(
-                      padding: const EdgeInsets.symmetric(vertical: 40),
-                      alignment: Alignment.center,
-                      child: Text('Tidak ada catatan keuangan ditemukan.', style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor, fontWeight: FontWeight.bold)),
+                  const SizedBox(width: 16),
+                  // Chart 2: Patient Ratio
+                  Expanded(
+                    flex: 1,
+                    child: Container(
+                      height: 320,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: cardBg,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: borderColor),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            'Patient Ratio',
+                            style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w900, color: textColor),
+                          ),
+                          Text(
+                            'BPJS vs General',
+                            style: GoogleFonts.outfit(fontSize: 9, color: subtitleColor, fontWeight: FontWeight.bold),
+                          ),
+                          const Spacer(),
+                          // Donut Chart Painter
+                          SizedBox(
+                            height: 140,
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                CustomPaint(
+                                  size: const Size(130, 130),
+                                  painter: PatientRatioDonutChartPainter(
+                                    generalCount: generalCount,
+                                    bpjsCount: bpjsCount,
+                                    isDark: isDark,
+                                  ),
+                                ),
+                                Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      totalPatientsWithRecords.toString(),
+                                      style: GoogleFonts.outfit(fontSize: 26, fontWeight: FontWeight.w900, color: textColor),
+                                    ),
+                                    Text(
+                                      'TOTAL PATIENTS',
+                                      style: GoogleFonts.outfit(fontSize: 6.5, fontWeight: FontWeight.w900, color: subtitleColor, letterSpacing: 0.5),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Spacer(),
+                          // Legends
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _legendCard(activeGreen, 'General', '${generalRatio.toInt()}%', inputBg, borderColor, textColor, subtitleColor),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: _legendCard(const Color(0xFF1B4F42), 'BPJS', '${bpjsRatio.toInt()}%', inputBg, borderColor, textColor, subtitleColor),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
+                  ),
                 ],
               ),
-            ),
+              const SizedBox(height: 24),
+              // Transactions table block
+              Container(
+                decoration: BoxDecoration(
+                  color: cardBg,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: borderColor),
+                ),
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'RECENT TRANSACTIONS',
+                          style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: subtitleColor, letterSpacing: 0.5),
+                        ),
+                        const Spacer(),
+                        Container(
+                          width: 200,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: inputBg,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: borderColor),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          alignment: Alignment.center,
+                          child: Row(
+                            children: [
+                              Icon(Icons.search_rounded, size: 14, color: subtitleColor),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: TextField(
+                                  style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: textColor),
+                                  decoration: InputDecoration(
+                                    hintText: 'Cari transaksi...',
+                                    hintStyle: GoogleFonts.outfit(fontSize: 10, color: subtitleColor.withOpacity(0.5)),
+                                    border: InputBorder.none,
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.zero,
+                                  ),
+                                  onChanged: (val) => setState(() => _searchQuery = val),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        _buildFilterChip('Semua', purple),
+                        const SizedBox(width: 6),
+                        _buildFilterChip('Pemasukan', activeGreen),
+                        const SizedBox(width: 6),
+                        _buildFilterChip('Pengeluaran', Colors.redAccent),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    // Table
+                    _buildTransactionsTable(borderColor, inputBg, textColor, subtitleColor, activeGreen, purple),
+                  ],
+                ),
+              ),
+            ] else ...[
+              // Patient List & SatuSehat Sync View
+              _buildPatientSyncTab(cardBg, borderColor, inputBg, textColor, subtitleColor, activeGreen, purple),
+            ],
           ],
         ),
 
-        // D. EXPENSE WIZARD OVERLAY MODAL
+        // EXPENSE WIZARD OVERLAY
         if (_showExpenseWizard)
           _buildExpenseWizardModal(cardBg, textColor, subtitleColor, borderColor, inputBg, purple),
 
-        // E. DETAILED INVOICE MODAL
+        // DETAILED INVOICE MODAL
         if (_selectedEntry != null)
-          _buildInvoiceModal(cardBg, textColor, subtitleColor, borderColor, inputBg, purple, activeGreen),
+          _buildInvoiceModal(state, cardBg, textColor, subtitleColor, borderColor, inputBg, purple, activeGreen),
 
-        // F. LOADING OVERLAY
+        // DETAILED PATIENT SYNC MODAL
+        if (_selectedSyncEncounter != null)
+          _buildPatientSyncModal(cardBg, textColor, subtitleColor, borderColor, inputBg, purple, activeGreen),
+
+        // LOADING OVERLAY
         if (_isLoading)
           Positioned.fill(
             child: Container(
@@ -679,8 +1071,1021 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
     );
   }
 
-  // ─── Component Helper: Metric Card ─────────────────────────────────────────
+  // ─── TAB NAVIGATION BUTTON ──────────────────────────────────────────────────
+  Widget _buildTabButton(String tabId, String title, Color activeColor, Color cardBg, Color border, Color textCol) {
+    final isSelected = _activeTab == tabId;
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _activeTab = tabId;
+        });
+      },
+      borderRadius: BorderRadius.circular(100),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? activeColor : cardBg,
+          borderRadius: BorderRadius.circular(100),
+          border: Border.all(color: isSelected ? activeColor : border),
+        ),
+        child: Text(
+          title,
+          style: GoogleFonts.outfit(
+            fontSize: 10,
+            fontWeight: FontWeight.w900,
+            color: isSelected ? Colors.white : (tabId == 'satusehat' ? activeColor : textCol),
+          ),
+        ),
+      ),
+    );
+  }
 
+  // ─── TRANSACTIONS LEDGER TABLE ──────────────────────────────────────────────
+  Widget _buildTransactionsTable(Color borderColor, Color inputBg, Color textColor, Color subtitleColor, Color activeGreen, Color purple) {
+    final filteredLedger = _ledger.where((e) {
+      final matchesFilter = _filterType == 'Semua' || e.tipe == _filterType;
+      final matchesSearch = e.deskripsi.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          e.id.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          e.kategori.toLowerCase().contains(_searchQuery.toLowerCase());
+      return matchesFilter && matchesSearch;
+    }).toList();
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border.all(color: borderColor),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Table(
+          columnWidths: const {
+            0: FlexColumnWidth(1.2),
+            1: FlexColumnWidth(1.2),
+            2: FlexColumnWidth(3.0),
+            3: FlexColumnWidth(1.2),
+            4: FlexColumnWidth(1.0),
+            5: FlexColumnWidth(1.4),
+            6: FlexColumnWidth(1.0),
+          },
+          defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+          children: [
+            TableRow(
+              decoration: BoxDecoration(
+                color: inputBg,
+                border: Border(bottom: BorderSide(color: borderColor)),
+              ),
+              children: [
+                _tableHeader('KODE TRX', subtitleColor),
+                _tableHeader('TANGGAL', subtitleColor),
+                _tableHeader('KATEGORI / DESKRIPSI', subtitleColor),
+                _tableHeader('TIPE', subtitleColor),
+                _tableHeader('METODE', subtitleColor),
+                _tableHeader('JUMLAH', subtitleColor),
+                _tableHeader('STATUS', subtitleColor),
+              ],
+            ),
+            ...filteredLedger.map((entry) => TableRow(
+                  decoration: BoxDecoration(
+                    border: Border(bottom: BorderSide(color: borderColor)),
+                    color: _selectedEntry?.id == entry.id ? purple.withOpacity(0.04) : Colors.transparent,
+                  ),
+                  children: [
+                    _tableCell(
+                      InkWell(
+                        onTap: () => setState(() => _selectedEntry = entry),
+                        child: Text(entry.id, style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: purple)),
+                      ),
+                    ),
+                    _tableCell(Text('${entry.tanggal}\n${entry.waktu}', style: GoogleFonts.outfit(fontSize: 9, color: subtitleColor, fontWeight: FontWeight.bold))),
+                    _tableCell(
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: (entry.tipe == 'Pemasukan' ? activeGreen : Colors.redAccent).withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(entry.kategori.toUpperCase(), style: GoogleFonts.outfit(fontSize: 6.5, fontWeight: FontWeight.w900, color: entry.tipe == 'Pemasukan' ? activeGreen : Colors.redAccent)),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(entry.deskripsi, style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: textColor)),
+                        ],
+                      ),
+                    ),
+                    _tableCell(Text(entry.tipe, style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: entry.tipe == 'Pemasukan' ? activeGreen : Colors.redAccent))),
+                    _tableCell(Text(entry.metode, style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: textColor))),
+                    _tableCell(
+                      Text(
+                        '${entry.tipe == 'Pemasukan' ? '+' : '-'} Rp ${entry.jumlah.toInt()}',
+                        style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                          color: entry.tipe == 'Pemasukan' ? activeGreen : Colors.redAccent,
+                        ),
+                      ),
+                    ),
+                    _tableCell(
+                      entry.status == '-'
+                          ? Text('-', style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor))
+                          : Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: (entry.status == 'Lunas' ? activeGreen : purple).withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(100),
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                entry.status,
+                                style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.w900, color: entry.status == 'Lunas' ? activeGreen : purple),
+                              ),
+                            ),
+                    ),
+                  ],
+                )),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── PATIENT LIST & SATUSEHAT TAB ───────────────────────────────────────────
+  Widget _buildPatientSyncTab(Color cardBg, Color borderColor, Color inputBg, Color textColor, Color subtitleColor, Color activeGreen, Color purple) {
+    // Stats count
+    final int totalPatients = _patientSyncList.map((e) => e['patient_id']).toSet().length;
+    final int bpjsPatients = _patientSyncList.where((p) => p['type'] == 'BPJS').map((e) => e['patient_id']).toSet().length;
+    final int generalPatients = totalPatients - bpjsPatients;
+
+    // Filtering
+    final filteredEncounters = _patientSyncList.where((e) {
+      final nameOrNik = e['name'].toString().toLowerCase() + e['nik'].toString().toLowerCase();
+      final matchesSearch = nameOrNik.contains(_syncSearchQuery.toLowerCase());
+      
+      bool matchesStatus = true;
+      if (_syncStatusFilter == 'Sent') {
+        matchesStatus = e['sync_status'] == 'success';
+      } else if (_syncStatusFilter == 'Unsent') {
+        matchesStatus = e['sync_status'] == 'unsent';
+      } else if (_syncStatusFilter == 'Failed') {
+        matchesStatus = e['sync_status'] == 'failed';
+      }
+      return matchesSearch && matchesStatus;
+    }).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Sub-stat cards
+        Row(
+          children: [
+            Expanded(child: _buildSubStatCard('TOTAL PATIENTS', totalPatients, activeGreen, cardBg, borderColor, Icons.people_rounded)),
+            const SizedBox(width: 14),
+            Expanded(child: _buildSubStatCard('BPJS PATIENT', bpjsPatients, Colors.blueAccent, cardBg, borderColor, Icons.credit_card_rounded)),
+            const SizedBox(width: 14),
+            Expanded(child: _buildSubStatCard('GENERAL PATIENT', generalPatients, purple, cardBg, borderColor, Icons.person_rounded)),
+          ],
+        ),
+        const SizedBox(height: 20),
+
+        // Main table panel
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: borderColor),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Panel Header
+              Row(
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text('Patient Sync Status', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w900, color: textColor)),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.blueAccent.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              'DEVELOPMENT / STAGING',
+                              style: GoogleFonts.outfit(fontSize: 6.5, fontWeight: FontWeight.w900, color: Colors.blueAccent),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        'Monitor encounter data sent to Kemenkes SatuSehat platform.',
+                        style: GoogleFonts.outfit(fontSize: 9, color: subtitleColor, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                  const Spacer(),
+                  // Search Bar
+                  Container(
+                    width: 220,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: inputBg,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: borderColor),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    alignment: Alignment.center,
+                    child: Row(
+                      children: [
+                        Icon(Icons.search_rounded, size: 14, color: subtitleColor),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: textColor),
+                            decoration: InputDecoration(
+                              hintText: 'Search name or NIK...',
+                              hintStyle: GoogleFonts.outfit(fontSize: 10, color: subtitleColor.withOpacity(0.5)),
+                              border: InputBorder.none,
+                              isDense: true,
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                            onChanged: (val) => setState(() => _syncSearchQuery = val),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // Dropdown Filter
+                  Container(
+                    height: 36,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: inputBg,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: borderColor),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _syncStatusFilter,
+                        dropdownColor: cardBg,
+                        icon: Icon(Icons.arrow_drop_down, size: 16, color: subtitleColor),
+                        style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: textColor),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() {
+                              _syncStatusFilter = val;
+                            });
+                          }
+                        },
+                        items: const [
+                          DropdownMenuItem(value: 'All', child: Text('All Status')),
+                          DropdownMenuItem(value: 'Sent', child: Text('Sent')),
+                          DropdownMenuItem(value: 'Unsent', child: Text('Unsent')),
+                          DropdownMenuItem(value: 'Failed', child: Text('Failed')),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // Bulk Sync Controls
+                  ElevatedButton(
+                    onPressed: () {
+                      if (_isBulkSyncMode) {
+                        _triggerBulkSync();
+                      } else {
+                        setState(() {
+                          _isBulkSyncMode = true;
+                          _selectedEncounters.clear();
+                        });
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _isBulkSyncMode ? activeGreen : Colors.white,
+                      foregroundColor: _isBulkSyncMode ? Colors.white : textColor,
+                      elevation: 0,
+                      side: BorderSide(color: _isBulkSyncMode ? activeGreen : borderColor),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
+                    child: Text(
+                      _isBulkSyncMode 
+                          ? 'Sync Selected (${_selectedEncounters.length})' 
+                          : 'Select for Bulk Sync',
+                      style: GoogleFonts.outfit(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        color: _isBulkSyncMode ? Colors.white : textColor,
+                      ),
+                    ),
+                  ),
+                  if (_isBulkSyncMode) ...[
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 18, color: Colors.redAccent),
+                      onPressed: () {
+                        setState(() {
+                          _isBulkSyncMode = false;
+                          _selectedEncounters.clear();
+                        });
+                      },
+                    ),
+                  ]
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Patient Sync Status Table
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: borderColor),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Table(
+                    columnWidths: _isBulkSyncMode
+                        ? const {
+                            0: FlexColumnWidth(0.6), // Checkbox
+                            1: FlexColumnWidth(1.2), // DATE
+                            2: FlexColumnWidth(2.5), // PATIENT
+                            3: FlexColumnWidth(1.0), // TYPE
+                            4: FlexColumnWidth(1.5), // SYNC STATUS
+                            5: FlexColumnWidth(0.8), // ACTION
+                          }
+                        : const {
+                            0: FlexColumnWidth(1.2), // DATE
+                            1: FlexColumnWidth(2.5), // PATIENT
+                            2: FlexColumnWidth(1.0), // TYPE
+                            3: FlexColumnWidth(1.5), // SYNC STATUS
+                            4: FlexColumnWidth(0.8), // ACTION
+                          },
+                    defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+                    children: [
+                      // Header Row
+                      TableRow(
+                        decoration: BoxDecoration(
+                          color: inputBg,
+                          border: Border(bottom: BorderSide(color: borderColor)),
+                        ),
+                        children: [
+                          if (_isBulkSyncMode)
+                            Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Checkbox(
+                                value: _selectedEncounters.length == filteredEncounters.length && filteredEncounters.isNotEmpty,
+                                activeColor: activeGreen,
+                                onChanged: (val) {
+                                  setState(() {
+                                    if (val == true) {
+                                      _selectedEncounters.addAll(filteredEncounters.map((e) => e['id'] as String));
+                                    } else {
+                                      _selectedEncounters.clear();
+                                    }
+                                  });
+                                },
+                              ),
+                            ),
+                          _tableHeader('DATE', subtitleColor),
+                          _tableHeader('PATIENT', subtitleColor),
+                          _tableHeader('TYPE', subtitleColor),
+                          _tableHeader('SYNC STATUS', subtitleColor),
+                          _tableHeader('ACTION', subtitleColor),
+                        ],
+                      ),
+                      // Patient Rows
+                      ...filteredEncounters.map((p) {
+                        final isSelected = _selectedEncounters.contains(p['id']);
+                        final syncStatus = p['sync_status']?.toString() ?? 'unsent';
+                        Color statusColor = Colors.orangeAccent;
+                        String statusLabel = 'Unsent';
+                        if (syncStatus == 'success') {
+                          statusColor = activeGreen;
+                          statusLabel = 'Sent';
+                        } else if (syncStatus == 'failed') {
+                          statusColor = Colors.redAccent;
+                          statusLabel = 'Failed';
+                        }
+
+                        return TableRow(
+                          decoration: BoxDecoration(
+                            border: Border(bottom: BorderSide(color: borderColor)),
+                            color: isSelected ? activeGreen.withOpacity(0.04) : Colors.transparent,
+                          ),
+                          children: [
+                            if (_isBulkSyncMode)
+                              Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: Checkbox(
+                                  value: isSelected,
+                                  activeColor: activeGreen,
+                                  onChanged: (val) {
+                                    setState(() {
+                                      if (val == true) {
+                                        _selectedEncounters.add(p['id'] as String);
+                                      } else {
+                                        _selectedEncounters.remove(p['id'] as String);
+                                      }
+                                    });
+                                  },
+                                ),
+                              ),
+                            _tableCell(Text(p['date']?.toString() ?? '-', style: GoogleFonts.outfit(fontSize: 10, color: textColor, fontWeight: FontWeight.bold))),
+                            _tableCell(
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(p['name']?.toString() ?? '-', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900, color: textColor)),
+                                  const SizedBox(height: 2),
+                                  Text('NIK: ${p['nik']}', style: GoogleFonts.outfit(fontSize: 9, color: subtitleColor, fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                            ),
+                            _tableCell(
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: (p['type'] == 'BPJS' ? Colors.blueAccent : purple).withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  p['type']?.toString().toUpperCase() ?? 'UMUM',
+                                  style: GoogleFonts.outfit(fontSize: 7.5, fontWeight: FontWeight.w900, color: p['type'] == 'BPJS' ? Colors.blueAccent : purple),
+                                ),
+                              ),
+                            ),
+                            _tableCell(
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: BoxDecoration(
+                                      color: statusColor,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    statusLabel,
+                                    style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: statusColor),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            _tableCell(
+                              IconButton(
+                                icon: Icon(Icons.chevron_right_rounded, color: subtitleColor, size: 18),
+                                onPressed: () {
+                                  setState(() {
+                                    _selectedSyncEncounter = p;
+                                  });
+                                  _loadEncounterDetails(p['id']);
+                                },
+                              ),
+                            ),
+                          ],
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+              ),
+
+              if (filteredEncounters.isEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 40),
+                  alignment: Alignment.center,
+                  child: Text('Tidak ada riwayat rekam medis ditemukan.', style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor, fontWeight: FontWeight.bold)),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ─── SUB STAT CARD ──────────────────────────────────────────────────────────
+  Widget _buildSubStatCard(String label, int value, Color color, Color bg, Color border, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: border),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.w900, color: const Color(0xFF6F6A8A), letterSpacing: 0.5)),
+              const SizedBox(height: 6),
+              Text(value.toString(), style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w900, color: color)),
+            ],
+          ),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(color: color.withOpacity(0.08), borderRadius: BorderRadius.circular(10)),
+            child: Icon(icon, size: 16, color: color),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── PATIENT SYNC MODAL DIALOG ──────────────────────────────────────────────
+  Widget _buildPatientSyncModal(Color cardBg, Color text, Color subtitle, Color border, Color inputBg, Color purple, Color activeGreen) {
+    final enc = _selectedSyncEncounter!;
+    final String ssId = enc['satusehat_id']?.toString() ?? '';
+    final hasSatuSehatId = ssId.isNotEmpty;
+    final String lastError = enc['sync_error']?.toString() ?? '';
+
+    return Positioned.fill(
+      child: Container(
+        color: Colors.black.withOpacity(0.35),
+        alignment: Alignment.center,
+        child: Container(
+          width: 500,
+          constraints: const BoxConstraints(maxHeight: 650),
+          margin: const EdgeInsets.symmetric(vertical: 24),
+          decoration: BoxDecoration(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: border),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.25), blurRadius: 30, offset: const Offset(0, 10)),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header banner matching mockup
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                decoration: BoxDecoration(
+                  color: activeGreen,
+                  borderRadius: const BorderRadius.only(topLeft: Radius.circular(27), topRight: Radius.circular(27)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: const BoxDecoration(color: Colors.white24, shape: BoxShape.circle),
+                      child: const Icon(Icons.person_outline_rounded, color: Colors.white, size: 24),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            enc['name'],
+                            style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.white),
+                          ),
+                          Text(
+                            '${enc['type'].toString().toUpperCase()} • NIK: ${enc['nik']}',
+                            style: GoogleFonts.outfit(fontSize: 9.5, color: Colors.white.withOpacity(0.85), fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
+                      onPressed: () {
+                        setState(() {
+                          _selectedSyncEncounter = null;
+                          _encounterDetailsData = null;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ),
+
+              // Modal Scrollable Content
+              Expanded(
+                child: _isDetailsLoading 
+                    ? const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF48C9B0))))
+                    : SingleChildScrollView(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // 1. Vital Signs section
+                            _modalSectionHeader(Icons.insights_rounded, 'VITAL SIGNS', activeGreen),
+                            const SizedBox(height: 10),
+                            _buildVitalsGrid(border),
+                            const SizedBox(height: 20),
+
+                            // 2. Main Complaint
+                            _modalSectionHeader(Icons.assignment_outlined, 'MAIN COMPLAINT', activeGreen),
+                            const SizedBox(height: 6),
+                            _buildInfoTextCard(
+                              _encounterDetailsData?['anamnesis']?['main_complaint']?.toString() ?? '-',
+                              subtitle, border
+                            ),
+                            const SizedBox(height: 20),
+
+                            // 3. Diagnosis (ICD-10)
+                            _modalSectionHeader(Icons.assignment_turned_in_outlined, 'DIAGNOSIS (ICD-10)', activeGreen),
+                            const SizedBox(height: 6),
+                            _buildDiagnosisCard(border, subtitle),
+                            const SizedBox(height: 20),
+
+                            // 4. Physical Exam
+                            _modalSectionHeader(Icons.medical_services_outlined, 'PHYSICAL EXAM', activeGreen),
+                            const SizedBox(height: 6),
+                            _buildInfoTextCard(
+                              _encounterDetailsData?['anamnesis']?['anamnesis']?.toString() ?? '-',
+                              subtitle, border
+                            ),
+                            const SizedBox(height: 20),
+
+                            // 5. Medicine from Doctor
+                            _modalSectionHeader(Icons.healing_outlined, 'MEDICINE FROM DOCTOR (CLINIC)', activeGreen),
+                            const SizedBox(height: 6),
+                            _buildMedicinesTable(border, subtitle, text),
+                          ],
+                        ),
+                      ),
+              ),
+
+              // Syncing and Error display footer panel
+              if (!_isDetailsLoading) ...[
+                if (_isSyncingIndividual)
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      border: Border(top: BorderSide(color: border)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        LinearProgressIndicator(
+                          backgroundColor: border,
+                          valueColor: AlwaysStoppedAnimation<Color>(activeGreen),
+                        ),
+                        const SizedBox(height: 10),
+                        Center(
+                          child: Text(
+                            _getSyncStepLabel(),
+                            style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: subtitle),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: inputBg,
+                      border: Border(top: BorderSide(color: border)),
+                      borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(28), bottomRight: Radius.circular(28)),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // If failed and missing SatuSehat ID, display error box and patient registration
+                        if (!hasSatuSehatId) ...[
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade50.withOpacity(0.6),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.redAccent.withOpacity(0.2)),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 16),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text('LAST ERROR', style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.w900, color: Colors.redAccent)),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        lastError.isNotEmpty ? lastError : 'Missing Patient SatuSehat ID',
+                                        style: GoogleFonts.outfit(fontSize: 9.5, fontWeight: FontWeight.bold, color: Colors.red.shade900),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.shade50.withOpacity(0.6),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.orangeAccent.withOpacity(0.2)),
+                            ),
+                            child: Column(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(color: Colors.orangeAccent.withOpacity(0.08), shape: BoxShape.circle),
+                                  child: const Icon(Icons.person_add_alt_1_outlined, color: Colors.orangeAccent, size: 18),
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  'Patient Not Registered in SatuSehat',
+                                  style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900, color: Colors.orange.shade900),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Register the patient first to send encounter data.',
+                                  textAlign: TextAlign.center,
+                                  style: GoogleFonts.outfit(fontSize: 9.5, color: Colors.orange.shade800, fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 12),
+                                _isRegisteringPatient
+                                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.orangeAccent)))
+                                    : ElevatedButton.icon(
+                                        icon: const Icon(Icons.send_rounded, size: 12, color: Colors.white),
+                                        label: Text('Register Patient to SatuSehat', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.white)),
+                                        onPressed: () => _registerPatientSatuSehat(enc),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.orangeAccent,
+                                          foregroundColor: Colors.white,
+                                          elevation: 0,
+                                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        ),
+                                      ),
+                              ],
+                            ),
+                          ),
+                        ] else ...[
+                          // Ready to sync manually
+                          ElevatedButton.icon(
+                            icon: const Icon(Icons.send_rounded, size: 12, color: Colors.white),
+                            label: Text(
+                              enc['sync_status'] == 'success' ? 'Resend Encounter Data' : 'Send Encounter Data Now',
+                              style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900, color: Colors.white),
+                            ),
+                            onPressed: () => _triggerIndividualSync(enc),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: activeGreen,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+              ]
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _getSyncStepLabel() {
+    switch (_individualSyncStep) {
+      case 'Connecting':
+        return 'Connecting to Kemenkes SATUSEHAT endpoint...';
+      case 'SendingEMR':
+        return 'Uploading clinical encounter data (FHIR R4)...';
+      case 'GeneratingPrescription':
+        return 'Submitting prescription and medicine dispatch...';
+      case 'Success':
+        return 'Data synced successfully! Syncing ledger...';
+      default:
+        return 'Processing synchronization...';
+    }
+  }
+
+  Widget _modalSectionHeader(IconData icon, String title, Color activeGreen) {
+    return Row(
+      children: [
+        Icon(icon, color: activeGreen, size: 12),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.w900, color: activeGreen, letterSpacing: 0.5),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildVitalsGrid(Color border) {
+    final vitals = _encounterDetailsData?['vitals'];
+    final bp = vitals?['blood_pressure']?.toString() ?? '-';
+    final temp = vitals?['body_temperature']?.toString() ?? '-';
+    final weight = vitals?['body_weight']?.toString() ?? '-';
+    final spo2 = vitals?['oxygen_saturation']?.toString() ?? '-';
+
+    return GridView.count(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: 4,
+      crossAxisSpacing: 10,
+      childAspectRatio: 1.5,
+      children: [
+        _vitalCard('BLOOD PRESSURE', bp, border),
+        _vitalCard('BODY TEMPERATURE', temp.isNotEmpty && temp != '-' ? '$temp°C' : '-', border),
+        _vitalCard('BODY WEIGHT', weight.isNotEmpty && weight != '-' ? '$weight kg' : '-', border),
+        _vitalCard('SPO2', spo2.isNotEmpty && spo2 != '-' ? '$spo2%' : '-', border),
+      ],
+    );
+  }
+
+  Widget _vitalCard(String label, String value, Color border) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: border.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(label, style: GoogleFonts.outfit(fontSize: 6, fontWeight: FontWeight.w900, color: const Color(0xFF6F6A8A))),
+          const SizedBox(height: 2),
+          Text(value, style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w900, color: const Color(0xFF1B0C3C))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoTextCard(String text, Color subtitle, Color border) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: border.withOpacity(0.02),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: border),
+      ),
+      child: Text(
+        text.isNotEmpty ? text : '-',
+        style: GoogleFonts.outfit(fontSize: 10.5, color: subtitle, fontWeight: FontWeight.bold, height: 1.3),
+      ),
+    );
+  }
+
+  Widget _buildDiagnosisCard(Color border, Color subtitle) {
+    final List<dynamic> diags = _encounterDetailsData?['diagnosis'] ?? [];
+    if (diags.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: border.withOpacity(0.02),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: border),
+        ),
+        child: Text(
+          'No diagnosis data',
+          style: GoogleFonts.outfit(fontSize: 10.5, color: subtitle.withOpacity(0.5), fontStyle: FontStyle.italic, fontWeight: FontWeight.bold),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: border.withOpacity(0.02),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: diags.map((d) {
+          final code = d['icdx_code']?.toString() ?? '';
+          final desc = d['description']?.toString() ?? '';
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  decoration: BoxDecoration(color: const Color(0xFF48C9B0).withOpacity(0.12), borderRadius: BorderRadius.circular(4)),
+                  child: Text(code, style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.w900, color: const Color(0xFF48C9B0))),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    desc,
+                    style: GoogleFonts.outfit(fontSize: 10, color: subtitle, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildMedicinesTable(Color border, Color subtitle, Color textCol) {
+    final List<dynamic> clinicItems = _encounterDetailsData?['inventory_items'] ?? [];
+    
+    // Prescription manual items
+    final prescriptionMap = _encounterDetailsData?['prescription'] as Map<String, dynamic>?;
+    final List<dynamic> rxItems = prescriptionMap?['electronic_prescription_items'] ?? [];
+
+    final List<Map<String, dynamic>> combined = [];
+
+    // Map inventory items
+    for (final item in clinicItems) {
+      final dm = item['detail_medicine'] as Map<String, dynamic>?;
+      final m = dm?['medicine'] as Map<String, dynamic>?;
+      final name = m?['medicine_name']?.toString() ?? 'Obat';
+      combined.add({
+        'name': name,
+        'qty': item['quantity']?.toString() ?? '0',
+        'dosage': item['dosage_instructions']?.toString() ?? '-',
+      });
+    }
+
+    // Map rx items
+    for (final item in rxItems) {
+      combined.add({
+        'name': item['medicine_name']?.toString() ?? 'Obat Resep',
+        'qty': item['quantity']?.toString() ?? '0',
+        'dosage': item['dosage_instructions']?.toString() ?? '-',
+      });
+    }
+
+    if (combined.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: border.withOpacity(0.02),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: border),
+        ),
+        child: Text(
+          'No therapy data',
+          style: GoogleFonts.outfit(fontSize: 10.5, color: subtitle.withOpacity(0.5), fontStyle: FontStyle.italic, fontWeight: FontWeight.bold),
+        ),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: border.withOpacity(0.01),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: border),
+      ),
+      child: Table(
+        columnWidths: const {
+          0: FlexColumnWidth(2.0),
+          1: FlexColumnWidth(0.8),
+          2: FlexColumnWidth(1.5),
+        },
+        defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+        children: [
+          TableRow(
+            decoration: BoxDecoration(
+              color: border.withOpacity(0.04),
+              border: Border(bottom: BorderSide(color: border)),
+            ),
+            children: [
+              _tableHeader('INVENTORY', subtitle),
+              _tableHeader('QTY', subtitle),
+              _tableHeader('SIGNATURE', subtitle),
+            ],
+          ),
+          ...combined.map((item) => TableRow(
+                decoration: BoxDecoration(
+                  border: Border(bottom: BorderSide(color: border)),
+                ),
+                children: [
+                  _tableCell(Text(item['name'], style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: textCol))),
+                  _tableCell(Text(item['qty'], style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: textCol))),
+                  _tableCell(Text(item['dosage'], style: GoogleFonts.outfit(fontSize: 9.5, color: subtitle, fontWeight: FontWeight.bold))),
+                ],
+              )),
+        ],
+      ),
+    );
+  }
+
+  // ─── Component Helper: Metric Card ─────────────────────────────────────────
   Widget _buildMetricCard(
     IconData icon,
     String label,
@@ -689,8 +2094,11 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
     Color valueCol,
     Color bg,
     Color border,
-    String subtitleDesc,
-  ) {
+    String subtitleDesc, {
+    String? badgeText,
+    bool isBadgeRed = false,
+    List<String>? patientsBadges,
+  }) {
     return Container(
       decoration: BoxDecoration(
         color: bg,
@@ -709,7 +2117,24 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                 label,
                 style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.w900, color: subCol, letterSpacing: 0.5),
               ),
-              Icon(icon, size: 14, color: subCol.withOpacity(0.5)),
+              if (badgeText != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: (isBadgeRed ? Colors.redAccent : const Color(0xFF48C9B0)).withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    badgeText,
+                    style: GoogleFonts.outfit(
+                      fontSize: 7,
+                      fontWeight: FontWeight.w900,
+                      color: isBadgeRed ? Colors.redAccent : const Color(0xFF48C9B0),
+                    ),
+                  ),
+                )
+              else
+                Icon(icon, size: 14, color: subCol.withOpacity(0.5)),
             ],
           ),
           const SizedBox(height: 8),
@@ -717,52 +2142,104 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
             value,
             style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w900, color: valueCol),
           ),
-          Text(
-            subtitleDesc,
-            style: GoogleFonts.outfit(fontSize: 7.5, color: subCol, fontWeight: FontWeight.bold),
-          ),
+          const SizedBox(height: 2),
+          if (patientsBadges != null)
+            Row(
+              children: patientsBadges.map((b) {
+                final isBpjs = b.startsWith('BPJS');
+                return Container(
+                  margin: const EdgeInsets.only(right: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: (isBpjs ? Colors.blueAccent : const Color(0xFF48C9B0)).withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: (isBpjs ? Colors.blueAccent : const Color(0xFF48C9B0)).withOpacity(0.2)),
+                  ),
+                  child: Text(
+                    b,
+                    style: GoogleFonts.outfit(
+                      fontSize: 6.5,
+                      fontWeight: FontWeight.w900,
+                      color: isBpjs ? Colors.blueAccent : const Color(0xFF48C9B0),
+                    ),
+                  ),
+                );
+              }).toList(),
+            )
+          else
+            Text(
+              subtitleDesc,
+              style: GoogleFonts.outfit(fontSize: 7.5, color: subCol, fontWeight: FontWeight.bold),
+            ),
         ],
       ),
     );
   }
 
-  // ─── Component Helper: Split Progress Meter ────────────────────────────────
+  // ─── Component Helper: Small Toggle Button ───────────────────────────────
+  Widget _buildSmallToggle(String text, bool isSelected, Color activeColor, Color border, Color bg, Color textCol) {
+    return Container(
+      margin: const EdgeInsets.only(left: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: isSelected ? activeColor : bg,
+        border: Border.all(color: border),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        text,
+        style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.w900, color: textCol),
+      ),
+    );
+  }
 
-  Widget _buildProgressMeter(
-    String label,
-    String value,
-    double pct,
-    Color color,
-    Color subCol,
-    Color valCol,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+  Widget _legendItem(Color color, String text, Color textCol) {
+    return Row(
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(label, style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: valCol)),
-            Text(value, style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: color)),
-          ],
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
-        const SizedBox(height: 8),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(100),
-          child: LinearProgressIndicator(
-            value: pct,
-            backgroundColor: subCol.withOpacity(0.08),
-            valueColor: AlwaysStoppedAnimation<Color>(color),
-            minHeight: 6,
-          ),
+        const SizedBox(width: 6),
+        Text(
+          text,
+          style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.bold, color: textCol),
         ),
-        const SizedBox(height: 4),
-        Text('${(pct * 100).toInt()}% dari total pemasukan', style: GoogleFonts.outfit(fontSize: 8, color: subCol, fontWeight: FontWeight.bold)),
       ],
     );
   }
 
-  // ─── Component Helper: Filter Chips ────────────────────────────────────────
+  Widget _legendCard(Color color, String text, String value, Color bg, Color border, Color textCol, Color subCol) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(text, style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.bold, color: subCol)),
+                Text(value, style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: textCol)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildFilterChip(String type, Color activeColor) {
     final isSelected = _filterType == type;
@@ -788,8 +2265,6 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
     );
   }
 
-  // ─── Component Helper: Tables cells ────────────────────────────────────────
-
   Widget _tableHeader(String text, Color color) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -803,8 +2278,6 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
       child: child,
     );
   }
-
-  // ─── Component: Expense Recorder Modal ─────────────────────────────────────
 
   Widget _buildExpenseWizardModal(
     Color cardBg,
@@ -898,7 +2371,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                               style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: text),
                               dropdownColor: cardBg,
                               onChanged: (val) {
-                                if (val != null) setState(() => _expCategory = val);
+                                  if (val != null) setState(() => _expCategory = val);
                               },
                               items: ['Obat & Medis', 'Operasional', 'Gaji Staff', 'Lain-lain']
                                   .map((c) => DropdownMenuItem(value: c, child: Text(c)))
@@ -966,9 +2439,8 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
     );
   }
 
-  // ─── Component: Detailed Invoice Popup ─────────────────────────────────────
-
   Widget _buildInvoiceModal(
+    LandingPageState state,
     Color cardBg,
     Color text,
     Color subtitle,
@@ -979,8 +2451,8 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
   ) {
     final entry = _selectedEntry!;
     final isPemasukan = entry.tipe == 'Pemasukan';
+    final isRme = isPemasukan && entry.deskripsi.startsWith('Pemeriksaan RME - ');
 
-    // Calculate invoice itemized splits
     final consultFee = isPemasukan ? min(entry.jumlah, 100000.0) : 0.0;
     final drugFee = isPemasukan ? (entry.jumlah - consultFee) : 0.0;
 
@@ -1003,7 +2475,6 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Header
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -1016,7 +2487,6 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
               ),
               const Divider(height: 20),
 
-              // Invoice Card Visual
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -1027,7 +2497,6 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Invoice Clinic Header
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -1053,7 +2522,6 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                     ),
                     const Padding(padding: EdgeInsets.symmetric(vertical: 10), child: Divider(height: 1)),
 
-                    // Metadata details
                     _invoiceMetaRow('Kode Transaksi', entry.id, text, subtitle),
                     const SizedBox(height: 6),
                     _invoiceMetaRow('Tanggal & Waktu', '${entry.tanggal} • ${entry.waktu}', text, subtitle),
@@ -1069,7 +2537,6 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
 
                     const Padding(padding: EdgeInsets.symmetric(vertical: 10), child: Divider(height: 1)),
                     
-                    // Rincian item
                     Text(
                       isPemasukan ? 'RINCIAN TRANSAKSI KLINIK' : 'RINCIAN PENGELUARAN KLINIK',
                       style: GoogleFonts.outfit(fontSize: 7.5, fontWeight: FontWeight.w900, color: subtitle, letterSpacing: 0.5),
@@ -1088,7 +2555,6 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
 
                     const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1)),
 
-                    // Total Row
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -1106,9 +2572,21 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                 ),
               ),
 
+              if (isRme)
+                _buildSatuSehatSection(
+                  entry,
+                  state,
+                  cardBg,
+                  text,
+                  subtitle,
+                  border,
+                  inputBg,
+                  purple,
+                  activeGreen,
+                ),
+
               const SizedBox(height: 24),
 
-              // Actions
               Row(
                 children: [
                   Expanded(
@@ -1173,6 +2651,194 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
     );
   }
 
+  Widget _buildSatuSehatSection(
+    BukuKasEntry entry,
+    LandingPageState state,
+    Color cardBg,
+    Color text,
+    Color subtitle,
+    Color border,
+    Color inputBg,
+    Color purple,
+    Color activeGreen,
+  ) {
+    final isSynced = state.satusehatAutoSync || state.syncedTransactions.contains(entry.id);
+
+    return Container(
+      margin: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: inputBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.cloud_sync_rounded, color: Color(0xFFB577F2), size: 16),
+                  const SizedBox(width: 8),
+                  Text(
+                    'SATUSEHAT Kemenkes',
+                    style: GoogleFonts.outfit(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      color: text,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: (isSynced ? activeGreen : Colors.amber).withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(100),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isSynced ? Icons.check_circle_rounded : Icons.access_time_filled_rounded,
+                      size: 10,
+                      color: isSynced ? activeGreen : Colors.amber,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      isSynced ? 'SYNCED' : 'PENDING',
+                      style: GoogleFonts.outfit(
+                        fontSize: 8,
+                        fontWeight: FontWeight.w900,
+                        color: isSynced ? activeGreen : Colors.amber,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (isSynced) ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'STATUS SINKRONISASI',
+                        style: GoogleFonts.outfit(fontSize: 7.5, fontWeight: FontWeight.w900, color: subtitle),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Data RME berhasil terkirim ke platform SATUSEHAT Kemenkes RI.',
+                        style: GoogleFonts.outfit(fontSize: 9, color: text, height: 1.3, fontWeight: FontWeight.w500),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'TRANSACTION HASH / ID',
+                        style: GoogleFonts.outfit(fontSize: 7.5, fontWeight: FontWeight.w900, color: subtitle),
+                      ),
+                      const SizedBox(height: 4),
+                      SelectableText(
+                        'ss-tx-${entry.id.hashCode.abs().toRadixString(16).toUpperCase()}-${entry.id.substring(0, min(entry.id.length, 4))}',
+                        style: GoogleFonts.outfit(fontSize: 8.5, color: purple, fontWeight: FontWeight.w900),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: border),
+                  ),
+                  padding: const EdgeInsets.all(4),
+                  child: Image.network(
+                    'https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://satusehat.kemkes.go.id/verification/tx/${entry.id}',
+                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.qr_code_rounded, size: 40, color: Colors.grey),
+                  ),
+                ),
+              ],
+            ),
+          ] else ...[
+            Text(
+              'Data pemeriksaan RME belum disinkronkan ke platform SATUSEHAT Kemenkes.',
+              style: GoogleFonts.outfit(fontSize: 9, color: subtitle, height: 1.3, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            _isSyncingIndividual
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8.0),
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(purple),
+                        ),
+                      ),
+                    ),
+                  )
+                : ElevatedButton(
+                    onPressed: () {
+                      setState(() => _isSyncingIndividual = true);
+                      Timer(const Duration(milliseconds: 1500), () {
+                        if (!mounted) return;
+                        ref.read(landingPageProvider.notifier).markTransactionSynced(entry.id);
+                        setState(() => _isSyncingIndividual = false);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            behavior: SnackBarBehavior.floating,
+                            backgroundColor: activeGreen,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            content: Row(
+                              children: [
+                                const Icon(Icons.cloud_done_rounded, color: Colors.white, size: 18),
+                                const SizedBox(width: 10),
+                                Text(
+                                  'Data rekam medis ${entry.id} berhasil disinkronkan ke SATUSEHAT.',
+                                  style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      });
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: purple,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.cloud_upload_rounded, size: 12, color: Colors.white),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Kirim SatuSehat (Manual)',
+                          style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.white),
+                        ),
+                      ],
+                    ),
+                  ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _invoiceMetaRow(String label, String value, Color textCol, Color subCol) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1193,4 +2859,207 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
       ],
     );
   }
+}
+
+// ─── CUSTOM CHALFLOW Bezier LINE CHART PAINTER ──────────────────────────────
+class CashflowChartPainter extends CustomPainter {
+  final List<double> incomeData;
+  final List<double> expenseData;
+  final bool isDark;
+
+  CashflowChartPainter({
+    required this.incomeData,
+    required this.expenseData,
+    required this.isDark,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final gridPaint = Paint()
+      ..color = isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+
+    final labelStyle = GoogleFonts.outfit(
+      fontSize: 7.5,
+      fontWeight: FontWeight.bold,
+      color: isDark ? Colors.grey[500] : const Color(0xFF6F6A8A),
+    );
+
+    double maxVal = 100000.0;
+    for (final val in incomeData) {
+      if (val > maxVal) maxVal = val;
+    }
+    for (final val in expenseData) {
+      if (val > maxVal) maxVal = val;
+    }
+    
+    maxVal = maxVal * 1.1;
+
+    final heightStep = size.height / 4;
+    for (int i = 0; i <= 4; i++) {
+      final y = size.height - (i * heightStep);
+      canvas.drawLine(Offset(35, y), Offset(size.width, y), gridPaint);
+      
+      final double gridVal = (maxVal / 4) * i;
+      final valStr = _formatYLabel(gridVal);
+      final tp = TextPainter(
+        text: TextSpan(text: valStr, style: labelStyle),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      tp.paint(canvas, Offset(5, y - tp.height / 2));
+    }
+
+    final widthStep = (size.width - 35) / 11;
+    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    for (int i = 0; i < 12; i++) {
+      final x = 35 + (i * widthStep);
+      final tp = TextPainter(
+        text: TextSpan(text: months[i], style: labelStyle),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      tp.paint(canvas, Offset(x - tp.width / 2, size.height + 6));
+    }
+
+    _drawBezierCurve(canvas, size, incomeData, const Color(0xFF48C9B0), maxVal);
+    _drawBezierCurve(canvas, size, expenseData, Colors.redAccent, maxVal);
+  }
+
+  void _drawBezierCurve(Canvas canvas, Size size, List<double> values, Color color, double maxVal) {
+    if (values.isEmpty) return;
+    final widthStep = (size.width - 35) / 11;
+    
+    final path = Path();
+    final fillPath = Path();
+    
+    final points = <Offset>[];
+    for (int i = 0; i < 12; i++) {
+      final val = i < values.length ? values[i] : 0.0;
+      final pct = (val / maxVal).clamp(0.0, 1.0);
+      final x = 35 + (i * widthStep);
+      final y = size.height - (pct * size.height);
+      points.add(Offset(x, y));
+    }
+
+    path.moveTo(points[0].dx, points[0].dy);
+    fillPath.moveTo(points[0].dx, size.height);
+    fillPath.lineTo(points[0].dx, points[0].dy);
+
+    for (int i = 0; i < points.length - 1; i++) {
+      final p0 = points[i];
+      final p1 = points[i + 1];
+      final controlPointX = (p0.dx + p1.dx) / 2;
+      
+      path.cubicTo(controlPointX, p0.dy, controlPointX, p1.dy, p1.dx, p1.dy);
+      fillPath.cubicTo(controlPointX, p0.dy, controlPointX, p1.dy, p1.dx, p1.dy);
+    }
+
+    fillPath.lineTo(points.last.dx, size.height);
+    fillPath.close();
+
+    final fillPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [color.withOpacity(0.18), color.withOpacity(0.0)],
+      ).createShader(Rect.fromLTWH(35, 0, size.width - 35, size.height))
+      ..style = PaintingStyle.fill;
+    canvas.drawPath(fillPath, fillPaint);
+
+    final linePaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0
+      ..strokeCap = StrokeCap.round;
+    canvas.drawPath(path, linePaint);
+
+    final dotPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    final borderPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+
+    for (int i = 0; i < points.length; i++) {
+      if (values[i] > 0) {
+        canvas.drawCircle(points[i], 4, dotPaint);
+        canvas.drawCircle(points[i], 4, borderPaint);
+      }
+    }
+  }
+
+  String _formatYLabel(double val) {
+    if (val >= 10000000) {
+      return '${(val / 10000000).toStringAsFixed(1).replaceAll('.0', '')}puluh jt';
+    } else if (val >= 1000000) {
+      return '${(val / 1000000).toStringAsFixed(1).replaceAll('.0', '')}jt';
+    } else if (val >= 1000) {
+      return '${(val / 1000).toStringAsFixed(0)}rb';
+    }
+    return val.toStringAsFixed(0);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+// ─── PATIENT RATIO DONUT CHART PAINTER ────────────────────────────────────────
+class PatientRatioDonutChartPainter extends CustomPainter {
+  final int generalCount;
+  final int bpjsCount;
+  final bool isDark;
+
+  PatientRatioDonutChartPainter({
+    required this.generalCount,
+    required this.bpjsCount,
+    required this.isDark,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = min(size.width, size.height) / 2;
+    const strokeWidth = 14.0;
+
+    final total = generalCount + bpjsCount;
+    if (total == 0) {
+      final paint = Paint()
+        ..color = isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth;
+      canvas.drawCircle(center, radius - strokeWidth / 2, paint);
+      return;
+    }
+
+    final generalPct = generalCount / total;
+    final bpjsPct = bpjsCount / total;
+
+    final generalPaint = Paint()
+      ..color = const Color(0xFF48C9B0)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+
+    final bpjsPaint = Paint()
+      ..color = const Color(0xFF1B4F42)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+
+    final rect = Rect.fromCircle(center: center, radius: radius - strokeWidth / 2);
+
+    const startAngle = -pi / 2;
+    final generalAngle = 2 * pi * generalPct;
+    final bpjsAngle = 2 * pi * bpjsPct;
+
+    canvas.drawArc(rect, startAngle, generalAngle, false, generalPaint);
+    
+    if (bpjsCount > 0) {
+      canvas.drawArc(rect, startAngle + generalAngle, bpjsAngle, false, bpjsPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

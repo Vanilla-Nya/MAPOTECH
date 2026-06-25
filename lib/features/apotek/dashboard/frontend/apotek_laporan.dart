@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:mapotech/shared/widgets/skeleton_loading.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/supabase_service.dart';
 
@@ -187,7 +188,9 @@ class _ApotekLaporanState extends ConsumerState<ApotekLaporan> {
     if (maxDaily == 0) maxDaily = 1.0;
 
     return _isLoading
-        ? Center(child: CircularProgressIndicator(color: themeAccent))
+        ? const SkeletonScope(
+            child: SkeletonApotekDashboard(type: 'report'),
+          )
         : RefreshIndicator(
             onRefresh: _loadTransactionsFromDatabase,
             color: themeAccent,
