@@ -10,6 +10,7 @@ import 'dart:math';
 // ─── Data Models ─────────────────────────────────────────────────────────────
 
 class BatchModel {
+  final String? id;
   final String batchNo;
   final int stok;
   final String expDate;
@@ -18,6 +19,7 @@ class BatchModel {
   final double hargaJual;
 
   const BatchModel({
+    this.id,
     required this.batchNo,
     required this.stok,
     required this.expDate,
@@ -27,6 +29,7 @@ class BatchModel {
   });
 
   BatchModel copyWith({
+    String? id,
     String? batchNo,
     int? stok,
     String? expDate,
@@ -35,6 +38,7 @@ class BatchModel {
     double? hargaJual,
   }) {
     return BatchModel(
+      id: id ?? this.id,
       batchNo: batchNo ?? this.batchNo,
       stok: stok ?? this.stok,
       expDate: expDate ?? this.expDate,
@@ -72,6 +76,7 @@ class ObatModel {
   final Color avatarBg;
   final List<BatchModel> batches;
   final List<OpnameLog> opnameLogs;
+  final String? kfaCode;
 
   const ObatModel({
     required this.id,
@@ -84,6 +89,7 @@ class ObatModel {
     required this.avatarBg,
     required this.batches,
     this.opnameLogs = const [],
+    this.kfaCode,
   });
 
   ObatModel copyWith({
@@ -97,6 +103,7 @@ class ObatModel {
     Color? avatarBg,
     List<BatchModel>? batches,
     List<OpnameLog>? opnameLogs,
+    String? kfaCode,
   }) {
     return ObatModel(
       id: id ?? this.id,
@@ -109,6 +116,7 @@ class ObatModel {
       avatarBg: avatarBg ?? this.avatarBg,
       batches: batches ?? this.batches,
       opnameLogs: opnameLogs ?? this.opnameLogs,
+      kfaCode: kfaCode ?? this.kfaCode,
     );
   }
 }
@@ -168,8 +176,10 @@ ObatModel _mapDbToObatModel(Map<String, dynamic> m) {
     final lokasi = batchMap['location']?.toString() ?? 'Shelf A-01';
     final hargaBeli = double.tryParse(batchMap['buy_price']?.toString() ?? '0') ?? 0.0;
     final hargaJual = double.tryParse(batchMap['sell_price']?.toString() ?? '0') ?? 0.0;
+    final batchId = batchMap['id']?.toString();
     
     batches.add(BatchModel(
+      id: batchId,
       batchNo: batchNo,
       stok: stok,
       expDate: expDate,
@@ -197,6 +207,7 @@ ObatModel _mapDbToObatModel(Map<String, dynamic> m) {
     status: totalStok <= 5 ? 'Stok Minim' : 'Tersedia',
     avatarBg: jenis.toLowerCase().contains('generik') ? const Color(0xFF48C9B0) : const Color(0xFFB577F2),
     batches: batches,
+    kfaCode: m['kfa_code']?.toString(),
   );
 }
 
@@ -869,6 +880,15 @@ class _DokterObatState extends ConsumerState<DokterObat> {
     );
   }
 
+  String _generateBatchNo({int offset = 0}) {
+    final now = DateTime.now();
+    final yy = now.year.toString().substring(2);
+    final mm = now.month.toString().padLeft(2, '0');
+    final dd = now.day.toString().padLeft(2, '0');
+    final random = Random().nextInt(900) + 100 + offset; // 100 to 999
+    return 'B$yy$mm$dd-$random';
+  }
+
   // ─── Modal: Detail Obat & Stock Opname ──────────────────────────────────────
 
   void _showDrugDetailModal(BuildContext context, ObatModel drug, bool isDark) {
@@ -1145,7 +1165,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                 ),
                                 const Divider(height: 16),
                                 ...drug.batches.map((batch) {
-                                  final controller = opnameControllers[batch.batchNo]!;
+                                  final controller = opnameControllers.putIfAbsent(batch.batchNo, () => TextEditingController());
                                   return Padding(
                                     padding: const EdgeInsets.symmetric(vertical: 6),
                                     child: Row(
@@ -1223,7 +1243,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                         int totalNewStock = 0;
 
                                         for (final batch in drug.batches) {
-                                          final controller = opnameControllers[batch.batchNo]!;
+                                          final controller = opnameControllers.putIfAbsent(batch.batchNo, () => TextEditingController());
                                           final parsedFisik = int.tryParse(controller.text) ?? batch.stok;
                                           final selisih = parsedFisik - batch.stok;
 
@@ -1344,6 +1364,10 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                   _showRestockModal(context, drug, isDark, onRestockSuccess: (updatedDrug) {
                                     setDialogState(() {
                                       drug = updatedDrug;
+                                      // Reinitialize opname controller for new batches
+                                      for (final batch in drug.batches) {
+                                        opnameControllers.putIfAbsent(batch.batchNo, () => TextEditingController());
+                                      }
                                     });
                                     ref.read(dokterObatListProvider.notifier).updateDrug(drug);
                                   });
@@ -1479,7 +1503,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
 
     final formKey = GlobalKey<FormState>();
     final stockController = TextEditingController(text: '0');
-    final batchController = TextEditingController(text: 'B260526-${100 + drug.batches.length * 12}');
+    final batchController = TextEditingController(text: _generateBatchNo(offset: drug.batches.length * 12));
     final expController = TextEditingController();
     final locationController = TextEditingController();
     final totalBuyController = TextEditingController();
@@ -1629,6 +1653,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                   textColor,
                                   subtitleColor,
                                   validator: (v) => v!.isEmpty ? 'Nomor batch wajib' : null,
+                                  readOnly: true,
                                 ),
                               ],
                             ),
@@ -1816,7 +1841,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
     final kfaController = TextEditingController();
     final nameController = TextEditingController();
     final skuController = TextEditingController();
-    final batchController = TextEditingController(text: 'B260526-656');
+    final batchController = TextEditingController(text: _generateBatchNo());
     final initialStockController = TextEditingController(text: '0');
     final buyPriceController = TextEditingController(text: '0');
     final sellPriceController = TextEditingController(text: '0');
@@ -2130,6 +2155,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                         textColor,
                                         subtitleColor,
                                         validator: (v) => v!.isEmpty ? 'Nomor batch wajib' : null,
+                                        readOnly: true,
                                       ),
                                     ],
                                   ),
@@ -2523,6 +2549,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
     int maxLines = 1,
     String? Function(String?)? validator,
     Function(String)? onChanged,
+    bool readOnly = false,
   }) {
     return TextFormField(
       controller: controller,
@@ -2531,7 +2558,8 @@ class _DokterObatState extends ConsumerState<DokterObat> {
       maxLines: maxLines,
       validator: validator,
       onChanged: onChanged,
-      style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: text),
+      readOnly: readOnly,
+      style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: readOnly ? text.withOpacity(0.6) : text),
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: GoogleFonts.outfit(fontSize: 11.5, color: subtitle.withOpacity(0.4)),

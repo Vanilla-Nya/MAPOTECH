@@ -6,17 +6,21 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/supabase_service.dart';
 import 'package:mapotech/features/dokter/dashboard/frontend/dokter_pasien.dart';
+import 'package:mapotech/shared/satusehat_service.dart';
 
 class BukuKasEntry {
   final String id;
   final String tanggal;
   final String waktu;
   final String deskripsi;
-  final String kategori; // 'Konsultasi', 'Farmasi', 'Obat & Medis', 'Operasional', 'Gaji Staff', 'Lain-lain'
+  final String
+  kategori; // 'Konsultasi', 'Farmasi', 'Obat & Medis', 'Operasional', 'Gaji Staff', 'Lain-lain'
   final String tipe; // 'Pemasukan' or 'Pengeluaran'
   final String metode; // 'Cash', 'QRIS', 'BPJS', or '-'
   final double jumlah;
   final String status; // 'Lunas', 'Selesai', or '-'
+  final String? idSource;
+  final String? sourceType;
 
   const BukuKasEntry({
     required this.id,
@@ -28,7 +32,33 @@ class BukuKasEntry {
     required this.metode,
     required this.jumlah,
     required this.status,
+    this.idSource,
+    this.sourceType,
   });
+}
+
+class GroupedDailyTransactions {
+  final String date;
+  final List<BukuKasEntry> transactions;
+
+  const GroupedDailyTransactions({
+    required this.date,
+    required this.transactions,
+  });
+
+  int get transactionCount => transactions.length;
+
+  double get totalIncome => transactions
+      .where((tx) => tx.tipe == 'Pemasukan')
+      .map((tx) => tx.jumlah)
+      .fold(0.0, (sum, val) => sum + val);
+
+  double get totalExpense => transactions
+      .where((tx) => tx.tipe == 'Pengeluaran')
+      .map((tx) => tx.jumlah)
+      .fold(0.0, (sum, val) => sum + val);
+
+  double get netProfit => totalIncome - totalExpense;
 }
 
 class DokterPembukuan extends ConsumerStatefulWidget {
@@ -43,10 +73,11 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
   String _filterType = 'Semua';
   String _searchQuery = '';
   BukuKasEntry? _selectedEntry;
+  GroupedDailyTransactions? _selectedGroupedDay;
   bool _showExpenseWizard = false;
   bool _isExporting = false;
   bool _isLoading = true;
-  
+
   // Tab control: 'overview' or 'satusehat'
   String _activeTab = 'overview';
 
@@ -56,7 +87,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
   String _syncStatusFilter = 'All'; // 'All', 'Sent', 'Unsent', 'Failed'
   final Set<String> _selectedEncounters = {};
   bool _isBulkSyncMode = false;
-  
+
   // Detailed modal
   Map<String, dynamic>? _selectedSyncEncounter;
   Map<String, dynamic>? _encounterDetailsData;
@@ -64,7 +95,8 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
 
   // Sync animation states
   bool _isSyncingIndividual = false;
-  String _individualSyncStep = 'Connecting'; // 'Connecting', 'SendingEMR', 'GeneratingPrescription', 'Success'
+  String _individualSyncStep =
+      'Connecting'; // 'Connecting', 'SendingEMR', 'GeneratingPrescription', 'Success'
   bool _isRegisteringPatient = false;
 
   final _db = SupabaseService();
@@ -82,10 +114,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
 
   Future<void> _loadAllData() async {
     setState(() => _isLoading = true);
-    await Future.wait([
-      _loadTransactions(),
-      _loadPatientSyncList(),
-    ]);
+    await Future.wait([_loadTransactions(), _loadPatientSyncList()]);
     setState(() => _isLoading = false);
   }
 
@@ -110,7 +139,10 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
       }
     } catch (e) {
       debugPrint('Error loading transactions: $e');
-      _showWarningDialog('Gagal Memuat Data', 'Gagal mengambil riwayat pembukuan dari database.');
+      _showWarningDialog(
+        'Gagal Memuat Data',
+        'Gagal mengambil riwayat pembukuan dari database.',
+      );
     }
   }
 
@@ -123,7 +155,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
         final queues = await _db.fetchDoctorQueues(doctorId);
 
         final Map<String, Map<String, dynamic>> queueMap = {
-          for (final q in queues) q['id']?.toString() ?? '': q
+          for (final q in queues) q['id']?.toString() ?? '': q,
         };
 
         Map<String, String?> guestSatuSehatMap = {};
@@ -146,7 +178,8 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
           final queue = queueMap[qId];
           if (queue == null) continue;
 
-          final patientName = queue['patient_name']?.toString() ?? 'Pasien Tanpa Nama';
+          final patientName =
+              queue['patient_name']?.toString() ?? 'Pasien Tanpa Nama';
           final patientNik = queue['patient_nik']?.toString() ?? '-';
           final patientType = queue['patient_type']?.toString() ?? 'Umum';
           final patientId = queue['id_patient'] as String?;
@@ -166,10 +199,14 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
           list.add({
             'id': ce['id'] as String,
             'queue_id': qId,
-            'date': ce['created_at'] != null 
-                ? _formatDateToIndonesian(DateTime.parse(ce['created_at'].toString()).toLocal())
+            'date': ce['created_at'] != null
+                ? _formatDateToIndonesian(
+                    DateTime.parse(ce['created_at'].toString()).toLocal(),
+                  )
                 : '-',
-            'raw_date': ce['created_at'] != null ? DateTime.parse(ce['created_at'].toString()) : null,
+            'raw_date': ce['created_at'] != null
+                ? DateTime.parse(ce['created_at'].toString())
+                : null,
             'name': patientName,
             'nik': patientNik,
             'type': patientType,
@@ -212,10 +249,49 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
 
   Future<void> _registerPatientSatuSehat(Map<String, dynamic> encounter) async {
     setState(() => _isRegisteringPatient = true);
-    final generatedId = 'P00994497528';
     try {
       final patientId = encounter['patient_id'] as String?;
       final isGuest = encounter['is_guest'] as bool? ?? false;
+      final nik = encounter['nik']?.toString() ?? '';
+
+      if (nik.isEmpty) {
+        throw Exception(
+          'NIK pasien kosong. Tidak dapat mendaftarkan ke SatuSehat.',
+        );
+      }
+
+      final doctorId =
+          ref.read(landingPageProvider).loggedInUser?['id'] ??
+          '8f93471a-74f8-486b-8e85-4002dc44c11c';
+      final docDetail = await SupabaseService.client
+          .from('user_detail_doctor')
+          .select('satu_sehat_api, id_satusehat')
+          .eq('id', doctorId)
+          .maybeSingle();
+
+      final ssConfig = docDetail?['satu_sehat_api'] as Map<String, dynamic>?;
+      if (ssConfig == null || ssConfig['client_id'] == null) {
+        throw Exception(
+          'Konfigurasi API SatuSehat belum lengkap di profil Anda.',
+        );
+      }
+
+      final ssService = SatuSehatService(
+        clientId: ssConfig['client_id']?.toString(),
+        clientSecret: ssConfig['client_secret']?.toString(),
+        organizationId: ssConfig['organization_id']?.toString(),
+        locationId:
+            ssConfig['location_id']?.toString() ??
+            docDetail?['id_satusehat']?.toString(),
+        env: ssConfig['env']?.toString(),
+      );
+
+      final result = await ssService.getPatientIdByNik(nik);
+      if (result['status'] != true) {
+        throw Exception(result['message'] ?? 'Gagal mendaftarkan pasien');
+      }
+
+      final generatedId = result['id'] as String;
 
       if (patientId != null) {
         if (!isGuest) {
@@ -247,68 +323,215 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
         SnackBar(
           behavior: SnackBarBehavior.floating,
           backgroundColor: const Color(0xFF48C9B0),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          content: Text('Pasien berhasil didaftarkan di SatuSehat dengan ID: $generatedId'),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          content: Text(
+            'Pasien berhasil didaftarkan di SatuSehat dengan ID: $generatedId',
+          ),
         ),
       );
     } catch (e) {
       debugPrint('Error registering SatuSehat: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.redAccent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          content: Text(
+            'Registrasi Gagal: ${e.toString().replaceAll('Exception: ', '')}',
+          ),
+        ),
+      );
     } finally {
       setState(() => _isRegisteringPatient = false);
     }
   }
 
-  void _triggerIndividualSync(Map<String, dynamic> encounter) {
+  Future<void> _triggerIndividualSync(Map<String, dynamic> encounter) async {
     setState(() {
+      _selectedSyncEncounter = encounter;
       _isSyncingIndividual = true;
       _individualSyncStep = 'Connecting';
     });
 
-    Timer(const Duration(milliseconds: 1000), () {
-      setState(() => _individualSyncStep = 'SendingEMR');
-      Timer(const Duration(milliseconds: 1200), () {
-        setState(() => _individualSyncStep = 'GeneratingPrescription');
-        Timer(const Duration(milliseconds: 1000), () {
-          setState(() {
-            _individualSyncStep = 'Success';
-          });
-          Timer(const Duration(milliseconds: 800), () async {
-            try {
-              final hashInt = Random().nextInt(900000) + 100000;
-              await SupabaseService.client
-                  .schema('private_doctor')
-                  .from('clinical_encounters')
-                  .update({
-                    'satusehat_sync_status': 'success',
-                    'satusehat_last_error': null,
-                    'satusehat_encounter_id': 'ss-encounter-$hashInt',
-                  })
-                  .eq('id', encounter['id']);
+    try {
+      final patientId = encounter['satusehat_id'] as String?;
+      final patientName = encounter['name']?.toString() ?? 'Pasien';
+      final encounterId = encounter['id'] as String;
 
-              await _loadPatientSyncList();
-              
-              if (mounted) {
-                setState(() {
-                  _isSyncingIndividual = false;
-                  _selectedSyncEncounter = null;
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    behavior: SnackBarBehavior.floating,
-                    backgroundColor: const Color(0xFF48C9B0),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    content: Text('Data rekam medis ${encounter['name']} berhasil disinkronkan ke SatuSehat.'),
-                  ),
-                );
-              }
-            } catch (e) {
-              debugPrint('Error writing sync success: $e');
-              if (mounted) setState(() => _isSyncingIndividual = false);
-            }
-          });
+      if (patientId == null || patientId.isEmpty) {
+        throw Exception(
+          'Pasien belum terdaftar di SatuSehat. Harap daftarkan terlebih dahulu.',
+        );
+      }
+
+      final doctorId =
+          ref.read(landingPageProvider).loggedInUser?['id'] ??
+          '8f93471a-74f8-486b-8e85-4002dc44c11c';
+      final doctorName =
+          ref.read(landingPageProvider).loggedInUser?['name']?.toString() ??
+          'Dokter';
+      final docDetail = await SupabaseService.client
+          .from('user_detail_doctor')
+          .select('satu_sehat_api, id_satusehat')
+          .eq('id', doctorId)
+          .maybeSingle();
+
+      final ssConfig = docDetail?['satu_sehat_api'] as Map<String, dynamic>?;
+      if (ssConfig == null || ssConfig['client_id'] == null) {
+        throw Exception(
+          'Konfigurasi API SatuSehat belum lengkap di profil Anda.',
+        );
+      }
+
+      final docSsId = docDetail?['id_satusehat']?.toString();
+      if (docSsId == null || docSsId.isEmpty) {
+        throw Exception(
+          'ID SatuSehat Dokter (Practitioner) belum diatur di profil.',
+        );
+      }
+
+      setState(() => _individualSyncStep = 'SendingEMR');
+
+      final ssService = SatuSehatService(
+        clientId: ssConfig['client_id']?.toString(),
+        clientSecret: ssConfig['client_secret']?.toString(),
+        organizationId: ssConfig['organization_id']?.toString(),
+        locationId: ssConfig['location_id']?.toString() ?? docSsId,
+        env: ssConfig['env']?.toString(),
+      );
+
+      if (_encounterDetailsData == null ||
+          _encounterDetailsData?['encounter']?['id'] != encounterId) {
+        await _loadEncounterDetails(encounterId);
+      }
+
+      final List<dynamic> diagnoses = _encounterDetailsData?['diagnosis'] ?? [];
+      final List<dynamic> clinicItems =
+          _encounterDetailsData?['inventory_items'] ?? [];
+      final prescriptionMap =
+          _encounterDetailsData?['prescription'] as Map<String, dynamic>?;
+      final List<dynamic> rxItems =
+          prescriptionMap?['electronic_prescription_items'] ?? [];
+
+      final List<Map<String, dynamic>> allRx = [];
+      for (final item in clinicItems) {
+        final dm = item['detail_medicine'] as Map<String, dynamic>?;
+        final m = dm?['medicine'] as Map<String, dynamic>?;
+        allRx.add({
+          'medicine_name': m?['medicine_name']?.toString() ?? 'Obat',
+          'quantity': item['quantity'],
+          'dosage_instructions': item['dosage_instructions'],
+          'kfa_code': m?['kfa_code'],
         });
-      });
-    });
+      }
+      for (final item in rxItems) {
+        if (item['id_catalog_item'] == null) {
+          allRx.add({
+            'medicine_name': item['medicine_name']?.toString() ?? 'Obat Resep',
+            'quantity': item['quantity'],
+            'dosage_instructions': item['dosage_instructions'],
+            'kfa_code': item['kfa_code'],
+          });
+        }
+      }
+
+      final List<Map<String, dynamic>> diagTags = diagnoses
+          .map(
+            (d) => {
+              'code': d['icdx_code']?.toString() ?? 'R69',
+              'label': d['description']?.toString() ?? 'Unknown causes',
+            },
+          )
+          .toList();
+
+      setState(() => _individualSyncStep = 'GeneratingPrescription');
+
+      final syncRes = await ssService.sendEncounterData(
+        patientId: patientId,
+        doctorId: docSsId,
+        patientName: patientName,
+        doctorName: doctorName,
+        encounterId: encounterId,
+        diagnoses: diagTags,
+        prescriptions: allRx,
+      );
+
+      if (syncRes['status'] != true) {
+        throw Exception(syncRes['message'] ?? 'Gagal melakukan sinkronisasi');
+      }
+
+      final ssEncounterId = syncRes['encounter_id'];
+      final medNote = syncRes['medication_note'] as String?;
+
+      await SupabaseService.client
+          .schema('private_doctor')
+          .from('clinical_encounters')
+          .update({
+            'satusehat_sync_status': 'success',
+            'satusehat_last_error': medNote,
+            'satusehat_encounter_id': ssEncounterId,
+          })
+          .eq('id', encounterId);
+
+      await _loadPatientSyncList();
+
+      if (mounted) {
+        setState(() {
+          _isSyncingIndividual = false;
+          _selectedSyncEncounter = null;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: const Color(0xFF48C9B0),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            content: Text(
+              medNote ??
+                  'Data rekam medis $patientName berhasil disinkronkan ke SatuSehat.',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error triggering SatuSehat sync: $e');
+
+      try {
+        await SupabaseService.client
+            .schema('private_doctor')
+            .from('clinical_encounters')
+            .update({
+              'satusehat_sync_status': 'failed',
+              'satusehat_last_error': e.toString().replaceAll(
+                'Exception: ',
+                '',
+              ),
+            })
+            .eq('id', encounter['id']);
+        await _loadPatientSyncList();
+      } catch (_) {}
+
+      if (mounted) {
+        setState(() => _isSyncingIndividual = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.redAccent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            content: Text(
+              'Sinkronisasi Gagal: ${e.toString().replaceAll('Exception: ', '')}',
+            ),
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _triggerBulkSync() async {
@@ -317,56 +540,186 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
     setState(() => _isLoading = true);
     int successCount = 0;
     int failedCount = 0;
+    String lastError = '';
 
-    for (final id in _selectedEncounters) {
-      try {
-        final match = _patientSyncList.firstWhere((p) => p['id'] == id);
-        final ssId = match['satusehat_id'] as String?;
+    try {
+      final doctorId =
+          ref.read(landingPageProvider).loggedInUser?['id'] ??
+          '8f93471a-74f8-486b-8e85-4002dc44c11c';
+      final doctorName =
+          ref.read(landingPageProvider).loggedInUser?['name']?.toString() ??
+          'Dokter';
+      final docDetail = await SupabaseService.client
+          .from('user_detail_doctor')
+          .select('satu_sehat_api, id_satusehat')
+          .eq('id', doctorId)
+          .maybeSingle();
 
-        if (ssId != null && ssId.isNotEmpty) {
-          final hashInt = Random().nextInt(900000) + 100000;
+      final ssConfig = docDetail?['satu_sehat_api'] as Map<String, dynamic>?;
+      final docSsId = docDetail?['id_satusehat']?.toString();
+
+      if (ssConfig == null ||
+          ssConfig['client_id'] == null ||
+          docSsId == null ||
+          docSsId.isEmpty) {
+        throw Exception(
+          'Konfigurasi API SatuSehat belum lengkap di profil Anda.',
+        );
+      }
+
+      final ssService = SatuSehatService(
+        clientId: ssConfig['client_id']?.toString(),
+        clientSecret: ssConfig['client_secret']?.toString(),
+        organizationId: ssConfig['organization_id']?.toString(),
+        locationId: ssConfig['location_id']?.toString() ?? docSsId,
+        env: ssConfig['env']?.toString(),
+      );
+
+      for (final id in _selectedEncounters) {
+        try {
+          final match = _patientSyncList.firstWhere((p) => p['id'] == id);
+          final ssId = match['satusehat_id'] as String?;
+          final patientName = match['name']?.toString() ?? 'Pasien';
+
+          if (ssId == null || ssId.isEmpty) {
+            throw Exception('Pasien tidak memiliki ID SatuSehat');
+          }
+
+          final details = await _db.fetchEncounterDetails(id);
+          final List<dynamic> diagnoses = details['diagnosis'] ?? [];
+          final List<dynamic> clinicItems = details['inventory_items'] ?? [];
+          final prescriptionMap =
+              details['prescription'] as Map<String, dynamic>?;
+          final List<dynamic> rxItems =
+              prescriptionMap?['electronic_prescription_items'] ?? [];
+
+          final List<Map<String, dynamic>> allRx = [];
+          for (final item in clinicItems) {
+            final dm = item['detail_medicine'] as Map<String, dynamic>?;
+            final m = dm?['medicine'] as Map<String, dynamic>?;
+            allRx.add({
+              'medicine_name': m?['medicine_name']?.toString() ?? 'Obat',
+              'quantity': item['quantity'],
+              'dosage_instructions': item['dosage_instructions'],
+              'kfa_code': m?['kfa_code'],
+            });
+          }
+          for (final item in rxItems) {
+            if (item['id_catalog_item'] == null) {
+              allRx.add({
+                'medicine_name':
+                    item['medicine_name']?.toString() ?? 'Obat Resep',
+                'quantity': item['quantity'],
+                'dosage_instructions': item['dosage_instructions'],
+                'kfa_code': item['kfa_code'],
+              });
+            }
+          }
+
+          final List<Map<String, dynamic>> diagTags = diagnoses
+              .map(
+                (d) => {
+                  'code': d['icdx_code']?.toString() ?? 'R69',
+                  'label': d['description']?.toString() ?? 'Unknown causes',
+                },
+              )
+              .toList();
+
+          final syncRes = await ssService.sendEncounterData(
+            patientId: ssId,
+            doctorId: docSsId,
+            patientName: patientName,
+            doctorName: doctorName,
+            encounterId: id,
+            diagnoses: diagTags,
+            prescriptions: allRx,
+          );
+
+          if (syncRes['status'] != true) {
+            throw Exception(syncRes['message'] ?? 'Gagal sync');
+          }
+
+          final ssEncounterId = syncRes['encounter_id'];
+          final medNote = syncRes['medication_note'] as String?;
+
           await SupabaseService.client
               .schema('private_doctor')
               .from('clinical_encounters')
               .update({
                 'satusehat_sync_status': 'success',
-                'satusehat_last_error': null,
-                'satusehat_encounter_id': 'ss-encounter-$hashInt',
+                'satusehat_last_error': medNote,
+                'satusehat_encounter_id': ssEncounterId,
               })
               .eq('id', id);
+
           successCount++;
-        } else {
+        } catch (e) {
+          lastError = e.toString().replaceAll('Exception: ', '');
+          failedCount++;
           await SupabaseService.client
               .schema('private_doctor')
               .from('clinical_encounters')
               .update({
                 'satusehat_sync_status': 'failed',
-                'satusehat_last_error': 'Missing Patient SatuSehat ID',
+                'satusehat_last_error': lastError,
               })
               .eq('id', id);
-          failedCount++;
         }
-      } catch (e) {
-        debugPrint('Error bulk syncing ID $id: $e');
-        failedCount++;
       }
-    }
 
-    await _loadPatientSyncList();
-    setState(() {
+      await _loadPatientSyncList();
       _selectedEncounters.clear();
-      _isBulkSyncMode = false;
-      _isLoading = false;
-    });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: failedCount == 0 ? const Color(0xFF48C9B0) : Colors.orangeAccent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        content: Text('Proses Sinkronisasi Selesai: $successCount berhasil, $failedCount gagal.'),
-      ),
-    );
+      if (mounted) {
+        if (failedCount == 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: const Color(0xFF48C9B0),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              content: Text(
+                'Berhasil mensinkronkan $successCount data ke SatuSehat.',
+              ),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: Colors.orangeAccent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              content: Text(
+                'Selesai dengan peringatan: $successCount berhasil, $failedCount gagal. Error terakhir: $lastError',
+              ),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.redAccent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            content: Text(
+              'Bulk Sync Gagal: ${e.toString().replaceAll('Exception: ', '')}',
+            ),
+          ),
+        );
+      }
+    } finally {
+      setState(() {
+        _isBulkSyncMode = false;
+        _isLoading = false;
+      });
+    }
   }
 
   BukuKasEntry _mapDbToBukuKasEntry(Map<String, dynamic> db) {
@@ -377,14 +730,15 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
       if (db['created_at'] != null) {
         final dt = DateTime.parse(db['created_at'].toString()).toLocal();
         tanggal = _formatDateToIndonesian(dt);
-        waktu = '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+        waktu =
+            '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
       }
     } catch (_) {}
 
     final String deskripsi = db['description']?.toString() ?? '-';
     final String type = db['transaction_type']?.toString() ?? 'expense';
     final String tipe = type == 'expense' ? 'Pengeluaran' : 'Pemasukan';
-    
+
     String dbCategory = db['category']?.toString() ?? '';
     String kategori = 'Lain-lain';
     if (dbCategory.isNotEmpty) {
@@ -412,7 +766,9 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
     if (tipe == 'Pemasukan') {
       final patientType = db['patient_type']?.toString();
       final descLower = deskripsi.toLowerCase();
-      if (patientType == 'BPJS' || descLower.contains('bpjs') || descLower.contains('klaim')) {
+      if (patientType == 'BPJS' ||
+          descLower.contains('bpjs') ||
+          descLower.contains('klaim')) {
         metode = 'BPJS';
       } else if (descLower.contains('qris')) {
         metode = 'QRIS';
@@ -422,8 +778,11 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
       }
     }
 
-    final double jumlah = double.tryParse(db['amount']?.toString() ?? '0') ?? 0.0;
-    final String status = tipe == 'Pemasukan' ? 'Lunas' : '-';
+    final double jumlah =
+        double.tryParse(db['amount']?.toString() ?? '0') ?? 0.0;
+    final String status = db['status']?.toString() ?? '-';
+    final String? idSource = db['id_source']?.toString();
+    final String? sourceType = db['source_type']?.toString();
 
     return BukuKasEntry(
       id: id,
@@ -435,13 +794,25 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
       metode: metode,
       jumlah: jumlah,
       status: status,
+      idSource: idSource,
+      sourceType: sourceType,
     );
   }
 
   String _formatDateToIndonesian(DateTime dt) {
     final months = [
-      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+      'Januari',
+      'Februari',
+      'Maret',
+      'April',
+      'Mei',
+      'Juni',
+      'Juli',
+      'Agustus',
+      'September',
+      'Oktober',
+      'November',
+      'Desember',
     ];
     return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
   }
@@ -457,11 +828,17 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
     final desc = _expDescController.text.trim();
     final amt = double.tryParse(_expAmountController.text) ?? 0.0;
     if (desc.isEmpty) {
-      _showWarningDialog('Form Belum Lengkap', 'Harap isi deskripsi pengeluaran klinik.');
+      _showWarningDialog(
+        'Form Belum Lengkap',
+        'Harap isi deskripsi pengeluaran klinik.',
+      );
       return;
     }
     if (amt <= 0) {
-      _showWarningDialog('Jumlah Salah', 'Harap masukkan jumlah nominal pengeluaran yang valid.');
+      _showWarningDialog(
+        'Jumlah Salah',
+        'Harap masukkan jumlah nominal pengeluaran yang valid.',
+      );
       return;
     }
 
@@ -493,21 +870,30 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
         SnackBar(
           behavior: SnackBarBehavior.floating,
           backgroundColor: Colors.redAccent,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           content: Row(
             children: [
               const Icon(Icons.outbox_rounded, color: Colors.white, size: 18),
               const SizedBox(width: 10),
               Text(
                 'Pengeluaran "$desc" sebesar Rp ${amt.toInt()} berhasil dicatat.',
-                style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                style: GoogleFonts.outfit(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
             ],
           ),
         ),
       );
     } catch (e) {
-      _showWarningDialog('Gagal Menyimpan', 'Terjadi kesalahan saat menyimpan pengeluaran: $e');
+      _showWarningDialog(
+        'Gagal Menyimpan',
+        'Terjadi kesalahan saat menyimpan pengeluaran: $e',
+      );
     } finally {
       setState(() => _isLoading = false);
     }
@@ -522,17 +908,41 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
-            const Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 20),
+            const Icon(
+              Icons.warning_amber_rounded,
+              color: Colors.amber,
+              size: 20,
+            ),
             const SizedBox(width: 8),
-            Text(title, style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w900)),
+            Text(
+              title,
+              style: GoogleFonts.outfit(
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
           ],
         ),
-        content: Text(message, style: GoogleFonts.outfit(fontSize: 11, color: Colors.grey[600], fontWeight: FontWeight.w500)),
+        content: Text(
+          message,
+          style: GoogleFonts.outfit(
+            fontSize: 11,
+            color: Colors.grey[600],
+            fontWeight: FontWeight.w500,
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: Text('Mengerti', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900, color: const Color(0xFFB577F2))),
-          )
+            child: Text(
+              'Mengerti',
+              style: GoogleFonts.outfit(
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFFB577F2),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -546,14 +956,24 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
         SnackBar(
           behavior: SnackBarBehavior.floating,
           backgroundColor: const Color(0xFF48C9B0),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           content: Row(
             children: [
-              const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+              const Icon(
+                Icons.check_circle_rounded,
+                color: Colors.white,
+                size: 18,
+              ),
               const SizedBox(width: 10),
               Text(
                 'Laporan PDF Buku Kas (Mei 2026) berhasil diunduh ke folder Downloads.',
-                style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                style: GoogleFonts.outfit(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
             ],
           ),
@@ -570,9 +990,11 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
     final cardBg = isDark ? const Color(0xFF161619) : Colors.white;
     final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
     final subtitleColor = isDark ? Colors.grey[400]! : const Color(0xFF6F6A8A);
-    final borderColor = isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2);
+    final borderColor = isDark
+        ? const Color(0xFF252528)
+        : const Color(0xFFECEEF2);
     final inputBg = isDark ? const Color(0xFF1E1E22) : const Color(0xFFF6F8FA);
-    
+
     final purple = const Color(0xFFB577F2);
     final activeGreen = const Color(0xFF48C9B0);
     final isMobile = MediaQuery.of(context).size.width < 768;
@@ -591,14 +1013,27 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
     final double saldoBersih = totalPemasukan - totalPengeluaran;
 
     // Retrieve unique patients count in bookkeeping
-    final int totalPatients = _patientSyncList.map((e) => e['patient_id']).toSet().length;
+    final int totalPatients = _patientSyncList
+        .map((e) => e['patient_id'])
+        .toSet()
+        .length;
 
     // Dynamic Chart Data Calculation (Income & Expense over 12 months)
     List<double> incomeMonthly = List.filled(12, 0.0);
     List<double> expenseMonthly = List.filled(12, 0.0);
     final monthsList = [
-      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+      'Januari',
+      'Februari',
+      'Maret',
+      'April',
+      'Mei',
+      'Juni',
+      'Juli',
+      'Agustus',
+      'September',
+      'Oktober',
+      'November',
+      'Desember',
     ];
     for (final entry in _ledger) {
       int monthIndex = -1;
@@ -622,8 +1057,12 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
     final bpjsCount = _patientSyncList.where((p) => p['type'] == 'BPJS').length;
     final generalCount = totalPatientsWithRecords - bpjsCount;
 
-    final double generalRatio = totalPatientsWithRecords > 0 ? (generalCount / totalPatientsWithRecords) * 100 : 78.0;
-    final double bpjsRatio = totalPatientsWithRecords > 0 ? (bpjsCount / totalPatientsWithRecords) * 100 : 22.0;
+    final double generalRatio = totalPatientsWithRecords > 0
+        ? (generalCount / totalPatientsWithRecords) * 100
+        : 78.0;
+    final double bpjsRatio = totalPatientsWithRecords > 0
+        ? (bpjsCount / totalPatientsWithRecords) * 100
+        : 22.0;
 
     return Stack(
       children: [
@@ -644,7 +1083,11 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     alignment: Alignment.center,
-                    child: Icon(Icons.account_balance_wallet_rounded, color: activeGreen, size: 18),
+                    child: Icon(
+                      Icons.account_balance_wallet_rounded,
+                      color: activeGreen,
+                      size: 18,
+                    ),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -655,16 +1098,33 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                           children: [
                             Text(
                               'Pembukuan',
-                              style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w900, color: textColor),
+                              style: GoogleFonts.outfit(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w900,
+                                color: textColor,
+                              ),
                             ),
                             const SizedBox(width: 12),
                             // System Online badge (mimicking mockup)
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
                               decoration: BoxDecoration(
-                                color: (state.satusehatAutoSync ? activeGreen : Colors.orangeAccent).withOpacity(0.08),
+                                color:
+                                    (state.satusehatAutoSync
+                                            ? activeGreen
+                                            : Colors.orangeAccent)
+                                        .withOpacity(0.08),
                                 borderRadius: BorderRadius.circular(100),
-                                border: Border.all(color: (state.satusehatAutoSync ? activeGreen : Colors.orangeAccent).withOpacity(0.3)),
+                                border: Border.all(
+                                  color:
+                                      (state.satusehatAutoSync
+                                              ? activeGreen
+                                              : Colors.orangeAccent)
+                                          .withOpacity(0.3),
+                                ),
                               ),
                               child: Row(
                                 children: [
@@ -672,17 +1132,23 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                                     width: 6,
                                     height: 6,
                                     decoration: BoxDecoration(
-                                      color: state.satusehatAutoSync ? activeGreen : Colors.orangeAccent,
+                                      color: state.satusehatAutoSync
+                                          ? activeGreen
+                                          : Colors.orangeAccent,
                                       shape: BoxShape.circle,
                                     ),
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
-                                    state.satusehatAutoSync ? 'SYSTEM ONLINE' : 'SINKRONISASI MANUAL',
+                                    state.satusehatAutoSync
+                                        ? 'SYSTEM ONLINE'
+                                        : 'SINKRONISASI MANUAL',
                                     style: GoogleFonts.outfit(
                                       fontSize: 7,
                                       fontWeight: FontWeight.w900,
-                                      color: state.satusehatAutoSync ? activeGreen : Colors.orangeAccent,
+                                      color: state.satusehatAutoSync
+                                          ? activeGreen
+                                          : Colors.orangeAccent,
                                       letterSpacing: 0.5,
                                     ),
                                   ),
@@ -693,7 +1159,11 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                         ),
                         Text(
                           'Ringkasan arus kas masuk, pengeluaran klinik, dan e-resep diintegrasi',
-                          style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor, fontWeight: FontWeight.bold),
+                          style: GoogleFonts.outfit(
+                            fontSize: 10,
+                            color: subtitleColor,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ],
                     ),
@@ -704,16 +1174,39 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                       backgroundColor: activeGreen.withOpacity(0.12),
                       foregroundColor: activeGreen,
                       elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                     ),
                     child: Row(
                       children: [
                         _isExporting
-                            ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF48C9B0))))
-                            : const Icon(Icons.picture_as_pdf_outlined, size: 14),
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Color(0xFF48C9B0),
+                                  ),
+                                ),
+                              )
+                            : const Icon(
+                                Icons.picture_as_pdf_outlined,
+                                size: 14,
+                              ),
                         const SizedBox(width: 8),
-                        Text('Ekspor Laporan', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900)),
+                        Text(
+                          'Ekspor Laporan',
+                          style: GoogleFonts.outfit(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -724,14 +1217,30 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                       backgroundColor: purple,
                       foregroundColor: Colors.white,
                       elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.outbox_rounded, size: 14, color: Colors.white),
+                        const Icon(
+                          Icons.outbox_rounded,
+                          size: 14,
+                          color: Colors.white,
+                        ),
                         const SizedBox(width: 8),
-                        Text('Catat Pengeluaran', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900, color: Colors.white)),
+                        Text(
+                          'Catat Pengeluaran',
+                          style: GoogleFonts.outfit(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -806,9 +1315,23 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
             // Tab toggles (Overview & Cashflow vs Patient List & SatuSehat)
             Row(
               children: [
-                _buildTabButton('overview', 'Overview & Cashflow', activeGreen, cardBg, borderColor, textColor),
+                _buildTabButton(
+                  'overview',
+                  'Overview & Cashflow',
+                  activeGreen,
+                  cardBg,
+                  borderColor,
+                  textColor,
+                ),
                 const SizedBox(width: 12),
-                _buildTabButton('satusehat', 'Patient List & SatuSehat', activeGreen, cardBg, borderColor, textColor),
+                _buildTabButton(
+                  'satusehat',
+                  'Patient List & SatuSehat',
+                  activeGreen,
+                  cardBg,
+                  borderColor,
+                  textColor,
+                ),
               ],
             ),
 
@@ -842,22 +1365,54 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                                 children: [
                                   Text(
                                     'Monthly Cashflow',
-                                    style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w900, color: textColor),
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w900,
+                                      color: textColor,
+                                    ),
                                   ),
                                   Text(
                                     'Income vs Expense (Year to Date)',
-                                    style: GoogleFonts.outfit(fontSize: 9, color: subtitleColor, fontWeight: FontWeight.bold),
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 9,
+                                      color: subtitleColor,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ],
                               ),
                               Row(
                                 children: [
-                                  _buildSmallToggle('Daily', false, subtitleColor, borderColor, inputBg, textColor),
-                                  _buildSmallToggle('Monthly', true, activeGreen, borderColor, inputBg, Colors.white),
-                                  _buildSmallToggle('Yearly', false, subtitleColor, borderColor, inputBg, textColor),
+                                  _buildSmallToggle(
+                                    'Daily',
+                                    false,
+                                    subtitleColor,
+                                    borderColor,
+                                    inputBg,
+                                    textColor,
+                                  ),
+                                  _buildSmallToggle(
+                                    'Monthly',
+                                    true,
+                                    activeGreen,
+                                    borderColor,
+                                    inputBg,
+                                    Colors.white,
+                                  ),
+                                  _buildSmallToggle(
+                                    'Yearly',
+                                    false,
+                                    subtitleColor,
+                                    borderColor,
+                                    inputBg,
+                                    textColor,
+                                  ),
                                   const SizedBox(width: 8),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: inputBg,
                                       border: Border.all(color: borderColor),
@@ -865,8 +1420,19 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                                     ),
                                     child: Row(
                                       children: [
-                                        Text('2026', style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: textColor)),
-                                        Icon(Icons.arrow_drop_down, size: 12, color: subtitleColor),
+                                        Text(
+                                          '2026',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w900,
+                                            color: textColor,
+                                          ),
+                                        ),
+                                        Icon(
+                                          Icons.arrow_drop_down,
+                                          size: 12,
+                                          color: subtitleColor,
+                                        ),
                                       ],
                                     ),
                                   ),
@@ -893,7 +1459,11 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                             children: [
                               _legendItem(activeGreen, 'Income', textColor),
                               const SizedBox(width: 16),
-                              _legendItem(Colors.redAccent, 'Expense', textColor),
+                              _legendItem(
+                                Colors.redAccent,
+                                'Expense',
+                                textColor,
+                              ),
                             ],
                           ),
                         ],
@@ -917,11 +1487,19 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                         children: [
                           Text(
                             'Patient Ratio',
-                            style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w900, color: textColor),
+                            style: GoogleFonts.outfit(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
+                              color: textColor,
+                            ),
                           ),
                           Text(
                             'BPJS vs General',
-                            style: GoogleFonts.outfit(fontSize: 9, color: subtitleColor, fontWeight: FontWeight.bold),
+                            style: GoogleFonts.outfit(
+                              fontSize: 9,
+                              color: subtitleColor,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                           const Spacer(),
                           // Donut Chart Painter
@@ -943,11 +1521,20 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                                   children: [
                                     Text(
                                       totalPatientsWithRecords.toString(),
-                                      style: GoogleFonts.outfit(fontSize: 26, fontWeight: FontWeight.w900, color: textColor),
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 26,
+                                        fontWeight: FontWeight.w900,
+                                        color: textColor,
+                                      ),
                                     ),
                                     Text(
                                       'TOTAL PATIENTS',
-                                      style: GoogleFonts.outfit(fontSize: 6.5, fontWeight: FontWeight.w900, color: subtitleColor, letterSpacing: 0.5),
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 6.5,
+                                        fontWeight: FontWeight.w900,
+                                        color: subtitleColor,
+                                        letterSpacing: 0.5,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -959,11 +1546,27 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                           Row(
                             children: [
                               Expanded(
-                                child: _legendCard(activeGreen, 'General', '${generalRatio.toInt()}%', inputBg, borderColor, textColor, subtitleColor),
+                                child: _legendCard(
+                                  activeGreen,
+                                  'General',
+                                  '${generalRatio.toInt()}%',
+                                  inputBg,
+                                  borderColor,
+                                  textColor,
+                                  subtitleColor,
+                                ),
                               ),
                               const SizedBox(width: 8),
                               Expanded(
-                                child: _legendCard(const Color(0xFF1B4F42), 'BPJS', '${bpjsRatio.toInt()}%', inputBg, borderColor, textColor, subtitleColor),
+                                child: _legendCard(
+                                  const Color(0xFF1B4F42),
+                                  'BPJS',
+                                  '${bpjsRatio.toInt()}%',
+                                  inputBg,
+                                  borderColor,
+                                  textColor,
+                                  subtitleColor,
+                                ),
                               ),
                             ],
                           ),
@@ -989,7 +1592,12 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                       children: [
                         Text(
                           'RECENT TRANSACTIONS',
-                          style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: subtitleColor, letterSpacing: 0.5),
+                          style: GoogleFonts.outfit(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w900,
+                            color: subtitleColor,
+                            letterSpacing: 0.5,
+                          ),
                         ),
                         const Spacer(),
                         Container(
@@ -1004,19 +1612,31 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                           alignment: Alignment.center,
                           child: Row(
                             children: [
-                              Icon(Icons.search_rounded, size: 14, color: subtitleColor),
+                              Icon(
+                                Icons.search_rounded,
+                                size: 14,
+                                color: subtitleColor,
+                              ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: TextField(
-                                  style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: textColor),
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: textColor,
+                                  ),
                                   decoration: InputDecoration(
                                     hintText: 'Cari transaksi...',
-                                    hintStyle: GoogleFonts.outfit(fontSize: 10, color: subtitleColor.withOpacity(0.5)),
+                                    hintStyle: GoogleFonts.outfit(
+                                      fontSize: 10,
+                                      color: subtitleColor.withOpacity(0.5),
+                                    ),
                                     border: InputBorder.none,
                                     isDense: true,
                                     contentPadding: EdgeInsets.zero,
                                   ),
-                                  onChanged: (val) => setState(() => _searchQuery = val),
+                                  onChanged: (val) =>
+                                      setState(() => _searchQuery = val),
                                 ),
                               ),
                             ],
@@ -1032,32 +1652,93 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                     ),
                     const SizedBox(height: 16),
                     // Table
-                    _buildTransactionsTable(borderColor, inputBg, textColor, subtitleColor, activeGreen, purple),
+                    _buildTransactionsTable(
+                      borderColor,
+                      inputBg,
+                      textColor,
+                      subtitleColor,
+                      activeGreen,
+                      purple,
+                    ),
                   ],
                 ),
               ),
             ] else ...[
               // Patient List & SatuSehat Sync View
-              _buildPatientSyncTab(cardBg, borderColor, inputBg, textColor, subtitleColor, activeGreen, purple),
+              _buildPatientSyncTab(
+                cardBg,
+                borderColor,
+                inputBg,
+                textColor,
+                subtitleColor,
+                activeGreen,
+                purple,
+              ),
             ],
           ],
         ),
 
         // EXPENSE WIZARD OVERLAY
-        if (_showExpenseWizard)
-          _buildExpenseWizardModal(cardBg, textColor, subtitleColor, borderColor, inputBg, purple),
+        ViewportOverlay(
+          show: _showExpenseWizard,
+          builder: (context) => _buildExpenseWizardModal(
+            cardBg,
+            textColor,
+            subtitleColor,
+            borderColor,
+            inputBg,
+            purple,
+          ),
+        ),
+
+        // DETAILED DAILY TRANSACTIONS MODAL
+        ViewportOverlay(
+          show: _selectedGroupedDay != null,
+          builder: (context) => _buildDailyTransactionsModal(
+            state,
+            cardBg,
+            textColor,
+            subtitleColor,
+            borderColor,
+            inputBg,
+            purple,
+            activeGreen,
+          ),
+        ),
 
         // DETAILED INVOICE MODAL
-        if (_selectedEntry != null)
-          _buildInvoiceModal(state, cardBg, textColor, subtitleColor, borderColor, inputBg, purple, activeGreen),
+        ViewportOverlay(
+          show: _selectedEntry != null,
+          builder: (context) => _buildInvoiceModal(
+            state,
+            cardBg,
+            textColor,
+            subtitleColor,
+            borderColor,
+            inputBg,
+            purple,
+            activeGreen,
+          ),
+        ),
 
         // DETAILED PATIENT SYNC MODAL
-        if (_selectedSyncEncounter != null)
-          _buildPatientSyncModal(cardBg, textColor, subtitleColor, borderColor, inputBg, purple, activeGreen),
+        ViewportOverlay(
+          show: _selectedSyncEncounter != null,
+          builder: (context) => _buildPatientSyncModal(
+            cardBg,
+            textColor,
+            subtitleColor,
+            borderColor,
+            inputBg,
+            purple,
+            activeGreen,
+          ),
+        ),
 
         // LOADING OVERLAY
-        if (_isLoading)
-          Positioned.fill(
+        ViewportOverlay(
+          show: _isLoading,
+          builder: (context) => Positioned.fill(
             child: Container(
               color: Colors.black.withOpacity(0.15),
               child: const Center(
@@ -1067,12 +1748,20 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
               ),
             ),
           ),
+        ),
       ],
     );
   }
 
   // ─── TAB NAVIGATION BUTTON ──────────────────────────────────────────────────
-  Widget _buildTabButton(String tabId, String title, Color activeColor, Color cardBg, Color border, Color textCol) {
+  Widget _buildTabButton(
+    String tabId,
+    String title,
+    Color activeColor,
+    Color cardBg,
+    Color border,
+    Color textCol,
+  ) {
     final isSelected = _activeTab == tabId;
     return InkWell(
       onTap: () {
@@ -1093,7 +1782,9 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
           style: GoogleFonts.outfit(
             fontSize: 10,
             fontWeight: FontWeight.w900,
-            color: isSelected ? Colors.white : (tabId == 'satusehat' ? activeColor : textCol),
+            color: isSelected
+                ? Colors.white
+                : (tabId == 'satusehat' ? activeColor : textCol),
           ),
         ),
       ),
@@ -1101,13 +1792,33 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
   }
 
   // ─── TRANSACTIONS LEDGER TABLE ──────────────────────────────────────────────
-  Widget _buildTransactionsTable(Color borderColor, Color inputBg, Color textColor, Color subtitleColor, Color activeGreen, Color purple) {
+  Widget _buildTransactionsTable(
+    Color borderColor,
+    Color inputBg,
+    Color textColor,
+    Color subtitleColor,
+    Color activeGreen,
+    Color purple,
+  ) {
     final filteredLedger = _ledger.where((e) {
       final matchesFilter = _filterType == 'Semua' || e.tipe == _filterType;
-      final matchesSearch = e.deskripsi.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+      final matchesSearch =
+          e.deskripsi.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           e.id.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           e.kategori.toLowerCase().contains(_searchQuery.toLowerCase());
       return matchesFilter && matchesSearch;
+    }).toList();
+
+    // Group transactions by date
+    final Map<String, List<BukuKasEntry>> groups = {};
+    for (final entry in filteredLedger) {
+      groups.putIfAbsent(entry.tanggal, () => []).add(entry);
+    }
+
+    final List<GroupedDailyTransactions> groupedLedger = groups.entries.map((
+      e,
+    ) {
+      return GroupedDailyTransactions(date: e.key, transactions: e.value);
     }).toList();
 
     return ClipRRect(
@@ -1120,12 +1831,10 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
         child: Table(
           columnWidths: const {
             0: FlexColumnWidth(1.2),
-            1: FlexColumnWidth(1.2),
-            2: FlexColumnWidth(3.0),
+            1: FlexColumnWidth(3.0),
+            2: FlexColumnWidth(1.2),
             3: FlexColumnWidth(1.2),
-            4: FlexColumnWidth(1.0),
-            5: FlexColumnWidth(1.4),
-            6: FlexColumnWidth(1.0),
+            4: FlexColumnWidth(1.8),
           },
           defaultVerticalAlignment: TableCellVerticalAlignment.middle,
           children: [
@@ -1135,75 +1844,181 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                 border: Border(bottom: BorderSide(color: borderColor)),
               ),
               children: [
-                _tableHeader('KODE TRX', subtitleColor),
-                _tableHeader('TANGGAL', subtitleColor),
-                _tableHeader('KATEGORI / DESKRIPSI', subtitleColor),
-                _tableHeader('TIPE', subtitleColor),
-                _tableHeader('METODE', subtitleColor),
-                _tableHeader('JUMLAH', subtitleColor),
-                _tableHeader('STATUS', subtitleColor),
+                _tableHeader('DATE', subtitleColor),
+                _tableHeader('DESCRIPTION', subtitleColor),
+                _tableHeader('CATEGORY', subtitleColor),
+                _tableHeader('TYPE', subtitleColor),
+                _tableHeader('AMOUNT', subtitleColor),
               ],
             ),
-            ...filteredLedger.map((entry) => TableRow(
-                  decoration: BoxDecoration(
-                    border: Border(bottom: BorderSide(color: borderColor)),
-                    color: _selectedEntry?.id == entry.id ? purple.withOpacity(0.04) : Colors.transparent,
+            ...groupedLedger.map((group) {
+              final hasIncome = group.transactions.any(
+                (t) => t.tipe == 'Pemasukan',
+              );
+              final hasExpense = group.transactions.any(
+                (t) => t.tipe == 'Pengeluaran',
+              );
+              String displayType;
+              Color typeColor;
+              IconData typeIcon;
+              if (hasIncome && hasExpense) {
+                displayType = 'Mixed';
+                typeColor = Colors.orangeAccent;
+                typeIcon = Icons.swap_horiz_rounded;
+              } else if (hasIncome) {
+                displayType = 'Income';
+                typeColor = activeGreen;
+                typeIcon = Icons.trending_up_rounded;
+              } else {
+                displayType = 'Expense';
+                typeColor = Colors.redAccent;
+                typeIcon = Icons.trending_down_rounded;
+              }
+
+              final categories = group.transactions
+                  .map((t) => t.kategori)
+                  .toSet()
+                  .toList();
+              final String categoryText = categories.length == 1
+                  ? categories.first
+                  : 'Multi';
+              Color categoryColor;
+              if (categoryText == 'Multi') {
+                categoryColor = Colors.orangeAccent;
+              } else if (categoryText == 'Konsultasi' ||
+                  categoryText == 'Service') {
+                categoryColor = activeGreen;
+              } else if (categoryText == 'Obat & Medis' ||
+                  categoryText == 'Farmasi') {
+                categoryColor = purple;
+              } else {
+                categoryColor = subtitleColor;
+              }
+
+              final double net = group.netProfit;
+              final String amountSign = net >= 0 ? '+' : '-';
+              final Color amountColor = net >= 0
+                  ? activeGreen
+                  : Colors.redAccent;
+              final String netText =
+                  '$amountSign Rp ${_formatAmount(net.abs())}';
+
+              final onTap = () => setState(() => _selectedGroupedDay = group);
+
+              return TableRow(
+                decoration: BoxDecoration(
+                  border: Border(bottom: BorderSide(color: borderColor)),
+                  color: _selectedGroupedDay?.date == group.date
+                      ? purple.withOpacity(0.04)
+                      : Colors.transparent,
+                ),
+                children: [
+                  _tableCellClickable(
+                    Text(
+                      group.date,
+                      style: GoogleFonts.outfit(
+                        fontSize: 10,
+                        color: textColor,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    onTap,
                   ),
-                  children: [
-                    _tableCell(
-                      InkWell(
-                        onTap: () => setState(() => _selectedEntry = entry),
-                        child: Text(entry.id, style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: purple)),
-                      ),
-                    ),
-                    _tableCell(Text('${entry.tanggal}\n${entry.waktu}', style: GoogleFonts.outfit(fontSize: 9, color: subtitleColor, fontWeight: FontWeight.bold))),
-                    _tableCell(
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: (entry.tipe == 'Pemasukan' ? activeGreen : Colors.redAccent).withOpacity(0.08),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(entry.kategori.toUpperCase(), style: GoogleFonts.outfit(fontSize: 6.5, fontWeight: FontWeight.w900, color: entry.tipe == 'Pemasukan' ? activeGreen : Colors.redAccent)),
+                  _tableCellClickable(
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${group.transactionCount} Transactions',
+                          style: GoogleFonts.outfit(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: textColor,
                           ),
-                          const SizedBox(height: 4),
-                          Text(entry.deskripsi, style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: textColor)),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          group.transactions.map((t) => t.deskripsi).join(', '),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.outfit(
+                            fontSize: 8.5,
+                            color: subtitleColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ),
-                    _tableCell(Text(entry.tipe, style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: entry.tipe == 'Pemasukan' ? activeGreen : Colors.redAccent))),
-                    _tableCell(Text(entry.metode, style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: textColor))),
-                    _tableCell(
-                      Text(
-                        '${entry.tipe == 'Pemasukan' ? '+' : '-'} Rp ${entry.jumlah.toInt()}',
+                    onTap,
+                  ),
+                  _tableCellClickable(
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: categoryColor.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        categoryText.toUpperCase(),
                         style: GoogleFonts.outfit(
-                          fontSize: 11,
+                          fontSize: 6.5,
                           fontWeight: FontWeight.w900,
-                          color: entry.tipe == 'Pemasukan' ? activeGreen : Colors.redAccent,
+                          color: categoryColor,
                         ),
                       ),
                     ),
-                    _tableCell(
-                      entry.status == '-'
-                          ? Text('-', style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor))
-                          : Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: (entry.status == 'Lunas' ? activeGreen : purple).withOpacity(0.12),
-                                borderRadius: BorderRadius.circular(100),
-                              ),
-                              alignment: Alignment.center,
-                              child: Text(
-                                entry.status,
-                                style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.w900, color: entry.status == 'Lunas' ? activeGreen : purple),
-                              ),
-                            ),
+                    onTap,
+                  ),
+                  _tableCellClickable(
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(typeIcon, size: 12, color: typeColor),
+                        const SizedBox(width: 4),
+                        Text(
+                          displayType,
+                          style: GoogleFonts.outfit(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w900,
+                            color: typeColor,
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                )),
+                    onTap,
+                  ),
+                  _tableCellClickable(
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          netText,
+                          style: GoogleFonts.outfit(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                            color: amountColor,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Rp ${_formatAmount(group.totalIncome)} / Rp ${_formatAmount(group.totalExpense)}',
+                          style: GoogleFonts.outfit(
+                            fontSize: 8.5,
+                            color: subtitleColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    onTap,
+                    alignment: Alignment.centerRight,
+                  ),
+                ],
+              );
+            }),
           ],
         ),
       ),
@@ -1211,17 +2026,34 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
   }
 
   // ─── PATIENT LIST & SATUSEHAT TAB ───────────────────────────────────────────
-  Widget _buildPatientSyncTab(Color cardBg, Color borderColor, Color inputBg, Color textColor, Color subtitleColor, Color activeGreen, Color purple) {
+  Widget _buildPatientSyncTab(
+    Color cardBg,
+    Color borderColor,
+    Color inputBg,
+    Color textColor,
+    Color subtitleColor,
+    Color activeGreen,
+    Color purple,
+  ) {
     // Stats count
-    final int totalPatients = _patientSyncList.map((e) => e['patient_id']).toSet().length;
-    final int bpjsPatients = _patientSyncList.where((p) => p['type'] == 'BPJS').map((e) => e['patient_id']).toSet().length;
+    final int totalPatients = _patientSyncList
+        .map((e) => e['patient_id'])
+        .toSet()
+        .length;
+    final int bpjsPatients = _patientSyncList
+        .where((p) => p['type'] == 'BPJS')
+        .map((e) => e['patient_id'])
+        .toSet()
+        .length;
     final int generalPatients = totalPatients - bpjsPatients;
 
     // Filtering
     final filteredEncounters = _patientSyncList.where((e) {
-      final nameOrNik = e['name'].toString().toLowerCase() + e['nik'].toString().toLowerCase();
+      final nameOrNik =
+          e['name'].toString().toLowerCase() +
+          e['nik'].toString().toLowerCase();
       final matchesSearch = nameOrNik.contains(_syncSearchQuery.toLowerCase());
-      
+
       bool matchesStatus = true;
       if (_syncStatusFilter == 'Sent') {
         matchesStatus = e['sync_status'] == 'success';
@@ -1239,11 +2071,38 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
         // Sub-stat cards
         Row(
           children: [
-            Expanded(child: _buildSubStatCard('TOTAL PATIENTS', totalPatients, activeGreen, cardBg, borderColor, Icons.people_rounded)),
+            Expanded(
+              child: _buildSubStatCard(
+                'TOTAL PATIENTS',
+                totalPatients,
+                activeGreen,
+                cardBg,
+                borderColor,
+                Icons.people_rounded,
+              ),
+            ),
             const SizedBox(width: 14),
-            Expanded(child: _buildSubStatCard('BPJS PATIENT', bpjsPatients, Colors.blueAccent, cardBg, borderColor, Icons.credit_card_rounded)),
+            Expanded(
+              child: _buildSubStatCard(
+                'BPJS PATIENT',
+                bpjsPatients,
+                Colors.blueAccent,
+                cardBg,
+                borderColor,
+                Icons.credit_card_rounded,
+              ),
+            ),
             const SizedBox(width: 14),
-            Expanded(child: _buildSubStatCard('GENERAL PATIENT', generalPatients, purple, cardBg, borderColor, Icons.person_rounded)),
+            Expanded(
+              child: _buildSubStatCard(
+                'GENERAL PATIENT',
+                generalPatients,
+                purple,
+                cardBg,
+                borderColor,
+                Icons.person_rounded,
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 20),
@@ -1267,24 +2126,42 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                     children: [
                       Row(
                         children: [
-                          Text('Patient Sync Status', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w900, color: textColor)),
+                          Text(
+                            'Patient Sync Status',
+                            style: GoogleFonts.outfit(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
+                              color: textColor,
+                            ),
+                          ),
                           const SizedBox(width: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.blueAccent.withOpacity(0.08),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
                               'DEVELOPMENT / STAGING',
-                              style: GoogleFonts.outfit(fontSize: 6.5, fontWeight: FontWeight.w900, color: Colors.blueAccent),
+                              style: GoogleFonts.outfit(
+                                fontSize: 6.5,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.blueAccent,
+                              ),
                             ),
                           ),
                         ],
                       ),
                       Text(
                         'Monitor encounter data sent to Kemenkes SatuSehat platform.',
-                        style: GoogleFonts.outfit(fontSize: 9, color: subtitleColor, fontWeight: FontWeight.bold),
+                        style: GoogleFonts.outfit(
+                          fontSize: 9,
+                          color: subtitleColor,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ],
                   ),
@@ -1302,19 +2179,31 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                     alignment: Alignment.center,
                     child: Row(
                       children: [
-                        Icon(Icons.search_rounded, size: 14, color: subtitleColor),
+                        Icon(
+                          Icons.search_rounded,
+                          size: 14,
+                          color: subtitleColor,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: TextField(
-                            style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: textColor),
+                            style: GoogleFonts.outfit(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: textColor,
+                            ),
                             decoration: InputDecoration(
                               hintText: 'Search name or NIK...',
-                              hintStyle: GoogleFonts.outfit(fontSize: 10, color: subtitleColor.withOpacity(0.5)),
+                              hintStyle: GoogleFonts.outfit(
+                                fontSize: 10,
+                                color: subtitleColor.withOpacity(0.5),
+                              ),
                               border: InputBorder.none,
                               isDense: true,
                               contentPadding: EdgeInsets.zero,
                             ),
-                            onChanged: (val) => setState(() => _syncSearchQuery = val),
+                            onChanged: (val) =>
+                                setState(() => _syncSearchQuery = val),
                           ),
                         ),
                       ],
@@ -1334,8 +2223,16 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                       child: DropdownButton<String>(
                         value: _syncStatusFilter,
                         dropdownColor: cardBg,
-                        icon: Icon(Icons.arrow_drop_down, size: 16, color: subtitleColor),
-                        style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: textColor),
+                        icon: Icon(
+                          Icons.arrow_drop_down,
+                          size: 16,
+                          color: subtitleColor,
+                        ),
+                        style: GoogleFonts.outfit(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: textColor,
+                        ),
                         onChanged: (val) {
                           if (val != null) {
                             setState(() {
@@ -1344,10 +2241,19 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                           }
                         },
                         items: const [
-                          DropdownMenuItem(value: 'All', child: Text('All Status')),
+                          DropdownMenuItem(
+                            value: 'All',
+                            child: Text('All Status'),
+                          ),
                           DropdownMenuItem(value: 'Sent', child: Text('Sent')),
-                          DropdownMenuItem(value: 'Unsent', child: Text('Unsent')),
-                          DropdownMenuItem(value: 'Failed', child: Text('Failed')),
+                          DropdownMenuItem(
+                            value: 'Unsent',
+                            child: Text('Unsent'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Failed',
+                            child: Text('Failed'),
+                          ),
                         ],
                       ),
                     ),
@@ -1366,16 +2272,27 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                       }
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _isBulkSyncMode ? activeGreen : Colors.white,
-                      foregroundColor: _isBulkSyncMode ? Colors.white : textColor,
+                      backgroundColor: _isBulkSyncMode
+                          ? activeGreen
+                          : Colors.white,
+                      foregroundColor: _isBulkSyncMode
+                          ? Colors.white
+                          : textColor,
                       elevation: 0,
-                      side: BorderSide(color: _isBulkSyncMode ? activeGreen : borderColor),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      side: BorderSide(
+                        color: _isBulkSyncMode ? activeGreen : borderColor,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                     ),
                     child: Text(
-                      _isBulkSyncMode 
-                          ? 'Sync Selected (${_selectedEncounters.length})' 
+                      _isBulkSyncMode
+                          ? 'Sync Selected (${_selectedEncounters.length})'
                           : 'Select for Bulk Sync',
                       style: GoogleFonts.outfit(
                         fontSize: 10,
@@ -1387,7 +2304,11 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                   if (_isBulkSyncMode) ...[
                     const SizedBox(width: 8),
                     IconButton(
-                      icon: const Icon(Icons.close, size: 18, color: Colors.redAccent),
+                      icon: const Icon(
+                        Icons.close,
+                        size: 18,
+                        color: Colors.redAccent,
+                      ),
                       onPressed: () {
                         setState(() {
                           _isBulkSyncMode = false;
@@ -1395,7 +2316,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                         });
                       },
                     ),
-                  ]
+                  ],
                 ],
               ),
               const SizedBox(height: 16),
@@ -1431,19 +2352,28 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                       TableRow(
                         decoration: BoxDecoration(
                           color: inputBg,
-                          border: Border(bottom: BorderSide(color: borderColor)),
+                          border: Border(
+                            bottom: BorderSide(color: borderColor),
+                          ),
                         ),
                         children: [
                           if (_isBulkSyncMode)
                             Padding(
                               padding: const EdgeInsets.all(8.0),
                               child: Checkbox(
-                                value: _selectedEncounters.length == filteredEncounters.length && filteredEncounters.isNotEmpty,
+                                value:
+                                    _selectedEncounters.length ==
+                                        filteredEncounters.length &&
+                                    filteredEncounters.isNotEmpty,
                                 activeColor: activeGreen,
                                 onChanged: (val) {
                                   setState(() {
                                     if (val == true) {
-                                      _selectedEncounters.addAll(filteredEncounters.map((e) => e['id'] as String));
+                                      _selectedEncounters.addAll(
+                                        filteredEncounters.map(
+                                          (e) => e['id'] as String,
+                                        ),
+                                      );
                                     } else {
                                       _selectedEncounters.clear();
                                     }
@@ -1460,8 +2390,11 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                       ),
                       // Patient Rows
                       ...filteredEncounters.map((p) {
-                        final isSelected = _selectedEncounters.contains(p['id']);
-                        final syncStatus = p['sync_status']?.toString() ?? 'unsent';
+                        final isSelected = _selectedEncounters.contains(
+                          p['id'],
+                        );
+                        final syncStatus =
+                            p['sync_status']?.toString() ?? 'unsent';
                         Color statusColor = Colors.orangeAccent;
                         String statusLabel = 'Unsent';
                         if (syncStatus == 'success') {
@@ -1472,10 +2405,21 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                           statusLabel = 'Failed';
                         }
 
+                        final onTap = () {
+                          setState(() {
+                            _selectedSyncEncounter = p;
+                          });
+                          _loadEncounterDetails(p['id']);
+                        };
+
                         return TableRow(
                           decoration: BoxDecoration(
-                            border: Border(bottom: BorderSide(color: borderColor)),
-                            color: isSelected ? activeGreen.withOpacity(0.04) : Colors.transparent,
+                            border: Border(
+                              bottom: BorderSide(color: borderColor),
+                            ),
+                            color: isSelected
+                                ? activeGreen.withOpacity(0.04)
+                                : Colors.transparent,
                           ),
                           children: [
                             if (_isBulkSyncMode)
@@ -1487,39 +2431,82 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                                   onChanged: (val) {
                                     setState(() {
                                       if (val == true) {
-                                        _selectedEncounters.add(p['id'] as String);
+                                        _selectedEncounters.add(
+                                          p['id'] as String,
+                                        );
                                       } else {
-                                        _selectedEncounters.remove(p['id'] as String);
+                                        _selectedEncounters.remove(
+                                          p['id'] as String,
+                                        );
                                       }
                                     });
                                   },
                                 ),
                               ),
-                            _tableCell(Text(p['date']?.toString() ?? '-', style: GoogleFonts.outfit(fontSize: 10, color: textColor, fontWeight: FontWeight.bold))),
-                            _tableCell(
+                            _tableCellClickable(
+                              Text(
+                                p['date']?.toString() ?? '-',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 10,
+                                  color: textColor,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              onTap,
+                            ),
+                            _tableCellClickable(
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(p['name']?.toString() ?? '-', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900, color: textColor)),
+                                  Text(
+                                    p['name']?.toString() ?? '-',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w900,
+                                      color: textColor,
+                                    ),
+                                  ),
                                   const SizedBox(height: 2),
-                                  Text('NIK: ${p['nik']}', style: GoogleFonts.outfit(fontSize: 9, color: subtitleColor, fontWeight: FontWeight.bold)),
+                                  Text(
+                                    'NIK: ${p['nik']}',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 9,
+                                      color: subtitleColor,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                                 ],
                               ),
+                              onTap,
                             ),
-                            _tableCell(
+                            _tableCellClickable(
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: (p['type'] == 'BPJS' ? Colors.blueAccent : purple).withOpacity(0.12),
+                                  color:
+                                      (p['type'] == 'BPJS'
+                                              ? Colors.blueAccent
+                                              : purple)
+                                          .withOpacity(0.12),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(
                                   p['type']?.toString().toUpperCase() ?? 'UMUM',
-                                  style: GoogleFonts.outfit(fontSize: 7.5, fontWeight: FontWeight.w900, color: p['type'] == 'BPJS' ? Colors.blueAccent : purple),
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 7.5,
+                                    fontWeight: FontWeight.w900,
+                                    color: p['type'] == 'BPJS'
+                                        ? Colors.blueAccent
+                                        : purple,
+                                  ),
                                 ),
                               ),
+                              onTap,
                             ),
-                            _tableCell(
+                            _tableCellClickable(
                               Row(
                                 children: [
                                   Container(
@@ -1533,21 +2520,24 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                                   const SizedBox(width: 8),
                                   Text(
                                     statusLabel,
-                                    style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: statusColor),
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w900,
+                                      color: statusColor,
+                                    ),
                                   ),
                                 ],
                               ),
+                              onTap,
                             ),
-                            _tableCell(
-                              IconButton(
-                                icon: Icon(Icons.chevron_right_rounded, color: subtitleColor, size: 18),
-                                onPressed: () {
-                                  setState(() {
-                                    _selectedSyncEncounter = p;
-                                  });
-                                  _loadEncounterDetails(p['id']);
-                                },
+                            _tableCellClickable(
+                              Icon(
+                                Icons.chevron_right_rounded,
+                                color: subtitleColor,
+                                size: 18,
                               ),
+                              onTap,
+                              alignment: Alignment.center,
                             ),
                           ],
                         );
@@ -1561,7 +2551,14 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                 Container(
                   padding: const EdgeInsets.symmetric(vertical: 40),
                   alignment: Alignment.center,
-                  child: Text('Tidak ada riwayat rekam medis ditemukan.', style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor, fontWeight: FontWeight.bold)),
+                  child: Text(
+                    'Tidak ada riwayat rekam medis ditemukan.',
+                    style: GoogleFonts.outfit(
+                      fontSize: 11,
+                      color: subtitleColor,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
             ],
           ),
@@ -1571,7 +2568,14 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
   }
 
   // ─── SUB STAT CARD ──────────────────────────────────────────────────────────
-  Widget _buildSubStatCard(String label, int value, Color color, Color bg, Color border, IconData icon) {
+  Widget _buildSubStatCard(
+    String label,
+    int value,
+    Color color,
+    Color bg,
+    Color border,
+    IconData icon,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1585,14 +2589,32 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.w900, color: const Color(0xFF6F6A8A), letterSpacing: 0.5)),
+              Text(
+                label,
+                style: GoogleFonts.outfit(
+                  fontSize: 8,
+                  fontWeight: FontWeight.w900,
+                  color: const Color(0xFF6F6A8A),
+                  letterSpacing: 0.5,
+                ),
+              ),
               const SizedBox(height: 6),
-              Text(value.toString(), style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w900, color: color)),
+              Text(
+                value.toString(),
+                style: GoogleFonts.outfit(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  color: color,
+                ),
+              ),
             ],
           ),
           Container(
             padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: color.withOpacity(0.08), borderRadius: BorderRadius.circular(10)),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(10),
+            ),
             child: Icon(icon, size: 16, color: color),
           ),
         ],
@@ -1601,257 +2623,441 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
   }
 
   // ─── PATIENT SYNC MODAL DIALOG ──────────────────────────────────────────────
-  Widget _buildPatientSyncModal(Color cardBg, Color text, Color subtitle, Color border, Color inputBg, Color purple, Color activeGreen) {
+  Widget _buildPatientSyncModal(
+    Color cardBg,
+    Color text,
+    Color subtitle,
+    Color border,
+    Color inputBg,
+    Color purple,
+    Color activeGreen,
+  ) {
     final enc = _selectedSyncEncounter!;
     final String ssId = enc['satusehat_id']?.toString() ?? '';
     final hasSatuSehatId = ssId.isNotEmpty;
     final String lastError = enc['sync_error']?.toString() ?? '';
 
     return Positioned.fill(
-      child: Container(
-        color: Colors.black.withOpacity(0.35),
-        alignment: Alignment.center,
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _selectedSyncEncounter = null;
+            _encounterDetailsData = null;
+          });
+        },
         child: Container(
-          width: 500,
-          constraints: const BoxConstraints(maxHeight: 650),
-          margin: const EdgeInsets.symmetric(vertical: 24),
-          decoration: BoxDecoration(
-            color: cardBg,
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: border),
-            boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.25), blurRadius: 30, offset: const Offset(0, 10)),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Header banner matching mockup
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                decoration: BoxDecoration(
-                  color: activeGreen,
-                  borderRadius: const BorderRadius.only(topLeft: Radius.circular(27), topRight: Radius.circular(27)),
+          color: Colors.black.withOpacity(0.35),
+          child: GestureDetector(
+            onTap: () {}, // Prevent click propagation to close modal
+            child: Center(
+              child: Container(
+                width: 500,
+                constraints: BoxConstraints(
+                  maxHeight: min(650, MediaQuery.of(context).size.height - 48),
                 ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: const BoxDecoration(color: Colors.white24, shape: BoxShape.circle),
-                      child: const Icon(Icons.person_outline_rounded, color: Colors.white, size: 24),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            enc['name'],
-                            style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.white),
-                          ),
-                          Text(
-                            '${enc['type'].toString().toUpperCase()} • NIK: ${enc['nik']}',
-                            style: GoogleFonts.outfit(fontSize: 9.5, color: Colors.white.withOpacity(0.85), fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
-                      onPressed: () {
-                        setState(() {
-                          _selectedSyncEncounter = null;
-                          _encounterDetailsData = null;
-                        });
-                      },
+                margin: const EdgeInsets.symmetric(
+                  vertical: 24,
+                  horizontal: 16,
+                ),
+                decoration: BoxDecoration(
+                  color: cardBg,
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(color: border),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.25),
+                      blurRadius: 30,
+                      offset: const Offset(0, 10),
                     ),
                   ],
                 ),
-              ),
-
-              // Modal Scrollable Content
-              Expanded(
-                child: _isDetailsLoading 
-                    ? const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF48C9B0))))
-                    : SingleChildScrollView(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            // 1. Vital Signs section
-                            _modalSectionHeader(Icons.insights_rounded, 'VITAL SIGNS', activeGreen),
-                            const SizedBox(height: 10),
-                            _buildVitalsGrid(border),
-                            const SizedBox(height: 20),
-
-                            // 2. Main Complaint
-                            _modalSectionHeader(Icons.assignment_outlined, 'MAIN COMPLAINT', activeGreen),
-                            const SizedBox(height: 6),
-                            _buildInfoTextCard(
-                              _encounterDetailsData?['anamnesis']?['main_complaint']?.toString() ?? '-',
-                              subtitle, border
-                            ),
-                            const SizedBox(height: 20),
-
-                            // 3. Diagnosis (ICD-10)
-                            _modalSectionHeader(Icons.assignment_turned_in_outlined, 'DIAGNOSIS (ICD-10)', activeGreen),
-                            const SizedBox(height: 6),
-                            _buildDiagnosisCard(border, subtitle),
-                            const SizedBox(height: 20),
-
-                            // 4. Physical Exam
-                            _modalSectionHeader(Icons.medical_services_outlined, 'PHYSICAL EXAM', activeGreen),
-                            const SizedBox(height: 6),
-                            _buildInfoTextCard(
-                              _encounterDetailsData?['anamnesis']?['anamnesis']?.toString() ?? '-',
-                              subtitle, border
-                            ),
-                            const SizedBox(height: 20),
-
-                            // 5. Medicine from Doctor
-                            _modalSectionHeader(Icons.healing_outlined, 'MEDICINE FROM DOCTOR (CLINIC)', activeGreen),
-                            const SizedBox(height: 6),
-                            _buildMedicinesTable(border, subtitle, text),
-                          ],
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Header banner matching mockup
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 16,
+                      ),
+                      decoration: BoxDecoration(
+                        color: activeGreen,
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(27),
+                          topRight: Radius.circular(27),
                         ),
                       ),
-              ),
-
-              // Syncing and Error display footer panel
-              if (!_isDetailsLoading) ...[
-                if (_isSyncingIndividual)
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      border: Border(top: BorderSide(color: border)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        LinearProgressIndicator(
-                          backgroundColor: border,
-                          valueColor: AlwaysStoppedAnimation<Color>(activeGreen),
-                        ),
-                        const SizedBox(height: 10),
-                        Center(
-                          child: Text(
-                            _getSyncStepLabel(),
-                            style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: subtitle),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                else
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: inputBg,
-                      border: Border(top: BorderSide(color: border)),
-                      borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(28), bottomRight: Radius.circular(28)),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // If failed and missing SatuSehat ID, display error box and patient registration
-                        if (!hasSatuSehatId) ...[
+                      child: Row(
+                        children: [
                           Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.red.shade50.withOpacity(0.6),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.redAccent.withOpacity(0.2)),
+                            padding: const EdgeInsets.all(8),
+                            decoration: const BoxDecoration(
+                              color: Colors.white24,
+                              shape: BoxShape.circle,
                             ),
-                            child: Row(
+                            child: const Icon(
+                              Icons.person_outline_rounded,
+                              color: Colors.white,
+                              size: 24,
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 16),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text('LAST ERROR', style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.w900, color: Colors.redAccent)),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        lastError.isNotEmpty ? lastError : 'Missing Patient SatuSehat ID',
-                                        style: GoogleFonts.outfit(fontSize: 9.5, fontWeight: FontWeight.bold, color: Colors.red.shade900),
-                                      ),
-                                    ],
+                                Text(
+                                  enc['name'],
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                Text(
+                                  '${enc['type'].toString().toUpperCase()} • NIK: ${enc['nik']}',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 9.5,
+                                    color: Colors.white.withOpacity(0.85),
+                                    fontWeight: FontWeight.bold,
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                          const SizedBox(height: 14),
-                          Container(
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.shade50.withOpacity(0.6),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: Colors.orangeAccent.withOpacity(0.2)),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.close_rounded,
+                              color: Colors.white,
+                              size: 20,
                             ),
-                            child: Column(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(color: Colors.orangeAccent.withOpacity(0.08), shape: BoxShape.circle),
-                                  child: const Icon(Icons.person_add_alt_1_outlined, color: Colors.orangeAccent, size: 18),
-                                ),
-                                const SizedBox(height: 10),
-                                Text(
-                                  'Patient Not Registered in SatuSehat',
-                                  style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900, color: Colors.orange.shade900),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  'Register the patient first to send encounter data.',
-                                  textAlign: TextAlign.center,
-                                  style: GoogleFonts.outfit(fontSize: 9.5, color: Colors.orange.shade800, fontWeight: FontWeight.bold),
-                                ),
-                                const SizedBox(height: 12),
-                                _isRegisteringPatient
-                                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.orangeAccent)))
-                                    : ElevatedButton.icon(
-                                        icon: const Icon(Icons.send_rounded, size: 12, color: Colors.white),
-                                        label: Text('Register Patient to SatuSehat', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.white)),
-                                        onPressed: () => _registerPatientSatuSehat(enc),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.orangeAccent,
-                                          foregroundColor: Colors.white,
-                                          elevation: 0,
-                                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                        ),
-                                      ),
-                              ],
-                            ),
-                          ),
-                        ] else ...[
-                          // Ready to sync manually
-                          ElevatedButton.icon(
-                            icon: const Icon(Icons.send_rounded, size: 12, color: Colors.white),
-                            label: Text(
-                              enc['sync_status'] == 'success' ? 'Resend Encounter Data' : 'Send Encounter Data Now',
-                              style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900, color: Colors.white),
-                            ),
-                            onPressed: () => _triggerIndividualSync(enc),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: activeGreen,
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
+                            onPressed: () {
+                              setState(() {
+                                _selectedSyncEncounter = null;
+                                _encounterDetailsData = null;
+                              });
+                            },
                           ),
                         ],
-                      ],
+                      ),
                     ),
-                  ),
-              ]
-            ],
+
+                    // Modal Scrollable Content
+                    Expanded(
+                      child: _isDetailsLoading
+                          ? const Center(
+                              child: CircularProgressIndicator(
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Color(0xFF48C9B0),
+                                ),
+                              ),
+                            )
+                          : SingleChildScrollView(
+                              padding: const EdgeInsets.all(24),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  // 1. Vital Signs section
+                                  _modalSectionHeader(
+                                    Icons.insights_rounded,
+                                    'VITAL SIGNS',
+                                    activeGreen,
+                                  ),
+                                  const SizedBox(height: 10),
+                                  _buildVitalsGrid(border),
+                                  const SizedBox(height: 20),
+
+                                  // 2. Main Complaint
+                                  _modalSectionHeader(
+                                    Icons.assignment_outlined,
+                                    'MAIN COMPLAINT',
+                                    activeGreen,
+                                  ),
+                                  const SizedBox(height: 6),
+                                  _buildInfoTextCard(
+                                    _encounterDetailsData?['anamnesis']?['main_complaint']
+                                            ?.toString() ??
+                                        '-',
+                                    subtitle,
+                                    border,
+                                  ),
+                                  const SizedBox(height: 20),
+
+                                  // 3. Diagnosis (ICD-10)
+                                  _modalSectionHeader(
+                                    Icons.assignment_turned_in_outlined,
+                                    'DIAGNOSIS (ICD-10)',
+                                    activeGreen,
+                                  ),
+                                  const SizedBox(height: 6),
+                                  _buildDiagnosisCard(border, subtitle),
+                                  const SizedBox(height: 20),
+
+                                  // 4. Physical Exam
+                                  _modalSectionHeader(
+                                    Icons.medical_services_outlined,
+                                    'PHYSICAL EXAM',
+                                    activeGreen,
+                                  ),
+                                  const SizedBox(height: 6),
+                                  _buildInfoTextCard(
+                                    _encounterDetailsData?['anamnesis']?['anamnesis']
+                                            ?.toString() ??
+                                        '-',
+                                    subtitle,
+                                    border,
+                                  ),
+                                  const SizedBox(height: 20),
+
+                                  // 5. Medicine from Doctor
+                                  _modalSectionHeader(
+                                    Icons.healing_outlined,
+                                    'MEDICINE FROM DOCTOR (CLINIC)',
+                                    activeGreen,
+                                  ),
+                                  const SizedBox(height: 6),
+                                  _buildMedicinesTable(border, subtitle, text),
+                                ],
+                              ),
+                            ),
+                    ),
+
+                    // Syncing and Error display footer panel
+                    if (!_isDetailsLoading) ...[
+                      if (_isSyncingIndividual)
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            border: Border(top: BorderSide(color: border)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              LinearProgressIndicator(
+                                backgroundColor: border,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  activeGreen,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              Center(
+                                child: Text(
+                                  _getSyncStepLabel(),
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: subtitle,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      else
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: inputBg,
+                            border: Border(top: BorderSide(color: border)),
+                            borderRadius: const BorderRadius.only(
+                              bottomLeft: Radius.circular(28),
+                              bottomRight: Radius.circular(28),
+                            ),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              // If failed and missing SatuSehat ID, display error box and patient registration
+                              if (!hasSatuSehatId) ...[
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red.shade50.withOpacity(0.6),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: Colors.redAccent.withOpacity(0.2),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Icon(
+                                        Icons.error_outline_rounded,
+                                        color: Colors.redAccent,
+                                        size: 16,
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'LAST ERROR',
+                                              style: GoogleFonts.outfit(
+                                                fontSize: 8,
+                                                fontWeight: FontWeight.w900,
+                                                color: Colors.redAccent,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              lastError.isNotEmpty
+                                                  ? lastError
+                                                  : 'Missing Patient SatuSehat ID',
+                                              style: GoogleFonts.outfit(
+                                                fontSize: 9.5,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.red.shade900,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 14),
+                                Container(
+                                  padding: const EdgeInsets.all(14),
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange.shade50.withOpacity(
+                                      0.6,
+                                    ),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: Colors.orangeAccent.withOpacity(
+                                        0.2,
+                                      ),
+                                    ),
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: Colors.orangeAccent
+                                              .withOpacity(0.08),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.person_add_alt_1_outlined,
+                                          color: Colors.orangeAccent,
+                                          size: 18,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 10),
+                                      Text(
+                                        'Patient Not Registered in SatuSehat',
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w900,
+                                          color: Colors.orange.shade900,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'Register the patient first to send encounter data.',
+                                        textAlign: TextAlign.center,
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 9.5,
+                                          color: Colors.orange.shade800,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      _isRegisteringPatient
+                                          ? const SizedBox(
+                                              width: 18,
+                                              height: 18,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                valueColor:
+                                                    AlwaysStoppedAnimation<
+                                                      Color
+                                                    >(Colors.orangeAccent),
+                                              ),
+                                            )
+                                          : ElevatedButton.icon(
+                                              icon: const Icon(
+                                                Icons.send_rounded,
+                                                size: 12,
+                                                color: Colors.white,
+                                              ),
+                                              label: Text(
+                                                'Register Patient to SatuSehat',
+                                                style: GoogleFonts.outfit(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w900,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                              onPressed: () =>
+                                                  _registerPatientSatuSehat(
+                                                    enc,
+                                                  ),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor:
+                                                    Colors.orangeAccent,
+                                                foregroundColor: Colors.white,
+                                                elevation: 0,
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 20,
+                                                      vertical: 12,
+                                                    ),
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(10),
+                                                ),
+                                              ),
+                                            ),
+                                    ],
+                                  ),
+                                ),
+                              ] else ...[
+                                // Ready to sync manually
+                                ElevatedButton.icon(
+                                  icon: const Icon(
+                                    Icons.send_rounded,
+                                    size: 12,
+                                    color: Colors.white,
+                                  ),
+                                  label: Text(
+                                    enc['sync_status'] == 'success'
+                                        ? 'Resend Encounter Data'
+                                        : 'Send Encounter Data Now',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  onPressed: () => _triggerIndividualSync(enc),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: activeGreen,
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 14,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -1880,7 +3086,12 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
         const SizedBox(width: 8),
         Text(
           title,
-          style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.w900, color: activeGreen, letterSpacing: 0.5),
+          style: GoogleFonts.outfit(
+            fontSize: 8.5,
+            fontWeight: FontWeight.w900,
+            color: activeGreen,
+            letterSpacing: 0.5,
+          ),
         ),
       ],
     );
@@ -1901,9 +3112,21 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
       childAspectRatio: 1.5,
       children: [
         _vitalCard('BLOOD PRESSURE', bp, border),
-        _vitalCard('BODY TEMPERATURE', temp.isNotEmpty && temp != '-' ? '$temp°C' : '-', border),
-        _vitalCard('BODY WEIGHT', weight.isNotEmpty && weight != '-' ? '$weight kg' : '-', border),
-        _vitalCard('SPO2', spo2.isNotEmpty && spo2 != '-' ? '$spo2%' : '-', border),
+        _vitalCard(
+          'BODY TEMPERATURE',
+          temp.isNotEmpty && temp != '-' ? '$temp°C' : '-',
+          border,
+        ),
+        _vitalCard(
+          'BODY WEIGHT',
+          weight.isNotEmpty && weight != '-' ? '$weight kg' : '-',
+          border,
+        ),
+        _vitalCard(
+          'SPO2',
+          spo2.isNotEmpty && spo2 != '-' ? '$spo2%' : '-',
+          border,
+        ),
       ],
     );
   }
@@ -1920,9 +3143,23 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(label, style: GoogleFonts.outfit(fontSize: 6, fontWeight: FontWeight.w900, color: const Color(0xFF6F6A8A))),
+          Text(
+            label,
+            style: GoogleFonts.outfit(
+              fontSize: 6,
+              fontWeight: FontWeight.w900,
+              color: const Color(0xFF6F6A8A),
+            ),
+          ),
           const SizedBox(height: 2),
-          Text(value, style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w900, color: const Color(0xFF1B0C3C))),
+          Text(
+            value,
+            style: GoogleFonts.outfit(
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+              color: const Color(0xFF1B0C3C),
+            ),
+          ),
         ],
       ),
     );
@@ -1939,7 +3176,12 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
       ),
       child: Text(
         text.isNotEmpty ? text : '-',
-        style: GoogleFonts.outfit(fontSize: 10.5, color: subtitle, fontWeight: FontWeight.bold, height: 1.3),
+        style: GoogleFonts.outfit(
+          fontSize: 10.5,
+          color: subtitle,
+          fontWeight: FontWeight.bold,
+          height: 1.3,
+        ),
       ),
     );
   }
@@ -1957,7 +3199,12 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
         ),
         child: Text(
           'No diagnosis data',
-          style: GoogleFonts.outfit(fontSize: 10.5, color: subtitle.withOpacity(0.5), fontStyle: FontStyle.italic, fontWeight: FontWeight.bold),
+          style: GoogleFonts.outfit(
+            fontSize: 10.5,
+            color: subtitle.withOpacity(0.5),
+            fontStyle: FontStyle.italic,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       );
     }
@@ -1980,15 +3227,32 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                  decoration: BoxDecoration(color: const Color(0xFF48C9B0).withOpacity(0.12), borderRadius: BorderRadius.circular(4)),
-                  child: Text(code, style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.w900, color: const Color(0xFF48C9B0))),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF48C9B0).withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    code,
+                    style: GoogleFonts.outfit(
+                      fontSize: 8,
+                      fontWeight: FontWeight.w900,
+                      color: const Color(0xFF48C9B0),
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     desc,
-                    style: GoogleFonts.outfit(fontSize: 10, color: subtitle, fontWeight: FontWeight.bold),
+                    style: GoogleFonts.outfit(
+                      fontSize: 10,
+                      color: subtitle,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],
@@ -2000,11 +3264,14 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
   }
 
   Widget _buildMedicinesTable(Color border, Color subtitle, Color textCol) {
-    final List<dynamic> clinicItems = _encounterDetailsData?['inventory_items'] ?? [];
-    
+    final List<dynamic> clinicItems =
+        _encounterDetailsData?['inventory_items'] ?? [];
+
     // Prescription manual items
-    final prescriptionMap = _encounterDetailsData?['prescription'] as Map<String, dynamic>?;
-    final List<dynamic> rxItems = prescriptionMap?['electronic_prescription_items'] ?? [];
+    final prescriptionMap =
+        _encounterDetailsData?['prescription'] as Map<String, dynamic>?;
+    final List<dynamic> rxItems =
+        prescriptionMap?['electronic_prescription_items'] ?? [];
 
     final List<Map<String, dynamic>> combined = [];
 
@@ -2040,7 +3307,12 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
         ),
         child: Text(
           'No therapy data',
-          style: GoogleFonts.outfit(fontSize: 10.5, color: subtitle.withOpacity(0.5), fontStyle: FontStyle.italic, fontWeight: FontWeight.bold),
+          style: GoogleFonts.outfit(
+            fontSize: 10.5,
+            color: subtitle.withOpacity(0.5),
+            fontStyle: FontStyle.italic,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       );
     }
@@ -2070,16 +3342,45 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
               _tableHeader('SIGNATURE', subtitle),
             ],
           ),
-          ...combined.map((item) => TableRow(
-                decoration: BoxDecoration(
-                  border: Border(bottom: BorderSide(color: border)),
+          ...combined.map(
+            (item) => TableRow(
+              decoration: BoxDecoration(
+                border: Border(bottom: BorderSide(color: border)),
+              ),
+              children: [
+                _tableCell(
+                  Text(
+                    item['name'],
+                    style: GoogleFonts.outfit(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: textCol,
+                    ),
+                  ),
                 ),
-                children: [
-                  _tableCell(Text(item['name'], style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: textCol))),
-                  _tableCell(Text(item['qty'], style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: textCol))),
-                  _tableCell(Text(item['dosage'], style: GoogleFonts.outfit(fontSize: 9.5, color: subtitle, fontWeight: FontWeight.bold))),
-                ],
-              )),
+                _tableCell(
+                  Text(
+                    item['qty'],
+                    style: GoogleFonts.outfit(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      color: textCol,
+                    ),
+                  ),
+                ),
+                _tableCell(
+                  Text(
+                    item['dosage'],
+                    style: GoogleFonts.outfit(
+                      fontSize: 9.5,
+                      color: subtitle,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -2115,13 +3416,25 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
             children: [
               Text(
                 label,
-                style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.w900, color: subCol, letterSpacing: 0.5),
+                style: GoogleFonts.outfit(
+                  fontSize: 8,
+                  fontWeight: FontWeight.w900,
+                  color: subCol,
+                  letterSpacing: 0.5,
+                ),
               ),
               if (badgeText != null)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
-                    color: (isBadgeRed ? Colors.redAccent : const Color(0xFF48C9B0)).withOpacity(0.12),
+                    color:
+                        (isBadgeRed
+                                ? Colors.redAccent
+                                : const Color(0xFF48C9B0))
+                            .withOpacity(0.12),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
@@ -2129,7 +3442,9 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                     style: GoogleFonts.outfit(
                       fontSize: 7,
                       fontWeight: FontWeight.w900,
-                      color: isBadgeRed ? Colors.redAccent : const Color(0xFF48C9B0),
+                      color: isBadgeRed
+                          ? Colors.redAccent
+                          : const Color(0xFF48C9B0),
                     ),
                   ),
                 )
@@ -2140,7 +3455,11 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
           const SizedBox(height: 8),
           Text(
             value,
-            style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w900, color: valueCol),
+            style: GoogleFonts.outfit(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              color: valueCol,
+            ),
           ),
           const SizedBox(height: 2),
           if (patientsBadges != null)
@@ -2149,18 +3468,29 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                 final isBpjs = b.startsWith('BPJS');
                 return Container(
                   margin: const EdgeInsets.only(right: 6),
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
-                    color: (isBpjs ? Colors.blueAccent : const Color(0xFF48C9B0)).withOpacity(0.08),
+                    color:
+                        (isBpjs ? Colors.blueAccent : const Color(0xFF48C9B0))
+                            .withOpacity(0.08),
                     borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: (isBpjs ? Colors.blueAccent : const Color(0xFF48C9B0)).withOpacity(0.2)),
+                    border: Border.all(
+                      color:
+                          (isBpjs ? Colors.blueAccent : const Color(0xFF48C9B0))
+                              .withOpacity(0.2),
+                    ),
                   ),
                   child: Text(
                     b,
                     style: GoogleFonts.outfit(
                       fontSize: 6.5,
                       fontWeight: FontWeight.w900,
-                      color: isBpjs ? Colors.blueAccent : const Color(0xFF48C9B0),
+                      color: isBpjs
+                          ? Colors.blueAccent
+                          : const Color(0xFF48C9B0),
                     ),
                   ),
                 );
@@ -2169,7 +3499,11 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
           else
             Text(
               subtitleDesc,
-              style: GoogleFonts.outfit(fontSize: 7.5, color: subCol, fontWeight: FontWeight.bold),
+              style: GoogleFonts.outfit(
+                fontSize: 7.5,
+                color: subCol,
+                fontWeight: FontWeight.bold,
+              ),
             ),
         ],
       ),
@@ -2177,7 +3511,14 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
   }
 
   // ─── Component Helper: Small Toggle Button ───────────────────────────────
-  Widget _buildSmallToggle(String text, bool isSelected, Color activeColor, Color border, Color bg, Color textCol) {
+  Widget _buildSmallToggle(
+    String text,
+    bool isSelected,
+    Color activeColor,
+    Color border,
+    Color bg,
+    Color textCol,
+  ) {
     return Container(
       margin: const EdgeInsets.only(left: 4),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -2188,7 +3529,11 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
       ),
       child: Text(
         text,
-        style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.w900, color: textCol),
+        style: GoogleFonts.outfit(
+          fontSize: 8.5,
+          fontWeight: FontWeight.w900,
+          color: textCol,
+        ),
       ),
     );
   }
@@ -2204,13 +3549,25 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
         const SizedBox(width: 6),
         Text(
           text,
-          style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.bold, color: textCol),
+          style: GoogleFonts.outfit(
+            fontSize: 9,
+            fontWeight: FontWeight.bold,
+            color: textCol,
+          ),
         ),
       ],
     );
   }
 
-  Widget _legendCard(Color color, String text, String value, Color bg, Color border, Color textCol, Color subCol) {
+  Widget _legendCard(
+    Color color,
+    String text,
+    String value,
+    Color bg,
+    Color border,
+    Color textCol,
+    Color subCol,
+  ) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
@@ -2231,8 +3588,22 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(text, style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.bold, color: subCol)),
-                Text(value, style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: textCol)),
+                Text(
+                  text,
+                  style: GoogleFonts.outfit(
+                    fontSize: 8,
+                    fontWeight: FontWeight.bold,
+                    color: subCol,
+                  ),
+                ),
+                Text(
+                  value,
+                  style: GoogleFonts.outfit(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    color: textCol,
+                  ),
+                ),
               ],
             ),
           ),
@@ -2249,9 +3620,13 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? activeColor.withOpacity(0.12) : Colors.transparent,
+          color: isSelected
+              ? activeColor.withOpacity(0.12)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: isSelected ? activeColor : Colors.transparent),
+          border: Border.all(
+            color: isSelected ? activeColor : Colors.transparent,
+          ),
         ),
         child: Text(
           type,
@@ -2268,7 +3643,15 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
   Widget _tableHeader(String text, Color color) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-      child: Text(text, style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.w900, color: color, letterSpacing: 0.5)),
+      child: Text(
+        text,
+        style: GoogleFonts.outfit(
+          fontSize: 8,
+          fontWeight: FontWeight.w900,
+          color: color,
+          letterSpacing: 0.5,
+        ),
+      ),
     );
   }
 
@@ -2277,6 +3660,26 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       child: child,
     );
+  }
+
+  Widget _tableCellClickable(
+    Widget child,
+    VoidCallback onTap, {
+    Alignment alignment = Alignment.centerLeft,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        child: Align(alignment: alignment, child: child),
+      ),
+    );
+  }
+
+  String _formatAmount(double amt) {
+    String s = amt.toInt().toString();
+    RegExp reg = RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))');
+    return s.replaceAllMapped(reg, (Match m) => '${m[1]}.');
   }
 
   Widget _buildExpenseWizardModal(
@@ -2290,153 +3693,762 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
     return Positioned.fill(
       child: Container(
         color: Colors.black.withOpacity(0.3),
-        alignment: Alignment.center,
-        child: Container(
-          width: 440,
-          padding: const EdgeInsets.all(28),
-          decoration: BoxDecoration(
-            color: cardBg,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: border),
-            boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 20, offset: const Offset(0, 10)),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: Center(
+          child: SingleChildScrollView(
+            child: Container(
+              width: 440,
+              margin: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+              padding: const EdgeInsets.all(28),
+              decoration: BoxDecoration(
+                color: cardBg,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: border),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(color: Colors.redAccent.withOpacity(0.12), borderRadius: BorderRadius.circular(8)),
-                        alignment: Alignment.center,
-                        child: const Icon(Icons.outbox_rounded, color: Colors.redAccent, size: 16),
-                      ),
-                      const SizedBox(width: 12),
-                      Text('Catat Pengeluaran Baru', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w900, color: text)),
-                    ],
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded, size: 18),
-                    onPressed: () => setState(() => _showExpenseWizard = false),
-                  ),
-                ],
-              ),
-              const Divider(height: 24),
-              
-              Text('Deskripsi Pengeluaran *', style: GoogleFonts.outfit(fontSize: 9.5, fontWeight: FontWeight.w900, color: text)),
-              const SizedBox(height: 6),
-              TextField(
-                controller: _expDescController,
-                style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: text),
-                decoration: InputDecoration(
-                  hintText: 'cth. Pembelian Reagen Golongan Darah & Syringe',
-                  hintStyle: GoogleFonts.outfit(fontSize: 11, color: subtitle.withOpacity(0.5)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14),
-                  filled: true,
-                  fillColor: inputBg,
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: border)),
-                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: purple)),
-                ),
-              ),
-
-              const SizedBox(height: 14),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Kategori Pengeluaran *', style: GoogleFonts.outfit(fontSize: 9.5, fontWeight: FontWeight.w900, color: text)),
-                        const SizedBox(height: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          decoration: BoxDecoration(
-                            color: inputBg,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: border),
-                          ),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              value: _expCategory,
-                              isExpanded: true,
-                              icon: Icon(Icons.arrow_drop_down, color: subtitle),
-                              style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: text),
-                              dropdownColor: cardBg,
-                              onChanged: (val) {
-                                  if (val != null) setState(() => _expCategory = val);
-                              },
-                              items: ['Obat & Medis', 'Operasional', 'Gaji Staff', 'Lain-lain']
-                                  .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                                  .toList(),
+                      Row(
+                        children: [
+                          Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: Colors.redAccent.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            alignment: Alignment.center,
+                            child: const Icon(
+                              Icons.outbox_rounded,
+                              color: Colors.redAccent,
+                              size: 16,
                             ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 12),
+                          Text(
+                            'Catat Pengeluaran Baru',
+                            style: GoogleFonts.outfit(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w900,
+                              color: text,
+                            ),
+                          ),
+                        ],
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, size: 18),
+                        onPressed: () =>
+                            setState(() => _showExpenseWizard = false),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 24),
+
+                  Text(
+                    'Deskripsi Pengeluaran *',
+                    style: GoogleFonts.outfit(
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w900,
+                      color: text,
                     ),
                   ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Jumlah Nominal (Rp) *', style: GoogleFonts.outfit(fontSize: 9.5, fontWeight: FontWeight.w900, color: text)),
-                        const SizedBox(height: 6),
-                        TextField(
-                          controller: _expAmountController,
-                          keyboardType: TextInputType.number,
-                          style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: text),
-                          decoration: InputDecoration(
-                            hintText: 'cth. 150000',
-                            hintStyle: GoogleFonts.outfit(fontSize: 11, color: subtitle.withOpacity(0.5)),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 14),
-                            filled: true,
-                            fillColor: inputBg,
-                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: border)),
-                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: purple)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: _expDescController,
+                    style: GoogleFonts.outfit(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: text,
+                    ),
+                    decoration: InputDecoration(
+                      hintText:
+                          'cth. Pembelian Reagen Golongan Darah & Syringe',
+                      hintStyle: GoogleFonts.outfit(
+                        fontSize: 11,
+                        color: subtitle.withOpacity(0.5),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                      ),
+                      filled: true,
+                      fillColor: inputBg,
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(color: border),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(color: purple),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Kategori Pengeluaran *',
+                              style: GoogleFonts.outfit(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w900,
+                                color: text,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                              ),
+                              decoration: BoxDecoration(
+                                color: inputBg,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: border),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  value: _expCategory,
+                                  isExpanded: true,
+                                  icon: Icon(
+                                    Icons.arrow_drop_down,
+                                    color: subtitle,
+                                  ),
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: text,
+                                  ),
+                                  dropdownColor: cardBg,
+                                  onChanged: (val) {
+                                    if (val != null)
+                                      setState(() => _expCategory = val);
+                                  },
+                                  items:
+                                      [
+                                            'Obat & Medis',
+                                            'Operasional',
+                                            'Gaji Staff',
+                                            'Lain-lain',
+                                          ]
+                                          .map(
+                                            (c) => DropdownMenuItem(
+                                              value: c,
+                                              child: Text(c),
+                                            ),
+                                          )
+                                          .toList(),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Jumlah Nominal (Rp) *',
+                              style: GoogleFonts.outfit(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w900,
+                                color: text,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            TextField(
+                              controller: _expAmountController,
+                              keyboardType: TextInputType.number,
+                              style: GoogleFonts.outfit(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: text,
+                              ),
+                              decoration: InputDecoration(
+                                hintText: 'cth. 150000',
+                                hintStyle: GoogleFonts.outfit(
+                                  fontSize: 11,
+                                  color: subtitle.withOpacity(0.5),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                ),
+                                filled: true,
+                                fillColor: inputBg,
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: BorderSide(color: border),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: BorderSide(color: purple),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 28),
+
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () =>
+                            setState(() => _showExpenseWizard = false),
+                        child: Text(
+                          'Batal',
+                          style: GoogleFonts.outfit(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                            color: subtitle,
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(width: 14),
+                      ElevatedButton(
+                        onPressed: _saveExpense,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: purple,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 14,
+                          ),
+                        ),
+                        child: Text(
+                          'Simpan Pengeluaran',
+                          style: GoogleFonts.outfit(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-
-              const SizedBox(height: 28),
-
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => setState(() => _showExpenseWizard = false),
-                    child: Text('Batal', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900, color: subtitle)),
-                  ),
-                  const SizedBox(width: 14),
-                  ElevatedButton(
-                    onPressed: _saveExpense,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: purple,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                    ),
-                    child: Text('Simpan Pengeluaran', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900, color: Colors.white)),
-                  ),
-                ],
-              ),
-            ],
+            ),
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildDailyTransactionsModal(
+    LandingPageState state,
+    Color cardBg,
+    Color text,
+    Color subtitle,
+    Color border,
+    Color inputBg,
+    Color purple,
+    Color activeGreen,
+  ) {
+    final group = _selectedGroupedDay!;
+    final double totalIncome = group.totalIncome;
+    final double totalExpense = group.totalExpense;
+    final double net = group.netProfit;
+    final Color netColor = net >= 0 ? activeGreen : Colors.redAccent;
+
+    return Positioned.fill(
+      child: GestureDetector(
+        onTap: () => setState(() => _selectedGroupedDay = null),
+        child: Container(
+          color: Colors.black.withOpacity(0.3),
+          child: GestureDetector(
+            onTap: () {}, // Prevent click propagation to close modal
+            child: Center(
+              child: SingleChildScrollView(
+                child: Container(
+                  width: 520,
+                  margin: const EdgeInsets.symmetric(
+                    vertical: 24,
+                    horizontal: 16,
+                  ),
+                  padding: const EdgeInsets.all(28),
+                  decoration: BoxDecoration(
+                    color: cardBg,
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(color: border),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
+                        blurRadius: 25,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Header Row
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.calendar_today_rounded,
+                            color: activeGreen,
+                            size: 24,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  group.date,
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w900,
+                                    color: text,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Daily Transaction Detail',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 10,
+                                    color: subtitle,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                "TODAY'S BALANCE",
+                                style: GoogleFonts.outfit(
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.w900,
+                                  color: subtitle,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Rp ${_formatAmount(net)}',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w900,
+                                  color: netColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded, size: 18),
+                            onPressed: () =>
+                                setState(() => _selectedGroupedDay = null),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Income / Expense Summary Row
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: activeGreen.withOpacity(0.04),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: activeGreen.withOpacity(0.2),
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'INCOME',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 8,
+                                      fontWeight: FontWeight.w900,
+                                      color: activeGreen,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Rp ${_formatAmount(totalIncome)}',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w900,
+                                      color: activeGreen,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: Colors.redAccent.withOpacity(0.04),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: Colors.redAccent.withOpacity(0.2),
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'EXPENSE',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 8,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.redAccent,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Rp ${_formatAmount(totalExpense)}',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.redAccent,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Scrollable list of transactions
+                      Container(
+                        constraints: const BoxConstraints(maxHeight: 320),
+                        child: SingleChildScrollView(
+                          child: Column(
+                            children: group.transactions.map((tx) {
+                              final isIncome = tx.tipe == 'Pemasukan';
+                              final Color txColor = isIncome
+                                  ? activeGreen
+                                  : Colors.redAccent;
+
+                              // Check for clinical encounter & sync status
+                              Map<String, dynamic>? matchedEncounter;
+                              if (tx.sourceType == 'clinical_encounter' &&
+                                  tx.idSource != null) {
+                                try {
+                                  matchedEncounter = _patientSyncList
+                                      .firstWhere(
+                                        (enc) => enc['id'] == tx.idSource,
+                                      );
+                                } catch (_) {}
+                              }
+
+                              return InkWell(
+                                onTap: () =>
+                                    setState(() => _selectedEntry = tx),
+                                child: Container(
+                                  margin: const EdgeInsets.only(bottom: 10),
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: inputBg,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(color: border),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      // Icon container
+                                      Container(
+                                        width: 36,
+                                        height: 36,
+                                        decoration: BoxDecoration(
+                                          color: txColor.withOpacity(0.08),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Icon(
+                                          isIncome
+                                              ? Icons.trending_up_rounded
+                                              : Icons.trending_down_rounded,
+                                          color: txColor,
+                                          size: 18,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      // Middle details
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              tx.deskripsi,
+                                              style: GoogleFonts.outfit(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                                color: text,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Row(
+                                              children: [
+                                                Container(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 6,
+                                                        vertical: 2,
+                                                      ),
+                                                  decoration: BoxDecoration(
+                                                    color: txColor.withOpacity(
+                                                      0.08,
+                                                    ),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          4,
+                                                        ),
+                                                  ),
+                                                  child: Text(
+                                                    tx.kategori.toUpperCase(),
+                                                    style: GoogleFonts.outfit(
+                                                      fontSize: 6.5,
+                                                      fontWeight:
+                                                          FontWeight.w900,
+                                                      color: txColor,
+                                                    ),
+                                                  ),
+                                                ),
+                                                if (tx.sourceType != null) ...[
+                                                  const SizedBox(width: 6),
+                                                  Text(
+                                                    tx.sourceType!,
+                                                    style: GoogleFonts.outfit(
+                                                      fontSize: 8,
+                                                      color: subtitle,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      // Right details
+                                      Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.end,
+                                        children: [
+                                          Text(
+                                            '${isIncome ? '+' : '-'} Rp ${_formatAmount(tx.jumlah)}',
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w900,
+                                              color: txColor,
+                                            ),
+                                          ),
+                                          if (matchedEncounter != null) ...[
+                                            const SizedBox(height: 6),
+                                            _buildSatuSehatSyncBadge(
+                                              matchedEncounter,
+                                              activeGreen,
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Close Button
+                      ElevatedButton(
+                        onPressed: () =>
+                            setState(() => _selectedGroupedDay = null),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: activeGreen,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        child: Text(
+                          'Close',
+                          style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSatuSehatSyncBadge(
+    Map<String, dynamic> encounter,
+    Color activeGreen,
+  ) {
+    final String syncStatus = encounter['sync_status'] ?? 'unsent';
+    final bool isSyncingThis =
+        _isSyncingIndividual &&
+        _selectedSyncEncounter?['id'] == encounter['id'];
+
+    if (syncStatus == 'success') {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: activeGreen.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(100),
+          border: Border.all(color: activeGreen.withOpacity(0.2)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.check_circle_outline_rounded,
+              size: 10,
+              color: activeGreen,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              'Sync Success',
+              style: GoogleFonts.outfit(
+                fontSize: 7.5,
+                fontWeight: FontWeight.w900,
+                color: activeGreen,
+              ),
+            ),
+          ],
+        ),
+      );
+    } else if (syncStatus == 'failed') {
+      return InkWell(
+        onTap: isSyncingThis ? null : () => _triggerIndividualSync(encounter),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: Colors.redAccent.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(100),
+            border: Border.all(color: Colors.redAccent.withOpacity(0.2)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (isSyncingThis)
+                const SizedBox(
+                  width: 10,
+                  height: 10,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 1.5,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.redAccent),
+                  ),
+                )
+              else
+                const Icon(
+                  Icons.error_outline_rounded,
+                  size: 10,
+                  color: Colors.redAccent,
+                ),
+              const SizedBox(width: 4),
+              Text(
+                'Sync Failed (Retry)',
+                style: GoogleFonts.outfit(
+                  fontSize: 7.5,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.redAccent,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    } else {
+      // Unsent
+      return InkWell(
+        onTap: isSyncingThis ? null : () => _triggerIndividualSync(encounter),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: activeGreen.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(100),
+            border: Border.all(color: activeGreen.withOpacity(0.3)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (isSyncingThis)
+                const SizedBox(
+                  width: 10,
+                  height: 10,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 1.5,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Color(0xFF48C9B0),
+                    ),
+                  ),
+                )
+              else
+                Icon(Icons.send_rounded, size: 10, color: activeGreen),
+              const SizedBox(width: 4),
+              Text(
+                'Sync SatuSehat',
+                style: GoogleFonts.outfit(
+                  fontSize: 7.5,
+                  fontWeight: FontWeight.w900,
+                  color: activeGreen,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
   }
 
   Widget _buildInvoiceModal(
@@ -2451,200 +4463,355 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
   ) {
     final entry = _selectedEntry!;
     final isPemasukan = entry.tipe == 'Pemasukan';
-    final isRme = isPemasukan && entry.deskripsi.startsWith('Pemeriksaan RME - ');
+    final isRme =
+        isPemasukan && entry.deskripsi.startsWith('Pemeriksaan RME - ');
 
     final consultFee = isPemasukan ? min(entry.jumlah, 100000.0) : 0.0;
     final drugFee = isPemasukan ? (entry.jumlah - consultFee) : 0.0;
 
     return Positioned.fill(
-      child: Container(
-        color: Colors.black.withOpacity(0.3),
-        alignment: Alignment.center,
+      child: GestureDetector(
+        onTap: () => setState(() => _selectedEntry = null),
         child: Container(
-          width: 440,
-          padding: const EdgeInsets.all(28),
-          decoration: BoxDecoration(
-            color: cardBg,
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: border),
-            boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 25, offset: const Offset(0, 8)),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Detail Kwitansi Pembayaran', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w900, color: text)),
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded, size: 18),
-                    onPressed: () => setState(() => _selectedEntry = null),
+          color: Colors.black.withOpacity(0.3),
+          child: GestureDetector(
+            onTap: () {}, // Prevent click propagation to close modal
+            child: Center(
+              child: SingleChildScrollView(
+                child: Container(
+                  width: 440,
+                  margin: const EdgeInsets.symmetric(
+                    vertical: 24,
+                    horizontal: 16,
                   ),
-                ],
-              ),
-              const Divider(height: 20),
-
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: border.withOpacity(0.04),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: border),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('MAPOTEK CLINIC', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900, color: text)),
-                            Text('Praktek Mandiri dr. Agoes Soetanto', style: GoogleFonts.outfit(fontSize: 7.5, color: subtitle, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: (isPemasukan ? activeGreen : Colors.redAccent).withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(100),
-                          ),
-                          child: Text(
-                            entry.tipe.toUpperCase(),
-                            style: GoogleFonts.outfit(fontSize: 7, fontWeight: FontWeight.w900, color: isPemasukan ? activeGreen : Colors.redAccent),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Padding(padding: EdgeInsets.symmetric(vertical: 10), child: Divider(height: 1)),
-
-                    _invoiceMetaRow('Kode Transaksi', entry.id, text, subtitle),
-                    const SizedBox(height: 6),
-                    _invoiceMetaRow('Tanggal & Waktu', '${entry.tanggal} • ${entry.waktu}', text, subtitle),
-                    if (isPemasukan) ...[
-                      const SizedBox(height: 6),
-                      _invoiceMetaRow('Pasien', entry.deskripsi.replaceFirst('Pemeriksaan RME - ', ''), text, subtitle),
-                      const SizedBox(height: 6),
-                      _invoiceMetaRow('Metode Pembayaran', entry.metode, text, subtitle),
-                    ] else ...[
-                      const SizedBox(height: 6),
-                      _invoiceMetaRow('Kategori Biaya', entry.kategori, text, subtitle),
-                    ],
-
-                    const Padding(padding: EdgeInsets.symmetric(vertical: 10), child: Divider(height: 1)),
-                    
-                    Text(
-                      isPemasukan ? 'RINCIAN TRANSAKSI KLINIK' : 'RINCIAN PENGELUARAN KLINIK',
-                      style: GoogleFonts.outfit(fontSize: 7.5, fontWeight: FontWeight.w900, color: subtitle, letterSpacing: 0.5),
-                    ),
-                    const SizedBox(height: 10),
-                    
-                    if (isPemasukan) ...[
-                      _invoiceItemRow('Jasa Pemeriksaan & Konsultasi Medis', 'Rp ${consultFee.toInt()}', text),
-                      if (drugFee > 0) ...[
-                        const SizedBox(height: 6),
-                        _invoiceItemRow('Resep Digital & Terapi Obat', 'Rp ${drugFee.toInt()}', text),
-                      ],
-                    ] else ...[
-                      _invoiceItemRow(entry.deskripsi, 'Rp ${entry.jumlah.toInt()}', text),
-                    ],
-
-                    const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1)),
-
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'TOTAL BAYAR',
-                          style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: text),
-                        ),
-                        Text(
-                          'Rp ${entry.jumlah.toInt()}',
-                          style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w900, color: isPemasukan ? activeGreen : Colors.redAccent),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-
-              if (isRme)
-                _buildSatuSehatSection(
-                  entry,
-                  state,
-                  cardBg,
-                  text,
-                  subtitle,
-                  border,
-                  inputBg,
-                  purple,
-                  activeGreen,
-                ),
-
-              const SizedBox(height: 24),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {
-                        setState(() => _selectedEntry = null);
-                      },
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: border),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.all(28),
+                  decoration: BoxDecoration(
+                    color: cardBg,
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(color: border),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
+                        blurRadius: 25,
+                        offset: const Offset(0, 8),
                       ),
-                      child: Text('Tutup', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900, color: subtitle)),
-                    ),
+                    ],
                   ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        setState(() => _selectedEntry = null);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            behavior: SnackBarBehavior.floating,
-                            backgroundColor: activeGreen,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            content: Row(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Detail Kwitansi Pembayaran',
+                            style: GoogleFonts.outfit(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w900,
+                              color: text,
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded, size: 18),
+                            onPressed: () =>
+                                setState(() => _selectedEntry = null),
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 20),
+
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: border.withOpacity(0.04),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: border),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Icon(Icons.print_rounded, color: Colors.white, size: 18),
-                                const SizedBox(width: 10),
-                                Text(
-                                  'Perintah cetak kwitansi ${entry.id} dikirim ke printer thermal.',
-                                  style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'MAPOTEK CLINIC',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w900,
+                                        color: text,
+                                      ),
+                                    ),
+                                    Text(
+                                      'Praktek Mandiri dr. Agoes Soetanto',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 7.5,
+                                        color: subtitle,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color:
+                                        (isPemasukan
+                                                ? activeGreen
+                                                : Colors.redAccent)
+                                            .withOpacity(0.12),
+                                    borderRadius: BorderRadius.circular(100),
+                                  ),
+                                  child: Text(
+                                    entry.tipe.toUpperCase(),
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 7,
+                                      fontWeight: FontWeight.w900,
+                                      color: isPemasukan
+                                          ? activeGreen
+                                          : Colors.redAccent,
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
-                          ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: purple,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 10),
+                              child: Divider(height: 1),
+                            ),
+
+                            _invoiceMetaRow(
+                              'Kode Transaksi',
+                              entry.id,
+                              text,
+                              subtitle,
+                            ),
+                            const SizedBox(height: 6),
+                            _invoiceMetaRow(
+                              'Tanggal & Waktu',
+                              '${entry.tanggal} • ${entry.waktu}',
+                              text,
+                              subtitle,
+                            ),
+                            if (isPemasukan) ...[
+                              const SizedBox(height: 6),
+                              _invoiceMetaRow(
+                                'Pasien',
+                                entry.deskripsi.replaceFirst(
+                                  'Pemeriksaan RME - ',
+                                  '',
+                                ),
+                                text,
+                                subtitle,
+                              ),
+                              const SizedBox(height: 6),
+                              _invoiceMetaRow(
+                                'Metode Pembayaran',
+                                entry.metode,
+                                text,
+                                subtitle,
+                              ),
+                            ] else ...[
+                              const SizedBox(height: 6),
+                              _invoiceMetaRow(
+                                'Kategori Biaya',
+                                entry.kategori,
+                                text,
+                                subtitle,
+                              ),
+                            ],
+
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 10),
+                              child: Divider(height: 1),
+                            ),
+
+                            Text(
+                              isPemasukan
+                                  ? 'RINCIAN TRANSAKSI KLINIK'
+                                  : 'RINCIAN PENGELUARAN KLINIK',
+                              style: GoogleFonts.outfit(
+                                fontSize: 7.5,
+                                fontWeight: FontWeight.w900,
+                                color: subtitle,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+
+                            if (isPemasukan) ...[
+                              _invoiceItemRow(
+                                'Jasa Pemeriksaan & Konsultasi Medis',
+                                'Rp ${consultFee.toInt()}',
+                                text,
+                              ),
+                              if (drugFee > 0) ...[
+                                const SizedBox(height: 6),
+                                _invoiceItemRow(
+                                  'Resep Digital & Terapi Obat',
+                                  'Rp ${drugFee.toInt()}',
+                                  text,
+                                ),
+                              ],
+                            ] else ...[
+                              _invoiceItemRow(
+                                entry.deskripsi,
+                                'Rp ${entry.jumlah.toInt()}',
+                                text,
+                              ),
+                            ],
+
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 12),
+                              child: Divider(height: 1),
+                            ),
+
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'TOTAL BAYAR',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w900,
+                                    color: text,
+                                  ),
+                                ),
+                                Text(
+                                  'Rp ${entry.jumlah.toInt()}',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w900,
+                                    color: isPemasukan
+                                        ? activeGreen
+                                        : Colors.redAccent,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+
+                      if (isRme)
+                        _buildSatuSehatSection(
+                          entry,
+                          state,
+                          cardBg,
+                          text,
+                          subtitle,
+                          border,
+                          inputBg,
+                          purple,
+                          activeGreen,
+                        ),
+
+                      const SizedBox(height: 24),
+
+                      Row(
                         children: [
-                          const Icon(Icons.print_rounded, size: 14, color: Colors.white),
-                          const SizedBox(width: 8),
-                          Text('Cetak Kwitansi', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900, color: Colors.white)),
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () {
+                                setState(() => _selectedEntry = null);
+                              },
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(color: border),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: Text(
+                                'Tutup',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w900,
+                                  color: subtitle,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () {
+                                setState(() => _selectedEntry = null);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    behavior: SnackBarBehavior.floating,
+                                    backgroundColor: activeGreen,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    content: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.print_rounded,
+                                          color: Colors.white,
+                                          size: 18,
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Text(
+                                          'Perintah cetak kwitansi ${entry.id} dikirim ke printer thermal.',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: purple,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(
+                                    Icons.print_rounded,
+                                    size: 14,
+                                    color: Colors.white,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Cetak Kwitansi',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                         ],
                       ),
-                    ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -2662,7 +4829,8 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
     Color purple,
     Color activeGreen,
   ) {
-    final isSynced = state.satusehatAutoSync || state.syncedTransactions.contains(entry.id);
+    final isSynced =
+        state.satusehatAutoSync || state.syncedTransactions.contains(entry.id);
 
     return Container(
       margin: const EdgeInsets.only(top: 16),
@@ -2680,7 +4848,11 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.cloud_sync_rounded, color: Color(0xFFB577F2), size: 16),
+                  const Icon(
+                    Icons.cloud_sync_rounded,
+                    color: Color(0xFFB577F2),
+                    size: 16,
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     'SATUSEHAT Kemenkes',
@@ -2695,14 +4867,18 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: (isSynced ? activeGreen : Colors.amber).withOpacity(0.12),
+                  color: (isSynced ? activeGreen : Colors.amber).withOpacity(
+                    0.12,
+                  ),
                   borderRadius: BorderRadius.circular(100),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      isSynced ? Icons.check_circle_rounded : Icons.access_time_filled_rounded,
+                      isSynced
+                          ? Icons.check_circle_rounded
+                          : Icons.access_time_filled_rounded,
                       size: 10,
                       color: isSynced ? activeGreen : Colors.amber,
                     ),
@@ -2731,22 +4907,39 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                     children: [
                       Text(
                         'STATUS SINKRONISASI',
-                        style: GoogleFonts.outfit(fontSize: 7.5, fontWeight: FontWeight.w900, color: subtitle),
+                        style: GoogleFonts.outfit(
+                          fontSize: 7.5,
+                          fontWeight: FontWeight.w900,
+                          color: subtitle,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         'Data RME berhasil terkirim ke platform SATUSEHAT Kemenkes RI.',
-                        style: GoogleFonts.outfit(fontSize: 9, color: text, height: 1.3, fontWeight: FontWeight.w500),
+                        style: GoogleFonts.outfit(
+                          fontSize: 9,
+                          color: text,
+                          height: 1.3,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         'TRANSACTION HASH / ID',
-                        style: GoogleFonts.outfit(fontSize: 7.5, fontWeight: FontWeight.w900, color: subtitle),
+                        style: GoogleFonts.outfit(
+                          fontSize: 7.5,
+                          fontWeight: FontWeight.w900,
+                          color: subtitle,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       SelectableText(
                         'ss-tx-${entry.id.hashCode.abs().toRadixString(16).toUpperCase()}-${entry.id.substring(0, min(entry.id.length, 4))}',
-                        style: GoogleFonts.outfit(fontSize: 8.5, color: purple, fontWeight: FontWeight.w900),
+                        style: GoogleFonts.outfit(
+                          fontSize: 8.5,
+                          color: purple,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
                     ],
                   ),
@@ -2763,7 +4956,11 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                   padding: const EdgeInsets.all(4),
                   child: Image.network(
                     'https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://satusehat.kemkes.go.id/verification/tx/${entry.id}',
-                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.qr_code_rounded, size: 40, color: Colors.grey),
+                    errorBuilder: (context, error, stackTrace) => const Icon(
+                      Icons.qr_code_rounded,
+                      size: 40,
+                      color: Colors.grey,
+                    ),
                   ),
                 ),
               ],
@@ -2771,7 +4968,12 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
           ] else ...[
             Text(
               'Data pemeriksaan RME belum disinkronkan ke platform SATUSEHAT Kemenkes.',
-              style: GoogleFonts.outfit(fontSize: 9, color: subtitle, height: 1.3, fontWeight: FontWeight.bold),
+              style: GoogleFonts.outfit(
+                fontSize: 9,
+                color: subtitle,
+                height: 1.3,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 12),
             _isSyncingIndividual
@@ -2793,20 +4995,32 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                       setState(() => _isSyncingIndividual = true);
                       Timer(const Duration(milliseconds: 1500), () {
                         if (!mounted) return;
-                        ref.read(landingPageProvider.notifier).markTransactionSynced(entry.id);
+                        ref
+                            .read(landingPageProvider.notifier)
+                            .markTransactionSynced(entry.id);
                         setState(() => _isSyncingIndividual = false);
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             behavior: SnackBarBehavior.floating,
                             backgroundColor: activeGreen,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                             content: Row(
                               children: [
-                                const Icon(Icons.cloud_done_rounded, color: Colors.white, size: 18),
+                                const Icon(
+                                  Icons.cloud_done_rounded,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
                                 const SizedBox(width: 10),
                                 Text(
                                   'Data rekam medis ${entry.id} berhasil disinkronkan ke SATUSEHAT.',
-                                  style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
                                 ),
                               ],
                             ),
@@ -2818,17 +5032,27 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                       backgroundColor: purple,
                       foregroundColor: Colors.white,
                       elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                       padding: const EdgeInsets.symmetric(vertical: 10),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.cloud_upload_rounded, size: 12, color: Colors.white),
+                        const Icon(
+                          Icons.cloud_upload_rounded,
+                          size: 12,
+                          color: Colors.white,
+                        ),
                         const SizedBox(width: 6),
                         Text(
                           'Kirim SatuSehat (Manual)',
-                          style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.white),
+                          style: GoogleFonts.outfit(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                          ),
                         ),
                       ],
                     ),
@@ -2839,12 +5063,31 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
     );
   }
 
-  Widget _invoiceMetaRow(String label, String value, Color textCol, Color subCol) {
+  Widget _invoiceMetaRow(
+    String label,
+    String value,
+    Color textCol,
+    Color subCol,
+  ) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.bold, color: subCol)),
-        Text(value, style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.w900, color: textCol)),
+        Text(
+          label,
+          style: GoogleFonts.outfit(
+            fontSize: 8.5,
+            fontWeight: FontWeight.bold,
+            color: subCol,
+          ),
+        ),
+        Text(
+          value,
+          style: GoogleFonts.outfit(
+            fontSize: 8.5,
+            fontWeight: FontWeight.w900,
+            color: textCol,
+          ),
+        ),
       ],
     );
   }
@@ -2853,9 +5096,25 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Expanded(child: Text(name, style: GoogleFonts.outfit(fontSize: 9.5, fontWeight: FontWeight.bold, color: textCol))),
+        Expanded(
+          child: Text(
+            name,
+            style: GoogleFonts.outfit(
+              fontSize: 9.5,
+              fontWeight: FontWeight.bold,
+              color: textCol,
+            ),
+          ),
+        ),
         const SizedBox(width: 14),
-        Text(price, style: GoogleFonts.outfit(fontSize: 9.5, fontWeight: FontWeight.w900, color: textCol)),
+        Text(
+          price,
+          style: GoogleFonts.outfit(
+            fontSize: 9.5,
+            fontWeight: FontWeight.w900,
+            color: textCol,
+          ),
+        ),
       ],
     );
   }
@@ -2893,14 +5152,14 @@ class CashflowChartPainter extends CustomPainter {
     for (final val in expenseData) {
       if (val > maxVal) maxVal = val;
     }
-    
+
     maxVal = maxVal * 1.1;
 
     final heightStep = size.height / 4;
     for (int i = 0; i <= 4; i++) {
       final y = size.height - (i * heightStep);
       canvas.drawLine(Offset(35, y), Offset(size.width, y), gridPaint);
-      
+
       final double gridVal = (maxVal / 4) * i;
       final valStr = _formatYLabel(gridVal);
       final tp = TextPainter(
@@ -2911,7 +5170,20 @@ class CashflowChartPainter extends CustomPainter {
     }
 
     final widthStep = (size.width - 35) / 11;
-    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     for (int i = 0; i < 12; i++) {
       final x = 35 + (i * widthStep);
       final tp = TextPainter(
@@ -2925,13 +5197,19 @@ class CashflowChartPainter extends CustomPainter {
     _drawBezierCurve(canvas, size, expenseData, Colors.redAccent, maxVal);
   }
 
-  void _drawBezierCurve(Canvas canvas, Size size, List<double> values, Color color, double maxVal) {
+  void _drawBezierCurve(
+    Canvas canvas,
+    Size size,
+    List<double> values,
+    Color color,
+    double maxVal,
+  ) {
     if (values.isEmpty) return;
     final widthStep = (size.width - 35) / 11;
-    
+
     final path = Path();
     final fillPath = Path();
-    
+
     final points = <Offset>[];
     for (int i = 0; i < 12; i++) {
       final val = i < values.length ? values[i] : 0.0;
@@ -2949,9 +5227,16 @@ class CashflowChartPainter extends CustomPainter {
       final p0 = points[i];
       final p1 = points[i + 1];
       final controlPointX = (p0.dx + p1.dx) / 2;
-      
+
       path.cubicTo(controlPointX, p0.dy, controlPointX, p1.dy, p1.dx, p1.dy);
-      fillPath.cubicTo(controlPointX, p0.dy, controlPointX, p1.dy, p1.dx, p1.dy);
+      fillPath.cubicTo(
+        controlPointX,
+        p0.dy,
+        controlPointX,
+        p1.dy,
+        p1.dx,
+        p1.dy,
+      );
     }
 
     fillPath.lineTo(points.last.dx, size.height);
@@ -3047,19 +5332,91 @@ class PatientRatioDonutChartPainter extends CustomPainter {
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;
 
-    final rect = Rect.fromCircle(center: center, radius: radius - strokeWidth / 2);
+    final rect = Rect.fromCircle(
+      center: center,
+      radius: radius - strokeWidth / 2,
+    );
 
     const startAngle = -pi / 2;
     final generalAngle = 2 * pi * generalPct;
     final bpjsAngle = 2 * pi * bpjsPct;
 
     canvas.drawArc(rect, startAngle, generalAngle, false, generalPaint);
-    
+
     if (bpjsCount > 0) {
-      canvas.drawArc(rect, startAngle + generalAngle, bpjsAngle, false, bpjsPaint);
+      canvas.drawArc(
+        rect,
+        startAngle + generalAngle,
+        bpjsAngle,
+        false,
+        bpjsPaint,
+      );
     }
   }
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+class ViewportOverlay extends StatefulWidget {
+  final bool show;
+  final WidgetBuilder builder;
+
+  const ViewportOverlay({
+    super.key,
+    required this.show,
+    required this.builder,
+  });
+
+  @override
+  State<ViewportOverlay> createState() => _ViewportOverlayState();
+}
+
+class _ViewportOverlayState extends State<ViewportOverlay> {
+  final _controller = OverlayPortalController();
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.show) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && widget.show) {
+          _controller.show();
+        }
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant ViewportOverlay oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.show != oldWidget.show) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          if (widget.show) {
+            _controller.show();
+          } else {
+            _controller.hide();
+          }
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    if (_controller.isShowing) {
+      _controller.hide();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return OverlayPortal(
+      controller: _controller,
+      overlayChildBuilder: (context) => widget.builder(context),
+      child: const SizedBox.shrink(),
+    );
+  }
 }

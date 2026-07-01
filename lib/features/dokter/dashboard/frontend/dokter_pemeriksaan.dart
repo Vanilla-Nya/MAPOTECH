@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
@@ -9,6 +10,7 @@ import 'package:mapotech/features/dokter/dashboard/frontend/dokter_pasien.dart';
 import 'package:mapotech/features/dokter/dashboard/frontend/dokter_obat.dart';
 import 'package:mapotech/shared/icd_codes.dart';
 import 'package:mapotech/shared/supabase_service.dart';
+import 'package:mapotech/shared/satusehat_service.dart';
 
 class DokterPemeriksaan extends ConsumerStatefulWidget {
   const DokterPemeriksaan({super.key});
@@ -29,6 +31,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
   bool _syncSuccess = false;
   String _syncStep = 'Connecting';
   String _txHash = '';
+  String? _lastSavedEncounterId;
 
   // Vital Signs (Step 4)
   final _tensiController = TextEditingController();
@@ -70,7 +73,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
   final List<Map<String, dynamic>> _addedPrescriptions = [];
   final List<Map<String, dynamic>> _manualPrescriptions = [];
   String? _selectedApotek;
-  final _serviceFeeController = TextEditingController(text: '100000');
+  final _serviceFeeController = TextEditingController();
   ObatModel? _selectedDrug;
   final _qtyController = TextEditingController(text: '1');
   final _instructionController = TextEditingController();
@@ -89,6 +92,8 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
   @override
   void initState() {
     super.initState();
+    _serviceFeeController.text =
+        ref.read(landingPageProvider).defaultServiceFee.toInt().toString();
     _tensiSysController.addListener(_updateTensiController);
     _tensiDiaController.addListener(_updateTensiController);
     _serviceFeeController.addListener(() {
@@ -267,7 +272,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
   }
 
   VitalWarning? getTempWarning(String tempStr) {
-    final temp = double.tryParse(tempStr);
+    final temp = double.tryParse(tempStr.replaceAll(',', '.'));
     if (temp == null) return null;
 
     if (temp < 35) {
@@ -351,8 +356,8 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
   }
 
   VitalWarning? getBmiWarning(String weightStr, String heightStr) {
-    final weight = double.tryParse(weightStr);
-    final height = double.tryParse(heightStr);
+    final weight = double.tryParse(weightStr.replaceAll(',', '.'));
+    final height = double.tryParse(heightStr.replaceAll(',', '.'));
     if (weight == null || height == null || height <= 0) return null;
 
     final bmi = weight / ((height / 100) * (height / 100));
@@ -387,6 +392,59 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
       borderColor: const Color(0xFFFADBD8),
       isCritical: true,
     );
+  }
+
+  List<String> _validateVitalSigns() {
+    final errors = <String>[];
+    if (_tensiSysController.text.isNotEmpty) {
+      final val = int.tryParse(_tensiSysController.text);
+      if (val == null || val < 50 || val > 260) {
+        errors.add('Tekanan Darah Systolic harus berada di rentang 50 - 260 mmHg.');
+      }
+    }
+    if (_tensiDiaController.text.isNotEmpty) {
+      final val = int.tryParse(_tensiDiaController.text);
+      if (val == null || val < 30 || val > 150) {
+        errors.add('Tekanan Darah Diastolic harus berada di rentang 30 - 150 mmHg.');
+      }
+    }
+    if (_nadiController.text.isNotEmpty) {
+      final val = int.tryParse(_nadiController.text);
+      if (val == null || val < 30 || val > 220) {
+        errors.add('Detak Jantung (Heart Rate) harus berada di rentang 30 - 220 bpm.');
+      }
+    }
+    if (_respirasiController.text.isNotEmpty) {
+      final val = int.tryParse(_respirasiController.text);
+      if (val == null || val < 8 || val > 60) {
+        errors.add('Laju Pernafasan (Respiration Rate) harus berada di rentang 8 - 60 rpm.');
+      }
+    }
+    if (_suhuController.text.isNotEmpty) {
+      final val = double.tryParse(_suhuController.text.replaceAll(',', '.'));
+      if (val == null || val < 30.0 || val > 45.0) {
+        errors.add('Suhu Tubuh (Body Temp) harus berada di rentang 30.0 - 45.0 °C.');
+      }
+    }
+    if (_beratController.text.isNotEmpty) {
+      final val = double.tryParse(_beratController.text.replaceAll(',', '.'));
+      if (val == null || val < 1.0 || val > 300.0) {
+        errors.add('Berat Badan (Weight) harus berada di rentang 1.0 - 300.0 kg.');
+      }
+    }
+    if (_tinggiController.text.isNotEmpty) {
+      final val = double.tryParse(_tinggiController.text.replaceAll(',', '.'));
+      if (val == null || val < 30.0 || val > 250.0) {
+        errors.add('Tinggi Badan (Height) harus berada di rentang 30.0 - 250.0 cm.');
+      }
+    }
+    if (_spo2Controller.text.isNotEmpty) {
+      final val = int.tryParse(_spo2Controller.text);
+      if (val == null || val < 0 || val > 100) {
+        errors.add('Saturasi Oksigen (SPO2) harus berada di rentang 0 - 100 %.');
+      }
+    }
+    return errors;
   }
 
   List<VitalWarning> get _activeWarnings {
@@ -478,7 +536,8 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
       _addedPrescriptions.clear();
       _manualPrescriptions.clear();
       _selectedApotek = null;
-      _serviceFeeController.text = '100000';
+      _serviceFeeController.text =
+          ref.read(landingPageProvider).defaultServiceFee.toInt().toString();
       _wantReferral = false;
       _generatedReferralNo = 'REF/2026/05/${1000 + Random().nextInt(9000)}';
 
@@ -514,23 +573,25 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
     }
   }
 
-  void _startSatuSehatSync() {
-    if (_keluhanController.text.trim().isEmpty) {
-      _showWarningDialog(
-        'Form Belum Lengkap',
-        'Harap isi bagian Anamnesis / Keluhan Pasien sebelum menyimpan.',
+  Future<void> _startSatuSehatSync({bool bypassValidation = false}) async {
+    if (!bypassValidation) {
+      if (_keluhanController.text.trim().isEmpty) {
+        _showWarningDialog(
+          'Form Belum Lengkap',
+          'Harap isi bagian Anamnesis / Keluhan Pasien sebelum menyimpan.',
+        );
+        return;
+      }
+      final hasIcd10 = _selectedDiagnoses.any(
+        (d) => RegExp(r'^[A-Z]').hasMatch(d.code),
       );
-      return;
-    }
-    final hasIcd10 = _selectedDiagnoses.any(
-      (d) => RegExp(r'^[A-Z]').hasMatch(d.code),
-    );
-    if (!hasIcd10) {
-      _showWarningDialog(
-        'Form Belum Lengkap',
-        'Harap tentukan Diagnosis klinis (ICD-10) untuk pasien.',
-      );
-      return;
+      if (!hasIcd10) {
+        _showWarningDialog(
+          'Form Belum Lengkap',
+          'Harap tentukan Diagnosis klinis (ICD-10) untuk pasien.',
+        );
+        return;
+      }
     }
 
     setState(() {
@@ -539,21 +600,147 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
       _syncStep = 'Connecting';
     });
 
-    // Animate through sync steps
-    Timer(const Duration(milliseconds: 1000), () {
+    try {
+      final queue = _activeQueue;
+      final patient = _activePatient;
+      final encounterId = _lastSavedEncounterId;
+
+      if (queue == null || patient == null || encounterId == null) {
+        throw Exception('Antrian aktif, pasien, atau ID Rekam Medis tidak valid.');
+      }
+
+      final doctorId = ref.read(landingPageProvider).loggedInUser?['id'] ?? '8f93471a-74f8-486b-8e85-4002dc44c11c';
+      final doctorName = ref.read(landingPageProvider).loggedInUser?['name']?.toString() ?? 'Dokter';
+      final docDetail = await SupabaseService.client
+          .from('user_detail_doctor')
+          .select('satu_sehat_api, id_satusehat')
+          .eq('id', doctorId)
+          .maybeSingle();
+
+      final ssConfig = docDetail?['satu_sehat_api'] as Map<String, dynamic>?;
+      if (ssConfig == null || ssConfig['client_id'] == null) {
+        throw Exception('Konfigurasi API SatuSehat belum lengkap di profil Anda.');
+      }
+
+      final docSsId = docDetail?['id_satusehat']?.toString();
+      if (docSsId == null || docSsId.isEmpty) {
+        throw Exception('ID SatuSehat Dokter (Practitioner) belum diatur di profil.');
+      }
+
       setState(() => _syncStep = 'SendingEMR');
-      Timer(const Duration(milliseconds: 1200), () {
-        setState(() => _syncStep = 'GeneratingPrescription');
-        Timer(const Duration(milliseconds: 1000), () {
-          final hashInt = Random().nextInt(900000) + 100000;
-          setState(() {
-            _syncStep = 'Success';
-            _syncSuccess = true;
-            _txHash = 'TX-EMR-2605-$hashInt';
-          });
+
+      final ssService = SatuSehatService(
+        clientId: ssConfig['client_id']?.toString(),
+        clientSecret: ssConfig['client_secret']?.toString(),
+        organizationId: ssConfig['organization_id']?.toString(),
+        locationId: ssConfig['location_id']?.toString() ?? docSsId,
+        env: ssConfig['env']?.toString(),
+      );
+
+      String? patientSsId = patient.satusehatId;
+      if (patientSsId == null || patientSsId.isEmpty) {
+        final nik = patient.nik;
+        if (nik == null || nik.isEmpty) {
+          throw Exception('Pasien tidak memiliki NIK yang valid untuk pendaftaran SatuSehat.');
+        }
+
+        final lookup = await ssService.getPatientIdByNik(nik);
+        if (lookup['status'] == true) {
+          patientSsId = lookup['id'] as String;
+          await SupabaseService.client
+              .from('user')
+              .update({'satusehat_id': patientSsId})
+              .eq('id', patient.id);
+          try {
+            ref.read(dokterPasienListProvider.notifier).loadPatients();
+          } catch (_) {}
+        } else {
+          throw Exception('NIK Pasien tidak ditemukan di database SatuSehat Kemenkes: ${lookup['message']}');
+        }
+      }
+
+      setState(() => _syncStep = 'GeneratingPrescription');
+
+      final List<Map<String, dynamic>> allRx = [];
+      for (final item in _addedPrescriptions) {
+        final obat = item['obat'] as ObatModel;
+        allRx.add({
+          'medicine_name': obat.nama,
+          'quantity': item['jumlah'],
+          'dosage_instructions': item['aturan'] ?? '',
+          'kfa_code': obat.kfaCode,
         });
+      }
+      for (final item in _manualPrescriptions) {
+        allRx.add({
+          'medicine_name': item['nama'] ?? 'Obat Resep',
+          'quantity': item['jumlah'],
+          'dosage_instructions': item['aturan'] ?? '',
+          'kfa_code': item['kfa_code'],
+        });
+      }
+
+      final List<Map<String, dynamic>> diagTags = _selectedDiagnoses.map((d) => {
+        'code': d.code,
+        'label': d.description,
+      }).toList();
+
+      final syncRes = await ssService.sendEncounterData(
+        patientId: patientSsId!,
+        doctorId: docSsId,
+        patientName: patient.nama,
+        doctorName: doctorName,
+        encounterId: encounterId,
+        diagnoses: diagTags,
+        prescriptions: allRx,
+      );
+
+      if (syncRes['status'] != true) {
+        throw Exception(syncRes['message'] ?? 'Gagal sync');
+      }
+
+      final ssEncounterId = syncRes['encounter_id'];
+      final medNote = syncRes['medication_note'] as String?;
+
+      await SupabaseService.client
+          .schema('private_doctor')
+          .from('clinical_encounters')
+          .update({
+            'satusehat_sync_status': 'success',
+            'satusehat_last_error': medNote,
+            'satusehat_encounter_id': ssEncounterId,
+          })
+          .eq('id', encounterId);
+
+      setState(() {
+        _syncStep = 'Success';
+        _syncSuccess = true;
+        _txHash = ssEncounterId ?? 'TX-EMR-${Random().nextInt(900000) + 100000}';
       });
-    });
+    } catch (e) {
+      debugPrint('Error during SatuSehat sync: $e');
+      final errorMsg = e.toString().replaceAll('Exception: ', '');
+
+      try {
+        if (_lastSavedEncounterId != null) {
+          await SupabaseService.client
+              .schema('private_doctor')
+              .from('clinical_encounters')
+              .update({
+                'satusehat_sync_status': 'failed',
+                'satusehat_last_error': errorMsg,
+              })
+              .eq('id', _lastSavedEncounterId!);
+        }
+      } catch (_) {}
+
+      setState(() {
+        _syncStep = 'Failed';
+        _syncSuccess = false;
+      });
+
+      _showWarningDialog('Sinkronisasi SatuSehat Gagal', errorMsg);
+    }
   }
 
   void _completeSyncAndRedirect() {
@@ -612,7 +799,8 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
       _addedPrescriptions.clear();
       _manualPrescriptions.clear();
       _selectedApotek = null;
-      _serviceFeeController.text = '100000';
+      _serviceFeeController.text =
+          ref.read(landingPageProvider).defaultServiceFee.toInt().toString();
       _wantReferral = false;
       _currentStep = 1;
       _step5TabIndex = 0;
@@ -685,7 +873,8 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
       _addedPrescriptions.clear();
       _manualPrescriptions.clear();
       _selectedApotek = null;
-      _serviceFeeController.text = '100000';
+      _serviceFeeController.text =
+          ref.read(landingPageProvider).defaultServiceFee.toInt().toString();
       _wantReferral = false;
       _currentStep = 1;
       _step5TabIndex = 0;
@@ -700,6 +889,107 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
       _bmhpController.clear();
       _referralNotesController.clear();
     });
+  }
+
+  Future<String?> _getApotekIdByName(String name) async {
+    try {
+      final res = await SupabaseService.client
+          .from('user')
+          .select('id')
+          .eq('name', name)
+          .eq('role', 'apotek')
+          .maybeSingle();
+      if (res != null) {
+        return res['id'] as String;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<bool> _saveEMRToDatabase() async {
+    final queue = _activeQueue;
+    if (queue == null) return false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Theme.of(context).cardColor,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: Row(
+          children: [
+            const CircularProgressIndicator(color: Color(0xFFB577F2)),
+            const SizedBox(width: 20),
+            Text(
+              'Menyimpan EMR ke database...',
+              style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      final userState = ref.read(landingPageProvider).loggedInUser;
+      final userId = userState?['id']?.toString();
+      final doctorId = (userId == 'mock-id-1234567890' || userId == null)
+          ? '8f93471a-74f8-486b-8e85-4002dc44c11c'
+          : userId;
+
+      final double subtotalObat = _addedPrescriptions.fold<double>(
+        0,
+        (sum, item) => sum + ((item["obat"] as ObatModel).hargaSatuan * item["jumlah"]),
+      );
+      final double serviceFee = double.tryParse(_serviceFeeController.text) ?? ref.read(landingPageProvider).defaultServiceFee;
+      final double totalBill = serviceFee + subtotalObat;
+
+      String? recommendedApotekId;
+      if (_selectedApotek != null) {
+        recommendedApotekId = await _getApotekIdByName(_selectedApotek!);
+      }
+
+      final db = SupabaseService();
+      _lastSavedEncounterId = await db.saveClinicalEncounter(
+        queueId: queue.id,
+        doctorId: doctorId,
+        serviceFee: serviceFee,
+        totalBill: totalBill,
+        complaint: _keluhanController.text,
+        anamnesis: _anamnesisController.text,
+        foodAllergy: _foodAllergy,
+        airAllergy: _airAllergy,
+        drugAllergy: _drugAllergy,
+        antibioticAllergy: _antibioticAllergy,
+        medTherapy: _medTherapyController.text,
+        nonMedTherapy: _nonMedTherapyController.text,
+        prognosis: _prognosis,
+        bmhp: _bmhpController.text,
+        weight: _beratController.text,
+        height: _tinggiController.text,
+        spo2: _spo2Controller.text,
+        temperature: _suhuController.text,
+        bloodPressure: _tensiController.text,
+        heartRate: _nadiController.text,
+        respiration: _respirasiController.text,
+        diagnoses: _selectedDiagnoses.map((d) => {'code': d.code, 'description': d.description}).toList(),
+        prescriptions: _addedPrescriptions,
+        manualPrescriptions: _manualPrescriptions,
+        recommendedApotekId: recommendedApotekId,
+        isReferral: _wantReferral,
+        referralRs: _referralRsController.text,
+        referralPoli: _referralPoliController.text,
+        referralNotes: _referralNotesController.text,
+        referralNo: _generatedReferralNo,
+      );
+
+      Navigator.pop(context);
+      return true;
+    } catch (e) {
+      Navigator.pop(context);
+      _showWarningDialog('Gagal Menyimpan EMR', e.toString());
+      return false;
+    }
   }
 
   void _showWarningDialog(String title, String message) {
@@ -744,6 +1034,389 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                 fontWeight: FontWeight.w900,
                 color: const Color(0xFFB577F2),
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showVitalValidationDialog({
+    required String title,
+    required List<String> errors,
+    required VoidCallback onLanjutkan,
+  }) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Theme.of(context).cardColor,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(
+              Icons.warning_amber_rounded,
+              color: Colors.amber,
+              size: 22,
+            ),
+            const SizedBox(width: 10),
+            Text(
+              title,
+              style: GoogleFonts.outfit(
+                fontSize: 15,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+        content: Container(
+          width: 450,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Beberapa input vital sign berada di luar rentang normal/sehat:',
+                style: GoogleFonts.outfit(
+                  fontSize: 12,
+                  color: Colors.grey[800],
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+              ...errors.map((error) => Padding(
+                padding: const EdgeInsets.only(bottom: 6.0),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('• ', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey[700])),
+                    Expanded(
+                      child: Text(
+                        error,
+                        style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )),
+              const SizedBox(height: 12),
+              Text(
+                'Tetap lanjutkan?',
+                style: GoogleFonts.outfit(
+                  fontSize: 12,
+                  color: Colors.grey[700],
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              onLanjutkan();
+            },
+            child: Text(
+              'Lanjutkan',
+              style: GoogleFonts.outfit(
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+                color: Colors.grey[600],
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(
+              'Mengerti',
+              style: GoogleFonts.outfit(
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFFB577F2),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showReviewAndSubmitDialog(bool autoSyncEnabled) {
+    final patient = _activePatient;
+    if (patient == null) return;
+
+    final hasIcd10 = _selectedDiagnoses.any(
+      (d) => RegExp(r'^[A-Z]').hasMatch(d.code),
+    );
+    final vitalErrors = _validateVitalSigns();
+
+    final warningChips = <Widget>[];
+    if (_keluhanController.text.trim().isEmpty) {
+      warningChips.add(
+        ActionChip(
+          avatar: const Icon(Icons.warning_amber_rounded, size: 12, color: Colors.orange),
+          label: Text(
+            'Anamnesis Kosong',
+            style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.orange[800]),
+          ),
+          backgroundColor: Colors.orange[50],
+          side: const BorderSide(color: Colors.orange),
+          onPressed: () {
+            Navigator.pop(context);
+            setState(() {
+              _currentStep = 2;
+            });
+          },
+        ),
+      );
+    }
+
+    if (!hasIcd10) {
+      warningChips.add(
+        ActionChip(
+          avatar: const Icon(Icons.warning_amber_rounded, size: 12, color: Colors.red),
+          label: Text(
+            'Diagnosis ICD-10 Kosong',
+            style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.red[800]),
+          ),
+          backgroundColor: Colors.red[50],
+          side: const BorderSide(color: Colors.red),
+          onPressed: () {
+            Navigator.pop(context);
+            setState(() {
+              _currentStep = 4;
+            });
+          },
+        ),
+      );
+    }
+
+    if (vitalErrors.isNotEmpty) {
+      warningChips.add(
+        ActionChip(
+          avatar: const Icon(Icons.warning_amber_rounded, size: 12, color: Colors.red),
+          label: Text(
+            'Vital Sign Tidak Valid',
+            style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.red[800]),
+          ),
+          backgroundColor: Colors.red[50],
+          side: const BorderSide(color: Colors.red),
+          onPressed: () {
+            Navigator.pop(context);
+            setState(() {
+              _currentStep = 4;
+            });
+          },
+        ),
+      );
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        final double subtotalObat = _addedPrescriptions.fold<double>(
+          0,
+          (sum, item) => sum + ((item["obat"] as ObatModel).hargaSatuan * item["jumlah"]),
+        );
+        final double serviceFee = double.tryParse(_serviceFeeController.text) ?? ref.read(landingPageProvider).defaultServiceFee;
+        final double totalBill = serviceFee + subtotalObat;
+
+        return AlertDialog(
+          backgroundColor: Theme.of(context).cardColor,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text(
+            'Review & Simpan EMR',
+            style: GoogleFonts.outfit(
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          content: Container(
+            width: 500,
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.6,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 1. Identitas Pasien
+                  _buildReviewSectionTitle('Identitas Pasien'),
+                  _buildReviewRow('Nama Pasien', patient.nama),
+                  _buildReviewRow('Umur', patient.umur),
+                  const Divider(height: 20),
+
+                  // 2. Anamnesa
+                  _buildReviewSectionTitle('Anamnesis / Keluhan'),
+                  Text(
+                    _keluhanController.text.isNotEmpty ? _keluhanController.text : '—',
+                    style: GoogleFonts.outfit(fontSize: 11, color: Colors.grey[700]),
+                  ),
+                  const Divider(height: 20),
+
+                  // 3. Vital Signs
+                  _buildReviewSectionTitle('Vital Signs'),
+                  _buildReviewRow('Tekanan Darah', _tensiController.text.isNotEmpty ? '${_tensiController.text} mmHg' : '— mmHg'),
+                  _buildReviewRow('Suhu Tubuh', _suhuController.text.isNotEmpty ? '${_suhuController.text} °C' : '— °C'),
+                  _buildReviewRow('Detak Jantung', _nadiController.text.isNotEmpty ? '${_nadiController.text} bpm' : '— bpm'),
+                  _buildReviewRow('Laju Pernafasan', _respirasiController.text.isNotEmpty ? '${_respirasiController.text} x/menit' : '— x/menit'),
+                  _buildReviewRow('Berat / Tinggi', '${_beratController.text.isNotEmpty ? _beratController.text : '—'} kg / ${_tinggiController.text.isNotEmpty ? _tinggiController.text : '—'} cm'),
+                  _buildReviewRow('Saturasi O2', _spo2Controller.text.isNotEmpty ? '${_spo2Controller.text} %' : '— %'),
+                  const Divider(height: 20),
+
+                  // 4. Diagnosis
+                  _buildReviewSectionTitle('Diagnosis (ICD-10)'),
+                  Text(
+                    _selectedDiagnoses.isNotEmpty
+                        ? _selectedDiagnoses.map((d) => '${d.code} - ${d.description}').join('\n')
+                        : '—',
+                    style: GoogleFonts.outfit(fontSize: 11, color: Colors.grey[700]),
+                  ),
+                  const Divider(height: 20),
+
+                  // 5. Resep & Terapi
+                  _buildReviewSectionTitle('Resep & Terapi'),
+                  if (_addedPrescriptions.isEmpty && _manualPrescriptions.isEmpty && !_wantReferral)
+                    Text(
+                      '—',
+                      style: GoogleFonts.outfit(fontSize: 11, color: Colors.grey[700]),
+                    )
+                  else ...[
+                    ..._addedPrescriptions.map((item) {
+                      final obat = item["obat"] as ObatModel;
+                      return _buildReviewRow(obat.nama, '${item["jumlah"]} unit (${item["aturan"]})');
+                    }),
+                    ..._manualPrescriptions.map((item) {
+                      return _buildReviewRow(item["nama"] ?? 'Obat Manual', '${item["jumlah"]} unit (${item["aturan"]})');
+                    }),
+                    if (_wantReferral) ...[
+                      const SizedBox(height: 4),
+                      _buildReviewRow(
+                        'Rujukan Ke',
+                        '${_referralRsController.text} (${_referralPoliController.text})',
+                        isBold: true,
+                      ),
+                    ]
+                  ],
+                  const Divider(height: 20),
+
+                  // 6. Billing
+                  _buildReviewSectionTitle('Total Tagihan'),
+                  _buildReviewRow('Jasa Layanan', 'Rp ${serviceFee.toInt()}'),
+                  _buildReviewRow('Subtotal Obat', 'Rp ${subtotalObat.toInt()}'),
+                  _buildReviewRow('Total Tagihan', 'Rp ${totalBill.toInt()}', isBold: true),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (warningChips.isNotEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Peringatan Validasi (Klik chip untuk lompat ke form):',
+                          style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.red[700]),
+                        ),
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 6,
+                          children: warningChips,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(),
+                ],
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        final success = await _saveEMRToDatabase();
+                        if (success) {
+                          if (autoSyncEnabled) {
+                            _startSatuSehatSync(bypassValidation: true);
+                          } else {
+                            _saveManualAndRedirect();
+                          }
+                        }
+                      },
+                      child: Text(
+                        'Lanjutkan dan Kirim',
+                        style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: Text(
+                        'Mengerti',
+                        style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                          color: const Color(0xFFB577F2),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildReviewSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6.0),
+      child: Text(
+        title.toUpperCase(),
+        style: GoogleFonts.outfit(
+          fontSize: 9,
+          fontWeight: FontWeight.bold,
+          color: const Color(0xFF48C9B0),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReviewRow(String label, String value, {bool isBold = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.outfit(fontSize: 11, color: Colors.grey[600]),
+          ),
+          Text(
+            value,
+            style: GoogleFonts.outfit(
+              fontSize: 11,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
+              color: isBold ? const Color(0xFF1B0C3C) : Colors.grey[800],
             ),
           ),
         ],
@@ -2469,6 +3142,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
               child: TextField(
                 controller: _tensiSysController,
                 keyboardType: TextInputType.number,
+                inputFormatters: [VitalInputFormatter(isDecimal: false)],
                 textAlign: TextAlign.center,
                 style: GoogleFonts.outfit(
                   fontSize: 12,
@@ -2511,6 +3185,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
               child: TextField(
                 controller: _tensiDiaController,
                 keyboardType: TextInputType.number,
+                inputFormatters: [VitalInputFormatter(isDecimal: false)],
                 textAlign: TextAlign.center,
                 style: GoogleFonts.outfit(
                   fontSize: 12,
@@ -2565,6 +3240,12 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
     } else if (label.contains('SPO2')) {
       warning = getSpO2Warning(controller.text);
     }
+
+    final isSPO2 = label.toUpperCase().contains('SPO2');
+    final isDecimalField = label.toUpperCase().contains('TEMP') ||
+        label.toUpperCase().contains('WEIGHT') ||
+        label.toUpperCase().contains('HEIGHT');
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2613,9 +3294,15 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
               padding: const EdgeInsets.symmetric(horizontal: 10),
               child: TextField(
                 controller: controller,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
+                keyboardType: TextInputType.numberWithOptions(
+                  decimal: isDecimalField,
                 ),
+                inputFormatters: [
+                  VitalInputFormatter(
+                    isDecimal: isDecimalField,
+                    maxVal: isSPO2 ? 100.0 : null,
+                  ),
+                ],
                 style: GoogleFonts.outfit(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
@@ -2657,8 +3344,8 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
     Color borderCol,
     Color inputBg,
   ) {
-    final double? weight = double.tryParse(_beratController.text);
-    final double? height = double.tryParse(_tinggiController.text);
+    final double? weight = double.tryParse(_beratController.text.replaceAll(',', '.'));
+    final double? height = double.tryParse(_tinggiController.text.replaceAll(',', '.'));
     double? bmi;
     String bmiCat = '—';
     Color bmiColor = subtitleCol;
@@ -3317,7 +4004,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
           sum + ((item["obat"] as ObatModel).hargaSatuan * item["jumlah"]),
     );
     final double serviceFee =
-        double.tryParse(_serviceFeeController.text) ?? 100000;
+        double.tryParse(_serviceFeeController.text) ?? ref.read(landingPageProvider).defaultServiceFee;
     final double totalBill = serviceFee + subtotalObat;
 
     final tabs = [
@@ -4196,7 +4883,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
           sum + ((item["obat"] as ObatModel).hargaSatuan * item["jumlah"]),
     );
     final double serviceFee =
-        double.tryParse(_serviceFeeController.text) ?? 100000;
+        double.tryParse(_serviceFeeController.text) ?? ref.read(landingPageProvider).defaultServiceFee;
     final double totalBill = serviceFee + subtotalObat;
 
     return Container(
@@ -5373,10 +6060,29 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                 final hasIcd10 = _selectedDiagnoses.any(
                   (d) => RegExp(r'^[A-Z]').hasMatch(d.code),
                 );
+                final vitalErrors = _validateVitalSigns();
+                final errors = <String>[];
                 if (!hasIcd10) {
-                  _showWarningDialog(
-                    'Diagnosis Kosong',
-                    'Harap pilih diagnosis ICD-10 terlebih dahulu.',
+                  errors.add('Diagnosis ICD-10 belum dipilih.');
+                }
+                errors.addAll(vitalErrors);
+
+                if (errors.isNotEmpty) {
+                  String title = 'Peringatan Validasi';
+                  if (errors.length == 1) {
+                    title = !hasIcd10 ? 'Diagnosis Kosong' : 'Vital Sign Tidak Valid';
+                  } else {
+                    title = 'Pemeriksaan Belum Lengkap';
+                  }
+
+                  _showVitalValidationDialog(
+                    title: title,
+                    errors: errors,
+                    onLanjutkan: () {
+                      setState(() {
+                        _currentStep++;
+                      });
+                    },
                   );
                   return;
                 }
@@ -5413,11 +6119,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
               ),
             ),
             onPressed: () {
-              if (autoSyncEnabled) {
-                _startSatuSehatSync();
-              } else {
-                _saveManualAndRedirect();
-              }
+              _showReviewAndSubmitDialog(autoSyncEnabled);
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: activeGreen,
@@ -6742,4 +7444,39 @@ class VitalWarning {
     required this.isCritical,
   });
 }
+
+class VitalInputFormatter extends TextInputFormatter {
+  final bool isDecimal;
+  final double? maxVal;
+
+  VitalInputFormatter({required this.isDecimal, this.maxVal});
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (newValue.text.isEmpty) {
+      return newValue;
+    }
+
+    // Allow only digits and at most one dot or comma if decimal
+    final pattern = isDecimal ? r'^[0-9]*[.,]?[0-9]*$' : r'^[0-9]*$';
+    final regExp = RegExp(pattern);
+    if (!regExp.hasMatch(newValue.text)) {
+      return oldValue;
+    }
+
+    if (maxVal != null) {
+      final normalizedText = newValue.text.replaceAll(',', '.');
+      final val = double.tryParse(normalizedText);
+      if (val != null && val > maxVal!) {
+        return oldValue;
+      }
+    }
+
+    return newValue;
+  }
+}
+
 

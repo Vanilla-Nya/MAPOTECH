@@ -15,6 +15,22 @@ class DokterSettings extends ConsumerStatefulWidget {
 class _DokterSettingsState extends ConsumerState<DokterSettings> {
   String _satuSehatStatus = 'TERHUBUNG (ID KLINIK VALID)';
   bool _isTestingSS = false;
+  late final TextEditingController _feeController;
+
+  @override
+  void initState() {
+    super.initState();
+    final state = ref.read(landingPageProvider);
+    _feeController = TextEditingController(
+      text: state.defaultServiceFee.toInt().toString(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _feeController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -150,6 +166,59 @@ class _DokterSettingsState extends ConsumerState<DokterSettings> {
                 padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
               ),
             ],
+          ),
+        ),
+
+        const SizedBox(height: 28),
+
+        // ── Tarif Layanan Default ──────────────────────────────────────────
+        SettingsSection(
+          title: 'Tarif Layanan Default',
+          subtitle: 'Tentukan tarif jasa layanan default (Service Fee) saat pemeriksaan pasien baru.',
+          textColor: textColor,
+          subtitleColor: subtitleColor,
+          child: Container(
+            width: 200,
+            height: 38,
+            decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: borderColor),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            alignment: Alignment.centerLeft,
+            child: Row(
+              children: [
+                Text(
+                  'Rp ',
+                  style: GoogleFonts.outfit(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: textColor,
+                  ),
+                ),
+                Expanded(
+                  child: TextField(
+                    controller: _feeController,
+                    keyboardType: TextInputType.number,
+                    style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: textColor,
+                    ),
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    onChanged: (val) {
+                      final double fee = double.tryParse(val) ?? 0.0;
+                      notifier.setDefaultServiceFee(fee);
+                    },
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
 

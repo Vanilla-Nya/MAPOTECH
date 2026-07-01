@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:ui' as ui;
+import 'package:mapotech/shared/supabase_service.dart';
+
 
 // --- MODELS ---
 
@@ -94,6 +96,7 @@ class LandingPageState {
   final bool blurProfileEffectEnabled;
   final bool satusehatAutoSync;
   final Set<String> syncedTransactions;
+  final double defaultServiceFee;
 
   const LandingPageState({
     required this.activeTab,
@@ -107,6 +110,7 @@ class LandingPageState {
     this.blurProfileEffectEnabled = true,
     this.satusehatAutoSync = true,
     this.syncedTransactions = const {},
+    this.defaultServiceFee = 0.0,
   });
 
   LandingPageState copyWith({
@@ -121,6 +125,7 @@ class LandingPageState {
     bool? blurProfileEffectEnabled,
     bool? satusehatAutoSync,
     Set<String>? syncedTransactions,
+    double? defaultServiceFee,
   }) {
     return LandingPageState(
       activeTab: activeTab ?? this.activeTab,
@@ -134,6 +139,7 @@ class LandingPageState {
       blurProfileEffectEnabled: blurProfileEffectEnabled ?? this.blurProfileEffectEnabled,
       satusehatAutoSync: satusehatAutoSync ?? this.satusehatAutoSync,
       syncedTransactions: syncedTransactions ?? this.syncedTransactions,
+      defaultServiceFee: defaultServiceFee ?? this.defaultServiceFee,
     );
   }
 }
@@ -163,12 +169,21 @@ class LandingPageNotifier extends StateNotifier<LandingPageState> {
     return 'en'; // Default to English if system/browser is not Indonesian
   }
 
-  void login(String role, {Map<String, dynamic>? user}) {
+  void login(
+    String role, {
+    Map<String, dynamic>? user,
+    bool? blurProfileEffectEnabled,
+    double? defaultServiceFee,
+    bool? satusehatAutoSync,
+  }) {
     state = state.copyWith(
       isLoggedIn: true,
       loggedInRole: role,
       loggedInName: user?['name'] ?? (role == 'pasien' ? 'Alvin' : (role == 'dokter' ? 'dr. Agoes Soetanto' : 'CyrenElysia~♪')),
       loggedInUser: user,
+      blurProfileEffectEnabled: blurProfileEffectEnabled ?? state.blurProfileEffectEnabled,
+      defaultServiceFee: defaultServiceFee ?? state.defaultServiceFee,
+      satusehatAutoSync: satusehatAutoSync ?? state.satusehatAutoSync,
     );
   }
 
@@ -217,12 +232,49 @@ class LandingPageNotifier extends StateNotifier<LandingPageState> {
     state = state.copyWith(appearance: value);
   }
 
-  void setBlurProfileEffect(bool enabled) {
+  void setBlurProfileEffect(bool enabled) async {
     state = state.copyWith(blurProfileEffectEnabled: enabled);
+    final userId = state.loggedInUser?['id'];
+    if (userId != null) {
+      try {
+        await SupabaseService.client
+            .from('user')
+            .update({'is_blur_enabled': enabled})
+            .eq('id', userId);
+      } catch (e) {
+        debugPrint('Failed to save is_blur_enabled: $e');
+      }
+    }
   }
 
-  void setSatusehatAutoSync(bool val) {
+  void setSatusehatAutoSync(bool val) async {
     state = state.copyWith(satusehatAutoSync: val);
+    final userId = state.loggedInUser?['id'];
+    if (userId != null && state.loggedInRole == 'dokter') {
+      try {
+        await SupabaseService.client
+            .from('user_detail_doctor')
+            .update({'satusehat_auto_sync': val})
+            .eq('id', userId);
+      } catch (e) {
+        debugPrint('Failed to save satusehat_auto_sync: $e');
+      }
+    }
+  }
+
+  void setDefaultServiceFee(double val) async {
+    state = state.copyWith(defaultServiceFee: val);
+    final userId = state.loggedInUser?['id'];
+    if (userId != null && state.loggedInRole == 'dokter') {
+      try {
+        await SupabaseService.client
+            .from('user_detail_doctor')
+            .update({'default_service_fee': val})
+            .eq('id', userId);
+      } catch (e) {
+        debugPrint('Failed to save default_service_fee: $e');
+      }
+    }
   }
 
   void markTransactionSynced(String id) {
