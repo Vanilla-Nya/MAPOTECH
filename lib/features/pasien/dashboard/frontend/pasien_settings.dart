@@ -13,6 +13,7 @@ class PasienSettings extends ConsumerWidget {
     final state = ref.watch(landingPageProvider);
     final notifier = ref.read(landingPageProvider.notifier);
 
+    final isEn = state.language == 'en';
     final isDark = state.appearance == 'dark';
     final cardBg = isDark ? const Color(0xFF161619) : Colors.white;
     final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
@@ -26,8 +27,10 @@ class PasienSettings extends ConsumerWidget {
       children: [
         // ── Tema ────────────────────────────────────────────────────────
         SettingsSection(
-          title: 'Tema',
-          subtitle: 'Perbarui pengaturan tema dan bahasa akun Pasien Anda.',
+          title: isEn ? 'Theme' : 'Tema',
+          subtitle: isEn
+              ? 'Update theme and language settings for your Patient account.'
+              : 'Perbarui pengaturan tema dan bahasa akun Pasien Anda.',
           textColor: textColor,
           subtitleColor: subtitleColor,
           child: Column(
@@ -80,7 +83,7 @@ class PasienSettings extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Efek Blur Foto Profil',
+                          isEn ? 'Profile Photo Blur Effect' : 'Efek Blur Foto Profil',
                           style: GoogleFonts.outfit(
                             fontSize: 13,
                             fontWeight: FontWeight.w900,
@@ -88,7 +91,9 @@ class PasienSettings extends ConsumerWidget {
                           ),
                         ),
                         Text(
-                          'Tampilkan foto profil yang diblur sebagai latar belakang di Profil, App Bar, dan Drawer',
+                          isEn
+                              ? 'Display blurred profile photo as background in Profile, App Bar, and Drawer'
+                              : 'Tampilkan foto profil yang diblur sebagai latar belakang di Profil, App Bar, dan Drawer',
                           style: GoogleFonts.outfit(
                             fontSize: 10,
                             color: subtitleColor,
@@ -114,8 +119,8 @@ class PasienSettings extends ConsumerWidget {
 
         // ── Bahasa ───────────────────────────────────────────────────────
         SettingsSection(
-          title: 'Bahasa',
-          subtitle: 'Pilih bahasa pilihan Anda',
+          title: isEn ? 'Language' : 'Bahasa',
+          subtitle: isEn ? 'Select your preferred language' : 'Pilih bahasa pilihan Anda',
           textColor: textColor,
           subtitleColor: subtitleColor,
           child: Row(
@@ -149,17 +154,19 @@ class PasienSettings extends ConsumerWidget {
 
         // ── Pengaturan Premium ────────────────────────────────────────────
         SettingsSection(
-          title: 'Pengaturan Premium',
-          subtitle: 'Sesuaikan profil Anda dengan fitur premium eksklusif.',
+          title: isEn ? 'Premium Settings' : 'Pengaturan Premium',
+          subtitle: isEn
+              ? 'Customize your profile with exclusive premium features.'
+              : 'Sesuaikan profil Anda dengan fitur premium eksklusif.',
           textColor: textColor,
           subtitleColor: subtitleColor,
-          child: _buildPremiumCard(isDark, textColor, subtitleColor, borderColor, cardBg, purple),
+          child: _buildPremiumCard(isEn, isDark, textColor, subtitleColor, borderColor, cardBg, purple),
         ),
 
         const SizedBox(height: 40),
 
         // ── Laporkan Bug ──────────────────────────────────────────────────
-        _buildBugReportSection(cardBg, borderColor, textColor, subtitleColor, purple),
+        _buildBugReportSection(isEn, cardBg, borderColor, textColor, subtitleColor, purple),
 
         const SizedBox(height: 24),
       ],
@@ -168,6 +175,7 @@ class PasienSettings extends ConsumerWidget {
 
   // ─── Premium Card ─────────────────────────────────────────────────────────
   Widget _buildPremiumCard(
+    bool isEn,
     bool isDark,
     Color textColor,
     Color subtitleColor,
@@ -203,7 +211,9 @@ class PasienSettings extends ConsumerWidget {
                       border: Border.all(color: orange.withOpacity(0.25)),
                     ),
                     child: Text(
-                      'Fitur ini hanya tersedia untuk anggota Premium.',
+                      isEn
+                          ? 'This feature is only available for Premium members.'
+                          : 'Fitur ini hanya tersedia untuk anggota Premium.',
                       style: GoogleFonts.outfit(
                         fontSize: 9,
                         fontWeight: FontWeight.w700,
@@ -214,7 +224,7 @@ class PasienSettings extends ConsumerWidget {
                   const SizedBox(height: 12),
 
                   Text(
-                    'Ayo Jadi Premium',
+                    isEn ? 'Upgrade to Premium' : 'Ayo Jadi Premium',
                     style: GoogleFonts.outfit(
                       fontSize: 20,
                       fontWeight: FontWeight.w900,
@@ -223,7 +233,9 @@ class PasienSettings extends ConsumerWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Buka fitur kustomisasi eksklusif termasuk latar belakang GIF kustom dan warna tema.',
+                    isEn
+                        ? 'Unlock exclusive customization features including custom GIF backgrounds and theme colors.'
+                        : 'Buka fitur kustomisasi eksklusif termasuk latar belakang GIF kustom dan warna tema.',
                     style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor, height: 1.5),
                   ),
 
@@ -232,9 +244,9 @@ class PasienSettings extends ConsumerWidget {
                   // Feature bullets
                   Row(
                     children: [
-                      _premiumFeatureBullet(Icons.color_lens_outlined, 'Warna Tema', subtitleColor),
+                      _premiumFeatureBullet(Icons.color_lens_outlined, isEn ? 'Theme Color' : 'Warna Tema', subtitleColor),
                       const SizedBox(width: 16),
-                      _premiumFeatureBullet(Icons.image_outlined, 'Efek Header', subtitleColor),
+                      _premiumFeatureBullet(Icons.image_outlined, isEn ? 'Header Effect' : 'Efek Header', subtitleColor),
                     ],
                   ),
 
@@ -244,7 +256,7 @@ class PasienSettings extends ConsumerWidget {
                   ElevatedButton.icon(
                     icon: const Icon(Icons.star_rounded, size: 16),
                     label: Text(
-                      'Upgrade Sekarang',
+                      isEn ? 'Upgrade Now' : 'Upgrade Sekarang',
                       style: GoogleFonts.outfit(
                         fontSize: 12,
                         fontWeight: FontWeight.w900,
@@ -332,6 +344,7 @@ class PasienSettings extends ConsumerWidget {
 
   // ─── Laporkan Bug ─────────────────────────────────────────────────────────
   Widget _buildBugReportSection(
+    bool isEn,
     Color cardBg,
     Color border,
     Color textColor,
@@ -360,7 +373,7 @@ class PasienSettings extends ConsumerWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            'Laporkan Bug',
+            isEn ? 'Report a Bug' : 'Laporkan Bug',
             style: GoogleFonts.outfit(
               fontSize: 14,
               fontWeight: FontWeight.w900,
@@ -373,9 +386,13 @@ class PasienSettings extends ConsumerWidget {
             text: TextSpan(
               style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor),
               children: [
-                const TextSpan(text: 'Menemukan masalah? Laporkan ke tim\n'),
                 TextSpan(
-                  text: 'kami.',
+                  text: isEn
+                      ? 'Found an issue? Report it to our\n'
+                      : 'Menemukan masalah? Laporkan ke tim\n',
+                ),
+                TextSpan(
+                  text: isEn ? 'team.' : 'kami.',
                   style: GoogleFonts.outfit(
                     fontSize: 11,
                     color: subtitleColor,
@@ -394,7 +411,7 @@ class PasienSettings extends ConsumerWidget {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             child: Text(
-              'Laporkan Bug',
+              isEn ? 'Report Bug' : 'Laporkan Bug',
               style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700),
             ),
           ),

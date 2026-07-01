@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
-import 'package:mapotech/shared/widgets/custom_button.dart';
+import 'package:mapotech/shared/widgets/ui.dart';
+
 
 // ─── Data Models ─────────────────────────────────────────────────────────────
 
@@ -189,10 +190,42 @@ class _ApotekAsistenState extends ConsumerState<ApotekAsisten> {
           mainAxisSpacing: 16,
           childAspectRatio: 1.6,
           children: [
-            _buildMetricCard(Icons.groups_outlined, 'TOTAL STAFF APOTEK', '$totalStaff Orang', subtitleColor, textColor, cardBgColor, borderColor),
-            _buildMetricCard(Icons.run_circle_outlined, 'STANDBY SEKARANG', '$activeStaff Standby', subtitleColor, themeAccent, cardBgColor, borderColor),
-            _buildMetricCard(Icons.local_pharmacy_outlined, 'ASISTEN APOTEKER', '$apotekerCount Orang', subtitleColor, const Color(0xFF3498DB), cardBgColor, borderColor),
-            _buildMetricCard(Icons.wb_sunny_outlined, 'SHIFT PAGI TODAY', '$shiftPagiCount Orang', subtitleColor, const Color(0xFFF39C12), cardBgColor, borderColor),
+            MetricCard(
+              icon: Icons.groups_outlined,
+              label: 'TOTAL STAFF APOTEK',
+              count: '$totalStaff Orang',
+              subtitleColor: subtitleColor,
+              countColor: textColor,
+              cardBgColor: cardBgColor,
+              borderColor: borderColor,
+            ),
+            MetricCard(
+              icon: Icons.run_circle_outlined,
+              label: 'STANDBY SEKARANG',
+              count: '$activeStaff Standby',
+              subtitleColor: subtitleColor,
+              countColor: themeAccent,
+              cardBgColor: cardBgColor,
+              borderColor: borderColor,
+            ),
+            MetricCard(
+              icon: Icons.local_pharmacy_outlined,
+              label: 'ASISTEN APOTEKER',
+              count: '$apotekerCount Orang',
+              subtitleColor: subtitleColor,
+              countColor: const Color(0xFF3498DB),
+              cardBgColor: cardBgColor,
+              borderColor: borderColor,
+            ),
+            MetricCard(
+              icon: Icons.wb_sunny_outlined,
+              label: 'SHIFT PAGI TODAY',
+              count: '$shiftPagiCount Orang',
+              subtitleColor: subtitleColor,
+              countColor: const Color(0xFFF39C12),
+              cardBgColor: cardBgColor,
+              borderColor: borderColor,
+            ),
           ],
         ),
 
@@ -281,51 +314,6 @@ class _ApotekAsistenState extends ConsumerState<ApotekAsisten> {
             },
           ),
       ],
-    );
-  }
-
-  // ─── Metric Card Widget ─────────────────────────────────────────────────────
-
-  Widget _buildMetricCard(
-    IconData icon,
-    String label,
-    String count,
-    Color subtitleColor,
-    Color countColor,
-    Color cardBgColor,
-    Color borderColor,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cardBgColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: borderColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 14, color: subtitleColor),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.bold, color: subtitleColor),
-                ),
-              ),
-            ],
-          ),
-          const Spacer(),
-          Text(
-            count,
-            style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w900, color: countColor),
-          ),
-        ],
-      ),
     );
   }
 

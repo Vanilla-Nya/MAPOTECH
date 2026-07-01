@@ -433,6 +433,7 @@ class _LoginModalContentState extends State<_LoginModalContent> {
 
                       if (dbSuccess) {
                         final blurProfile = user?['is_blur_enabled'] as bool? ?? true;
+                        final savedLanguage = user?['language'] as String? ?? state.language;
                         double defaultFee = 0.0;
                         bool ssAutoSync = true;
 
@@ -459,6 +460,7 @@ class _LoginModalContentState extends State<_LoginModalContent> {
                           blurProfileEffectEnabled: blurProfile,
                           defaultServiceFee: defaultFee,
                           satusehatAutoSync: ssAutoSync,
+                          language: savedLanguage,
                         );
                         
                         ScaffoldMessenger.of(context).showSnackBar(

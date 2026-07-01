@@ -6,6 +6,7 @@ import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/features/dokter/dashboard/frontend/dokter_pasien.dart'; // To access registered patients
 import 'package:mapotech/shared/widgets/custom_button.dart';
 import 'package:mapotech/shared/supabase_service.dart';
+import 'package:mapotech/shared/widgets/common_pagination.dart';
 
 // ─── Data Models ─────────────────────────────────────────────────────────────
 
@@ -339,6 +340,8 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
   int _quota = 20;
   DateTime _selectedDate = DateTime.now();
   bool _isLoading = false;
+  int _currentPage = 1;
+  int _rowsPerPage = 10;
 
   @override
   void initState() {
@@ -353,19 +356,17 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
   }
 
   String _formatDateToIndonesian(DateTime dt) {
+    final state = ref.read(landingPageProvider);
+    if (state.language == 'en') {
+      final months = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+      ];
+      return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
+    }
     final months = [
-      'Januari',
-      'Februari',
-      'Maret',
-      'April',
-      'Mei',
-      'Juni',
-      'Juli',
-      'Agustus',
-      'September',
-      'Oktober',
-      'November',
-      'Desember',
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
     ];
     return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
   }
@@ -387,6 +388,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
         ? const Color(0xFFB577F2)
         : const Color(0xFF48C9B0);
     final purpleAccent = const Color(0xFFB577F2);
+    final inputBg = isDark ? const Color(0xFF1E1E22) : const Color(0xFFF6F8FA);
 
     // Filter
     List<AntrianModel> filteredQueues = queues.where((q) {
@@ -411,6 +413,13 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
       }
       return true;
     }).toList();
+
+    // Pagination
+    final totalDataCount = filteredQueues.length;
+    final totalPages = (totalDataCount / _rowsPerPage).ceil();
+    final startIndex = (_currentPage - 1) * _rowsPerPage;
+    final endIndex = (startIndex + _rowsPerPage) > totalDataCount ? totalDataCount : (startIndex + _rowsPerPage);
+    final paginatedQueues = filteredQueues.sublist(startIndex, endIndex);
 
     // Metric Counts
     final dateQueues = queues.where((q) {
@@ -448,7 +457,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Antrian Pasien',
+                    'Antrian Pasien'.tr(state),
                     style: GoogleFonts.outfit(
                       fontSize: 22,
                       fontWeight: FontWeight.w900,
@@ -456,7 +465,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                     ),
                   ),
                   Text(
-                    'Data untuk tanggal: ${_formatDateToIndonesian(_selectedDate)}',
+                    'Data untuk tanggal: '.tr(state) + _formatDateToIndonesian(_selectedDate),
                     style: GoogleFonts.outfit(
                       fontSize: 11,
                       color: purpleAccent,
@@ -480,7 +489,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Antrian Pasien',
+                        'Antrian Pasien'.tr(state),
                         style: GoogleFonts.outfit(
                           fontSize: 28,
                           fontWeight: FontWeight.w900,
@@ -496,7 +505,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                             fontWeight: FontWeight.w500,
                           ),
                           children: [
-                            const TextSpan(text: 'Data untuk tanggal: '),
+                            TextSpan(text: 'Data untuk tanggal: '.tr(state)),
                             TextSpan(
                               text: _formatDateToIndonesian(_selectedDate),
                               style: GoogleFonts.outfit(
@@ -622,7 +631,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Tambah Antrian Walk-in',
+                                'Tambah Antrian Walk-in'.tr(state),
                                 style: GoogleFonts.outfit(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w900,
@@ -630,7 +639,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                                 ),
                               ),
                               Text(
-                                'Daftarkan pasien langsung di loket klinik.',
+                                'Daftarkan pasien langsung di loket klinik.'.tr(state),
                                 style: GoogleFonts.outfit(
                                   fontSize: 9.5,
                                   color: subtitleColor,
@@ -648,7 +657,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                       children: [
                         _buildOnlineSystemIndicator(purpleAccent),
                         CustomButton(
-                          text: 'Tambah Antrian',
+                          text: 'Tambah Antrian'.tr(state),
                           icon: Icons.add_rounded,
                           primaryColor: purpleAccent,
                           textColor: Colors.white,
@@ -681,7 +690,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Tambah Antrian Walk-in',
+                            'Tambah Antrian Walk-in'.tr(state),
                             style: GoogleFonts.outfit(
                               fontSize: 13,
                               fontWeight: FontWeight.w900,
@@ -689,7 +698,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                             ),
                           ),
                           Text(
-                            'Daftarkan pasien langsung di loket klinik.',
+                            'Daftarkan pasien langsung di loket klinik.'.tr(state),
                             style: GoogleFonts.outfit(
                               fontSize: 10.5,
                               color: subtitleColor,
@@ -702,7 +711,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                     _buildOnlineSystemIndicator(purpleAccent),
                     const SizedBox(width: 16),
                     CustomButton(
-                      text: 'Tambah Antrian',
+                      text: 'Tambah Antrian'.tr(state),
                       icon: Icons.add_rounded,
                       primaryColor: purpleAccent,
                       textColor: Colors.white,
@@ -734,7 +743,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                         _buildFilterChip(
                           'Semua',
                           _activeFilter == 'Semua',
-                          () => setState(() => _activeFilter = 'Semua'),
+                          () => setState(() { _activeFilter = 'Semua'; _currentPage = 1; }),
                           subtitleColor,
                           cardBgColor,
                           borderColor,
@@ -743,7 +752,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                         _buildFilterChip(
                           'Menunggu',
                           _activeFilter == 'Menunggu',
-                          () => setState(() => _activeFilter = 'Menunggu'),
+                          () => setState(() { _activeFilter = 'Menunggu'; _currentPage = 1; }),
                           subtitleColor,
                           cardBgColor,
                           borderColor,
@@ -753,7 +762,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                         _buildFilterChip(
                           'Memproses...',
                           _activeFilter == 'Memproses...',
-                          () => setState(() => _activeFilter = 'Memproses...'),
+                          () => setState(() { _activeFilter = 'Memproses...'; _currentPage = 1; }),
                           subtitleColor,
                           cardBgColor,
                           borderColor,
@@ -763,7 +772,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                         _buildFilterChip(
                           'Pembayaran',
                           _activeFilter == 'Pembayaran',
-                          () => setState(() => _activeFilter = 'Pembayaran'),
+                          () => setState(() { _activeFilter = 'Pembayaran'; _currentPage = 1; }),
                           subtitleColor,
                           cardBgColor,
                           borderColor,
@@ -773,7 +782,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                         _buildFilterChip(
                           'Selesai',
                           _activeFilter == 'Selesai',
-                          () => setState(() => _activeFilter = 'Selesai'),
+                          () => setState(() { _activeFilter = 'Selesai'; _currentPage = 1; }),
                           subtitleColor,
                           cardBgColor,
                           borderColor,
@@ -789,7 +798,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                   _buildFilterChip(
                     'Semua',
                     _activeFilter == 'Semua',
-                    () => setState(() => _activeFilter = 'Semua'),
+                    () => setState(() { _activeFilter = 'Semua'; _currentPage = 1; }),
                     subtitleColor,
                     cardBgColor,
                     borderColor,
@@ -798,7 +807,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                   _buildFilterChip(
                     'Menunggu',
                     _activeFilter == 'Menunggu',
-                    () => setState(() => _activeFilter = 'Menunggu'),
+                    () => setState(() { _activeFilter = 'Menunggu'; _currentPage = 1; }),
                     subtitleColor,
                     cardBgColor,
                     borderColor,
@@ -808,7 +817,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                   _buildFilterChip(
                     'Memproses...',
                     _activeFilter == 'Memproses...',
-                    () => setState(() => _activeFilter = 'Memproses...'),
+                    () => setState(() { _activeFilter = 'Memproses...'; _currentPage = 1; }),
                     subtitleColor,
                     cardBgColor,
                     borderColor,
@@ -818,7 +827,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                   _buildFilterChip(
                     'Pembayaran',
                     _activeFilter == 'Pembayaran',
-                    () => setState(() => _activeFilter = 'Pembayaran'),
+                    () => setState(() { _activeFilter = 'Pembayaran'; _currentPage = 1; }),
                     subtitleColor,
                     cardBgColor,
                     borderColor,
@@ -828,7 +837,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                   _buildFilterChip(
                     'Selesai',
                     _activeFilter == 'Selesai',
-                    () => setState(() => _activeFilter = 'Selesai'),
+                    () => setState(() { _activeFilter = 'Selesai'; _currentPage = 1; }),
                     subtitleColor,
                     cardBgColor,
                     borderColor,
@@ -917,11 +926,11 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                   : ListView.separated(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
-                      itemCount: filteredQueues.length,
+                      itemCount: paginatedQueues.length,
                       separatorBuilder: (context, index) =>
                           Divider(color: borderColor, height: 1),
                       itemBuilder: (context, index) {
-                        final antrian = filteredQueues[index];
+                        final antrian = paginatedQueues[index];
                         return _buildQueueRow(
                           context,
                           antrian,
@@ -933,6 +942,32 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                         );
                       },
                     ),
+
+              // Pagination Footer
+              ReusablePagination(
+                totalItems: totalDataCount,
+                itemsPerPage: _rowsPerPage,
+                currentPage: _currentPage,
+                onPageChanged: (page) {
+                  setState(() {
+                    _currentPage = page;
+                  });
+                },
+                onItemsPerPageChanged: (val) {
+                  if (val != null) {
+                    setState(() {
+                      _rowsPerPage = val;
+                      _currentPage = 1;
+                    });
+                  }
+                },
+                textColor: textColor,
+                subtitleColor: subtitleColor,
+                borderColor: borderColor,
+                inputBg: inputBg,
+                activeColor: purpleAccent,
+                languageCode: state.language,
+              ),
             ],
           ),
         ),
@@ -966,6 +1001,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
         if (date != null) {
           setState(() {
             _selectedDate = date;
+            _currentPage = 1;
           });
         }
       },
@@ -1169,6 +1205,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
               onChanged: (val) {
                 setState(() {
                   _searchQuery = val;
+                  _currentPage = 1;
                 });
               },
               style: GoogleFonts.outfit(
@@ -1423,6 +1460,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
     Color text,
     Color subtitle,
   ) {
+    final state = ref.read(landingPageProvider);
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 72),
       child: Column(
@@ -1443,7 +1481,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
           ),
           const SizedBox(height: 12),
           Text(
-            'Tidak ada antrian ditemukan.',
+            'Tidak ada antrian ditemukan.'.tr(state),
             style: GoogleFonts.outfit(
               fontSize: 13,
               fontWeight: FontWeight.w900,
@@ -1458,6 +1496,8 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
   // ─── Modal Wizard: Tambah Antrian Baru ─────────────────────────────────────
 
   void _showAddQueueWizard(BuildContext context, bool isDark) {
+    final state = ref.read(landingPageProvider);
+    final isEn = state.language == 'en';
     final purple = const Color(0xFFB577F2);
     final cardBg = isDark ? const Color(0xFF161619) : Colors.white;
     final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
@@ -1585,7 +1625,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            'Tambah Antrian Baru',
+                            'Tambah Antrian Baru'.tr(state),
                             style: GoogleFonts.outfit(
                               fontSize: 15,
                               fontWeight: FontWeight.w900,
@@ -1666,7 +1706,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                                                 ),
                                                 const SizedBox(width: 6),
                                                 Text(
-                                                  'Cari Pasien',
+                                                  'Cari Pasien'.tr(state),
                                                   style: GoogleFonts.outfit(
                                                     fontSize: 11,
                                                     fontWeight: FontWeight.bold,
@@ -1710,7 +1750,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                                                 ),
                                                 const SizedBox(width: 6),
                                                 Text(
-                                                  'Pasien Spesial',
+                                                  'Pasien Spesial'.tr(state),
                                                   style: GoogleFonts.outfit(
                                                     fontSize: 11,
                                                     fontWeight: FontWeight.bold,
@@ -1814,7 +1854,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                             ),
                           ),
                           child: Text(
-                            currentStep == 1 ? 'Batal' : 'Kembali',
+                            currentStep == 1 ? 'Batal'.tr(state) : 'Kembali'.tr(state),
                             style: GoogleFonts.outfit(
                               fontSize: 11,
                               color: subtitleColor,
@@ -1915,12 +1955,14 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                                     Navigator.of(ctx).pop();
                                     _showSuccessSnackBar(
                                       context,
-                                      'Pasien $currentName berhasil dimasukkan ke antrean!',
+                                      isEn
+                                          ? 'Patient $currentName successfully added to the queue!'
+                                          : 'Pasien $currentName berhasil dimasukkan ke antrean!',
                                     );
                                   }
                                 },
                           child: Text(
-                            currentStep == 1 ? 'Lanjut →' : 'Simpan Antrian',
+                            currentStep == 1 ? 'Lanjut →'.tr(state) : 'Simpan Antrian'.tr(state),
                             style: GoogleFonts.outfit(
                               fontSize: 11,
                               fontWeight: FontWeight.w900,
@@ -1952,17 +1994,19 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
     bool searched,
     StateSetter setWizardState,
   ) {
+    final state = ref.read(landingPageProvider);
+    final isEn = state.language == 'en';
     final purple = const Color(0xFFB577F2);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildFormFieldLabel('Cari Pasien *', textCol),
+        _buildFormFieldLabel('Cari Pasien *'.tr(state), textCol),
         Row(
           children: [
             Expanded(
               child: _buildTextInput(
                 controller,
-                'Ketik nama / NIK...',
+                'Ketik nama / NIK...'.tr(state),
                 Icons.search_rounded,
                 inputBg,
                 borderCol,
@@ -1989,7 +2033,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                   const Icon(Icons.search_rounded, size: 14),
                   const SizedBox(width: 6),
                   Text(
-                    'search',
+                    'search'.tr(state),
                     style: GoogleFonts.outfit(
                       fontSize: 11,
                       fontWeight: FontWeight.w900,
@@ -2031,7 +2075,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
         ),
         const SizedBox(height: 6),
         Text(
-          'Ketik minimal 3 karakter',
+          'Ketik minimal 3 karakter'.tr(state),
           style: GoogleFonts.outfit(
             fontSize: 9,
             color: subCol,
@@ -2081,7 +2125,9 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                           ),
                         ),
                         Text(
-                          'NIK: ${found!.nik} • PASIEN TERDAFTAR',
+                          isEn
+                              ? 'NIK: ${found!.nik} • REGISTERED PATIENT'
+                              : 'NIK: ${found!.nik} • PASIEN TERDAFTAR',
                           style: GoogleFonts.outfit(
                             fontSize: 9.5,
                             color: subCol,
@@ -2097,7 +2143,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
           ] else ...[
             Center(
               child: Text(
-                'Pasien tidak terdaftar. Gunakan tab Pasien Spesial untuk walk-in.',
+                'Pasien tidak terdaftar. Gunakan tab Pasien Spesial untuk walk-in.'.tr(state),
                 textAlign: TextAlign.center,
                 style: GoogleFonts.outfit(
                   fontSize: 11,
@@ -2128,6 +2174,8 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
     bool verified,
     StateSetter setWizardState,
   ) {
+    final state = ref.read(landingPageProvider);
+    final isEn = state.language == 'en';
     final purple = const Color(0xFFB577F2);
     final orange = const Color(0xFFF39C12);
     final isChecking = false; // Simulated state
@@ -2135,10 +2183,10 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _buildFormFieldLabel('Nama Pasien (Wajib)', textCol),
+        _buildFormFieldLabel('Nama Pasien (Wajib)'.tr(state), textCol),
         _buildTextInput(
           nameCtrl,
-          'Nama Lengkap',
+          'Nama Lengkap'.tr(state),
           Icons.person_outline_rounded,
           inputBg,
           borderCol,
@@ -2148,10 +2196,10 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
         ),
         const SizedBox(height: 14),
 
-        _buildFormFieldLabel('NIK (Wajib)', textCol),
+        _buildFormFieldLabel('NIK (Wajib)'.tr(state), textCol),
         _buildTextInput(
           nikCtrl,
-          'Masukkan NIK',
+          'Masukkan NIK'.tr(state),
           Icons.fingerprint_rounded,
           inputBg,
           borderCol,
@@ -2162,7 +2210,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
         ),
         const SizedBox(height: 14),
 
-        _buildFormFieldLabel('Nomor Telepon (Opsional)', textCol),
+        _buildFormFieldLabel('Nomor Telepon (Opsional)'.tr(state), textCol),
         _buildTextInput(
           phoneCtrl,
           '08...',
@@ -2181,7 +2229,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildFormFieldLabel('Tanggal Lahir', textCol),
+                  _buildFormFieldLabel('Tanggal Lahir'.tr(state), textCol),
                   _buildDateInput(
                     context,
                     dobCtrl,
@@ -2200,7 +2248,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildFormFieldLabel('Jenis Kelamin', textCol),
+                  _buildFormFieldLabel('Jenis Kelamin'.tr(state), textCol),
                   Container(
                     height: 44,
                     padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -2213,7 +2261,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                       child: DropdownButton<String>(
                         value: gender == '— Pilih —' ? null : gender,
                         hint: Text(
-                          gender,
+                          gender == '— Pilih —' ? '— Pilih —'.tr(state) : gender,
                           style: GoogleFonts.outfit(
                             fontSize: 12,
                             color: subCol.withOpacity(0.5),
@@ -2234,7 +2282,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                         ),
                         items: ['Laki-laki', 'Perempuan']
                             .map(
-                              (g) => DropdownMenuItem(value: g, child: Text(g)),
+                              (g) => DropdownMenuItem(value: g, child: Text(g.tr(state))),
                             )
                             .toList(),
                         onChanged: (val) {
@@ -2259,7 +2307,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
         OutlinedButton.icon(
           icon: const Icon(Icons.search_rounded, size: 14),
           label: Text(
-            'Cek & Verifikasi NIK (SatuSehat)',
+            'Cek & Verifikasi NIK (SatuSehat)'.tr(state),
             style: GoogleFonts.outfit(
               fontSize: 10,
               fontWeight: FontWeight.w900,
@@ -2279,12 +2327,16 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
               });
               _showSuccessSnackBar(
                 context,
-                'NIK terverifikasi di SatuSehat Kemenkes!',
+                isEn
+                    ? 'NIK verified in SatuSehat Kemenkes!'
+                    : 'NIK terverifikasi di SatuSehat Kemenkes!',
               );
             } else {
               _showSuccessSnackBar(
                 context,
-                'Harap isi NIK 16 digit dengan valid.',
+                isEn
+                    ? 'Please enter a valid 16-digit NIK.'
+                    : 'Harap isi NIK 16 digit dengan valid.',
               );
             }
           },
@@ -2307,7 +2359,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Catatan: Pasien ini hanya terdaftar untuk antrian hari ini dan tidak tersimpan di database pasien permanen.',
+                  'Catatan: Pasien ini hanya terdaftar untuk antrian hari ini and tidak tersimpan di database pasien permanen.'.tr(state),
                   style: GoogleFonts.outfit(
                     fontSize: 9.5,
                     height: 1.4,
@@ -2338,6 +2390,8 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
     TextEditingController noCtrl,
     StateSetter setWizardState,
   ) {
+    final state = ref.read(landingPageProvider);
+    final isEn = state.language == 'en';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -2382,7 +2436,9 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                       ),
                     ),
                     Text(
-                      'NIK: ${patient.nik} • PASIEN TERDAFTAR',
+                      isEn
+                          ? 'NIK: ${patient.nik} • REGISTERED PATIENT'
+                          : 'NIK: ${patient.nik} • PASIEN TERDAFTAR',
                       style: GoogleFonts.outfit(
                         fontSize: 9.5,
                         color: subCol,
@@ -2399,7 +2455,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
         const SizedBox(height: 20),
 
         // Tipe Pasien Radio Switch
-        _buildFormFieldLabel('Tipe Pasien *', textCol),
+        _buildFormFieldLabel('Tipe Pasien *'.tr(state), textCol),
         Row(
           children: [
             Radio<String>(
@@ -2428,7 +2484,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
               },
             ),
             Text(
-              'Umum',
+              'Umum'.tr(state),
               style: GoogleFonts.outfit(
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
@@ -2445,10 +2501,10 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildFormFieldLabel('Tanggal Antrian *', textCol),
+                  _buildFormFieldLabel('Tanggal Antrian *'.tr(state), textCol),
                   _buildTextInput(
                     dateCtrl,
-                    'Pilih Tanggal',
+                    'Pilih Tanggal'.tr(state),
                     Icons.calendar_month_outlined,
                     inputBg,
                     borderCol,
@@ -2463,7 +2519,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildFormFieldLabel('Waktu Antrian *', textCol),
+                  _buildFormFieldLabel('Waktu Antrian *'.tr(state), textCol),
                   _buildTextInput(
                     timeCtrl,
                     '08:03 PM',
@@ -2480,7 +2536,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
         ),
         const SizedBox(height: 14),
 
-        _buildFormFieldLabel('Nomor Antrian (Otomatis)', textCol),
+        _buildFormFieldLabel('Nomor Antrian (Otomatis)'.tr(state), textCol),
         Container(
           height: 44,
           padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -2501,7 +2557,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
         ),
         const SizedBox(height: 6),
         Text(
-          'Format: DDMM-NNN (Contoh: 1212-001)',
+          'Format: DDMM-NNN (Contoh: 1212-001)'.tr(state),
           style: GoogleFonts.outfit(
             fontSize: 8.5,
             color: subCol,

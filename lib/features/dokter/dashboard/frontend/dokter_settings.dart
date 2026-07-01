@@ -37,6 +37,7 @@ class _DokterSettingsState extends ConsumerState<DokterSettings> {
     final state = ref.watch(landingPageProvider);
     final notifier = ref.read(landingPageProvider.notifier);
 
+    final isEn = state.language == 'en';
     final isDark = state.appearance == 'dark';
     final cardBg = isDark ? const Color(0xFF161619) : Colors.white;
     final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
@@ -50,8 +51,10 @@ class _DokterSettingsState extends ConsumerState<DokterSettings> {
       children: [
         // ── Tema ────────────────────────────────────────────────────────
         SettingsSection(
-          title: 'Tema & Visual',
-          subtitle: 'Perbarui pengaturan tema dan bahasa antarmuka Dokter Anda.',
+          title: isEn ? 'Theme & Visual' : 'Tema & Visual',
+          subtitle: isEn
+              ? 'Update theme and language settings for your Doctor interface.'
+              : 'Perbarui pengaturan tema dan bahasa antarmuka Dokter Anda.',
           textColor: textColor,
           subtitleColor: subtitleColor,
           child: Column(
@@ -104,7 +107,7 @@ class _DokterSettingsState extends ConsumerState<DokterSettings> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Efek Blur Foto Profil',
+                          isEn ? 'Profile Photo Blur Effect' : 'Efek Blur Foto Profil',
                           style: GoogleFonts.outfit(
                             fontSize: 13,
                             fontWeight: FontWeight.w900,
@@ -112,7 +115,9 @@ class _DokterSettingsState extends ConsumerState<DokterSettings> {
                           ),
                         ),
                         Text(
-                          'Tampilkan foto profil yang diblur sebagai latar belakang di Profil, App Bar, dan Drawer',
+                          isEn
+                              ? 'Display blurred profile photo as background in Profile, App Bar, and Drawer'
+                              : 'Tampilkan foto profil yang diblur sebagai latar belakang di Profil, App Bar, dan Drawer',
                           style: GoogleFonts.outfit(
                             fontSize: 10,
                             color: subtitleColor,
@@ -138,8 +143,10 @@ class _DokterSettingsState extends ConsumerState<DokterSettings> {
 
         // ── Bahasa ───────────────────────────────────────────────────────
         SettingsSection(
-          title: 'Bahasa Pilihan',
-          subtitle: 'Ganti bahasa default untuk pelaporan RME.',
+          title: isEn ? 'Preferred Language' : 'Bahasa Pilihan',
+          subtitle: isEn
+              ? 'Change default language for EMR reporting.'
+              : 'Ganti bahasa default untuk pelaporan RME.',
           textColor: textColor,
           subtitleColor: subtitleColor,
           child: Row(
@@ -173,8 +180,10 @@ class _DokterSettingsState extends ConsumerState<DokterSettings> {
 
         // ── Tarif Layanan Default ──────────────────────────────────────────
         SettingsSection(
-          title: 'Tarif Layanan Default',
-          subtitle: 'Tentukan tarif jasa layanan default (Service Fee) saat pemeriksaan pasien baru.',
+          title: isEn ? 'Default Service Fee' : 'Tarif Layanan Default',
+          subtitle: isEn
+              ? 'Determine the default service fee (Service Fee) when examining a new patient.'
+              : 'Tentukan tarif jasa layanan default (Service Fee) saat pemeriksaan pasien baru.',
           textColor: textColor,
           subtitleColor: subtitleColor,
           child: Container(
@@ -226,8 +235,10 @@ class _DokterSettingsState extends ConsumerState<DokterSettings> {
 
         // ── Integrasi SatuSehat Kemenkes ──────────────────────────────────
         SettingsSection(
-          title: 'Integrasi SatuSehat (RME)',
-          subtitle: 'Sambungkan database rekam medis dokter dengan server kemenkes.',
+          title: isEn ? 'SatuSehat Integration (EMR)' : 'Integrasi SatuSehat (RME)',
+          subtitle: isEn
+              ? 'Connect doctor\'s medical record database with ministry of health server.'
+              : 'Sambungkan database rekam medis dokter dengan server kemenkes.',
           textColor: textColor,
           subtitleColor: subtitleColor,
           child: Container(
@@ -248,11 +259,13 @@ class _DokterSettingsState extends ConsumerState<DokterSettings> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Sinkronisasi Otomatis SatuSehat',
+                            isEn ? 'SatuSehat Auto Sync' : 'Sinkronisasi Otomatis SatuSehat',
                             style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w900, color: textColor),
                           ),
                           Text(
-                            'Kirim data resep & diagnosis setiap kali pemeriksaan selesai',
+                            isEn
+                                ? 'Send prescription & diagnosis data every time an examination is finished'
+                                : 'Kirim data resep & diagnosis setiap kali pemeriksaan selesai',
                             style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
                           ),
                         ],
@@ -279,7 +292,11 @@ class _DokterSettingsState extends ConsumerState<DokterSettings> {
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        _satuSehatStatus,
+                        _satuSehatStatus == 'TERHUBUNG (ID KLINIK VALID)'
+                            ? (isEn ? 'CONNECTED (VALID CLINIC ID)' : 'TERHUBUNG (ID KLINIK VALID)')
+                            : (_satuSehatStatus == 'KONEKSI AKTIF (PING 42ms) - OK'
+                                ? (isEn ? 'CONNECTION ACTIVE (PING 42ms) - OK' : 'KONEKSI AKTIF (PING 42ms) - OK')
+                                : _satuSehatStatus),
                         style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.w900, color: teal),
                       ),
                     ),
@@ -293,7 +310,9 @@ class _DokterSettingsState extends ConsumerState<DokterSettings> {
                             )
                           : const Icon(Icons.sync_rounded, size: 12),
                       label: Text(
-                        _isTestingSS ? 'Menghubungkan...' : 'Tes Koneksi RME',
+                        _isTestingSS
+                            ? (isEn ? 'Connecting...' : 'Menghubungkan...')
+                            : (isEn ? 'Test EMR Connection' : 'Tes Koneksi RME'),
                         style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900),
                       ),
                       style: OutlinedButton.styleFrom(
@@ -346,7 +365,7 @@ class _DokterSettingsState extends ConsumerState<DokterSettings> {
               ),
               const SizedBox(height: 12),
               Text(
-                'Hubungi Admin / Support RME',
+                isEn ? 'Contact Admin / EMR Support' : 'Hubungi Admin / Support RME',
                 style: GoogleFonts.outfit(
                   fontSize: 14,
                   fontWeight: FontWeight.w900,
@@ -355,7 +374,9 @@ class _DokterSettingsState extends ConsumerState<DokterSettings> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Mengalami kendala sinkronisasi dengan BPJS / SatuSehat?\nHubungi admin Mapotech untuk bantuan integrasi.',
+                isEn
+                    ? 'Experiencing synchronization issues with BPJS / SatuSehat?\nContact Mapotech admin for integration assistance.'
+                    : 'Mengalami kendala sinkronisasi dengan BPJS / SatuSehat?\nHubungi admin Mapotech untuk bantuan integrasi.',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.outfit(fontSize: 10.5, color: subtitleColor, height: 1.5),
               ),
@@ -369,7 +390,7 @@ class _DokterSettingsState extends ConsumerState<DokterSettings> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
                 child: Text(
-                  'Kirim Pesan Bantuan',
+                  isEn ? 'Send Help Message' : 'Kirim Pesan Bantuan',
                   style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700),
                 ),
               ),

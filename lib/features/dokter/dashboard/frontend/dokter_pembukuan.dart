@@ -7,6 +7,7 @@ import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/supabase_service.dart';
 import 'package:mapotech/features/dokter/dashboard/frontend/dokter_pasien.dart';
 import 'package:mapotech/shared/satusehat_service.dart';
+import 'package:mapotech/shared/widgets/common_pagination.dart';
 
 class BukuKasEntry {
   final String id;
@@ -21,6 +22,7 @@ class BukuKasEntry {
   final String status; // 'Lunas', 'Selesai', or '-'
   final String? idSource;
   final String? sourceType;
+  final DateTime? rawDate;
 
   const BukuKasEntry({
     required this.id,
@@ -34,6 +36,7 @@ class BukuKasEntry {
     required this.status,
     this.idSource,
     this.sourceType,
+    this.rawDate,
   });
 }
 
@@ -70,8 +73,14 @@ class DokterPembukuan extends ConsumerStatefulWidget {
 
 class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
   final List<BukuKasEntry> _ledger = [];
+  int _ledgerCurrentPage = 1;
+  int _ledgerItemsPerPage = 10;
+  int _syncCurrentPage = 1;
+  int _syncItemsPerPage = 10;
   String _filterType = 'Semua';
   String _searchQuery = '';
+  DateTimeRange? _selectedDateRange;
+  DateTimeRange? _syncSelectedDateRange;
   BukuKasEntry? _selectedEntry;
   GroupedDailyTransactions? _selectedGroupedDay;
   bool _showExpenseWizard = false;
@@ -726,9 +735,11 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
     final String id = db['id']?.toString() ?? '';
     String tanggal = '-';
     String waktu = '-';
+    DateTime? rawDate;
     try {
       if (db['created_at'] != null) {
         final dt = DateTime.parse(db['created_at'].toString()).toLocal();
+        rawDate = dt;
         tanggal = _formatDateToIndonesian(dt);
         waktu =
             '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
@@ -796,6 +807,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
       status: status,
       idSource: idSource,
       sourceType: sourceType,
+      rawDate: rawDate,
     );
   }
 
@@ -1097,7 +1109,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                         Row(
                           children: [
                             Text(
-                              'Pembukuan',
+                              'Pembukuan'.tr(state),
                               style: GoogleFonts.outfit(
                                 fontSize: 20,
                                 fontWeight: FontWeight.w900,
@@ -1158,7 +1170,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                           ],
                         ),
                         Text(
-                          'Ringkasan arus kas masuk, pengeluaran klinik, dan e-resep diintegrasi',
+                          'Ringkasan arus kas masuk, pengeluaran klinik, dan e-resep diintegrasi'.tr(state),
                           style: GoogleFonts.outfit(
                             fontSize: 10,
                             color: subtitleColor,
@@ -1201,7 +1213,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                               ),
                         const SizedBox(width: 8),
                         Text(
-                          'Ekspor Laporan',
+                          'Ekspor Laporan'.tr(state),
                           style: GoogleFonts.outfit(
                             fontSize: 11,
                             fontWeight: FontWeight.w900,
@@ -1234,7 +1246,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          'Catat Pengeluaran',
+                          'Catat Pengeluaran'.tr(state),
                           style: GoogleFonts.outfit(
                             fontSize: 11,
                             fontWeight: FontWeight.w900,
@@ -1626,7 +1638,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                                     color: textColor,
                                   ),
                                   decoration: InputDecoration(
-                                    hintText: 'Cari transaksi...',
+                                    hintText: 'Cari transaksi...'.tr(state),
                                     hintStyle: GoogleFonts.outfit(
                                       fontSize: 10,
                                       color: subtitleColor.withOpacity(0.5),
@@ -1635,11 +1647,102 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                                     isDense: true,
                                     contentPadding: EdgeInsets.zero,
                                   ),
-                                  onChanged: (val) =>
-                                      setState(() => _searchQuery = val),
+                                  onChanged: (val) => setState(() {
+                                    _searchQuery = val;
+                                    _ledgerCurrentPage = 1;
+                                  }),
                                 ),
                               ),
                             ],
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Container(
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: inputBg,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: borderColor),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          alignment: Alignment.center,
+                          child: InkWell(
+                            onTap: () async {
+                              final picked = await showDialog<DateTimeRange>(
+                                context: context,
+                                builder: (context) {
+                                  return Dialog(
+                                    clipBehavior: Clip.antiAlias,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    child: ConstrainedBox(
+                                      constraints: const BoxConstraints(
+                                        maxWidth: 600,
+                                        maxHeight: 520,
+                                      ),
+                                      child: Theme(
+                                        data: Theme.of(context).copyWith(
+                                          colorScheme: ColorScheme.light(
+                                            primary: purple,
+                                            onPrimary: Colors.white,
+                                            onSurface: textColor,
+                                          ),
+                                        ),
+                                        child: DateRangePickerDialog(
+                                          firstDate: DateTime(2020),
+                                          lastDate: DateTime(2030),
+                                          initialDateRange: _selectedDateRange,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              );
+                              if (picked != null) {
+                                setState(() {
+                                  _selectedDateRange = picked;
+                                  _ledgerCurrentPage = 1;
+                                });
+                              }
+                            },
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.calendar_today_rounded,
+                                  size: 14,
+                                  color: subtitleColor,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _selectedDateRange == null
+                                      ? (state.language == 'en' ? 'Select Date' : 'Pilih Tanggal')
+                                      : '${_formatDateShort(_selectedDateRange!.start, state.language == 'en')} - ${_formatDateShort(_selectedDateRange!.end, state.language == 'en')}',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: textColor,
+                                  ),
+                                ),
+                                if (_selectedDateRange != null) ...[
+                                  const SizedBox(width: 8),
+                                  InkWell(
+                                    onTap: () {
+                                      setState(() {
+                                        _selectedDateRange = null;
+                                        _ledgerCurrentPage = 1;
+                                      });
+                                    },
+                                    child: Icon(
+                                      Icons.close_rounded,
+                                      size: 14,
+                                      color: Colors.redAccent,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
                           ),
                         ),
                         const SizedBox(width: 14),
@@ -1800,13 +1903,33 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
     Color activeGreen,
     Color purple,
   ) {
+    final state = ref.watch(landingPageProvider);
     final filteredLedger = _ledger.where((e) {
       final matchesFilter = _filterType == 'Semua' || e.tipe == _filterType;
       final matchesSearch =
           e.deskripsi.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           e.id.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           e.kategori.toLowerCase().contains(_searchQuery.toLowerCase());
-      return matchesFilter && matchesSearch;
+
+      bool matchesDate = true;
+      if (_selectedDateRange != null && e.rawDate != null) {
+        final start = DateTime(
+          _selectedDateRange!.start.year,
+          _selectedDateRange!.start.month,
+          _selectedDateRange!.start.day,
+        );
+        final end = DateTime(
+          _selectedDateRange!.end.year,
+          _selectedDateRange!.end.month,
+          _selectedDateRange!.end.day,
+          23,
+          59,
+          59,
+        );
+        matchesDate = e.rawDate!.isAfter(start) && e.rawDate!.isBefore(end);
+      }
+
+      return matchesFilter && matchesSearch && matchesDate;
     }).toList();
 
     // Group transactions by date
@@ -1821,6 +1944,15 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
       return GroupedDailyTransactions(date: e.key, transactions: e.value);
     }).toList();
 
+    final totalItems = groupedLedger.length;
+    final startIndex = (totalItems == 0) ? 0 : (_ledgerCurrentPage - 1) * _ledgerItemsPerPage;
+    final endIndex = (startIndex + _ledgerItemsPerPage) > totalItems
+        ? totalItems
+        : (startIndex + _ledgerItemsPerPage);
+    final paginatedGroupedLedger = totalItems == 0
+        ? <GroupedDailyTransactions>[]
+        : groupedLedger.sublist(startIndex, endIndex);
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
       child: Container(
@@ -1828,197 +1960,227 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
           border: Border.all(color: borderColor),
           borderRadius: BorderRadius.circular(16),
         ),
-        child: Table(
-          columnWidths: const {
-            0: FlexColumnWidth(1.2),
-            1: FlexColumnWidth(3.0),
-            2: FlexColumnWidth(1.2),
-            3: FlexColumnWidth(1.2),
-            4: FlexColumnWidth(1.8),
-          },
-          defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            TableRow(
-              decoration: BoxDecoration(
-                color: inputBg,
-                border: Border(bottom: BorderSide(color: borderColor)),
-              ),
+            Table(
+              columnWidths: const {
+                0: FlexColumnWidth(1.2),
+                1: FlexColumnWidth(3.0),
+                2: FlexColumnWidth(1.2),
+                3: FlexColumnWidth(1.2),
+                4: FlexColumnWidth(1.8),
+              },
+              defaultVerticalAlignment: TableCellVerticalAlignment.middle,
               children: [
-                _tableHeader('DATE', subtitleColor),
-                _tableHeader('DESCRIPTION', subtitleColor),
-                _tableHeader('CATEGORY', subtitleColor),
-                _tableHeader('TYPE', subtitleColor),
-                _tableHeader('AMOUNT', subtitleColor),
+                TableRow(
+                  decoration: BoxDecoration(
+                    color: inputBg,
+                    border: Border(bottom: BorderSide(color: borderColor)),
+                  ),
+                  children: [
+                    _tableHeader('DATE', subtitleColor),
+                    _tableHeader('DESCRIPTION', subtitleColor),
+                    _tableHeader('CATEGORY', subtitleColor),
+                    _tableHeader('TYPE', subtitleColor),
+                    _tableHeader('AMOUNT', subtitleColor),
+                  ],
+                ),
+                ...paginatedGroupedLedger.map((group) {
+                  final hasIncome = group.transactions.any(
+                    (t) => t.tipe == 'Pemasukan',
+                  );
+                  final hasExpense = group.transactions.any(
+                    (t) => t.tipe == 'Pengeluaran',
+                  );
+                  String displayType;
+                  Color typeColor;
+                  IconData typeIcon;
+                  if (hasIncome && hasExpense) {
+                    displayType = 'Mixed';
+                    typeColor = Colors.orangeAccent;
+                    typeIcon = Icons.swap_horiz_rounded;
+                  } else if (hasIncome) {
+                    displayType = 'Income';
+                    typeColor = activeGreen;
+                    typeIcon = Icons.trending_up_rounded;
+                  } else {
+                    displayType = 'Expense';
+                    typeColor = Colors.redAccent;
+                    typeIcon = Icons.trending_down_rounded;
+                  }
+
+                  final categories = group.transactions
+                      .map((t) => t.kategori)
+                      .toSet()
+                      .toList();
+                  final String categoryText = categories.length == 1
+                      ? categories.first
+                      : 'Multi';
+                  Color categoryColor;
+                  if (categoryText == 'Multi') {
+                    categoryColor = Colors.orangeAccent;
+                  } else if (categoryText == 'Konsultasi' ||
+                      categoryText == 'Service') {
+                    categoryColor = activeGreen;
+                  } else if (categoryText == 'Obat & Medis' ||
+                      categoryText == 'Farmasi') {
+                    categoryColor = purple;
+                  } else {
+                    categoryColor = subtitleColor;
+                  }
+
+                  final double net = group.netProfit;
+                  final String amountSign = net >= 0 ? '+' : '-';
+                  final Color amountColor = net >= 0
+                      ? activeGreen
+                      : Colors.redAccent;
+                  final String netText =
+                      '$amountSign Rp ${_formatAmount(net.abs())}';
+
+                  final onTap = () => setState(() => _selectedGroupedDay = group);
+
+                  return TableRow(
+                    decoration: BoxDecoration(
+                      border: Border(bottom: BorderSide(color: borderColor)),
+                      color: _selectedGroupedDay?.date == group.date
+                          ? purple.withOpacity(0.04)
+                          : Colors.transparent,
+                    ),
+                    children: [
+                      _tableCellClickable(
+                        Text(
+                          group.date,
+                          style: GoogleFonts.outfit(
+                            fontSize: 10,
+                            color: textColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        onTap,
+                      ),
+                      _tableCellClickable(
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${group.transactionCount} Transactions',
+                              style: GoogleFonts.outfit(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: textColor,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              group.transactions.map((t) => t.deskripsi).join(', '),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.outfit(
+                                  fontSize: 8.5,
+                                  color: subtitleColor,
+                                  fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        onTap,
+                      ),
+                      _tableCellClickable(
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: categoryColor.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            categoryText.toUpperCase(),
+                            style: GoogleFonts.outfit(
+                              fontSize: 6.5,
+                              fontWeight: FontWeight.w900,
+                              color: categoryColor,
+                            ),
+                          ),
+                        ),
+                        onTap,
+                      ),
+                      _tableCellClickable(
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(typeIcon, size: 12, color: typeColor),
+                            const SizedBox(width: 4),
+                            Text(
+                              displayType,
+                              style: GoogleFonts.outfit(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w900,
+                                color: typeColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                        onTap,
+                      ),
+                      _tableCellClickable(
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              netText,
+                              style: GoogleFonts.outfit(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                                color: amountColor,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Rp ${_formatAmount(group.totalIncome)} / Rp ${_formatAmount(group.totalExpense)}',
+                              style: GoogleFonts.outfit(
+                                fontSize: 8.5,
+                                color: subtitleColor,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        onTap,
+                        alignment: Alignment.centerRight,
+                      ),
+                    ],
+                  );
+                }),
               ],
             ),
-            ...groupedLedger.map((group) {
-              final hasIncome = group.transactions.any(
-                (t) => t.tipe == 'Pemasukan',
-              );
-              final hasExpense = group.transactions.any(
-                (t) => t.tipe == 'Pengeluaran',
-              );
-              String displayType;
-              Color typeColor;
-              IconData typeIcon;
-              if (hasIncome && hasExpense) {
-                displayType = 'Mixed';
-                typeColor = Colors.orangeAccent;
-                typeIcon = Icons.swap_horiz_rounded;
-              } else if (hasIncome) {
-                displayType = 'Income';
-                typeColor = activeGreen;
-                typeIcon = Icons.trending_up_rounded;
-              } else {
-                displayType = 'Expense';
-                typeColor = Colors.redAccent;
-                typeIcon = Icons.trending_down_rounded;
-              }
-
-              final categories = group.transactions
-                  .map((t) => t.kategori)
-                  .toSet()
-                  .toList();
-              final String categoryText = categories.length == 1
-                  ? categories.first
-                  : 'Multi';
-              Color categoryColor;
-              if (categoryText == 'Multi') {
-                categoryColor = Colors.orangeAccent;
-              } else if (categoryText == 'Konsultasi' ||
-                  categoryText == 'Service') {
-                categoryColor = activeGreen;
-              } else if (categoryText == 'Obat & Medis' ||
-                  categoryText == 'Farmasi') {
-                categoryColor = purple;
-              } else {
-                categoryColor = subtitleColor;
-              }
-
-              final double net = group.netProfit;
-              final String amountSign = net >= 0 ? '+' : '-';
-              final Color amountColor = net >= 0
-                  ? activeGreen
-                  : Colors.redAccent;
-              final String netText =
-                  '$amountSign Rp ${_formatAmount(net.abs())}';
-
-              final onTap = () => setState(() => _selectedGroupedDay = group);
-
-              return TableRow(
-                decoration: BoxDecoration(
-                  border: Border(bottom: BorderSide(color: borderColor)),
-                  color: _selectedGroupedDay?.date == group.date
-                      ? purple.withOpacity(0.04)
-                      : Colors.transparent,
-                ),
-                children: [
-                  _tableCellClickable(
-                    Text(
-                      group.date,
-                      style: GoogleFonts.outfit(
-                        fontSize: 10,
-                        color: textColor,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    onTap,
-                  ),
-                  _tableCellClickable(
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${group.transactionCount} Transactions',
-                          style: GoogleFonts.outfit(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: textColor,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          group.transactions.map((t) => t.deskripsi).join(', '),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.outfit(
-                            fontSize: 8.5,
-                            color: subtitleColor,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    onTap,
-                  ),
-                  _tableCellClickable(
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: categoryColor.withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        categoryText.toUpperCase(),
-                        style: GoogleFonts.outfit(
-                          fontSize: 6.5,
-                          fontWeight: FontWeight.w900,
-                          color: categoryColor,
-                        ),
-                      ),
-                    ),
-                    onTap,
-                  ),
-                  _tableCellClickable(
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(typeIcon, size: 12, color: typeColor),
-                        const SizedBox(width: 4),
-                        Text(
-                          displayType,
-                          style: GoogleFonts.outfit(
-                            fontSize: 9.5,
-                            fontWeight: FontWeight.w900,
-                            color: typeColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                    onTap,
-                  ),
-                  _tableCellClickable(
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          netText,
-                          style: GoogleFonts.outfit(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w900,
-                            color: amountColor,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Rp ${_formatAmount(group.totalIncome)} / Rp ${_formatAmount(group.totalExpense)}',
-                          style: GoogleFonts.outfit(
-                            fontSize: 8.5,
-                            color: subtitleColor,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    onTap,
-                    alignment: Alignment.centerRight,
-                  ),
-                ],
-              );
-            }),
+            if (groupedLedger.isNotEmpty)
+              ReusablePagination(
+                totalItems: totalItems,
+                itemsPerPage: _ledgerItemsPerPage,
+                currentPage: _ledgerCurrentPage,
+                onPageChanged: (page) {
+                  setState(() {
+                    _ledgerCurrentPage = page;
+                  });
+                },
+                onItemsPerPageChanged: (val) {
+                  if (val != null) {
+                    setState(() {
+                      _ledgerItemsPerPage = val;
+                      _ledgerCurrentPage = 1;
+                    });
+                  }
+                },
+                textColor: textColor,
+                subtitleColor: subtitleColor,
+                borderColor: borderColor,
+                inputBg: inputBg,
+                activeColor: purple,
+                languageCode: state.language,
+              ),
           ],
         ),
       ),
@@ -2035,6 +2197,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
     Color activeGreen,
     Color purple,
   ) {
+    final state = ref.watch(landingPageProvider);
     // Stats count
     final int totalPatients = _patientSyncList
         .map((e) => e['patient_id'])
@@ -2062,8 +2225,37 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
       } else if (_syncStatusFilter == 'Failed') {
         matchesStatus = e['sync_status'] == 'failed';
       }
-      return matchesSearch && matchesStatus;
+
+      bool matchesDate = true;
+      if (_syncSelectedDateRange != null && e['raw_date'] != null) {
+        final rawDate = e['raw_date'] as DateTime;
+        final start = DateTime(
+          _syncSelectedDateRange!.start.year,
+          _syncSelectedDateRange!.start.month,
+          _syncSelectedDateRange!.start.day,
+        );
+        final end = DateTime(
+          _syncSelectedDateRange!.end.year,
+          _syncSelectedDateRange!.end.month,
+          _syncSelectedDateRange!.end.day,
+          23,
+          59,
+          59,
+        );
+        matchesDate = rawDate.isAfter(start) && rawDate.isBefore(end);
+      }
+
+      return matchesSearch && matchesStatus && matchesDate;
     }).toList();
+
+    final totalSyncItems = filteredEncounters.length;
+    final syncStartIndex = (totalSyncItems == 0) ? 0 : (_syncCurrentPage - 1) * _syncItemsPerPage;
+    final syncEndIndex = (syncStartIndex + _syncItemsPerPage) > totalSyncItems
+        ? totalSyncItems
+        : (syncStartIndex + _syncItemsPerPage);
+    final paginatedEncounters = totalSyncItems == 0
+        ? <Map<String, dynamic>>[]
+        : filteredEncounters.sublist(syncStartIndex, syncEndIndex);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2202,11 +2394,102 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                               isDense: true,
                               contentPadding: EdgeInsets.zero,
                             ),
-                            onChanged: (val) =>
-                                setState(() => _syncSearchQuery = val),
+                            onChanged: (val) => setState(() {
+                              _syncSearchQuery = val;
+                              _syncCurrentPage = 1;
+                            }),
                           ),
                         ),
                       ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Container(
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: inputBg,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: borderColor),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    alignment: Alignment.center,
+                    child: InkWell(
+                      onTap: () async {
+                        final picked = await showDialog<DateTimeRange>(
+                          context: context,
+                          builder: (context) {
+                            return Dialog(
+                              clipBehavior: Clip.antiAlias,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(
+                                  maxWidth: 600,
+                                  maxHeight: 520,
+                                ),
+                                child: Theme(
+                                  data: Theme.of(context).copyWith(
+                                    colorScheme: ColorScheme.light(
+                                      primary: activeGreen,
+                                      onPrimary: Colors.white,
+                                      onSurface: textColor,
+                                    ),
+                                  ),
+                                  child: DateRangePickerDialog(
+                                    firstDate: DateTime(2020),
+                                    lastDate: DateTime(2030),
+                                    initialDateRange: _syncSelectedDateRange,
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                        if (picked != null) {
+                          setState(() {
+                            _syncSelectedDateRange = picked;
+                            _syncCurrentPage = 1;
+                          });
+                        }
+                      },
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.calendar_today_rounded,
+                            size: 14,
+                            color: subtitleColor,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            _syncSelectedDateRange == null
+                                ? (state.language == 'en' ? 'Select Date' : 'Pilih Tanggal')
+                                : '${_formatDateShort(_syncSelectedDateRange!.start, state.language == 'en')} - ${_formatDateShort(_syncSelectedDateRange!.end, state.language == 'en')}',
+                            style: GoogleFonts.outfit(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: textColor,
+                            ),
+                          ),
+                          if (_syncSelectedDateRange != null) ...[
+                            const SizedBox(width: 8),
+                            InkWell(
+                              onTap: () {
+                                setState(() {
+                                  _syncSelectedDateRange = null;
+                                  _syncCurrentPage = 1;
+                                });
+                              },
+                              child: Icon(
+                                Icons.close_rounded,
+                                size: 14,
+                                color: Colors.redAccent,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -2237,6 +2520,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                           if (val != null) {
                             setState(() {
                               _syncStatusFilter = val;
+                              _syncCurrentPage = 1;
                             });
                           }
                         },
@@ -2329,219 +2613,237 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                     border: Border.all(color: borderColor),
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: Table(
-                    columnWidths: _isBulkSyncMode
-                        ? const {
-                            0: FlexColumnWidth(0.6), // Checkbox
-                            1: FlexColumnWidth(1.2), // DATE
-                            2: FlexColumnWidth(2.5), // PATIENT
-                            3: FlexColumnWidth(1.0), // TYPE
-                            4: FlexColumnWidth(1.5), // SYNC STATUS
-                            5: FlexColumnWidth(0.8), // ACTION
-                          }
-                        : const {
-                            0: FlexColumnWidth(1.2), // DATE
-                            1: FlexColumnWidth(2.5), // PATIENT
-                            2: FlexColumnWidth(1.0), // TYPE
-                            3: FlexColumnWidth(1.5), // SYNC STATUS
-                            4: FlexColumnWidth(0.8), // ACTION
-                          },
-                    defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Header Row
-                      TableRow(
-                        decoration: BoxDecoration(
-                          color: inputBg,
-                          border: Border(
-                            bottom: BorderSide(color: borderColor),
-                          ),
-                        ),
+                      Table(
+                        columnWidths: _isBulkSyncMode
+                            ? const {
+                                0: FlexColumnWidth(0.6), // Checkbox
+                                1: FlexColumnWidth(1.2), // DATE
+                                2: FlexColumnWidth(2.5), // PATIENT
+                                3: FlexColumnWidth(1.0), // TYPE
+                                4: FlexColumnWidth(1.5), // SYNC STATUS
+                              }
+                            : const {
+                                0: FlexColumnWidth(1.2), // DATE
+                                1: FlexColumnWidth(2.5), // PATIENT
+                                2: FlexColumnWidth(1.0), // TYPE
+                                3: FlexColumnWidth(1.5), // SYNC STATUS
+                              },
+                        defaultVerticalAlignment: TableCellVerticalAlignment.middle,
                         children: [
-                          if (_isBulkSyncMode)
-                            Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: Checkbox(
-                                value:
-                                    _selectedEncounters.length ==
-                                        filteredEncounters.length &&
-                                    filteredEncounters.isNotEmpty,
-                                activeColor: activeGreen,
-                                onChanged: (val) {
-                                  setState(() {
-                                    if (val == true) {
-                                      _selectedEncounters.addAll(
-                                        filteredEncounters.map(
-                                          (e) => e['id'] as String,
-                                        ),
-                                      );
-                                    } else {
-                                      _selectedEncounters.clear();
-                                    }
-                                  });
-                                },
+                          // Header Row
+                          TableRow(
+                            decoration: BoxDecoration(
+                              color: inputBg,
+                              border: Border(
+                                bottom: BorderSide(color: borderColor),
                               ),
                             ),
-                          _tableHeader('DATE', subtitleColor),
-                          _tableHeader('PATIENT', subtitleColor),
-                          _tableHeader('TYPE', subtitleColor),
-                          _tableHeader('SYNC STATUS', subtitleColor),
-                          _tableHeader('ACTION', subtitleColor),
-                        ],
-                      ),
-                      // Patient Rows
-                      ...filteredEncounters.map((p) {
-                        final isSelected = _selectedEncounters.contains(
-                          p['id'],
-                        );
-                        final syncStatus =
-                            p['sync_status']?.toString() ?? 'unsent';
-                        Color statusColor = Colors.orangeAccent;
-                        String statusLabel = 'Unsent';
-                        if (syncStatus == 'success') {
-                          statusColor = activeGreen;
-                          statusLabel = 'Sent';
-                        } else if (syncStatus == 'failed') {
-                          statusColor = Colors.redAccent;
-                          statusLabel = 'Failed';
-                        }
-
-                        final onTap = () {
-                          setState(() {
-                            _selectedSyncEncounter = p;
-                          });
-                          _loadEncounterDetails(p['id']);
-                        };
-
-                        return TableRow(
-                          decoration: BoxDecoration(
-                            border: Border(
-                              bottom: BorderSide(color: borderColor),
-                            ),
-                            color: isSelected
-                                ? activeGreen.withOpacity(0.04)
-                                : Colors.transparent,
+                            children: [
+                              if (_isBulkSyncMode)
+                                Padding(
+                                  padding: const EdgeInsets.all(8.0),
+                                  child: Checkbox(
+                                    value:
+                                        _selectedEncounters.length ==
+                                            filteredEncounters.length &&
+                                        filteredEncounters.isNotEmpty,
+                                    activeColor: activeGreen,
+                                    onChanged: (val) {
+                                      setState(() {
+                                        if (val == true) {
+                                          _selectedEncounters.addAll(
+                                            filteredEncounters.map(
+                                              (e) => e['id'] as String,
+                                            ),
+                                          );
+                                        } else {
+                                          _selectedEncounters.clear();
+                                        }
+                                      });
+                                    },
+                                  ),
+                                ),
+                              _tableHeader('DATE', subtitleColor),
+                              _tableHeader('PATIENT', subtitleColor),
+                              _tableHeader('TYPE', subtitleColor),
+                              _tableHeader('SYNC STATUS', subtitleColor),
+                            ],
                           ),
-                          children: [
-                            if (_isBulkSyncMode)
-                              Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: Checkbox(
-                                  value: isSelected,
-                                  activeColor: activeGreen,
-                                  onChanged: (val) {
-                                    setState(() {
-                                      if (val == true) {
-                                        _selectedEncounters.add(
-                                          p['id'] as String,
-                                        );
-                                      } else {
-                                        _selectedEncounters.remove(
-                                          p['id'] as String,
-                                        );
-                                      }
-                                    });
-                                  },
+                          // Patient Rows
+                          ...paginatedEncounters.map((p) {
+                            final isSelected = _selectedEncounters.contains(
+                              p['id'],
+                            );
+                            final syncStatus =
+                                p['sync_status']?.toString() ?? 'unsent';
+                            Color statusColor = Colors.orangeAccent;
+                            String statusLabel = 'Unsent';
+                            if (syncStatus == 'success') {
+                              statusColor = activeGreen;
+                              statusLabel = 'Sent';
+                            } else if (syncStatus == 'failed') {
+                              statusColor = Colors.redAccent;
+                              statusLabel = 'Failed';
+                            }
+
+                            final onTap = () {
+                              setState(() {
+                                _selectedSyncEncounter = p;
+                              });
+                              _loadEncounterDetails(p['id']);
+                            };
+
+                            return TableRow(
+                              decoration: BoxDecoration(
+                                border: Border(
+                                  bottom: BorderSide(color: borderColor),
                                 ),
+                                color: isSelected
+                                    ? activeGreen.withOpacity(0.04)
+                                    : Colors.transparent,
                               ),
-                            _tableCellClickable(
-                              Text(
-                                p['date']?.toString() ?? '-',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 10,
-                                  color: textColor,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              onTap,
-                            ),
-                            _tableCellClickable(
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    p['name']?.toString() ?? '-',
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w900,
-                                      color: textColor,
+                              children: [
+                                if (_isBulkSyncMode)
+                                  Padding(
+                                    padding: const EdgeInsets.all(8.0),
+                                    child: Checkbox(
+                                      value: isSelected,
+                                      activeColor: activeGreen,
+                                      onChanged: (val) {
+                                        setState(() {
+                                          if (val == true) {
+                                            _selectedEncounters.add(
+                                              p['id'] as String,
+                                            );
+                                          } else {
+                                            _selectedEncounters.remove(
+                                              p['id'] as String,
+                                            );
+                                          }
+                                        });
+                                      },
                                     ),
                                   ),
-                                  const SizedBox(height: 2),
+                                _tableCellClickable(
                                   Text(
-                                    'NIK: ${p['nik']}',
+                                    p['date']?.toString() ?? '-',
                                     style: GoogleFonts.outfit(
-                                      fontSize: 9,
-                                      color: subtitleColor,
+                                      fontSize: 10,
+                                      color: textColor,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                ],
-                              ),
-                              onTap,
-                            ),
-                            _tableCellClickable(
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 3,
+                                  onTap,
                                 ),
-                                decoration: BoxDecoration(
-                                  color:
-                                      (p['type'] == 'BPJS'
-                                              ? Colors.blueAccent
-                                              : purple)
-                                          .withOpacity(0.12),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  p['type']?.toString().toUpperCase() ?? 'UMUM',
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 7.5,
-                                    fontWeight: FontWeight.w900,
-                                    color: p['type'] == 'BPJS'
-                                        ? Colors.blueAccent
-                                        : purple,
+                                _tableCellClickable(
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        p['name']?.toString() ?? '-',
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w900,
+                                          color: textColor,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'NIK: ${p['nik']}',
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 9,
+                                          color: subtitleColor,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
                                   ),
+                                  onTap,
                                 ),
-                              ),
-                              onTap,
-                            ),
-                            _tableCellClickable(
-                              Row(
-                                children: [
+                                _tableCellClickable(
                                   Container(
-                                    width: 6,
-                                    height: 6,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 3,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: statusColor,
-                                      shape: BoxShape.circle,
+                                      color:
+                                          (p['type'] == 'BPJS'
+                                                  ? Colors.blueAccent
+                                                  : purple)
+                                              .withOpacity(0.12),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      p['type']?.toString().toUpperCase() ?? 'UMUM',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 7.5,
+                                        fontWeight: FontWeight.w900,
+                                        color: p['type'] == 'BPJS'
+                                            ? Colors.blueAccent
+                                            : purple,
+                                      ),
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    statusLabel,
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w900,
-                                      color: statusColor,
-                                    ),
+                                  onTap,
+                                ),
+                                _tableCellClickable(
+                                  Row(
+                                    children: [
+                                      Container(
+                                        width: 6,
+                                        height: 6,
+                                        decoration: BoxDecoration(
+                                          color: statusColor,
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        statusLabel,
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w900,
+                                          color: statusColor,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
-                              onTap,
-                            ),
-                            _tableCellClickable(
-                              Icon(
-                                Icons.chevron_right_rounded,
-                                color: subtitleColor,
-                                size: 18,
-                              ),
-                              onTap,
-                              alignment: Alignment.center,
-                            ),
-                          ],
-                        );
-                      }),
+                                  onTap,
+                                ),
+                              ],
+                            );
+                          }),
+                        ],
+                      ),
+                      if (filteredEncounters.isNotEmpty)
+                        ReusablePagination(
+                          totalItems: totalSyncItems,
+                          itemsPerPage: _syncItemsPerPage,
+                          currentPage: _syncCurrentPage,
+                          onPageChanged: (page) {
+                            setState(() {
+                              _syncCurrentPage = page;
+                            });
+                          },
+                          onItemsPerPageChanged: (val) {
+                            if (val != null) {
+                              setState(() {
+                                _syncItemsPerPage = val;
+                                _syncCurrentPage = 1;
+                              });
+                            }
+                          },
+                          textColor: textColor,
+                          subtitleColor: subtitleColor,
+                          borderColor: borderColor,
+                          inputBg: inputBg,
+                          activeColor: activeGreen,
+                          languageCode: state.language,
+                        ),
                     ],
                   ),
                 ),
@@ -3613,9 +3915,13 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
   }
 
   Widget _buildFilterChip(String type, Color activeColor) {
+    final state = ref.read(landingPageProvider);
     final isSelected = _filterType == type;
     return InkWell(
-      onTap: () => setState(() => _filterType = type),
+      onTap: () => setState(() {
+        _filterType = type;
+        _ledgerCurrentPage = 1;
+      }),
       borderRadius: BorderRadius.circular(8),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -3629,7 +3935,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
           ),
         ),
         child: Text(
-          type,
+          type.tr(state),
           style: GoogleFonts.outfit(
             fontSize: 9.5,
             fontWeight: FontWeight.w900,
@@ -3682,6 +3988,25 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
     return s.replaceAllMapped(reg, (Match m) => '${m[1]}.');
   }
 
+  String _formatDateShort(DateTime dt, bool isEnglish) {
+    return '${dt.day} ${_getMonthNameShort(dt.month, isEnglish)} ${dt.year}';
+  }
+
+  String _getMonthNameShort(int month, bool isEnglish) {
+    const monthsId = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+      'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'
+    ];
+    const monthsEn = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    if (month >= 1 && month <= 12) {
+      return isEnglish ? monthsEn[month - 1] : monthsId[month - 1];
+    }
+    return '';
+  }
+
   Widget _buildExpenseWizardModal(
     Color cardBg,
     Color text,
@@ -3690,6 +4015,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
     Color inputBg,
     Color purple,
   ) {
+    final state = ref.read(landingPageProvider);
     return Positioned.fill(
       child: Container(
         color: Colors.black.withOpacity(0.3),
@@ -3736,7 +4062,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                           ),
                           const SizedBox(width: 12),
                           Text(
-                            'Catat Pengeluaran Baru',
+                            'Catat Pengeluaran Baru'.tr(state),
                             style: GoogleFonts.outfit(
                               fontSize: 14,
                               fontWeight: FontWeight.w900,
@@ -3755,7 +4081,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                   const Divider(height: 24),
 
                   Text(
-                    'Deskripsi Pengeluaran *',
+                    'Deskripsi Pengeluaran *'.tr(state),
                     style: GoogleFonts.outfit(
                       fontSize: 9.5,
                       fontWeight: FontWeight.w900,
@@ -3772,7 +4098,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                     ),
                     decoration: InputDecoration(
                       hintText:
-                          'cth. Pembelian Reagen Golongan Darah & Syringe',
+                          'cth. Pembelian Reagen Golongan Darah & Syringe'.tr(state),
                       hintStyle: GoogleFonts.outfit(
                         fontSize: 11,
                         color: subtitle.withOpacity(0.5),
@@ -3802,7 +4128,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Kategori Pengeluaran *',
+                              'Kategori Pengeluaran *'.tr(state),
                               style: GoogleFonts.outfit(
                                 fontSize: 9.5,
                                 fontWeight: FontWeight.w900,
@@ -3847,7 +4173,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                                           .map(
                                             (c) => DropdownMenuItem(
                                               value: c,
-                                              child: Text(c),
+                                              child: Text(c.tr(state)),
                                             ),
                                           )
                                           .toList(),
@@ -3863,7 +4189,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Jumlah Nominal (Rp) *',
+                              'Jumlah Nominal (Rp) *'.tr(state),
                               style: GoogleFonts.outfit(
                                 fontSize: 9.5,
                                 fontWeight: FontWeight.w900,
@@ -3880,7 +4206,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                                 color: text,
                               ),
                               decoration: InputDecoration(
-                                hintText: 'cth. 150000',
+                                hintText: 'cth. 150000'.tr(state),
                                 hintStyle: GoogleFonts.outfit(
                                   fontSize: 11,
                                   color: subtitle.withOpacity(0.5),
@@ -3915,7 +4241,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                         onPressed: () =>
                             setState(() => _showExpenseWizard = false),
                         child: Text(
-                          'Batal',
+                          'Batal'.tr(state),
                           style: GoogleFonts.outfit(
                             fontSize: 11,
                             fontWeight: FontWeight.w900,
@@ -3939,7 +4265,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                           ),
                         ),
                         child: Text(
-                          'Simpan Pengeluaran',
+                          'Simpan Pengeluaran'.tr(state),
                           style: GoogleFonts.outfit(
                             fontSize: 11,
                             fontWeight: FontWeight.w900,

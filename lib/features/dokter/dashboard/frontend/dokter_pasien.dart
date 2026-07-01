@@ -277,7 +277,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Daftar Pasien',
+                    'Daftar Pasien'.tr(state),
                     style: GoogleFonts.outfit(
                       fontSize: isMobile ? 22 : 28,
                       fontWeight: FontWeight.w900,
@@ -286,7 +286,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Kelola konsultasi aktif dan riwayat pasien',
+                    'Kelola konsultasi aktif dan riwayat pasien'.tr(state),
                     style: GoogleFonts.outfit(
                       fontSize: 12,
                       color: subtitleColor,
@@ -316,7 +316,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                       ),
                       const SizedBox(width: 12),
                       CustomButton(
-                        text: 'Tambah Pasien',
+                        text: 'Tambah Pasien'.tr(state),
                         icon: Icons.add_rounded,
                         primaryColor: purpleAccent,
                         textColor: Colors.white,
@@ -336,7 +336,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                   _buildSortButton(isDark, textColor, subtitleColor, borderColor),
                   const SizedBox(width: 16),
                   CustomButton(
-                    text: 'Tambah Pasien',
+                    text: 'Tambah Pasien'.tr(state),
                     icon: Icons.add_rounded,
                     primaryColor: purpleAccent,
                     textColor: Colors.white,
@@ -356,8 +356,8 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
             : filteredPatients.isEmpty
                 ? _buildEmptyState(
                     Icons.people_outline_rounded,
-                    'Pasien tidak ditemukan',
-                    'Coba gunakan kata kunci pencarian yang berbeda.',
+                    'Pasien tidak ditemukan'.tr(state),
+                    'Coba gunakan kata kunci pencarian yang berbeda.'.tr(state),
                     subtitleColor,
                     textColor,
                     cardBgColor,
@@ -430,7 +430,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                 color: textColor,
               ),
               decoration: InputDecoration(
-                hintText: 'Cari nama, NIK, atau ID...',
+                hintText: 'Cari nama, NIK, atau ID...'.tr(ref.read(landingPageProvider)),
                 hintStyle: GoogleFonts.outfit(
                   fontSize: 13,
                   color: subtitleColor.withOpacity(0.5),
@@ -447,9 +447,13 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
 
   Widget _buildSortButton(
       bool isDark, Color textColor, Color subtitleColor, Color borderColor) {
+    final state = ref.read(landingPageProvider);
+    final isEn = state.language == 'en';
     final sortLabel = _sortOption == 'nama'
-        ? 'Nama (${_sortAscending ? 'A-Z' : 'Z-A'})'
-        : 'ID (${_sortAscending ? 'Terlama' : 'Terbaru'})';
+        ? (isEn ? 'Name (${_sortAscending ? 'A-Z' : 'Z-A'})' : 'Nama (${_sortAscending ? 'A-Z' : 'Z-A'})')
+        : (_sortAscending 
+            ? (isEn ? 'ID (Oldest)' : 'ID (Terlama)') 
+            : (isEn ? 'ID (Newest)' : 'ID (Terbaru)'));
 
     return InkWell(
       onTap: () {
@@ -555,6 +559,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
     final subtitleColor = isDark ? Colors.grey[400]! : const Color(0xFF6F6A8A);
     final borderColor = isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2);
     final inputBg = isDark ? const Color(0xFF1E1E22) : const Color(0xFFF6F8FA);
+    final state = ref.read(landingPageProvider);
 
     final formKey = GlobalKey<FormState>();
     final nameController = TextEditingController();
@@ -622,12 +627,12 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Registrasi Pasien Baru',
+                                  'Registrasi Pasien Baru'.tr(state),
                                   style: GoogleFonts.outfit(
                                       fontSize: 15, fontWeight: FontWeight.w900, color: textColor),
                                 ),
                                 Text(
-                                  'Daftarkan rekam medis pasien di bawah ini',
+                                  'Daftarkan rekam medis pasien di bawah ini'.tr(state),
                                   style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
                                 ),
                               ],
@@ -667,7 +672,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                                         Icon(Icons.add_a_photo_outlined, size: 20, color: subtitleColor),
                                         const SizedBox(height: 4),
                                         Text(
-                                          'Unggah Foto',
+                                          'Unggah Foto'.tr(state),
                                           style: GoogleFonts.outfit(
                                               fontSize: 7.5,
                                               fontWeight: FontWeight.bold,
@@ -689,8 +694,8 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      _buildFormFieldLabel('Nama Lengkap Pasien', textColor),
-                                      _buildTextInput(nameController, 'Masukkan nama...', Icons.person_outline, inputBg, borderColor, textColor, subtitleColor, validator: (v) => v!.isEmpty ? 'Nama wajib diisi' : null),
+                                      _buildFormFieldLabel('Nama Lengkap Pasien'.tr(state), textColor),
+                                      _buildTextInput(nameController, 'Masukkan nama...'.tr(state), Icons.person_outline, inputBg, borderColor, textColor, subtitleColor, validator: (v) => v!.isEmpty ? 'Nama wajib diisi' : null),
                                     ],
                                   ),
                                 ),
@@ -699,8 +704,8 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      _buildFormFieldLabel('Nomor Induk Kependudukan (NIK)', textColor),
-                                      _buildTextInput(nikController, 'Masukkan 16 digit NIK...', Icons.fingerprint_rounded, inputBg, borderColor, textColor, subtitleColor, keyboardType: TextInputType.number, validator: (v) => v!.length != 16 ? 'NIK harus 16 digit' : null),
+                                      _buildFormFieldLabel('Nomor Induk Kependudukan (NIK)'.tr(state), textColor),
+                                      _buildTextInput(nikController, 'Masukkan 16 digit NIK...'.tr(state), Icons.fingerprint_rounded, inputBg, borderColor, textColor, subtitleColor, keyboardType: TextInputType.number, validator: (v) => v!.length != 16 ? 'NIK harus 16 digit' : null),
                                     ],
                                   ),
                                 ),
@@ -715,8 +720,8 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      _buildFormFieldLabel('Alamat Email', textColor),
-                                      _buildTextInput(emailController, 'contoh@email.com', Icons.mail_outline_rounded, inputBg, borderColor, textColor, subtitleColor, keyboardType: TextInputType.emailAddress),
+                                      _buildFormFieldLabel('Alamat Email'.tr(state), textColor),
+                                      _buildTextInput(emailController, 'contoh@email.com'.tr(state), Icons.mail_outline_rounded, inputBg, borderColor, textColor, subtitleColor, keyboardType: TextInputType.emailAddress),
                                     ],
                                   ),
                                 ),
@@ -725,8 +730,8 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      _buildFormFieldLabel('Kata Sandi Default', textColor),
-                                      _buildTextInput(passwordController, 'Buat sandi...', Icons.lock_outline_rounded, inputBg, borderColor, textColor, subtitleColor, obscureText: true),
+                                      _buildFormFieldLabel('Kata Sandi Default'.tr(state), textColor),
+                                      _buildTextInput(passwordController, 'Buat sandi...'.tr(state), Icons.lock_outline_rounded, inputBg, borderColor, textColor, subtitleColor, obscureText: true),
                                     ],
                                   ),
                                 ),
@@ -741,8 +746,8 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      _buildFormFieldLabel('Tempat Lahir', textColor),
-                                      _buildTextInput(birthplaceController, 'Kota tempat lahir...', Icons.location_city_rounded, inputBg, borderColor, textColor, subtitleColor),
+                                      _buildFormFieldLabel('Tempat Lahir'.tr(state), textColor),
+                                      _buildTextInput(birthplaceController, 'Kota tempat lahir...'.tr(state), Icons.location_city_rounded, inputBg, borderColor, textColor, subtitleColor),
                                     ],
                                   ),
                                 ),
@@ -751,8 +756,8 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      _buildFormFieldLabel('Tanggal Lahir', textColor),
-                                      _buildDateInput(ctx, dobController, 'Pilih tanggal...', inputBg, borderColor, textColor, subtitleColor, setDialogState),
+                                      _buildFormFieldLabel('Tanggal Lahir'.tr(state), textColor),
+                                      _buildDateInput(ctx, dobController, 'Pilih tanggal...'.tr(state), inputBg, borderColor, textColor, subtitleColor, setDialogState),
                                     ],
                                   ),
                                 ),
@@ -767,7 +772,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      _buildFormFieldLabel('Jenis Kelamin', textColor),
+                                      _buildFormFieldLabel('Jenis Kelamin'.tr(state), textColor),
                                       Container(
                                         height: 44,
                                         padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -783,7 +788,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                                             icon: Icon(Icons.arrow_drop_down_rounded, color: subtitleColor),
                                             isExpanded: true,
                                             style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: textColor),
-                                            items: ['Laki-laki', 'Perempuan'].map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
+                                            items: ['Laki-laki', 'Perempuan'].map((g) => DropdownMenuItem(value: g, child: Text(g.tr(state)))).toList(),
                                             onChanged: (val) {
                                               if (val != null) {
                                                 setDialogState(() {
@@ -802,8 +807,8 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      _buildFormFieldLabel('No. Telepon Aktif', textColor),
-                                      _buildTextInput(phoneController, '08xxxxxxxxxx', Icons.phone_android_rounded, inputBg, borderColor, textColor, subtitleColor, keyboardType: TextInputType.phone),
+                                      _buildFormFieldLabel('No. Telepon Aktif'.tr(state), textColor),
+                                      _buildTextInput(phoneController, '08xxxxxxxxxx'.tr(state), Icons.phone_android_rounded, inputBg, borderColor, textColor, subtitleColor, keyboardType: TextInputType.phone),
                                     ],
                                   ),
                                 ),
@@ -814,10 +819,10 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildFormFieldLabel('Alamat Lengkap Domisili', textColor),
+                                _buildFormFieldLabel('Alamat Lengkap Domisili'.tr(state), textColor),
                                 _buildTextInput(
                                   addressController,
-                                  'Tulis nama jalan, kelurahan, kecamatan, kota...',
+                                  'Tulis nama jalan, kelurahan, kecamatan, kota...'.tr(state),
                                   Icons.home_outlined,
                                   inputBg,
                                   borderColor,
@@ -849,7 +854,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                             ),
                             child: Text(
-                              'Batal',
+                              'Batal'.tr(state),
                               style: GoogleFonts.outfit(
                                   fontSize: 11, fontWeight: FontWeight.w900, color: subtitleColor),
                             ),
@@ -891,7 +896,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
                             ),
                             child: Text(
-                              'Daftarkan Pasien',
+                              'Daftarkan Pasien'.tr(state),
                               style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900),
                             ),
                           ),

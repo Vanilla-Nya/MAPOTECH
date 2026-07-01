@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:mapotech/shared/widgets/skeleton_loading.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
-import 'package:mapotech/shared/widgets/custom_button.dart';
+import 'package:mapotech/shared/widgets/ui.dart';
+
 import 'package:mapotech/shared/supabase_service.dart';
 import 'dart:math';
 
@@ -248,10 +248,42 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
           mainAxisSpacing: 16,
           childAspectRatio: 1.6,
           children: [
-            _buildMetricCard(Icons.people_outline_rounded, 'TOTAL ASISTEN', '$totalStaff Orang', subtitleColor, textColor, cardBgColor, borderColor),
-            _buildMetricCard(Icons.check_circle_outline_rounded, 'BERTUGAS HARI INI', '$activeStaff Aktif', subtitleColor, const Color(0xFF48C9B0), cardBgColor, borderColor),
-            _buildMetricCard(Icons.medical_services_outlined, 'PERAWAT KLINIK', '$nursesCount Orang', subtitleColor, purpleAccent, cardBgColor, borderColor),
-            _buildMetricCard(Icons.badge_outlined, 'ADMIN / FRONT DESK', '$adminsCount Orang', subtitleColor, const Color(0xFFF39C12), cardBgColor, borderColor),
+            MetricCard(
+              icon: Icons.people_outline_rounded,
+              label: 'TOTAL ASISTEN'.tr(state),
+              count: '$totalStaff ' + (state.language == 'en' ? 'People' : 'Orang'),
+              subtitleColor: subtitleColor,
+              countColor: textColor,
+              cardBgColor: cardBgColor,
+              borderColor: borderColor,
+            ),
+            MetricCard(
+              icon: Icons.check_circle_outline_rounded,
+              label: 'BERTUGAS HARI INI'.tr(state),
+              count: '$activeStaff ' + (state.language == 'en' ? 'Active' : 'Aktif'),
+              subtitleColor: subtitleColor,
+              countColor: const Color(0xFF48C9B0),
+              cardBgColor: cardBgColor,
+              borderColor: borderColor,
+            ),
+            MetricCard(
+              icon: Icons.medical_services_outlined,
+              label: 'PERAWAT KLINIK'.tr(state),
+              count: '$nursesCount ' + (state.language == 'en' ? 'People' : 'Orang'),
+              subtitleColor: subtitleColor,
+              countColor: purpleAccent,
+              cardBgColor: cardBgColor,
+              borderColor: borderColor,
+            ),
+            MetricCard(
+              icon: Icons.badge_outlined,
+              label: 'ADMIN / FRONT DESK'.tr(state),
+              count: '$adminsCount ' + (state.language == 'en' ? 'People' : 'Orang'),
+              subtitleColor: subtitleColor,
+              countColor: const Color(0xFFF39C12),
+              cardBgColor: cardBgColor,
+              borderColor: borderColor,
+            ),
           ],
         ),
 
@@ -277,7 +309,7 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                       child: TextField(
                         style: GoogleFonts.outfit(fontSize: 12, color: textColor),
                         decoration: InputDecoration(
-                          hintText: 'Cari nama, NIK, atau peran asisten...',
+                          hintText: 'Cari nama, NIK, atau peran asisten...'.tr(state),
                           hintStyle: GoogleFonts.outfit(fontSize: 11, color: subtitleColor.withOpacity(0.6)),
                           border: InputBorder.none,
                           isDense: true,
@@ -295,7 +327,7 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
             ),
             const SizedBox(width: 16),
             CustomButton(
-              text: '+ Tambah Asisten',
+              text: '+ Tambah Asisten'.tr(state),
               onPressed: () {
                 _showAddAssistantDialog(context);
               },
@@ -344,51 +376,6 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
             },
           ),
       ],
-    );
-  }
-
-  // ─── Metric Card Widget ─────────────────────────────────────────────────────
-
-  Widget _buildMetricCard(
-    IconData icon,
-    String label,
-    String count,
-    Color subtitleColor,
-    Color countColor,
-    Color cardBgColor,
-    Color borderColor,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cardBgColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: borderColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 14, color: subtitleColor),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.bold, color: subtitleColor),
-                ),
-              ),
-            ],
-          ),
-          const Spacer(),
-          Text(
-            count,
-            style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w900, color: countColor),
-          ),
-        ],
-      ),
     );
   }
 
@@ -759,7 +746,8 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            final isDark = ref.watch(landingPageProvider).appearance == 'dark';
+            final state = ref.watch(landingPageProvider);
+            final isDark = state.appearance == 'dark';
             final dialogBg = isDark ? const Color(0xFF1E1E22) : Colors.white;
             final txtColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
             final subColor = isDark ? Colors.grey[400]! : const Color(0xFF6F6A8A);
@@ -780,19 +768,19 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        'Registrasi Asisten Baru',
+                        'Registrasi Asisten Baru'.tr(state),
                         style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w900, color: txtColor),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Daftarkan asisten klinik praktik mandiri Anda',
+                        'Daftarkan asisten klinik praktik mandiri Anda'.tr(state),
                         style: GoogleFonts.outfit(fontSize: 11, color: subColor),
                       ),
                       const SizedBox(height: 20),
 
                       // Nama
-                      _buildInputLabel('NAMA LENGKAP & GELAR', subColor),
-                      _buildInputField(nameController, 'Contoh: Siti Aminah, A.Md.Kep.', inputBg, txtColor, subColor),
+                      _buildInputLabel('NAMA LENGKAP & GELAR'.tr(state), subColor),
+                      _buildInputField(nameController, 'Contoh: Siti Aminah, A.Md.Kep.'.tr(state), inputBg, txtColor, subColor),
                       const SizedBox(height: 12),
 
                       // NIK & Peran Row
@@ -802,7 +790,7 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildInputLabel('NIK (KTP 16-DIGIT)', subColor),
+                                _buildInputLabel('NIK (KTP 16-DIGIT)'.tr(state), subColor),
                                 _buildInputField(nikController, '351108...', inputBg, txtColor, subColor, keyboardType: TextInputType.number),
                               ],
                             ),
@@ -812,7 +800,7 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildInputLabel('PERAN / JABATAN', subColor),
+                                _buildInputLabel('PERAN / JABATAN'.tr(state), subColor),
                                 Container(
                                   height: 44,
                                   decoration: BoxDecoration(
@@ -829,7 +817,7 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                                       items: ['Perawat', 'Front Desk', 'Administrator'].map((String role) {
                                         return DropdownMenuItem<String>(
                                           value: role,
-                                          child: Text(role),
+                                          child: Text(role.tr(state)),
                                         );
                                       }).toList(),
                                       onChanged: (val) {
@@ -849,8 +837,8 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
 
                       // SIP (only if nurse)
                       if (selectedRole == 'Perawat') ...[
-                        _buildInputLabel('SURAT IZIN PRAKTEK (SIP) PERAWAT', subColor),
-                        _buildInputField(sipController, 'Contoh: 503/1204/SIP.P/...', inputBg, txtColor, subColor),
+                        _buildInputLabel('SURAT IZIN PRAKTEK (SIP) PERAWAT'.tr(state), subColor),
+                        _buildInputField(sipController, 'Contoh: 503/1204/SIP.P/...'.tr(state), inputBg, txtColor, subColor),
                         const SizedBox(height: 12),
                       ],
 
@@ -861,7 +849,7 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildInputLabel('NOMOR TELEPON', subColor),
+                                _buildInputLabel('NOMOR TELEPON'.tr(state), subColor),
                                 _buildInputField(phoneController, '0812...', inputBg, txtColor, subColor, keyboardType: TextInputType.phone),
                               ],
                             ),
@@ -871,7 +859,7 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildInputLabel('EMAIL KLINIK', subColor),
+                                _buildInputLabel('EMAIL KLINIK'.tr(state), subColor),
                                 _buildInputField(emailController, 'asisten@gmail.com', inputBg, txtColor, subColor),
                               ],
                             ),
@@ -881,7 +869,7 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                       const SizedBox(height: 16),
 
                       // Permissions
-                      _buildInputLabel('IZIN AKSES UTAMA', subColor),
+                      _buildInputLabel('IZIN AKSES UTAMA'.tr(state), subColor),
                       Wrap(
                         spacing: 8,
                         runSpacing: 6,
@@ -889,7 +877,7 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                           final isChecked = selectedPerms.contains(p);
                           return FilterChip(
                             label: Text(
-                              p,
+                              p.tr(state),
                               style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.bold, color: isChecked ? Colors.white : txtColor),
                             ),
                             selected: isChecked,
@@ -916,12 +904,12 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
                           TextButton(
-                            child: Text('Batal', style: GoogleFonts.outfit(fontSize: 12, color: subColor, fontWeight: FontWeight.w700)),
+                            child: Text('Batal'.tr(state), style: GoogleFonts.outfit(fontSize: 12, color: subColor, fontWeight: FontWeight.w700)),
                             onPressed: () => Navigator.pop(context),
                           ),
                           const SizedBox(width: 14),
                           CustomButton(
-                            text: 'Simpan Asisten',
+                            text: 'Simpan Asisten'.tr(state),
                             onPressed: () {
                               final name = nameController.text.trim();
                               final nik = nikController.text.trim();

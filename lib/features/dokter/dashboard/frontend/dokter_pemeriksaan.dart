@@ -1475,7 +1475,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Pemeriksaan & RME',
+                          'Pemeriksaan & RME'.tr(state),
                           style: GoogleFonts.outfit(
                             fontSize: 20,
                             fontWeight: FontWeight.w900,
@@ -1483,7 +1483,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                           ),
                         ),
                         Text(
-                          'Sesi pencatatan rekam medis elektronik aktif dr. Agoes Soetanto',
+                          'Sesi pencatatan rekam medis elektronik aktif dr. Agoes Soetanto'.tr(state),
                           style: GoogleFonts.outfit(
                             fontSize: 10,
                             color: subtitleColor,
@@ -2076,6 +2076,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
     Color borderCol,
     bool isDark,
   ) {
+    final state = ref.read(landingPageProvider);
     final steps = [
       {'label': 'Pasien', 'icon': Icons.person_rounded},
       {'label': 'Anamnesa', 'icon': Icons.assignment_rounded},
@@ -2135,7 +2136,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                 const SizedBox(width: 6),
                 // Label
                 Text(
-                  step['label'] as String,
+                  (step['label'] as String).tr(state),
                   style: GoogleFonts.outfit(
                     fontSize: 9,
                     fontWeight: isActive || isDone
@@ -2424,11 +2425,12 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
     Color inputBg,
     Color purple,
   ) {
+    final state = ref.read(landingPageProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Keluhan Utama *',
+          'Keluhan Utama *'.tr(state),
           style: GoogleFonts.outfit(
             fontSize: 10,
             fontWeight: FontWeight.w900,
@@ -2452,7 +2454,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
           ),
           decoration: InputDecoration(
             hintText:
-                'Tulis keluhan utama pasien, misal: Sakit kepala hebat disertai mual sejak kemarin malam...',
+                'Tulis keluhan utama pasien, misal: Sakit kepala hebat disertai mual sejak kemarin malam...'.tr(state),
             hintStyle: GoogleFonts.outfit(
               fontSize: 11,
               color: subtitleCol.withOpacity(0.5),
@@ -2472,7 +2474,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
         ),
         const SizedBox(height: 16),
         Text(
-          'Anamnesis',
+          'Anamnesa'.tr(state),
           style: GoogleFonts.outfit(
             fontSize: 10,
             fontWeight: FontWeight.w900,
@@ -2496,7 +2498,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
           ),
           decoration: InputDecoration(
             hintText:
-                'Tulis riwayat penyakit atau anamnesis tambahan (opsional)...',
+                'Tulis riwayat penyakit atau anamnesis tambahan (opsional)...'.tr(state),
             hintStyle: GoogleFonts.outfit(
               fontSize: 11,
               color: subtitleCol.withOpacity(0.5),
@@ -5985,6 +5987,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
     Color activeGreen,
     bool autoSyncEnabled,
   ) {
+    final state = ref.read(landingPageProvider);
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -5992,7 +5995,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
           OutlinedButton.icon(
             icon: const Icon(Icons.arrow_back_rounded, size: 14),
             label: Text(
-              'Sebelumnya',
+              'Sebelumnya'.tr(state),
               style: GoogleFonts.outfit(
                 fontSize: 11,
                 fontWeight: FontWeight.w900,
@@ -6020,7 +6023,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
               });
             },
             child: Text(
-              'Batal',
+              'Batal'.tr(state),
               style: GoogleFonts.outfit(
                 fontSize: 12,
                 fontWeight: FontWeight.w900,
@@ -6037,7 +6040,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
               color: Colors.white,
             ),
             label: Text(
-              'Selanjutnya',
+              'Selanjutnya'.tr(state),
               style: GoogleFonts.outfit(
                 fontSize: 11,
                 fontWeight: FontWeight.w900,
@@ -6233,6 +6236,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
     Color activeGreen,
     List<AntrianModel> queues,
   ) {
+    final state = ref.read(landingPageProvider);
     final waitingOrProcessing = queues
         .where((q) => q.status == 'Menunggu' || q.status == 'Memproses...')
         .toList();
@@ -6354,7 +6358,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                               ),
                               alignment: Alignment.center,
                               child: Text(
-                                'SEDANG DIPERIKSA',
+                                'SEDANG DIPERIKSA'.tr(state),
                                 style: GoogleFonts.outfit(
                                   fontSize: 9,
                                   fontWeight: FontWeight.w900,

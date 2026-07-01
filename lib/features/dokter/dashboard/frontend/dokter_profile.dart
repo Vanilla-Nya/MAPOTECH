@@ -2388,6 +2388,8 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
     Color borderColor,
     Color tealColor,
   ) {
+    final state = ref.read(landingPageProvider);
+    final isEn = state.language == 'en';
     return Center(
       child: Container(
         padding: const EdgeInsets.all(6),
@@ -2401,21 +2403,21 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
           children: [
             _buildTabItem(
               0,
-              'Profile & Status',
+              isEn ? 'Profile & Status' : 'Profil & Status',
               Icons.info_outline_rounded,
               tealColor,
               isDark,
             ),
             _buildTabItem(
               1,
-              'Practice & Service',
+              isEn ? 'Practice & Service' : 'Praktik & Layanan',
               Icons.loop_rounded,
               tealColor,
               isDark,
             ),
             _buildTabItem(
               2,
-              'API & Integration',
+              isEn ? 'API & Integration' : 'API & Integrasi',
               Icons.shield_outlined,
               tealColor,
               isDark,

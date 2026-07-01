@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
-import 'package:mapotech/shared/widgets/custom_button.dart';
+import 'package:mapotech/shared/widgets/ui.dart';
+
 
 class DokterDashboard extends ConsumerWidget {
   const DokterDashboard({super.key});
@@ -10,6 +11,7 @@ class DokterDashboard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(landingPageProvider);
+    final notifier = ref.read(landingPageProvider.notifier);
 
     final isDark = state.appearance == 'dark';
     final isRev = state.appearance == 'rev';
@@ -62,13 +64,13 @@ class DokterDashboard extends ConsumerWidget {
                             borderRadius: BorderRadius.circular(100),
                           ),
                           child: Text(
-                            'SEDANG BERTUGAS',
+                            notifier.t('SEDANG BERTUGAS'),
                             style: GoogleFonts.outfit(fontSize: 6.5, fontWeight: FontWeight.w900, color: const Color(0xFF48C9B0)),
                           ),
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          'Selasa, 26 Mei 2026',
+                          notifier.t('Selasa, 26 Mei 2026'),
                           style: GoogleFonts.outfit(fontSize: 9, color: subtitleColor, fontWeight: FontWeight.bold),
                         ),
                       ],
@@ -87,7 +89,7 @@ class DokterDashboard extends ConsumerWidget {
               ),
               if (!isMobile)
                 CustomButton(
-                  text: 'Lihat Profil',
+                  text: notifier.t('Lihat Profil'),
                   icon: Icons.person_outline_rounded,
                   height: 38,
                   onPressed: () {},
@@ -100,7 +102,7 @@ class DokterDashboard extends ConsumerWidget {
 
         // Indikator Kinerja Utama Cards Grid (metrics)
         Text(
-          'INDIKATOR KINERJA UTAMA',
+          notifier.t('INDIKATOR KINERJA UTAMA'),
           style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: subtitleColor, letterSpacing: 0.5),
         ),
         const SizedBox(height: 12),
@@ -112,10 +114,42 @@ class DokterDashboard extends ConsumerWidget {
           mainAxisSpacing: 16,
           childAspectRatio: 1.6,
           children: [
-            _buildMetricCard(Icons.people_rounded, 'TOTAL PASIEN', '3', subtitleColor, textColor, cardBgColor, borderColor),
-            _buildMetricCard(Icons.calendar_today_rounded, 'ANTREAN HARI INI', '0', subtitleColor, textColor, cardBgColor, borderColor),
-            _buildMetricCard(Icons.warning_amber_rounded, 'OBAT KEDALUWARSA', '00', subtitleColor, Colors.redAccent, cardBgColor, borderColor),
-            _buildMetricCard(Icons.inventory_rounded, 'STOK MENIPIS', '0', subtitleColor, Colors.amber, cardBgColor, borderColor),
+            MetricCard(
+              icon: Icons.people_rounded,
+              label: notifier.t('TOTAL PASIEN'),
+              count: '3',
+              subtitleColor: subtitleColor,
+              countColor: textColor,
+              cardBgColor: cardBgColor,
+              borderColor: borderColor,
+            ),
+            MetricCard(
+              icon: Icons.calendar_today_rounded,
+              label: notifier.t('ANTREAN HARI INI'),
+              count: '0',
+              subtitleColor: subtitleColor,
+              countColor: textColor,
+              cardBgColor: cardBgColor,
+              borderColor: borderColor,
+            ),
+            MetricCard(
+              icon: Icons.warning_amber_rounded,
+              label: notifier.t('OBAT KEDALUWARSA'),
+              count: '00',
+              subtitleColor: subtitleColor,
+              countColor: Colors.redAccent,
+              cardBgColor: cardBgColor,
+              borderColor: borderColor,
+            ),
+            MetricCard(
+              icon: Icons.inventory_rounded,
+              label: notifier.t('STOK MENIPIS'),
+              count: '0',
+              subtitleColor: subtitleColor,
+              countColor: Colors.amber,
+              cardBgColor: cardBgColor,
+              borderColor: borderColor,
+            ),
           ],
         ),
 
@@ -140,11 +174,11 @@ class DokterDashboard extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'TREN PEMASUKAN',
+                      notifier.t('TREN PEMASUKAN'),
                       style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: subtitleColor),
                     ),
                     Text(
-                      '+0% dari bulan lalu',
+                      notifier.t('+0% dari bulan lalu'),
                       style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900, color: const Color(0xFF48C9B0)),
                     ),
                     const Spacer(),
@@ -173,7 +207,9 @@ class DokterDashboard extends ConsumerWidget {
                     const Spacer(),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: ['Rab', 'Kam', 'Jum', 'Sab', 'Min', 'Sen', 'Sel']
+                      children: (state.language == 'en'
+                              ? ['Wed', 'Thu', 'Fri', 'Sat', 'Sun', 'Mon', 'Tue']
+                              : ['Rab', 'Kam', 'Jum', 'Sab', 'Min', 'Sen', 'Sel'])
                           .map((day) => Text(day, style: TextStyle(color: subtitleColor, fontSize: 9)))
                           .toList(),
                     ),
@@ -198,11 +234,11 @@ class DokterDashboard extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'PASIEN PER HARI',
+                      notifier.t('PASIEN PER HARI'),
                       style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: subtitleColor),
                     ),
                     Text(
-                      '7 hari terakhir',
+                      notifier.t('7 hari terakhir'),
                       style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor),
                     ),
                     const Spacer(),
@@ -212,13 +248,13 @@ class DokterDashboard extends ConsumerWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        _buildChartBar('Rab', 0.0, themeAccent, subtitleColor),
-                        _buildChartBar('Kam', 0.0, themeAccent, subtitleColor),
-                        _buildChartBar('Jum', 0.0, themeAccent, subtitleColor),
-                        _buildChartBar('Sab', 0.8, themeAccent, subtitleColor), // Alvin logged in
-                        _buildChartBar('Min', 0.0, themeAccent, subtitleColor),
-                        _buildChartBar('Sen', 0.0, themeAccent, subtitleColor),
-                        _buildChartBar('Sel', 0.0, themeAccent, subtitleColor),
+                        _buildChartBar(state.language == 'en' ? 'Wed' : 'Rab', 0.0, themeAccent, subtitleColor),
+                        _buildChartBar(state.language == 'en' ? 'Thu' : 'Kam', 0.0, themeAccent, subtitleColor),
+                        _buildChartBar(state.language == 'en' ? 'Fri' : 'Jum', 0.0, themeAccent, subtitleColor),
+                        _buildChartBar(state.language == 'en' ? 'Sat' : 'Sab', 0.8, themeAccent, subtitleColor), // Alvin logged in
+                        _buildChartBar(state.language == 'en' ? 'Sun' : 'Min', 0.0, themeAccent, subtitleColor),
+                        _buildChartBar(state.language == 'en' ? 'Mon' : 'Sen', 0.0, themeAccent, subtitleColor),
+                        _buildChartBar(state.language == 'en' ? 'Tue' : 'Sel', 0.0, themeAccent, subtitleColor),
                       ],
                     ),
                   ],
@@ -248,11 +284,11 @@ class DokterDashboard extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Daftar Antrean',
+                        notifier.t('Daftar Antrean'),
                         style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w900, color: textColor),
                       ),
                       Text(
-                        'Status konsultasi secara real-time',
+                        notifier.t('Status konsultasi secara real-time'),
                         style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
                       ),
                     ],
@@ -261,11 +297,11 @@ class DokterDashboard extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        'TOTAL ANTREAN',
+                        notifier.t('TOTAL ANTREAN'),
                         style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.bold, color: subtitleColor),
                       ),
                       Text(
-                        '0 pasien',
+                        notifier.t('0 pasien'),
                         style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w900, color: textColor),
                       ),
                     ],
@@ -277,7 +313,7 @@ class DokterDashboard extends ConsumerWidget {
               const SizedBox(height: 48),
               Center(
                 child: Text(
-                  'Belum ada pasien dalam antrean hari ini.',
+                  notifier.t('Belum ada pasien dalam antrean hari ini.'),
                   style: GoogleFonts.outfit(fontSize: 12, color: subtitleColor, fontWeight: FontWeight.bold),
                 ),
               ),
@@ -286,49 +322,6 @@ class DokterDashboard extends ConsumerWidget {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildMetricCard(
-    IconData icon,
-    String label,
-    String count,
-    Color subtitleColor,
-    Color countColor,
-    Color cardBgColor,
-    Color borderColor,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cardBgColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: borderColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 14, color: subtitleColor),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.bold, color: subtitleColor),
-                ),
-              ),
-            ],
-          ),
-          const Spacer(),
-          Text(
-            count,
-            style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w900, color: countColor),
-          ),
-        ],
-      ),
     );
   }
 

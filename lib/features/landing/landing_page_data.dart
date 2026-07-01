@@ -175,6 +175,7 @@ class LandingPageNotifier extends StateNotifier<LandingPageState> {
     bool? blurProfileEffectEnabled,
     double? defaultServiceFee,
     bool? satusehatAutoSync,
+    String? language,
   }) {
     state = state.copyWith(
       isLoggedIn: true,
@@ -184,6 +185,7 @@ class LandingPageNotifier extends StateNotifier<LandingPageState> {
       blurProfileEffectEnabled: blurProfileEffectEnabled ?? state.blurProfileEffectEnabled,
       defaultServiceFee: defaultServiceFee ?? state.defaultServiceFee,
       satusehatAutoSync: satusehatAutoSync ?? state.satusehatAutoSync,
+      language: language ?? state.language,
     );
   }
 
@@ -220,12 +222,23 @@ class LandingPageNotifier extends StateNotifier<LandingPageState> {
     state = state.copyWith(activeTab: tab);
   }
 
-  void setLanguage(String lang) {
+  void setLanguage(String lang) async {
     state = state.copyWith(language: lang);
+    final userId = state.loggedInUser?['id'];
+    if (userId != null) {
+      try {
+        await SupabaseService.client
+            .from('user')
+            .update({'language': lang})
+            .eq('id', userId);
+      } catch (e) {
+        debugPrint('Failed to save language: $e');
+      }
+    }
   }
 
   void toggleLanguage() {
-    state = state.copyWith(language: state.language == 'id' ? 'en' : 'id');
+    setLanguage(state.language == 'id' ? 'en' : 'id');
   }
 
   void updateAppearance(String value) {
@@ -799,6 +812,253 @@ const _translations = {
     'masyarakat_portal_badge': 'COMMUNITY PORTAL',
     'masyarakat_features_title': 'KEY FEATURES',
     'masyarakat_timeline_title': 'What\'s New in COMMUNITY',
+    // General
+    'Batal': 'Cancel',
+    'Simpan': 'Save',
+    'Keluar': 'Logout',
+    'Pengaturan': 'Settings',
+    'Cari': 'Search',
+    'Semua': 'All',
+    // Dashboard
+    'INDIKATOR KINERJA UTAMA': 'KEY PERFORMANCE INDICATORS',
+    'TOTAL PASIEN': 'TOTAL PATIENTS',
+    'ANTREAN HARI INI': 'TODAY\'S QUEUES',
+    'OBAT KEDALUWARSA': 'EXPIRED MEDS',
+    'STOK MENIPIS': 'LOW STOCK',
+    'TREN PEMASUKAN': 'INCOME TREND',
+    '+0% dari bulan lalu': '+0% from last month',
+    'PASIEN PER HARI': 'PATIENTS PER DAY',
+    '7 hari terakhir': 'last 7 days',
+    'Daftar Antrean': 'Queue List',
+    'Status konsultasi secara real-time': 'Real-time consultation status',
+    'TOTAL ANTREAN': 'TOTAL QUEUES',
+    '0 pasien': '0 patients',
+    'Belum ada pasien dalam antrean hari ini.': 'No patients in queue today.',
+    'Lihat Profil': 'View Profile',
+    'SEDANG BERTUGAS': 'ON DUTY',
+    'Selasa, 26 Mei 2026': 'Tuesday, May 26, 2026',
+    // Patients
+    'Daftar Pasien': 'Patient List',
+    'Kelola konsultasi aktif dan riwayat pasien': 'Manage active consultations and patient history',
+    'Cari nama, NIK, No. Rekam Medis...': 'Search name, NIK, Medical Record No...',
+    '+ Tambah Pasien Baru': '+ Add New Patient',
+    'Tambah Pasien': 'Add Patient',
+    'Cari nama, NIK, atau ID...': 'Search name, NIK, or ID...',
+    'Pasien tidak ditemukan': 'Patient not found',
+    'Coba gunakan kata kunci pencarian yang berbeda.': 'Try using different search keywords.',
+    'Belum ada data pasien terdaftar.': 'No registered patient data yet.',
+    // Medicines
+    'Data Obat': 'Medicine Data',
+    'Tambah Obat': 'Add Medicine',
+    'Daftar Katalog Obat': 'Medicine Catalog List',
+    'Stok Minim': 'Low Stock',
+    'Hampir Kadaluarsa': 'Near Expired',
+    'Kelola stok, lacak batch, dan pantau tanggal kedaluwarsa.': 'Manage stock, track batches, and monitor expiration dates.',
+    'Semua Obat': 'All Medicines',
+    'Hampir Kedaluwarsa': 'Near Expired',
+    'Cari nama, SKU, atau ID batch...': 'Search name, SKU, or batch ID...',
+    'Tambah Obat Baru': 'Add New Medicine',
+    'Isi data obat beserta informasi batch awal.': 'Fill in drug data along with initial batch info.',
+    'CARI DARI KATALOG SATUSEHAT KFA': 'SEARCH FROM SATUSEHAT KFA CATALOG',
+    'Opsional — isi otomatis nama, bentuk & kode KFA': 'Optional — auto-fill name, form & KFA code',
+    'cth. Paracetamol, Amoxicillin...': 'e.g. Paracetamol, Amoxicillin...',
+    'Cari KFA': 'Search KFA',
+    'INFORMASI UMUM': 'GENERAL INFORMATION',
+    'Nama Obat': 'Drug Name',
+    'cth. Paracetamol 500mg': 'e.g. Paracetamol 500mg',
+    'SKU / Barcode': 'SKU / Barcode',
+    'cth. 8993601452': 'e.g. 8993601452',
+    'Jenis': 'Type',
+    'Pilih Jenis / Generic': 'Select Type / Generic',
+    'Generik': 'Generic',
+    'Paten': 'Patent',
+    'Satuan': 'Unit',
+    'Pilih Satuan': 'Select Unit',
+    'Tablet': 'Tablet',
+    'Kapsul': 'Capsule',
+    'Botol': 'Bottle',
+    'Tube': 'Tube',
+    'Pcs': 'Pcs',
+    'BATCH AWAL': 'INITIAL BATCH',
+    'Nomor Batch': 'Batch Number',
+    'Stok Awal': 'Initial Stock',
+    'Total Harga Beli (Modal)': 'Total Buy Price (Cost)',
+    'Harga Beli Satuan (Hasil Kalkulasi)': 'Unit Buy Price (Calculated)',
+    'Harga Jual Satuan': 'Unit Selling Price',
+    'Tanggal Kedaluwarsa': 'Expiration Date',
+    'Lokasi Penyimpanan': 'Storage Location',
+    'cth. Shelf A-01': 'e.g. Shelf A-01',
+    'Simpan Obat': 'Save Medicine',
+    'INFORMASI OBAT': 'DRUG INFORMATION',
+    'SKU / BARCODE': 'SKU / BARCODE',
+    'HARGA SATUAN': 'UNIT PRICE',
+    'STATUS': 'STATUS',
+    'TAMBAH BATCH BARU': 'ADD NEW BATCH',
+    'Masukkan jumlah stok fisik hasil penghitungan di lapangan.': 'Enter physical stock count from actual inventory.',
+    'BATCH NO.': 'BATCH NO.',
+    'STOK SISTEM': 'SYSTEM STOCK',
+    'STOK FISIK': 'PHYSICAL STOCK',
+    'SELISIH': 'DIFFERENCE',
+    'Simpan Opname': 'Save Opname',
+    'Reset': 'Reset',
+    'RIWAYAT OPNAME': 'OPNAME HISTORY',
+    'Belum ada riwayat opname untuk obat ini.': 'No opname history for this medicine yet.',
+    'LOKASI': 'LOCATION',
+    'KEDALUWARSA': 'EXPIRATION',
+    'STOK': 'STOCK',
+    'Restock': 'Restock',
+    'Jumlah Stok Masuk (Tablet)': 'Incoming Stock Qty (Tablet)',
+    'Total Harga Beli': 'Total Buy Price',
+    'Tambah Stok': 'Add Stock',
+    'cth. Rak A-1': 'e.g. Rack A-1',
+    'NAMA OBAT': 'DRUG NAME',
+    'KATEGORI': 'CATEGORY',
+    'TOTAL STOK': 'TOTAL STOCK',
+    'TIPE': 'TYPE',
+    'SATUAN': 'UNIT',
+    'AKSI': 'ACTION',
+    'DETAIL OBAT': 'MEDICINE DETAILS',
+    'BATCH & STOK': 'BATCH & STOCK',
+    'OPNAME STOK': 'STOCK OPNAME',
+    // Queues
+    'Antrian Pasien': 'Patient Queues',
+    'Data untuk tanggal: ': 'Data for date: ',
+    'Daftar Antrean Hari Ini': 'Today\'s Queue List',
+    'BATAS KUOTA ANTREAN': 'QUEUE LIMIT',
+    '+ Daftarkan Pasien': '+ Register Patient',
+    'Ubah Kuota': 'Change Limit',
+    'Panggil': 'Call',
+    'Layani': 'Serve',
+    'Lewati': 'Skip',
+    'Tambah Antrian Baru': 'Add New Queue',
+    'Cari Pasien': 'Search Patient',
+    'Pasien Spesial': 'Special Patient',
+    'Cari Pasien *': 'Search Patient *',
+    'Ketik nama / NIK...': 'Type name / NIK...',
+    'search': 'Search',
+    'Ketik minimal 3 karakter': 'Type at least 3 characters',
+    'Tidak ada antrian ditemukan.': 'No queues found.',
+    'Pasien tidak terdaftar. Gunakan tab Pasien Spesial untuk walk-in.': 'Patient is not registered. Use the Special Patient tab for walk-in.',
+    'PASIEN TERDAFTAR': 'REGISTERED PATIENT',
+    'Tambah Antrian': 'Add Queue',
+    'Tambah Antrian Walk-in': 'Add Walk-in Queue',
+    'Daftarkan pasien langsung di loket klinik.': 'Register patients directly at the clinic counter.',
+    'Kembali': 'Back',
+    'Simpan Antrian': 'Save Queue',
+    'Lanjut →': 'Continue →',
+    'Nama Pasien (Wajib)': 'Patient Name (Required)',
+    'Nama Lengkap': 'Full Name',
+    'NIK (Wajib)': 'NIK (Required)',
+    'Masukkan NIK': 'Enter NIK',
+    'Nomor Telepon (Opsional)': 'Phone Number (Optional)',
+    '— Pilih —': '— Choose —',
+    'Laki-laki': 'Male',
+    'Perempuan': 'Female',
+    'Cek & Verifikasi NIK (SatuSehat)': 'Check & Verify NIK (SatuSehat)',
+    'Catatan: Pasien ini hanya terdaftar untuk antrian hari ini and tidak tersimpan di database pasien permanen.': 'Note: This patient is only registered for today\'s queue and is not saved in the permanent patient database.',
+    'Tipe Pasien *': 'Patient Type *',
+    'Umum': 'General',
+    'Tanggal Antrian *': 'Queue Date *',
+    'Pilih Tanggal': 'Select Date',
+    'Waktu Antrian *': 'Queue Time *',
+    'Nomor Antrian (Otomatis)': 'Queue Number (Automatic)',
+    'Format: DDMM-NNN (Contoh: 1212-001)': 'Format: DDMM-NNN (Example: 1212-001)',
+    // Examinations
+    'Pemeriksaan & RME': 'Examinations & EMR',
+    'Sesi pencatatan rekam medis elektronik aktif dr. Agoes Soetanto': 'Active electronic medical record recording session for dr. Agoes Soetanto',
+    'PEMERIKSAAN FISIK & VITAL': 'PHYSICAL & VITAL EXAMINATIONS',
+    'DIAGNOSA MEDIS (ICD-10)': 'MEDICAL DIAGNOSIS (ICD-10)',
+    'RESEP OBAT & TERAPI': 'PRESCRIPTIONS & THERAPY',
+    'Simpan & Kirim SatuSehat': 'Save & Send SatuSehat',
+    'Selesai Pemeriksaan': 'Complete Examination',
+    // Bookkeeping
+    'Pembukuan': 'Bookkeeping',
+    'Ringkasan arus kas masuk, pengeluaran klinik, dan e-resep diintegrasi': 'Summary of cash inflows, clinic expenses, and integrated e-prescriptions',
+    'Ringkasan Keuangan': 'Financial Summary',
+    'TOTAL PEMASUKAN': 'TOTAL INCOME',
+    'TOTAL PENGELUARAN': 'TOTAL EXPENSE',
+    'SALDO BERSIH': 'NET BALANCE',
+    'Buku Kas': 'Ledger',
+    'Catat Pengeluaran Baru': 'Record New Expense',
+    'Pemasukan': 'Income',
+    'Pengeluaran': 'Expense',
+    'Cari transaksi...': 'Search transactions...',
+    'Catat Pengeluaran': 'Record Expense',
+    // Assistants
+    'Daftar Asisten Praktik': 'Practice Assistant List',
+    'TOTAL ASISTEN': 'TOTAL ASSISTANTS',
+    'BERTUGAS HARI INI': 'ON DUTY TODAY',
+    'PERAWAT KLINIK': 'CLINIC NURSES',
+    'ADMIN / FRONT DESK': 'ADMIN / FRONT DESK',
+    'Cari nama, NIK, atau peran asisten...': 'Search name, NIK, or assistant role...',
+    '+ Tambah Asisten': '+ Add Assistant',
+    'Registrasi Asisten Baru': 'Register New Assistant',
+    // Photo 1: Assistant Form
+    'NAMA LENGKAP & GELAR': 'FULL NAME & TITLE',
+    'Contoh: Siti Aminah, A.Md.Kep.': 'Example: Siti Aminah, A.Md.Kep.',
+    'NIK (KTP 16-DIGIT)': 'NIK (16-DIGIT ID)',
+    'PERAN / JABATAN': 'ROLE / POSITION',
+    'Perawat': 'Nurse',
+    'SURAT IZIN PRAKTEK (SIP) PERAWAT': 'NURSE PRACTICE LICENSE (SIP)',
+    'Contoh: 503/1204/SIP.P/...': 'Example: 503/1204/SIP.P/...',
+    'NOMOR TELEPON': 'PHONE NUMBER',
+    'EMAIL KLINIK': 'CLINIC EMAIL',
+    'IZIN AKSES UTAMA': 'PRIMARY ACCESS PERMISSIONS',
+    'Rekam Medis (EMR)': 'Medical Records (EMR)',
+    'Pemeriksaan Awal': 'Initial Examination',
+    'Registrasi & Antrian': 'Registration & Queue',
+    'Billing / Kasir': 'Billing / Cashier',
+    'Stok Obat': 'Drug Stock',
+    'Simpan Asisten': 'Save Assistant',
+    // Photo 2 & 3: Bookkeeping Form & Export
+    'Deskripsi Pengeluaran *': 'Expense Description *',
+    'cth. Pembelian Reagen Golongan Darah & Syringe': 'e.g. Purchase of Blood Type Reagents & Syringe',
+    'Kategori Pengeluaran *': 'Expense Category *',
+    'Obat & Medis': 'Meds & Medical',
+    'Jumlah Nominal (Rp) *': 'Nominal Amount (Rp) *',
+    'cth. 150000': 'e.g. 150000',
+    'Simpan Pengeluaran': 'Save Expense',
+    'Ekspor Laporan': 'Export Report',
+    // Photo 4: EMR Step 2 (Anamnesis)
+    'SEDANG DIPERIKSA': 'UNDER EXAMINATION',
+    'Pasien': 'Patient',
+    'Anamnesa': 'Anamnesis',
+    'Kondisi': 'Condition',
+    'Vital': 'Vitals',
+    'Resep': 'Prescription',
+    'Keluhan Utama *': 'Chief Complaint *',
+    'Tulis keluhan utama pasien, misal: Sakit kepala hebat disertai mual sejak kemarin malam...': 'Write patient\'s chief complaint, e.g. Severe headache with nausea since last night...',
+    'Tulis riwayat penyakit atau anamnesis tambahan (opsional)...': 'Write medical history or additional anamnesis (optional)...',
+    'Sebelumnya': 'Previous',
+    'Selanjutnya': 'Next',
+    // Photo 5: Register Patient Form
+    'Daftarkan rekam medis pasien di bawah ini': 'Register patient medical record below',
+    'Unggah Foto': 'Upload Photo',
+    'Nama Lengkap Pasien': 'Patient Full Name',
+    'Masukkan nama...': 'Enter name...',
+    'Nomor Induk Kependudukan (NIK)': 'National Identity Number (NIK)',
+    'Masukkan 16 digit NIK...': 'Enter 16 digit NIK...',
+    'Alamat Email': 'Email Address',
+    'contoh@email.com': 'example@email.com',
+    'Kata Sandi Default': 'Default Password',
+    'Buat sandi...': 'Create password...',
+    'Tempat Lahir': 'Place of Birth',
+    'Kota tempat lahir...': 'City of birth...',
+    'Tanggal Lahir': 'Date of Birth',
+    'Pilih tanggal...': 'Select date...',
+    'Jenis Kelamin': 'Gender',
+    'No. Telepon Aktif': 'Active Phone No.',
+    '08xxxxxxxxxx': '08xxxxxxxxxx',
+    'Alamat Lengkap Domisili': 'Complete Residence Address',
+    'Tulis nama jalan, kelurahan, kecamatan, kota...': 'Write street name, village, sub-district, city...',
+    'Daftarkan Pasien': 'Register Patient',
+    // Profile
+    'Profil Dokter': 'Doctor Profile',
+    'Jadwal Praktik': 'Practice Schedules',
+    'QRIS & Pembayaran': 'QRIS & Payments',
+    'Kredensial SatuSehat': 'SatuSehat Credentials',
+    'Integrasi BPJS': 'BPJS Integration',
+    'Simpan Perubahan': 'Save Changes'
   }
 };
 
@@ -1129,3 +1389,15 @@ const _updatesDataEn = {
     ),
   ]
 };
+
+extension StringTranslateExtension on String {
+  String tr(LandingPageState state) {
+    final lang = state.language;
+    if (_translations.containsKey(lang) &&
+        _translations[lang]!.containsKey(this)) {
+      return _translations[lang]![this]!;
+    }
+    return this;
+  }
+}
+

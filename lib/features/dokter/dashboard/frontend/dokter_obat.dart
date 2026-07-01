@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/widgets/custom_button.dart';
 import 'package:mapotech/shared/supabase_service.dart';
+import 'package:mapotech/shared/widgets/common_pagination.dart';
 import 'dart:math';
 
 
@@ -330,7 +331,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
   String _searchQuery = '';
   String _activeFilter = 'Semua'; // 'Semua', 'Stok Minim', 'Hampir Kadaluarsa'
   int _currentPage = 1;
-  final int _rowsPerPage = 10;
+  int _rowsPerPage = 10;
 
   @override
   void initState() {
@@ -358,6 +359,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
     final borderColor = isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2);
     final themeAccent = isRev ? const Color(0xFFB577F2) : const Color(0xFF48C9B0);
     final purpleAccent = const Color(0xFFB577F2);
+    final inputBg = isDark ? const Color(0xFF1E1E22) : const Color(0xFFF6F8FA);
 
     // Apply Filter & Search
     List<ObatModel> filteredDrugs = allDrugs.where((o) {
@@ -403,7 +405,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Data Obat',
+                    'Data Obat'.tr(state),
                     style: GoogleFonts.outfit(
                       fontSize: isMobile ? 22 : 28,
                       fontWeight: FontWeight.w900,
@@ -412,7 +414,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Kelola stok, lacak batch, dan pantau tanggal kedaluwarsa.',
+                    'Kelola stok, lacak batch, dan pantau tanggal kedaluwarsa.'.tr(state),
                     style: GoogleFonts.outfit(
                       fontSize: 12,
                       color: subtitleColor,
@@ -423,7 +425,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
               ),
             ),
             CustomButton(
-              text: 'Tambah Obat',
+              text: 'Tambah Obat'.tr(state),
               icon: Icons.add_rounded,
               primaryColor: purpleAccent,
               textColor: Colors.white,
@@ -520,41 +522,29 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                     ),
 
               // Pagination Footer
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                decoration: BoxDecoration(
-                  border: Border(top: BorderSide(color: borderColor)),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      totalDataCount == 0
-                          ? 'Menampilkan 0 data'
-                          : 'Menampilkan ${startIndex + 1} hingga $endIndex dari $totalDataCount data',
-                      style: GoogleFonts.outfit(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: subtitleColor,
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        _buildPaginationBtn('Sebelumnya', _currentPage > 1, () {
-                          setState(() {
-                            _currentPage--;
-                          });
-                        }, cardBgColor, borderColor, subtitleColor),
-                        const SizedBox(width: 8),
-                        _buildPaginationBtn('Berikutnya', _currentPage < totalPages, () {
-                          setState(() {
-                            _currentPage++;
-                          });
-                        }, cardBgColor, borderColor, subtitleColor),
-                      ],
-                    ),
-                  ],
-                ),
+              ReusablePagination(
+                totalItems: totalDataCount,
+                itemsPerPage: _rowsPerPage,
+                currentPage: _currentPage,
+                onPageChanged: (page) {
+                  setState(() {
+                    _currentPage = page;
+                  });
+                },
+                onItemsPerPageChanged: (val) {
+                  if (val != null) {
+                    setState(() {
+                      _rowsPerPage = val;
+                      _currentPage = 1;
+                    });
+                  }
+                },
+                textColor: textColor,
+                subtitleColor: subtitleColor,
+                borderColor: borderColor,
+                inputBg: inputBg,
+                activeColor: purpleAccent,
+                languageCode: state.language,
               ),
             ],
           ),
@@ -567,6 +557,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
 
   Widget _buildSearchField(
       bool isDark, Color textColor, Color subtitleColor, Color borderColor) {
+    final state = ref.read(landingPageProvider);
     return Container(
       height: 44,
       decoration: BoxDecoration(
@@ -593,7 +584,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                 color: textColor,
               ),
               decoration: InputDecoration(
-                hintText: 'Cari nama, SKU, atau ID batch...',
+                hintText: 'Cari nama, SKU, atau ID batch...'.tr(state),
                 hintStyle: GoogleFonts.outfit(
                   fontSize: 12,
                   color: subtitleColor.withOpacity(0.5),
@@ -619,6 +610,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
     int count = 0,
     IconData? icon,
   }) {
+    final state = ref.read(landingPageProvider);
     final bg = isSelected ? activeColor.withOpacity(0.12) : cardBg;
     final fg = isSelected ? activeColor : subtitleColor;
 
@@ -823,34 +815,9 @@ class _DokterObatState extends ConsumerState<DokterObat> {
     );
   }
 
-  Widget _buildPaginationBtn(
-    String text,
-    bool isEnabled,
-    VoidCallback onTap,
-    Color bg,
-    Color border,
-    Color subtitle,
-  ) {
-    return OutlinedButton(
-      onPressed: isEnabled ? onTap : null,
-      style: OutlinedButton.styleFrom(
-        side: BorderSide(color: isEnabled ? border : border.withOpacity(0.5)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      ),
-      child: Text(
-        text,
-        style: GoogleFonts.outfit(
-          fontSize: 10.5,
-          fontWeight: FontWeight.w900,
-          color: isEnabled ? subtitle : subtitle.withOpacity(0.4),
-        ),
-      ),
-    );
-  }
-
   Widget _buildEmptyState(
       bool isDark, Color cardBg, Color border, Color text, Color subtitle) {
+    final state = ref.read(landingPageProvider);
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 64),
       child: Column(
@@ -867,12 +834,12 @@ class _DokterObatState extends ConsumerState<DokterObat> {
           ),
           const SizedBox(height: 12),
           Text(
-            'Obat tidak ditemukan',
+            'Obat tidak ditemukan'.tr(state),
             style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w900, color: text),
           ),
           const SizedBox(height: 3),
           Text(
-            'Sesuaikan kata kunci pencarian Anda.',
+            'Sesuaikan kata kunci pencarian Anda.'.tr(state),
             style: GoogleFonts.outfit(fontSize: 10.5, color: subtitle, fontWeight: FontWeight.w500),
           ),
         ],
@@ -892,6 +859,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
   // ─── Modal: Detail Obat & Stock Opname ──────────────────────────────────────
 
   void _showDrugDetailModal(BuildContext context, ObatModel drug, bool isDark) {
+    final state = ref.read(landingPageProvider);
     final purple = const Color(0xFFB577F2);
     final green = const Color(0xFF27AE60);
     final cardBg = isDark ? const Color(0xFF161619) : Colors.white;
@@ -958,7 +926,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            'Detail Obat',
+                            'Detail Obat'.tr(state),
                             style: GoogleFonts.outfit(
                               fontSize: 15,
                               fontWeight: FontWeight.w900,
@@ -982,7 +950,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           // 1. INFORMASI OBAT Card
-                          _buildModalSectionHeader('INFORMASI OBAT', purple),
+                          _buildModalSectionHeader('INFORMASI OBAT'.tr(state), purple),
                           const SizedBox(height: 10),
                           Container(
                             padding: const EdgeInsets.all(16),
@@ -1028,20 +996,20 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                       const SizedBox(height: 10),
                                       Row(
                                         children: [
-                                          _buildDetailGridCell('SKU / BARCODE', drug.sku, subtitleColor, textColor),
+                                          _buildDetailGridCell('SKU / BARCODE'.tr(state), drug.sku, subtitleColor, textColor),
                                           const SizedBox(width: 20),
-                                          _buildDetailGridCell('HARGA SATUAN', drug.hargaSatuan == 0 ? 'Rp 0' : 'Rp ${_formatPrice(drug.hargaSatuan)}', subtitleColor, textColor),
+                                          _buildDetailGridCell('HARGA SATUAN'.tr(state), drug.hargaSatuan == 0 ? 'Rp 0' : 'Rp ${_formatPrice(drug.hargaSatuan)}', subtitleColor, textColor),
                                         ],
                                       ),
                                       const SizedBox(height: 8),
                                       Row(
                                         children: [
-                                          _buildDetailGridCell('TOTAL STOK', '${_formatStock(drug.totalStok)} Tablet', subtitleColor, textColor),
+                                          _buildDetailGridCell('TOTAL STOK'.tr(state), '${_formatStock(drug.totalStok)} Tablet', subtitleColor, textColor),
                                           const SizedBox(width: 20),
                                           Column(
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
-                                              Text('STATUS', style: GoogleFonts.outfit(fontSize: 7.5, fontWeight: FontWeight.w900, color: subtitleColor, letterSpacing: 0.5)),
+                                              Text('STATUS'.tr(state), style: GoogleFonts.outfit(fontSize: 7.5, fontWeight: FontWeight.w900, color: subtitleColor, letterSpacing: 0.5)),
                                               const SizedBox(height: 3),
                                               _buildStatusBadge(drug.status),
                                             ],
@@ -1061,11 +1029,11 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              _buildModalSectionHeader('BATCH & STOK', purple),
+                              _buildModalSectionHeader('BATCH & STOK'.tr(state), purple),
                               TextButton.icon(
                                 icon: const Icon(Icons.add_rounded, size: 12),
                                 label: Text(
-                                  'TAMBAH BATCH BARU',
+                                  'TAMBAH BATCH BARU'.tr(state),
                                   style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: purple),
                                 ),
                                 onPressed: () {
@@ -1105,28 +1073,28 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                     Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Text('BATCH NO.', style: GoogleFonts.outfit(fontSize: 7.5, fontWeight: FontWeight.w900, color: subtitleColor)),
+                                        Text('BATCH NO.'.tr(state), style: GoogleFonts.outfit(fontSize: 7.5, fontWeight: FontWeight.w900, color: subtitleColor)),
                                         Text(batch.batchNo, style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.bold, color: textColor)),
                                       ],
                                     ),
                                     Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Text('LOKASI', style: GoogleFonts.outfit(fontSize: 7.5, fontWeight: FontWeight.w900, color: subtitleColor)),
+                                        Text('LOKASI'.tr(state), style: GoogleFonts.outfit(fontSize: 7.5, fontWeight: FontWeight.w900, color: subtitleColor)),
                                         Text(batch.lokasi.isEmpty ? '-' : batch.lokasi, style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.bold, color: textColor)),
                                       ],
                                     ),
                                     Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Text('KEDALUWARSA', style: GoogleFonts.outfit(fontSize: 7.5, fontWeight: FontWeight.w900, color: subtitleColor)),
+                                        Text('KEDALUWARSA'.tr(state), style: GoogleFonts.outfit(fontSize: 7.5, fontWeight: FontWeight.w900, color: subtitleColor)),
                                         Text(batch.expDate, style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.bold, color: textColor)),
                                       ],
                                     ),
                                     Column(
                                       crossAxisAlignment: CrossAxisAlignment.end,
                                       children: [
-                                        Text('STOK', style: GoogleFonts.outfit(fontSize: 7.5, fontWeight: FontWeight.w900, color: subtitleColor)),
+                                        Text('STOK'.tr(state), style: GoogleFonts.outfit(fontSize: 7.5, fontWeight: FontWeight.w900, color: subtitleColor)),
                                         Text('${_formatStock(batch.stok)} Tab', style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.w900, color: textColor)),
                                       ],
                                     ),
@@ -1139,10 +1107,10 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                           const SizedBox(height: 20),
 
                           // 3. OPNAME STOK form
-                          _buildModalSectionHeader('OPNAME STOK', purple),
+                          _buildModalSectionHeader('OPNAME STOK'.tr(state), purple),
                           const SizedBox(height: 4),
                           Text(
-                            'Masukkan jumlah stok fisik hasil penghitungan di lapangan.',
+                            'Masukkan jumlah stok fisik hasil penghitungan di lapangan.'.tr(state),
                             style: GoogleFonts.outfit(fontSize: 10.5, color: subtitleColor, fontWeight: FontWeight.w500),
                           ),
                           const SizedBox(height: 10),
@@ -1157,10 +1125,10 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                               children: [
                                 Row(
                                   children: [
-                                    Expanded(flex: 3, child: _buildOpnameHeader('BATCH NO.', subtitleColor)),
-                                    Expanded(flex: 2, child: _buildOpnameHeader('STOK SISTEM', subtitleColor)),
-                                    Expanded(flex: 2, child: _buildOpnameHeader('STOK FISIK', subtitleColor)),
-                                    Expanded(flex: 2, child: _buildOpnameHeader('SELISIH', subtitleColor)),
+                                    Expanded(flex: 3, child: _buildOpnameHeader('BATCH NO.'.tr(state), subtitleColor)),
+                                    Expanded(flex: 2, child: _buildOpnameHeader('STOK SISTEM'.tr(state), subtitleColor)),
+                                    Expanded(flex: 2, child: _buildOpnameHeader('STOK FISIK'.tr(state), subtitleColor)),
+                                    Expanded(flex: 2, child: _buildOpnameHeader('SELISIH'.tr(state), subtitleColor)),
                                   ],
                                 ),
                                 const Divider(height: 16),
@@ -1228,7 +1196,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                   children: [
                                     ElevatedButton.icon(
                                       icon: const Icon(Icons.check_rounded, size: 14),
-                                      label: Text('Simpan Opname', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900)),
+                                      label: Text('Simpan Opname'.tr(state), style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900)),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: purple,
                                         foregroundColor: Colors.white,
@@ -1277,7 +1245,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                         });
 
                                         ref.read(dokterObatListProvider.notifier).updateDrug(drug);
-                                        _showSuccessSnackBar(context, 'Hasil stok opname berhasil disimpan!');
+                                        _showSuccessSnackBar(context, 'Hasil stok opname berhasil disimpan!'.tr(state));
                                       },
                                     ),
                                     const SizedBox(width: 8),
@@ -1287,7 +1255,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                                       ),
-                                      child: Text('Reset', style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor, fontWeight: FontWeight.bold)),
+                                      child: Text('Reset'.tr(state), style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor, fontWeight: FontWeight.bold)),
                                       onPressed: () {
                                         setDialogState(() {
                                           for (final controller in opnameControllers.values) {
@@ -1305,11 +1273,11 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                           const SizedBox(height: 20),
 
                           // 4. RIWAYAT OPNAME section
-                          _buildModalSectionHeader('RIWAYAT OPNAME', purple),
+                          _buildModalSectionHeader('RIWAYAT OPNAME'.tr(state), purple),
                           const SizedBox(height: 8),
                           drug.opnameLogs.isEmpty
                               ? Text(
-                                  'Belum ada riwayat opname untuk obat ini.',
+                                  'Belum ada riwayat opname untuk obat ini.'.tr(state),
                                   style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor, fontStyle: FontStyle.italic, fontWeight: FontWeight.w500),
                                 )
                               : ListView.builder(
@@ -1346,13 +1314,13 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                           const SizedBox(height: 20),
 
                           // 5. AKSI section
-                          _buildModalSectionHeader('AKSI', purple),
+                          _buildModalSectionHeader('AKSI'.tr(state), purple),
                           const SizedBox(height: 10),
                           Row(
                             children: [
                               ElevatedButton.icon(
                                 icon: const Icon(Icons.sync_rounded, size: 14),
-                                label: Text('Restock', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900)),
+                                label: Text('Restock'.tr(state), style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900)),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: purple,
                                   foregroundColor: Colors.white,
@@ -1376,7 +1344,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                               const SizedBox(width: 8),
                               OutlinedButton.icon(
                                 icon: const Icon(Icons.sell_outlined, size: 14),
-                                label: Text('Ubah Harga', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900)),
+                                label: Text('Ubah Harga'.tr(state), style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900)),
                                 style: OutlinedButton.styleFrom(
                                   side: BorderSide(color: borderColor),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -1394,7 +1362,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                               const Spacer(),
                               OutlinedButton.icon(
                                 icon: const Icon(Icons.delete_outline_rounded, size: 14),
-                                label: Text('Hapus Obat', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900)),
+                                label: Text('Hapus Obat'.tr(state), style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900)),
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: Colors.redAccent,
                                   side: const BorderSide(color: Colors.redAccent),
@@ -1428,7 +1396,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                           ),
                           child: Text(
-                            'Tutup',
+                            'Tutup'.tr(state),
                             style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor, fontWeight: FontWeight.w900),
                           ),
                           onPressed: () => Navigator.of(ctx).pop(),
@@ -1494,6 +1462,8 @@ class _DokterObatState extends ConsumerState<DokterObat> {
     bool isDark, {
     required Function(ObatModel) onRestockSuccess,
   }) {
+    final state = ref.read(landingPageProvider);
+    final isEn = state.language == 'en';
     final purple = const Color(0xFFB577F2);
     final cardBg = isDark ? const Color(0xFF161619) : Colors.white;
     final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
@@ -1561,12 +1531,12 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Restock',
+                                  'Restock'.tr(state),
                                   style: GoogleFonts.outfit(
                                       fontSize: 15, fontWeight: FontWeight.w900, color: textColor),
                                 ),
                                 Text(
-                                  'Tambah batch kedaluwarsa baru untuk ${drug.nama}.',
+                                  'Tambah batch kedaluwarsa baru untuk ${drug.nama}.'.tr(state),
                                   style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
                                 ),
                               ],
@@ -1593,7 +1563,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      _buildFormFieldLabel('Jumlah Stok Masuk (Tablet)', textColor),
+                                      _buildFormFieldLabel('Jumlah Stok Masuk (Tablet)'.tr(state), textColor),
                                       _buildTextInput(
                                         stockController,
                                         '0',
@@ -1611,7 +1581,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                           });
                                         },
                                         validator: (v) => (int.tryParse(v ?? '') ?? 0) <= 0
-                                            ? 'Wajib diisi (> 0)'
+                                            ? (isEn ? 'Required (> 0)' : 'Wajib diisi (> 0)')
                                             : null,
                                       ),
                                     ],
@@ -1622,11 +1592,11 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      _buildFormFieldLabel('Tanggal Kedaluwarsa', textColor),
+                                      _buildFormFieldLabel('Tanggal Kedaluwarsa'.tr(state), textColor),
                                       _buildDateInput(
                                         ctx,
                                         expController,
-                                        'Pilih tanggal...',
+                                        'Pilih tanggal...'.tr(state),
                                         inputBg,
                                         borderColor,
                                         textColor,
@@ -1643,16 +1613,16 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildFormFieldLabel('Nomor Batch', textColor),
+                                _buildFormFieldLabel('Nomor Batch'.tr(state), textColor),
                                 _buildTextInput(
                                   batchController,
-                                  'Bxxxxxx...',
+                                  'Bxxxxxx...'.tr(state),
                                   Icons.tag_rounded,
                                   inputBg,
                                   borderColor,
                                   textColor,
                                   subtitleColor,
-                                  validator: (v) => v!.isEmpty ? 'Nomor batch wajib' : null,
+                                  validator: (v) => v!.isEmpty ? (isEn ? 'Batch number required' : 'Nomor batch wajib') : null,
                                   readOnly: true,
                                 ),
                               ],
@@ -1662,10 +1632,10 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildFormFieldLabel('Lokasi Penyimpanan', textColor),
+                                _buildFormFieldLabel('Lokasi Penyimpanan'.tr(state), textColor),
                                 _buildTextInput(
                                   locationController,
-                                  'cth. Rak A-1',
+                                  'cth. Rak A-1'.tr(state),
                                   Icons.location_on_outlined,
                                   inputBg,
                                   borderColor,
@@ -1683,7 +1653,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      _buildFormFieldLabel('Total Harga Beli', textColor),
+                                      _buildFormFieldLabel('Total Harga Beli'.tr(state), textColor),
                                       _buildTextInput(
                                         totalBuyController,
                                         'Rp 0',
@@ -1709,12 +1679,12 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      _buildFormFieldLabel('Harga Beli Satuan (Hasil Kalkulasi)', textColor),
+                                      _buildFormFieldLabel('Harga Beli Satuan (Hasil Kalkulasi)'.tr(state), textColor),
                                       Container(
                                         height: 44,
                                         padding: const EdgeInsets.symmetric(horizontal: 12),
                                         decoration: BoxDecoration(
-                                          color: isDark ? const Color(0xFF1E1E22) : const Color(0xFFECEFF2),
+                                          color: isDark ? const Color(0xFF1E1E22) : const Color(0xFFECEEF2),
                                           borderRadius: BorderRadius.circular(10),
                                           border: Border.all(color: borderColor),
                                         ),
@@ -1735,7 +1705,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildFormFieldLabel('Harga Jual Satuan', textColor),
+                                _buildFormFieldLabel('Harga Jual Satuan'.tr(state), textColor),
                                 _buildTextInput(
                                   sellPriceController,
                                   'Rp 0',
@@ -1745,7 +1715,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                   textColor,
                                   subtitleColor,
                                   keyboardType: TextInputType.number,
-                                  validator: (v) => v!.isEmpty ? 'Harga jual wajib diisi' : null,
+                                  validator: (v) => v!.isEmpty ? (isEn ? 'Sale price is required' : 'Harga jual wajib diisi') : null,
                                 ),
                               ],
                             ),
@@ -1769,7 +1739,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                             ),
-                            child: Text('Batal', style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor, fontWeight: FontWeight.bold)),
+                            child: Text('Batal'.tr(state), style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor, fontWeight: FontWeight.bold)),
                             onPressed: () => Navigator.of(ctx).pop(),
                           ),
                           const SizedBox(width: 12),
@@ -1781,7 +1751,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
                             ),
-                            child: Text('Tambah Stok', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900)),
+                            child: Text('Tambah Stok'.tr(state), style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900)),
                             onPressed: () {
                               if (formKey.currentState!.validate()) {
                                 final stockIn = int.parse(stockController.text);
@@ -1810,7 +1780,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
 
                                 Navigator.of(ctx).pop();
                                 onRestockSuccess(updatedDrug);
-                                _showSuccessSnackBar(context, 'Stok obat berhasil ditambahkan!');
+                                _showSuccessSnackBar(context, 'Stok obat berhasil ditambahkan!'.tr(state));
                               }
                             },
                           ),
@@ -1830,6 +1800,8 @@ class _DokterObatState extends ConsumerState<DokterObat> {
   // ─── Modal: Tambah Obat Baru ──────────────────────────────────────────────
 
   void _showAddDrugModal(BuildContext context, bool isDark) {
+    final state = ref.read(landingPageProvider);
+    final isEn = state.language == 'en';
     final purple = const Color(0xFFB577F2);
     final cardBg = isDark ? const Color(0xFF161619) : Colors.white;
     final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
@@ -1916,12 +1888,12 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Tambah Obat Baru',
+                                  'Tambah Obat Baru'.tr(state),
                                   style: GoogleFonts.outfit(
                                       fontSize: 15, fontWeight: FontWeight.w900, color: textColor),
                                 ),
                                 Text(
-                                  'Isi data obat beserta informasi batch awal.',
+                                  'Isi data obat beserta informasi batch awal.'.tr(state),
                                   style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
                                 ),
                               ],
@@ -1943,10 +1915,10 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             // CARI DARI KATALOG SATUSEHAT KFA (Opcional)
-                            _buildModalSectionHeader('CARI DARI KATALOG SATUSEHAT KFA', purple),
+                            _buildModalSectionHeader('CARI DARI KATALOG SATUSEHAT KFA'.tr(state), purple),
                             const SizedBox(height: 3),
                             Text(
-                              'Opsional — isi otomatis nama, bentuk & kode KFA',
+                              'Opsional — isi otomatis nama, bentuk & kode KFA'.tr(state),
                               style: GoogleFonts.outfit(fontSize: 9, color: subtitleColor, fontWeight: FontWeight.w600),
                             ),
                             const SizedBox(height: 8),
@@ -1970,7 +1942,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                             controller: kfaController,
                                             style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: textColor),
                                             decoration: InputDecoration(
-                                              hintText: 'cth. Paracetamol, Amoxicillin...',
+                                              hintText: 'cth. Paracetamol, Amoxicillin...'.tr(state),
                                               hintStyle: GoogleFonts.outfit(fontSize: 11.5, color: subtitleColor.withOpacity(0.4)),
                                               border: InputBorder.none,
                                               isDense: true,
@@ -1988,7 +1960,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                   ),
-                                  child: Text('Cari KFA', style: GoogleFonts.outfit(fontSize: 11, color: purple, fontWeight: FontWeight.w900)),
+                                  child: Text('Cari KFA'.tr(state), style: GoogleFonts.outfit(fontSize: 11, color: purple, fontWeight: FontWeight.w900)),
                                   onPressed: () {
                                     final query = kfaController.text.toLowerCase();
                                     if (query.isNotEmpty) {
@@ -2003,9 +1975,9 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                           typeSelection = match['jenis'];
                                           unitSelection = match['satuan'];
                                         });
-                                        _showSuccessSnackBar(context, 'Data KFA berhasil terintegrasi!');
+                                        _showSuccessSnackBar(context, isEn ? 'KFA data successfully integrated!' : 'Data KFA berhasil terintegrasi!');
                                       } else {
-                                        _showSuccessSnackBar(context, 'Kata kunci KFA tidak cocok.');
+                                        _showSuccessSnackBar(context, isEn ? 'KFA keyword does not match.' : 'Kata kunci KFA tidak cocok.');
                                       }
                                     }
                                   },
@@ -2016,22 +1988,22 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                             const SizedBox(height: 20),
 
                             // INFORMASI UMUM
-                            _buildModalSectionHeader('INFORMASI UMUM', purple),
+                            _buildModalSectionHeader('INFORMASI UMUM'.tr(state), purple),
                             const SizedBox(height: 10),
 
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildFormFieldLabel('Nama Obat', textColor),
+                                _buildFormFieldLabel('Nama Obat'.tr(state), textColor),
                                 _buildTextInput(
                                   nameController,
-                                  'cth. Paracetamol 500mg',
+                                  'cth. Paracetamol 500mg'.tr(state),
                                   Icons.medication_outlined,
                                   inputBg,
                                   borderColor,
                                   textColor,
                                   subtitleColor,
-                                  validator: (v) => v!.isEmpty ? 'Nama obat wajib diisi' : null,
+                                  validator: (v) => v!.isEmpty ? (isEn ? 'Drug name is required' : 'Nama obat wajib diisi') : null,
                                 ),
                               ],
                             ),
@@ -2044,16 +2016,16 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      _buildFormFieldLabel('SKU / Barcode', textColor),
+                                      _buildFormFieldLabel('SKU / Barcode'.tr(state), textColor),
                                       _buildTextInput(
                                         skuController,
-                                        'cth. 8993601452',
+                                        'cth. 8993601452'.tr(state),
                                         Icons.qr_code_scanner_rounded,
                                         inputBg,
                                         borderColor,
                                         textColor,
                                         subtitleColor,
-                                        validator: (v) => v!.isEmpty ? 'SKU wajib' : null,
+                                        validator: (v) => v!.isEmpty ? (isEn ? 'SKU required' : 'SKU wajib') : null,
                                       ),
                                     ],
                                   ),
@@ -2063,7 +2035,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      _buildFormFieldLabel('Jenis', textColor),
+                                      _buildFormFieldLabel('Jenis'.tr(state), textColor),
                                       Container(
                                         height: 44,
                                         padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -2080,7 +2052,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                             icon: Icon(Icons.arrow_drop_down_rounded, color: subtitleColor),
                                             isExpanded: true,
                                             style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: textColor),
-                                            items: ['Generik', 'Paten', 'Umum'].map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
+                                            items: ['Generik', 'Paten', 'Umum'].map((g) => DropdownMenuItem(value: g, child: Text(g.tr(state)))).toList(),
                                             onChanged: (val) {
                                               if (val != null) {
                                                 setDialogState(() {
@@ -2101,7 +2073,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildFormFieldLabel('Satuan', textColor),
+                                _buildFormFieldLabel('Satuan'.tr(state), textColor),
                                 Container(
                                   height: 44,
                                   padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -2118,7 +2090,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                       icon: Icon(Icons.arrow_drop_down_rounded, color: subtitleColor),
                                       isExpanded: true,
                                       style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: textColor),
-                                      items: ['Tablet', 'Kapsul', 'Botol', 'Tube', 'Pcs'].map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
+                                      items: ['Tablet', 'Kapsul', 'Botol', 'Tube', 'Pcs'].map((u) => DropdownMenuItem(value: u, child: Text(u.tr(state)))).toList(),
                                       onChanged: (val) {
                                         if (val != null) {
                                           setDialogState(() {
@@ -2135,7 +2107,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                             const SizedBox(height: 20),
 
                             // BATCH AWAL
-                            _buildModalSectionHeader('BATCH AWAL', purple),
+                            _buildModalSectionHeader('BATCH AWAL'.tr(state), purple),
                             const SizedBox(height: 10),
 
                             Row(
@@ -2145,16 +2117,16 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      _buildFormFieldLabel('Nomor Batch', textColor),
+                                      _buildFormFieldLabel('Nomor Batch'.tr(state), textColor),
                                       _buildTextInput(
                                         batchController,
-                                        'Bxxxxxx...',
+                                        'Bxxxxxx...'.tr(state),
                                         Icons.tag_rounded,
                                         inputBg,
                                         borderColor,
                                         textColor,
                                         subtitleColor,
-                                        validator: (v) => v!.isEmpty ? 'Nomor batch wajib' : null,
+                                        validator: (v) => v!.isEmpty ? (isEn ? 'Batch number required' : 'Nomor batch wajib') : null,
                                         readOnly: true,
                                       ),
                                     ],
@@ -2165,7 +2137,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      _buildFormFieldLabel('Stok Awal', textColor),
+                                      _buildFormFieldLabel('Stok Awal'.tr(state), textColor),
                                       _buildTextInput(
                                         initialStockController,
                                         '0',
@@ -2182,7 +2154,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                             hargaBeliSatuanVal = stock > 0 ? (total / stock) : 0.0;
                                           });
                                         },
-                                        validator: (v) => v!.isEmpty ? 'Wajib' : null,
+                                        validator: (v) => v!.isEmpty ? (isEn ? 'Required' : 'Wajib') : null,
                                       ),
                                     ],
                                   ),
@@ -2198,7 +2170,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      _buildFormFieldLabel('Total Harga Beli (Modal)', textColor),
+                                      _buildFormFieldLabel('Total Harga Beli (Modal)'.tr(state), textColor),
                                       _buildTextInput(
                                         buyPriceController,
                                         'Rp 0',
@@ -2224,7 +2196,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      _buildFormFieldLabel('Harga Beli Satuan (Hasil Kalkulasi)', textColor),
+                                      _buildFormFieldLabel('Harga Beli Satuan (Hasil Kalkulasi)'.tr(state), textColor),
                                       Container(
                                         height: 44,
                                         padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -2254,7 +2226,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      _buildFormFieldLabel('Harga Jual Satuan', textColor),
+                                      _buildFormFieldLabel('Harga Jual Satuan'.tr(state), textColor),
                                       _buildTextInput(
                                         sellPriceController,
                                         'Rp 0',
@@ -2264,7 +2236,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                         textColor,
                                         subtitleColor,
                                         keyboardType: TextInputType.number,
-                                        validator: (v) => v!.isEmpty ? 'Harga jual wajib diisi' : null,
+                                        validator: (v) => v!.isEmpty ? (isEn ? 'Selling price is required' : 'Harga jual wajib diisi') : null,
                                       ),
                                     ],
                                   ),
@@ -2274,11 +2246,11 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      _buildFormFieldLabel('Tanggal Kedaluwarsa', textColor),
+                                      _buildFormFieldLabel('Tanggal Kedaluwarsa'.tr(state), textColor),
                                       _buildDateInput(
                                         ctx,
                                         expController,
-                                        'Pilih tanggal...',
+                                        'Pilih tanggal...'.tr(state),
                                         inputBg,
                                         borderColor,
                                         textColor,
@@ -2327,7 +2299,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                             ),
-                            child: Text('Batal', style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor, fontWeight: FontWeight.bold)),
+                            child: Text('Batal'.tr(state), style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor, fontWeight: FontWeight.bold)),
                             onPressed: () => Navigator.of(ctx).pop(),
                           ),
                           const SizedBox(width: 12),
@@ -2339,11 +2311,11 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
                             ),
-                            child: Text('Simpan Obat', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900)),
+                            child: Text('Simpan Obat'.tr(state), style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900)),
                             onPressed: () {
                               if (formKey.currentState!.validate()) {
                                 if (typeSelection == 'Pilih Jenis / Generic' || unitSelection == 'Pilih Satuan') {
-                                  _showSuccessSnackBar(context, 'Harap pilih jenis dan satuan obat!');
+                                  _showSuccessSnackBar(context, isEn ? 'Please select drug type and unit!' : 'Harap pilih jenis dan satuan obat!');
                                   return;
                                 }
 
@@ -2369,14 +2341,14 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                   sku: skuController.text,
                                   hargaSatuan: priceSell,
                                   totalStok: stok,
-                                  status: stok <= 5 ? 'Stok Minim' : 'Tersedia',
+                                  status: stok <= 5 ? (isEn ? 'Low Stock' : 'Stok Minim') : (isEn ? 'Available' : 'Tersedia'),
                                   avatarBg: typeSelection == 'Generik' ? const Color(0xFF48C9B0) : const Color(0xFFB577F2),
                                   batches: [initialBatch],
                                 );
 
                                 Navigator.of(ctx).pop();
                                 ref.read(dokterObatListProvider.notifier).addDrug(newDrug);
-                                _showSuccessSnackBar(context, 'Obat baru berhasil disimpan!');
+                                _showSuccessSnackBar(context, isEn ? 'New drug successfully saved!' : 'Obat baru berhasil disimpan!');
                               }
                             },
                           ),

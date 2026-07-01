@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
+import 'package:mapotech/shared/widgets/ui.dart';
+
 
 class ApotekDashboard extends ConsumerWidget {
   const ApotekDashboard({super.key});
@@ -58,10 +60,42 @@ class ApotekDashboard extends ConsumerWidget {
           mainAxisSpacing: 16,
           childAspectRatio: 1.6,
           children: [
-            _buildMetricCard(Icons.monetization_on_rounded, 'PENJUALAN HARI INI', 'Rp 0', subtitleColor, textColor, cardBgColor, borderColor),
-            _buildMetricCard(Icons.receipt_long_rounded, 'RESEP PENDING', 'SEGERA', subtitleColor, themeAccent, cardBgColor, borderColor),
-            _buildMetricCard(Icons.warning_amber_rounded, 'STOK MENIPIS', '0', subtitleColor, Colors.amber, cardBgColor, borderColor),
-            _buildMetricCard(Icons.hourglass_empty_rounded, 'OBAT HAMPIR EXPIRED', '0', subtitleColor, Colors.redAccent, cardBgColor, borderColor),
+            MetricCard(
+              icon: Icons.monetization_on_rounded,
+              label: 'PENJUALAN HARI INI',
+              count: 'Rp 0',
+              subtitleColor: subtitleColor,
+              countColor: textColor,
+              cardBgColor: cardBgColor,
+              borderColor: borderColor,
+            ),
+            MetricCard(
+              icon: Icons.receipt_long_rounded,
+              label: 'RESEP PENDING',
+              count: 'SEGERA',
+              subtitleColor: subtitleColor,
+              countColor: themeAccent,
+              cardBgColor: cardBgColor,
+              borderColor: borderColor,
+            ),
+            MetricCard(
+              icon: Icons.warning_amber_rounded,
+              label: 'STOK MENIPIS',
+              count: '0',
+              subtitleColor: subtitleColor,
+              countColor: Colors.amber,
+              cardBgColor: cardBgColor,
+              borderColor: borderColor,
+            ),
+            MetricCard(
+              icon: Icons.hourglass_empty_rounded,
+              label: 'OBAT HAMPIR EXPIRED',
+              count: '0',
+              subtitleColor: subtitleColor,
+              countColor: Colors.redAccent,
+              cardBgColor: cardBgColor,
+              borderColor: borderColor,
+            ),
           ],
         ),
 
@@ -113,49 +147,6 @@ class ApotekDashboard extends ConsumerWidget {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildMetricCard(
-    IconData icon,
-    String label,
-    String count,
-    Color subtitleColor,
-    Color countColor,
-    Color cardBgColor,
-    Color borderColor,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cardBgColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: borderColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 14, color: subtitleColor),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.bold, color: subtitleColor),
-                ),
-              ),
-            ],
-          ),
-          const Spacer(),
-          Text(
-            count,
-            style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w900, color: countColor),
-          ),
-        ],
-      ),
     );
   }
 

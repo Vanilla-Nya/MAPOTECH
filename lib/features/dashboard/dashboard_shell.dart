@@ -277,7 +277,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
               Builder(
                 builder: (context) {
                   final role = state.loggedInRole ?? 'pasien';
-                  final menuItems = getMenuItemsForRole(role);
+                  final menuItems = getMenuItemsForRole(role, state.language);
                   String displayTitle = _activeMenu.toUpperCase();
                   for (final item in menuItems) {
                     if (item.id == _activeMenu) {
@@ -286,7 +286,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                     }
                   }
                   if (_activeMenu == 'settings') {
-                    displayTitle = 'PENGATURAN';
+                    displayTitle = state.language == 'en' ? 'SETTINGS' : 'PENGATURAN';
                   }
                   return Text(
                     displayTitle,
@@ -312,7 +312,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                   icon: Icon(Icons.help_outline_rounded, size: 20, color: textColor.withOpacity(0.6)),
                   onPressed: () {
                     final role = state.loggedInRole ?? 'pasien';
-                    final menuItems = getMenuItemsForRole(role);
+                    final menuItems = getMenuItemsForRole(role, state.language);
                     String menuLabel = _activeMenu.toUpperCase();
                     for (final item in menuItems) {
                       if (item.id == _activeMenu) {

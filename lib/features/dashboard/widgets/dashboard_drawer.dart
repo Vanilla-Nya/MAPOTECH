@@ -21,36 +21,37 @@ class DrawerMenuItem {
   });
 }
 
-List<DrawerMenuItem> getMenuItemsForRole(String role) {
+List<DrawerMenuItem> getMenuItemsForRole(String role, String lang) {
+  final isEn = lang == 'en';
   if (role == 'dokter') {
-    return const [
+    return [
       DrawerMenuItem(id: 'dashboard', label: 'Dashboard', icon: Icons.dashboard_rounded),
-      DrawerMenuItem(id: 'pasien', label: 'Pasien', icon: Icons.people_rounded),
-      DrawerMenuItem(id: 'obat', label: 'Obat', icon: Icons.medication_rounded),
-      DrawerMenuItem(id: 'antrian', label: 'Antrian', icon: Icons.hourglass_empty_rounded),
-      DrawerMenuItem(id: 'pemeriksaan', label: 'Pemeriksaan', icon: Icons.assignment_rounded),
-      DrawerMenuItem(id: 'pembukuan', label: 'Pembukuan', icon: Icons.account_balance_wallet_rounded),
-      DrawerMenuItem(id: 'asisten_praktik', label: 'Asisten Praktik', icon: Icons.badge_rounded),
-      DrawerMenuItem(id: 'profile', label: 'Profil', icon: Icons.person_rounded),
+      DrawerMenuItem(id: 'pasien', label: isEn ? 'Patients' : 'Pasien', icon: Icons.people_rounded),
+      DrawerMenuItem(id: 'obat', label: isEn ? 'Medicines' : 'Obat', icon: Icons.medication_rounded),
+      DrawerMenuItem(id: 'antrian', label: isEn ? 'Queues' : 'Antrian', icon: Icons.hourglass_empty_rounded),
+      DrawerMenuItem(id: 'pemeriksaan', label: isEn ? 'Examinations' : 'Pemeriksaan', icon: Icons.assignment_rounded),
+      DrawerMenuItem(id: 'pembukuan', label: isEn ? 'Bookkeeping' : 'Pembukuan', icon: Icons.account_balance_wallet_rounded),
+      DrawerMenuItem(id: 'asisten_praktik', label: isEn ? 'Practice Assistant' : 'Asisten Praktik', icon: Icons.badge_rounded),
+      DrawerMenuItem(id: 'profile', label: isEn ? 'Profile' : 'Profil', icon: Icons.person_rounded),
     ];
   } else if (role == 'apotek') {
-    return const [
+    return [
       DrawerMenuItem(id: 'dashboard', label: 'Dashboard', icon: Icons.dashboard_rounded),
-      DrawerMenuItem(id: 'penjualan', label: 'POS (Penjualan)', icon: Icons.shopping_cart_rounded),
-      DrawerMenuItem(id: 'inventori', label: 'Inventori', icon: Icons.inventory_2_rounded),
-      DrawerMenuItem(id: 'pesanan', label: 'Pesanan Masuk', icon: Icons.description_rounded),
-      DrawerMenuItem(id: 'laporan', label: 'Laporan Keuangan', icon: Icons.bar_chart_rounded),
-      DrawerMenuItem(id: 'staff', label: 'Manajemen Staff', icon: Icons.groups_rounded),
-      DrawerMenuItem(id: 'profile', label: 'Profil', icon: Icons.account_circle_rounded),
+      DrawerMenuItem(id: 'penjualan', label: isEn ? 'POS (Sales)' : 'POS (Penjualan)', icon: Icons.shopping_cart_rounded),
+      DrawerMenuItem(id: 'inventori', label: isEn ? 'Inventory' : 'Inventori', icon: Icons.inventory_2_rounded),
+      DrawerMenuItem(id: 'pesanan', label: isEn ? 'Incoming Orders' : 'Pesanan Masuk', icon: Icons.description_rounded),
+      DrawerMenuItem(id: 'laporan', label: isEn ? 'Financial Reports' : 'Laporan Keuangan', icon: Icons.bar_chart_rounded),
+      DrawerMenuItem(id: 'staff', label: isEn ? 'Staff Management' : 'Manajemen Staff', icon: Icons.groups_rounded),
+      DrawerMenuItem(id: 'profile', label: isEn ? 'Profile' : 'Profil', icon: Icons.account_circle_rounded),
     ];
   } else {
-    return const [
+    return [
       DrawerMenuItem(id: 'dashboard', label: 'Dashboard', icon: Icons.dashboard_rounded),
-      DrawerMenuItem(id: 'dokter_search', label: 'Cari Praktik Mandiri', icon: Icons.search_rounded),
-      DrawerMenuItem(id: 'apotek_search', label: 'Cari Apotek', icon: Icons.local_pharmacy_rounded),
-      DrawerMenuItem(id: 'history', label: 'Riwayat', icon: Icons.history_rounded),
-      DrawerMenuItem(id: 'prescription', label: 'Resep Obat', icon: Icons.medication_rounded),
-      DrawerMenuItem(id: 'profile', label: 'Profil', icon: Icons.person_rounded),
+      DrawerMenuItem(id: 'dokter_search', label: isEn ? 'Search Private Practice' : 'Cari Praktik Mandiri', icon: Icons.search_rounded),
+      DrawerMenuItem(id: 'apotek_search', label: isEn ? 'Search Pharmacy' : 'Cari Apotek', icon: Icons.local_pharmacy_rounded),
+      DrawerMenuItem(id: 'history', label: isEn ? 'History' : 'Riwayat', icon: Icons.history_rounded),
+      DrawerMenuItem(id: 'prescription', label: isEn ? 'Prescriptions' : 'Resep Obat', icon: Icons.medication_rounded),
+      DrawerMenuItem(id: 'profile', label: isEn ? 'Profile' : 'Profil', icon: Icons.person_rounded),
     ];
   }
 }
@@ -65,8 +66,8 @@ class DashboardDrawer extends ConsumerWidget {
     required this.onMenuSelected,
   });
 
-  List<DrawerMenuItem> _getMenuItemsForRole(String role) {
-    return getMenuItemsForRole(role);
+  List<DrawerMenuItem> _getMenuItemsForRole(String role, String lang) {
+    return getMenuItemsForRole(role, lang);
   }
 
   @override
@@ -97,9 +98,10 @@ class DashboardDrawer extends ConsumerWidget {
           ? 'A' 
           : (state.loggedInRole == 'dokter' ? 'AS' : 'CE');
     }
+    final isEn = state.language == 'en';
     final String avatarRoleLabel = state.loggedInRole == 'pasien' 
-        ? 'PASIEN' 
-        : (state.loggedInRole == 'dokter' ? 'DOKTER' : 'APOTEK');
+        ? (isEn ? 'PATIENT' : 'PASIEN') 
+        : (state.loggedInRole == 'dokter' ? (isEn ? 'DOCTOR' : 'DOKTER') : (isEn ? 'PHARMACY' : 'APOTEK'));
 
     final showLabels = state.drawerSize == 1;
 
@@ -335,7 +337,7 @@ class DashboardDrawer extends ConsumerWidget {
           Expanded(
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 8),
-              children: _getMenuItemsForRole(state.loggedInRole ?? 'pasien').map((item) {
+              children: _getMenuItemsForRole(state.loggedInRole ?? 'pasien', state.language).map((item) {
                 return _buildMenuItem(context, item.icon, item.label, item.id, showLabels, themeAccent, isDark);
               }).toList(),
             ),
@@ -346,9 +348,9 @@ class DashboardDrawer extends ConsumerWidget {
             padding: const EdgeInsets.all(8),
             child: Column(
               children: [
-                _buildMenuItem(context, Icons.settings_rounded, 'Pengaturan', 'settings', showLabels, themeAccent, isDark),
+                _buildMenuItem(context, Icons.settings_rounded, state.language == 'en' ? 'Settings' : 'Pengaturan', 'settings', showLabels, themeAccent, isDark),
                 const SizedBox(height: 6),
-                _buildMenuItem(context, Icons.logout_rounded, 'Keluar', 'logout', showLabels, Colors.redAccent, isDark, isLogout: true, onTap: () {
+                _buildMenuItem(context, Icons.logout_rounded, state.language == 'en' ? 'Logout' : 'Keluar', 'logout', showLabels, Colors.redAccent, isDark, isLogout: true, onTap: () {
                   notifier.logout();
                 }),
               ],
@@ -432,8 +434,8 @@ class FullScreenDrawerOverlay extends ConsumerWidget {
     required this.onMenuSelected,
   });
 
-  List<DrawerMenuItem> _getMenuItemsForRole(String role) {
-    return getMenuItemsForRole(role);
+  List<DrawerMenuItem> _getMenuItemsForRole(String role, String lang) {
+    return getMenuItemsForRole(role, lang);
   }
 
   @override
@@ -724,11 +726,11 @@ class FullScreenDrawerOverlay extends ConsumerWidget {
               mainAxisSpacing: 16,
               childAspectRatio: 1.1,
               children: [
-                ..._getMenuItemsForRole(state.loggedInRole ?? 'pasien').map((item) {
+                ..._getMenuItemsForRole(state.loggedInRole ?? 'pasien', state.language).map((item) {
                   return _buildGridMenuCard(ref, item.label, item.icon, item.id, themeAccent, cardBgColor, isDark);
                 }),
-                _buildGridMenuCard(ref, 'Pengaturan', Icons.settings_rounded, 'settings', themeAccent, cardBgColor, isDark),
-                _buildGridMenuCard(ref, 'Keluar', Icons.logout_rounded, 'logout', Colors.redAccent, cardBgColor, isDark, isLogout: true, onTap: () {
+                _buildGridMenuCard(ref, state.language == 'en' ? 'Settings' : 'Pengaturan', Icons.settings_rounded, 'settings', themeAccent, cardBgColor, isDark),
+                _buildGridMenuCard(ref, state.language == 'en' ? 'Logout' : 'Keluar', Icons.logout_rounded, 'logout', Colors.redAccent, cardBgColor, isDark, isLogout: true, onTap: () {
                   notifier.logout();
                 }),
               ],
