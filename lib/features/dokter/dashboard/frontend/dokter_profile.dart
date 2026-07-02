@@ -14,6 +14,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/supabase_service.dart';
 import 'package:mapotech/shared/widgets/skeleton_loading.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'web_map_widget.dart';
 import 'package:image/image.dart' as img;
 
@@ -77,12 +78,14 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
   double _zoomLevel = 15;
 
   // QRIS Payment Method State
-  String _selectedQrisType = 'UPLOAD QR PHOTO'; // 'UPLOAD QR PHOTO', 'QR IMAGE URL / LABEL', 'AUTOMATIC PAYMENT LINK'
+  String _selectedQrisType =
+      'UPLOAD QR PHOTO'; // 'UPLOAD QR PHOTO', 'QR IMAGE URL / LABEL', 'AUTOMATIC PAYMENT LINK'
   late TextEditingController _qrisQrLinkController;
   String _qrisQrPath = '';
   bool _qrisQrUploading = false;
 
-  String _selectedQrisBgType = 'DEFAULT GRADIENT'; // 'DEFAULT GRADIENT', 'UPLOAD BACKGROUND', 'BACKGROUND URL'
+  String _selectedQrisBgType =
+      'DEFAULT GRADIENT'; // 'DEFAULT GRADIENT', 'UPLOAD BACKGROUND', 'BACKGROUND URL'
   late TextEditingController _qrisBgLinkController;
   String _qrisBgPath = '';
   bool _qrisBgUploading = false;
@@ -271,6 +274,18 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
     return userId;
   }
 
+  String get _effectiveDoctorId {
+    final docId = ref.read(landingPageProvider).activeDoctorId;
+    if (docId == 'mock-id-1234567890' || docId == null) {
+      return '8f93471a-74f8-486b-8e85-4002dc44c11c'; // Fallback to active doctor UUID
+    }
+    return docId;
+  }
+
+  bool get _isAssistant {
+    return ref.read(landingPageProvider).isAssistant;
+  }
+
   String _getMapEmbedUrl(String inputLink) {
     if (inputLink.isEmpty) {
       final faskes = _faskesController.text.trim();
@@ -279,7 +294,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
       final kec = _selectedKecamatan;
       final kab = _selectedKabupaten;
       final prov = _selectedProvinsi;
-      
+
       final queryParts = [
         if (faskes.isNotEmpty) faskes,
         if (address.isNotEmpty && address != faskes) address,
@@ -313,7 +328,9 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
     final placeRegex = RegExp(r'/maps/place/([^/]+)');
     match = placeRegex.firstMatch(inputLink);
     if (match != null) {
-      final placeName = Uri.decodeComponent(match.group(1)!.replaceAll('+', ' '));
+      final placeName = Uri.decodeComponent(
+        match.group(1)!.replaceAll('+', ' '),
+      );
       return 'https://maps.google.com/maps?q=${Uri.encodeComponent(placeName)}&t=&z=${_zoomLevel.toInt()}&ie=UTF8&iwloc=&output=embed';
     }
 
@@ -333,7 +350,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
       final embedUrl = _getMapEmbedUrl(mapsLink);
       return buildWebMapWidget(mapUrl: embedUrl, isDark: isDark);
     }
-    
+
     // Non-web fallback
     return Stack(
       children: [
@@ -344,10 +361,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
         // Custom Painter or Mock Vector Map Graphics
         Positioned.fill(
           child: CustomPaint(
-            painter: MapGraphicsPainter(
-              isDark: isDark,
-              zoomLevel: _zoomLevel,
-            ),
+            painter: MapGraphicsPainter(isDark: isDark, zoomLevel: _zoomLevel),
           ),
         ),
         // Center Pin Marker
@@ -356,10 +370,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 4,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(4),
@@ -372,7 +383,9 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                   ],
                 ),
                 child: Text(
-                  _selectedKelurahan.isNotEmpty ? _selectedKelurahan : 'Panggungan',
+                  _selectedKelurahan.isNotEmpty
+                      ? _selectedKelurahan
+                      : 'Panggungan',
                   style: GoogleFonts.outfit(
                     fontSize: 10,
                     fontWeight: FontWeight.bold,
@@ -415,10 +428,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
           right: 0,
           child: Container(
             color: Colors.white.withOpacity(0.9),
-            padding: const EdgeInsets.symmetric(
-              horizontal: 10,
-              vertical: 4,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -474,7 +484,8 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
         // Load avatar_url — allow http/https URLs and let errorBuilder handle loading errors/CORS issues
         final rawAvatarUrl = userRes['avatar_url']?.toString() ?? '';
         if (rawAvatarUrl.isNotEmpty &&
-            (rawAvatarUrl.startsWith('http://') || rawAvatarUrl.startsWith('https://'))) {
+            (rawAvatarUrl.startsWith('http://') ||
+                rawAvatarUrl.startsWith('https://'))) {
           _avatarUrl = rawAvatarUrl;
         } else {
           _avatarUrl = '';
@@ -485,9 +496,9 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
 
         final prov =
             userRes['province']?.toString().toUpperCase() ?? 'JAWA TIMUR';
-        if (prov.contains('JAWA TIMUR'))
+        if (prov.contains('JAWA TIMUR')) {
           _selectedProvinsi = 'JAWA TIMUR';
-        else if (prov.contains('JAWA TENGAH'))
+        } else if (prov.contains('JAWA TENGAH'))
           _selectedProvinsi = 'JAWA TENGAH';
         else if (prov.contains('JAWA BARAT'))
           _selectedProvinsi = 'JAWA BARAT';
@@ -497,36 +508,36 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
         final dist =
             userRes['district']?.toString().toUpperCase() ??
             'KABUPATEN BONDOWOSO';
-        if (dist.contains('BONDOWOSO'))
+        if (dist.contains('BONDOWOSO')) {
           _selectedKabupaten = 'KABUPATEN BONDOWOSO';
-        else if (dist.contains('JEMBER'))
+        } else if (dist.contains('JEMBER'))
           _selectedKabupaten = 'KABUPATEN JEMBER';
         else if (dist.contains('BANYUWANGI'))
           _selectedKabupaten = 'KABUPATEN BANYUWANGI';
 
         final subD =
             userRes['sub_district']?.toString().toUpperCase() ?? 'PUJER';
-        if (subD.contains('PUJER'))
+        if (subD.contains('PUJER')) {
           _selectedKecamatan = 'PUJER';
-        else if (subD.contains('TENGGARANG'))
+        } else if (subD.contains('TENGGARANG'))
           _selectedKecamatan = 'TENGGARANG';
         else if (subD.contains('KLOJEN'))
           _selectedKecamatan = 'KLOJEN';
 
         final vill = userRes['village']?.toString().toUpperCase() ?? 'KEJAYAN';
-        if (vill.contains('KEJAYAN'))
+        if (vill.contains('KEJAYAN')) {
           _selectedKelurahan = 'KEJAYAN';
-        else if (vill.contains('PANGGUNGAN'))
+        } else if (vill.contains('PANGGUNGAN'))
           _selectedKelurahan = 'PANGGUNGAN';
         else if (vill.contains('SUMBERSARI'))
           _selectedKelurahan = 'SUMBERSARI';
       }
 
-      // 2. Fetch user_detail_doctor
+      // 2. Fetch user_detail_doctor using employing doctor's ID
       final detailRes = await client
           .from('user_detail_doctor')
           .select()
-          .eq('id', userId)
+          .eq('id', _effectiveDoctorId)
           .maybeSingle();
 
       if (detailRes != null) {
@@ -540,29 +551,28 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
         _showProfileInSearch = detailRes['is_visible'] ?? true;
         _serveBPJSPatients = detailRes['is_bpjs'] ?? true;
 
-         // Parse practice_licenses
-         final licensesRaw = detailRes['practice_licenses'];
-         if (licensesRaw is List) {
-           for (var c in _certificationControllers) {
-             c.dispose();
-           }
-           _certificationControllers.clear();
-           _certificationTypes.clear();
-           _certificationUploading.clear();
-           for (var item in licensesRaw) {
-             final text = item.toString();
-             _certificationControllers.add(
-               TextEditingController(text: text),
-             );
-             
-             // Treat as UPLOAD if it is a local mock or a Supabase Storage URL
-             final isUpload = text.startsWith('mock_uploads/') ||
-                 text.contains('.supabase.co/storage/v1/object/public/');
+        // Parse practice_licenses
+        final licensesRaw = detailRes['practice_licenses'];
+        if (licensesRaw is List) {
+          for (var c in _certificationControllers) {
+            c.dispose();
+          }
+          _certificationControllers.clear();
+          _certificationTypes.clear();
+          _certificationUploading.clear();
+          for (var item in licensesRaw) {
+            final text = item.toString();
+            _certificationControllers.add(TextEditingController(text: text));
 
-             _certificationTypes.add(isUpload ? 'UPLOAD' : 'LINK');
-             _certificationUploading.add(false);
-           }
-         }
+            // Treat as UPLOAD if it is a local mock or a Supabase Storage URL
+            final isUpload =
+                text.startsWith('mock_uploads/') ||
+                text.contains('.supabase.co/storage/v1/object/public/');
+
+            _certificationTypes.add(isUpload ? 'UPLOAD' : 'LINK');
+            _certificationUploading.add(false);
+          }
+        }
 
         final prof = detailRes['profession']?.toString() ?? 'Doctor';
         if (prof.toLowerCase() == 'midwife') {
@@ -730,7 +740,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
           .select()
           .eq('id_doctor', userId);
 
-      if (schedulesRes != null && (schedulesRes as List).isNotEmpty) {
+      if ((schedulesRes as List).isNotEmpty) {
         final List<dynamic> schedulesList = schedulesRes;
         for (var dayMap in _scheduleDays) {
           final matches = schedulesList.where(
@@ -802,10 +812,12 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
       };
 
       await client.from('user').update(updatedUser).eq('id', userId);
-      await client
-          .from('user_detail_doctor')
-          .update(updatedDoctorDetail)
-          .eq('id', userId);
+      if (!_isAssistant) {
+        await client
+            .from('user_detail_doctor')
+            .update(updatedDoctorDetail)
+            .eq('id', userId);
+      }
 
       ref.read(landingPageProvider.notifier).updateUser(updatedUser);
 
@@ -828,6 +840,15 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
   }
 
   Future<void> _savePracticeSettings() async {
+    if (_isAssistant) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Hanya Dokter (Pemilik) yang dapat mengubah pengaturan praktik.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
     final userId = _effectiveUserId;
     setState(() => _isSaving = true);
 
@@ -914,6 +935,15 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
   }
 
   Future<void> _saveApiSettings() async {
+    if (_isAssistant) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Hanya Dokter (Pemilik) yang dapat mengubah API Integrasi.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
     final userId = _effectiveUserId;
 
     setState(() => _isSaving = true);
@@ -988,6 +1018,15 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
   }
 
   Future<void> _renewSubscription() async {
+    if (_isAssistant) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Hanya Dokter (Pemilik) yang dapat memperpanjang langganan.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
     final userId = _effectiveUserId;
 
     setState(() => _isSaving = true);
@@ -1045,6 +1084,15 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
   }
 
   Future<void> _regenerateQrToken() async {
+    if (_isAssistant) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Hanya Dokter (Pemilik) yang dapat meregenerasi QR Code.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
     final userId = _effectiveUserId;
 
     setState(() => _isSaving = true);
@@ -1095,7 +1143,13 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
       final x = (image.width - size) ~/ 2;
       final y = (image.height - size) ~/ 2;
 
-      final cropped = img.copyCrop(image, x: x, y: y, width: size, height: size);
+      final cropped = img.copyCrop(
+        image,
+        x: x,
+        y: y,
+        width: size,
+        height: size,
+      );
 
       // Encode back to jpeg
       return Uint8List.fromList(img.encodeJpg(cropped, quality: 85));
@@ -1119,7 +1173,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
 
       // Map coordinates back to original image
       final double totalScale = scale * initialScale;
-      
+
       int x = (-tx / totalScale).round();
       int y = (-ty / totalScale).round();
       int w = (viewportSize / totalScale).round();
@@ -1130,7 +1184,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
       if (y < 0) y = 0;
       if (x + w > image.width) w = image.width - x;
       if (y + h > image.height) h = image.height - y;
-      
+
       // Ensure w and h are positive
       if (w <= 0) w = 1;
       if (h <= 0) h = 1;
@@ -1145,7 +1199,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
 
   Future<void> _uploadProfilePhoto() async {
     final TextEditingController urlController = TextEditingController();
-    
+
     // Dialog state
     Uint8List? selectedFileBytes;
     String? selectedFileName;
@@ -1168,11 +1222,12 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
             final Color tealColor = const Color(0xFF48C9B0);
             final Color cardBg = const Color(0xFF1E1E22);
             final Color inputBg = const Color(0xFF2A2A30);
-            
+
             // Set up transformation listener once
             if (transformController != null && !listenerRegistered) {
               transformController!.addListener(() {
-                final double scale = transformController!.value.getMaxScaleOnAxis();
+                final double scale = transformController!.value
+                    .getMaxScaleOnAxis();
                 if (scale != currentZoom) {
                   setStateDialog(() {
                     currentZoom = scale.clamp(1.0, 5.0);
@@ -1184,13 +1239,17 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
 
             return AlertDialog(
               backgroundColor: cardBg,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
               title: Row(
                 children: [
                   Icon(Icons.add_a_photo_rounded, color: tealColor),
                   const SizedBox(width: 8),
                   Text(
-                    isCroppingMode ? 'Sesuaikan Foto Profil' : 'Update Foto Profil',
+                    isCroppingMode
+                        ? 'Sesuaikan Foto Profil'
+                        : 'Update Foto Profil',
                     style: GoogleFonts.outfit(
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
@@ -1230,7 +1289,11 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                           const SizedBox(height: 16),
                           Row(
                             children: [
-                              const Icon(Icons.zoom_out_rounded, color: Colors.grey, size: 16),
+                              const Icon(
+                                Icons.zoom_out_rounded,
+                                color: Colors.grey,
+                                size: 16,
+                              ),
                               Expanded(
                                 child: Slider(
                                   value: currentZoom,
@@ -1241,16 +1304,25 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                                   onChanged: (val) {
                                     setStateDialog(() {
                                       currentZoom = val;
-                                      final double tx = transformController!.value.entry(0, 3);
-                                      final double ty = transformController!.value.entry(1, 3);
-                                      transformController!.value = Matrix4.identity()
-                                        ..translate(tx, ty)
-                                        ..scale(val);
+                                      final double tx = transformController!
+                                          .value
+                                          .entry(0, 3);
+                                      final double ty = transformController!
+                                          .value
+                                          .entry(1, 3);
+                                      transformController!.value =
+                                          Matrix4.identity()
+                                            ..translate(tx, ty)
+                                            ..scale(val);
                                     });
                                   },
                                 ),
                               ),
-                              const Icon(Icons.zoom_in_rounded, color: Colors.grey, size: 16),
+                              const Icon(
+                                Icons.zoom_in_rounded,
+                                color: Colors.grey,
+                                size: 16,
+                              ),
                             ],
                           ),
                           const SizedBox(height: 8),
@@ -1278,36 +1350,50 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                                     listenerRegistered = false;
                                   });
                                 },
-                                child: Text('Kembali', style: GoogleFonts.outfit(color: Colors.grey)),
+                                child: Text(
+                                  'Kembali',
+                                  style: GoogleFonts.outfit(color: Colors.grey),
+                                ),
                               ),
                               const SizedBox(width: 8),
                               ElevatedButton(
                                 onPressed: () {
-                                  setStateDialog(() => isProcessingImage = true);
-                                  
+                                  setStateDialog(
+                                    () => isProcessingImage = true,
+                                  );
+
                                   // Wait briefly to show spinner
-                                  Future.delayed(const Duration(milliseconds: 50), () {
-                                    final double scale = transformController!.value.getMaxScaleOnAxis();
-                                    final double tx = transformController!.value.entry(0, 3);
-                                    final double ty = transformController!.value.entry(1, 3);
-                                    
-                                    final cropped = _cropImageInteractive(
-                                      originalBytes: selectedFileBytes!,
-                                      tx: tx,
-                                      ty: ty,
-                                      scale: scale,
-                                      viewportSize: 200.0,
-                                      initialScale: initialScale,
-                                    );
-                                    
-                                    setStateDialog(() {
-                                      selectedFileBytes = cropped;
-                                      isCroppingMode = false;
-                                      isProcessingImage = false;
-                                      transformController = null;
-                                      listenerRegistered = false;
-                                    });
-                                  });
+                                  Future.delayed(
+                                    const Duration(milliseconds: 50),
+                                    () {
+                                      final double scale = transformController!
+                                          .value
+                                          .getMaxScaleOnAxis();
+                                      final double tx = transformController!
+                                          .value
+                                          .entry(0, 3);
+                                      final double ty = transformController!
+                                          .value
+                                          .entry(1, 3);
+
+                                      final cropped = _cropImageInteractive(
+                                        originalBytes: selectedFileBytes!,
+                                        tx: tx,
+                                        ty: ty,
+                                        scale: scale,
+                                        viewportSize: 200.0,
+                                        initialScale: initialScale,
+                                      );
+
+                                      setStateDialog(() {
+                                        selectedFileBytes = cropped;
+                                        isCroppingMode = false;
+                                        isProcessingImage = false;
+                                        transformController = null;
+                                        listenerRegistered = false;
+                                      });
+                                    },
+                                  );
                                 },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: tealColor,
@@ -1315,7 +1401,9 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                                 ),
                                 child: Text(
                                   'Selesai Potong',
-                                  style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+                                  style: GoogleFonts.outfit(
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             ],
@@ -1343,19 +1431,29 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                                   height: 60,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    border: Border.all(color: Colors.white24, width: 2),
+                                    border: Border.all(
+                                      color: Colors.white24,
+                                      width: 2,
+                                    ),
                                   ),
                                   child: ClipOval(
                                     child: _avatarUrl.isNotEmpty
                                         ? Image.network(
                                             _avatarUrl,
                                             fit: BoxFit.cover,
-                                            errorBuilder: (_, __, ___) => const Center(
-                                              child: Icon(Icons.person_rounded, color: Colors.grey),
-                                            ),
+                                            errorBuilder: (_, _, _) =>
+                                                const Center(
+                                                  child: Icon(
+                                                    Icons.person_rounded,
+                                                    color: Colors.grey,
+                                                  ),
+                                                ),
                                           )
                                         : const Center(
-                                            child: Icon(Icons.person_rounded, color: Colors.grey),
+                                            child: Icon(
+                                              Icons.person_rounded,
+                                              color: Colors.grey,
+                                            ),
                                           ),
                                   ),
                                 ),
@@ -1365,20 +1463,26 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                           const SizedBox(height: 16),
                           const Divider(color: Colors.white10),
                           const SizedBox(height: 12),
-                          
+
                           // Tab Bar switcher
                           Row(
                             children: [
                               Expanded(
                                 child: InkWell(
-                                  onTap: () => setStateDialog(() => activeTab = 'upload'),
+                                  onTap: () => setStateDialog(
+                                    () => activeTab = 'upload',
+                                  ),
                                   child: Container(
                                     alignment: Alignment.center,
-                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 8,
+                                    ),
                                     decoration: BoxDecoration(
                                       border: Border(
                                         bottom: BorderSide(
-                                          color: activeTab == 'upload' ? tealColor : Colors.transparent,
+                                          color: activeTab == 'upload'
+                                              ? tealColor
+                                              : Colors.transparent,
                                           width: 2,
                                         ),
                                       ),
@@ -1386,7 +1490,9 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                                     child: Text(
                                       'Upload File',
                                       style: GoogleFonts.outfit(
-                                        color: activeTab == 'upload' ? Colors.white : Colors.grey[400],
+                                        color: activeTab == 'upload'
+                                            ? Colors.white
+                                            : Colors.grey[400],
                                         fontWeight: FontWeight.bold,
                                         fontSize: 13,
                                       ),
@@ -1396,14 +1502,19 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                               ),
                               Expanded(
                                 child: InkWell(
-                                  onTap: () => setStateDialog(() => activeTab = 'link'),
+                                  onTap: () =>
+                                      setStateDialog(() => activeTab = 'link'),
                                   child: Container(
                                     alignment: Alignment.center,
-                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 8,
+                                    ),
                                     decoration: BoxDecoration(
                                       border: Border(
                                         bottom: BorderSide(
-                                          color: activeTab == 'link' ? tealColor : Colors.transparent,
+                                          color: activeTab == 'link'
+                                              ? tealColor
+                                              : Colors.transparent,
                                           width: 2,
                                         ),
                                       ),
@@ -1411,7 +1522,9 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                                     child: Text(
                                       'Input Link URL',
                                       style: GoogleFonts.outfit(
-                                        color: activeTab == 'link' ? Colors.white : Colors.grey[400],
+                                        color: activeTab == 'link'
+                                            ? Colors.white
+                                            : Colors.grey[400],
                                         fontWeight: FontWeight.bold,
                                         fontSize: 13,
                                       ),
@@ -1422,7 +1535,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                             ],
                           ),
                           const SizedBox(height: 20),
-                          
+
                           if (activeTab == 'upload') ...[
                             Center(
                               child: Column(
@@ -1433,7 +1546,10 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
                                       color: inputBg,
-                                      border: Border.all(color: tealColor.withOpacity(0.5), width: 2),
+                                      border: Border.all(
+                                        color: tealColor.withOpacity(0.5),
+                                        width: 2,
+                                      ),
                                     ),
                                     child: ClipOval(
                                       child: isProcessingImage
@@ -1444,17 +1560,17 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                                               ),
                                             )
                                           : selectedFileBytes != null
-                                              ? Image.memory(
-                                                  selectedFileBytes!,
-                                                  fit: BoxFit.cover,
-                                                )
-                                              : Center(
-                                                  child: Icon(
-                                                    Icons.person_rounded,
-                                                    size: 60,
-                                                    color: Colors.grey[600],
-                                                  ),
-                                                ),
+                                          ? Image.memory(
+                                              selectedFileBytes!,
+                                              fit: BoxFit.cover,
+                                            )
+                                          : Center(
+                                              child: Icon(
+                                                Icons.person_rounded,
+                                                size: 60,
+                                                color: Colors.grey[600],
+                                              ),
+                                            ),
                                     ),
                                   ),
                                   const SizedBox(height: 12),
@@ -1463,72 +1579,138 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                                         ? null
                                         : () async {
                                             try {
-                                              final pickerResult = await FilePicker.platform.pickFiles(
-                                                type: FileType.image,
-                                                withData: true,
-                                              );
-                                              if (pickerResult != null && pickerResult.files.isNotEmpty) {
-                                                setStateDialog(() => isProcessingImage = true);
-                                                
+                                              final pickerResult =
+                                                  await FilePicker.platform
+                                                      .pickFiles(
+                                                        type: FileType.image,
+                                                        withData: true,
+                                                      );
+                                              if (pickerResult != null &&
+                                                  pickerResult
+                                                      .files
+                                                      .isNotEmpty) {
+                                                setStateDialog(
+                                                  () =>
+                                                      isProcessingImage = true,
+                                                );
+
                                                 // Briefly yield to let UI render the spinner
-                                                await Future.delayed(const Duration(milliseconds: 100));
-                                                
-                                                final pickedFile = pickerResult.files.first;
-                                                Uint8List? bytes = pickedFile.bytes;
-                                                if (bytes == null && !kIsWeb && pickedFile.path != null) {
-                                                  bytes = io.File(pickedFile.path!).readAsBytesSync();
+                                                await Future.delayed(
+                                                  const Duration(
+                                                    milliseconds: 100,
+                                                  ),
+                                                );
+
+                                                final pickedFile =
+                                                    pickerResult.files.first;
+                                                Uint8List? bytes =
+                                                    pickedFile.bytes;
+                                                if (bytes == null &&
+                                                    !kIsWeb &&
+                                                    pickedFile.path != null) {
+                                                  bytes = io.File(
+                                                    pickedFile.path!,
+                                                  ).readAsBytesSync();
                                                 }
                                                 if (bytes != null) {
-                                                  final decoded = img.decodeImage(bytes);
+                                                  final decoded = img
+                                                      .decodeImage(bytes);
                                                   if (decoded != null) {
-                                                    final imgW = decoded.width.toDouble();
-                                                    final imgH = decoded.height.toDouble();
-                                                    
+                                                    final imgW = decoded.width
+                                                        .toDouble();
+                                                    final imgH = decoded.height
+                                                        .toDouble();
+
                                                     if (imgW / imgH > 1.0) {
-                                                      initialScale = 200.0 / imgH;
+                                                      initialScale =
+                                                          200.0 / imgH;
                                                     } else {
-                                                      initialScale = 200.0 / imgW;
+                                                      initialScale =
+                                                          200.0 / imgW;
                                                     }
-                                                    
-                                                    final double initialTranslationX = imgW > imgH ? -(imgW * initialScale - 200.0) / 2.0 : 0.0;
-                                                    final double initialTranslationY = imgH > imgW ? -(imgH * initialScale - 200.0) / 2.0 : 0.0;
-                                                    
-                                                    final initialMatrix = Matrix4.identity()
-                                                      ..translate(initialTranslationX, initialTranslationY);
-                                                      
-                                                    transformController = TransformationController(initialMatrix);
+
+                                                    final double
+                                                    initialTranslationX =
+                                                        imgW > imgH
+                                                        ? -(imgW * initialScale -
+                                                                  200.0) /
+                                                              2.0
+                                                        : 0.0;
+                                                    final double
+                                                    initialTranslationY =
+                                                        imgH > imgW
+                                                        ? -(imgH * initialScale -
+                                                                  200.0) /
+                                                              2.0
+                                                        : 0.0;
+
+                                                    final initialMatrix =
+                                                        Matrix4.identity()
+                                                          ..translate(
+                                                            initialTranslationX,
+                                                            initialTranslationY,
+                                                          );
+
+                                                    transformController =
+                                                        TransformationController(
+                                                          initialMatrix,
+                                                        );
                                                     currentZoom = 1.0;
-                                                    
+
                                                     setStateDialog(() {
                                                       selectedFileBytes = bytes;
-                                                      selectedFileName = pickedFile.name;
+                                                      selectedFileName =
+                                                          pickedFile.name;
                                                       decodedImage = decoded;
                                                       isCroppingMode = true;
                                                       isProcessingImage = false;
                                                     });
                                                   } else {
-                                                    setStateDialog(() => isProcessingImage = false);
+                                                    setStateDialog(
+                                                      () => isProcessingImage =
+                                                          false,
+                                                    );
                                                   }
                                                 } else {
-                                                  setStateDialog(() => isProcessingImage = false);
+                                                  setStateDialog(
+                                                    () => isProcessingImage =
+                                                        false,
+                                                  );
                                                 }
                                               }
                                             } catch (pickerErr) {
-                                              setStateDialog(() => isProcessingImage = false);
-                                              debugPrint('File picker error: $pickerErr');
+                                              setStateDialog(
+                                                () => isProcessingImage = false,
+                                              );
+                                              debugPrint(
+                                                'File picker error: $pickerErr',
+                                              );
                                             }
                                           },
-                                    icon: const Icon(Icons.photo_library_rounded, size: 16),
+                                    icon: const Icon(
+                                      Icons.photo_library_rounded,
+                                      size: 16,
+                                    ),
                                     label: Text(
-                                      selectedFileBytes == null ? 'Pilih Gambar' : 'Ganti Gambar',
-                                      style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 12),
+                                      selectedFileBytes == null
+                                          ? 'Pilih Gambar'
+                                          : 'Ganti Gambar',
+                                      style: GoogleFonts.outfit(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
                                     ),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: const Color(0xFF2E4053),
                                       foregroundColor: Colors.white,
                                       elevation: 0,
-                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 8,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
                                     ),
                                   ),
                                   if (selectedFileName != null) ...[
@@ -1537,7 +1719,10 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                                       selectedFileName!,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: GoogleFonts.outfit(color: Colors.grey[400], fontSize: 11),
+                                      style: GoogleFonts.outfit(
+                                        color: Colors.grey[400],
+                                        fontSize: 11,
+                                      ),
                                     ),
                                   ],
                                   const SizedBox(height: 12),
@@ -1568,7 +1753,10 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                               onChanged: (val) {
                                 setStateDialog(() {});
                               },
-                              style: GoogleFonts.outfit(color: Colors.white, fontSize: 13),
+                              style: GoogleFonts.outfit(
+                                color: Colors.white,
+                                fontSize: 13,
+                              ),
                               decoration: InputDecoration(
                                 hintText: 'https://...',
                                 hintStyle: GoogleFonts.outfit(
@@ -1606,7 +1794,10 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                                       decoration: BoxDecoration(
                                         shape: BoxShape.circle,
                                         color: inputBg,
-                                        border: Border.all(color: tealColor.withOpacity(0.5), width: 2),
+                                        border: Border.all(
+                                          color: tealColor.withOpacity(0.5),
+                                          width: 2,
+                                        ),
                                       ),
                                       child: ClipOval(
                                         child: Image.network(
@@ -1615,7 +1806,8 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                                           errorBuilder: (context, error, stackTrace) {
                                             return Center(
                                               child: Column(
-                                                mainAxisAlignment: MainAxisAlignment.center,
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
                                                 children: [
                                                   Icon(
                                                     Icons.broken_image_rounded,
@@ -1629,7 +1821,8 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                                                     style: GoogleFonts.outfit(
                                                       color: Colors.red[300],
                                                       fontSize: 8,
-                                                      fontWeight: FontWeight.bold,
+                                                      fontWeight:
+                                                          FontWeight.bold,
                                                     ),
                                                   ),
                                                 ],
@@ -1661,7 +1854,10 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                   : [
                       TextButton(
                         onPressed: () => Navigator.of(ctx).pop(null),
-                        child: Text('Batal', style: GoogleFonts.outfit(color: Colors.grey)),
+                        child: Text(
+                          'Batal',
+                          style: GoogleFonts.outfit(color: Colors.grey),
+                        ),
                       ),
                       ElevatedButton(
                         onPressed: isProcessingImage
@@ -1676,19 +1872,26 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                                     });
                                   } else {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Pilih file gambar terlebih dahulu!')),
+                                      const SnackBar(
+                                        content: Text(
+                                          'Pilih file gambar terlebih dahulu!',
+                                        ),
+                                      ),
                                     );
                                   }
                                 } else {
                                   final url = urlController.text.trim();
                                   if (url.isNotEmpty) {
-                                    Navigator.of(ctx).pop({
-                                      'type': 'link',
-                                      'url': url,
-                                    });
+                                    Navigator.of(
+                                      ctx,
+                                    ).pop({'type': 'link', 'url': url});
                                   } else {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Masukkan URL link terlebih dahulu!')),
+                                      const SnackBar(
+                                        content: Text(
+                                          'Masukkan URL link terlebih dahulu!',
+                                        ),
+                                      ),
                                     );
                                   }
                                 }
@@ -1702,7 +1905,9 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                         ),
                         child: Text(
                           'Simpan',
-                          style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+                          style: GoogleFonts.outfit(
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ],
@@ -1728,7 +1933,8 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
         final Uint8List croppedBytes = _cropImageToSquare(originalBytes);
 
         // Upload to Supabase Storage in 'profiles' bucket
-        final storagePath = 'avatars/$userId/${DateTime.now().millisecondsSinceEpoch}_$fileName';
+        final storagePath =
+            'avatars/$userId/${DateTime.now().millisecondsSinceEpoch}_$fileName';
         await SupabaseService.client.storage
             .from('profiles')
             .uploadBinary(storagePath, croppedBytes);
@@ -1741,7 +1947,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
         finalUrl = result['url'] as String;
       }
 
-      if (finalUrl == null || finalUrl.isEmpty) {
+      if (finalUrl.isEmpty) {
         throw Exception('URL foto profil kosong.');
       }
 
@@ -1751,7 +1957,9 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
           .eq('id', userId);
 
       // Also update local provider state
-      ref.read(landingPageProvider.notifier).updateUser({'avatar_url': finalUrl});
+      ref.read(landingPageProvider.notifier).updateUser({
+        'avatar_url': finalUrl,
+      });
 
       setState(() => _avatarUrl = finalUrl!);
 
@@ -1777,11 +1985,18 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
     }
   }
 
-
-
   // --- DUITKU INTEGRATION ---
 
   Future<void> _buySubscriptionWithDuitku() async {
+    if (_isAssistant) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Hanya Dokter (Pemilik) yang dapat memperpanjang langganan.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
     final userId = _effectiveUserId;
     final userState = ref.read(landingPageProvider).loggedInUser;
     final email = userState?['email'] ?? 'agoes.soetanto@gmail.com';
@@ -1792,9 +2007,12 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
         'SUBS_${userId.toString().substring(0, 8)}_${DateTime.now().millisecondsSinceEpoch ~/ 1000}';
     final int amount = 150000; // Rp 150.000
 
-    // Sandbox credentials
-    final String merchantCode = 'DS18306';
-    final String merchantKey = 'e0f7e44015ef056b406e1dfd7b1ce05c';
+    // Credentials from environment
+    final String merchantCode = dotenv.env['DUITKU_MERCHANT_CODE'] ?? 'DS18306';
+    final String merchantKey = dotenv.env['DUITKU_MERCHANT_KEY'] ?? 'e0f7e44015ef056b406e1dfd7b1ce05c';
+    final String inquiryUrl = dotenv.env['DUITKU_INQUIRY_URL'] ?? 'https://sandbox.duitku.com/webapi/api/merchant/v2/inquiry';
+    final String callbackUrl = dotenv.env['DUITKU_CALLBACK_URL'] ?? 'https://abdburxhqqwsobmzuwmz.supabase.co/functions/v1/duitku-callback';
+    final String returnUrl = dotenv.env['DUITKU_RETURN_URL'] ?? 'https://mapotech.app/payment-success';
 
     // Signature formula: md5(merchantCode + merchantOrderId + paymentAmount + merchantKey)
     final signatureStr = '$merchantCode$orderId$amount$merchantKey';
@@ -1803,7 +2021,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
 
     try {
       final response = await http.post(
-        Uri.parse('https://sandbox.duitku.com/webapi/api/merchant/v2/inquiry'),
+        Uri.parse(inquiryUrl),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'merchantCode': merchantCode,
@@ -1811,9 +2029,8 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
           'merchantOrderId': orderId,
           'productDetails': 'Perpanjang Layanan Mandiri 30 Hari',
           'email': email,
-          'callbackUrl':
-              'https://abdburxhqqwsobmzuwmz.supabase.co/functions/v1/duitku-callback',
-          'returnUrl': 'https://mapotech.app/payment-success',
+          'callbackUrl': callbackUrl,
+          'returnUrl': returnUrl,
           'signature': signature,
         }),
       );
@@ -2042,15 +2259,12 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
     final inputBg = isDark ? const Color(0xFF1E1E22) : const Color(0xFFF8FAFC);
 
     // Premium Brand Colors adapt dynamically to the global theme
-    final tealColor = isRev ? const Color(0xFFB577F2) : const Color(0xFF00A67E);
-    final purpleColor = isRev
-        ? const Color(0xFF00A67E)
-        : const Color(0xFFB577F2);
+    final notifier = ref.read(landingPageProvider.notifier);
+    final tealColor = notifier.getPrimaryColor();
+    final purpleColor = notifier.getPrimaryColor();
 
     if (_isLoading) {
-      return const SkeletonScope(
-        child: SkeletonProfile(isDoctor: true),
-      );
+      return const SkeletonScope(child: SkeletonProfile(isDoctor: true));
     }
 
     return Column(
@@ -2170,7 +2384,8 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
               clipBehavior: Clip.none,
               alignment: Alignment.bottomCenter,
               children: [
-                if (_avatarUrl.isNotEmpty && ref.watch(landingPageProvider).blurProfileEffectEnabled)
+                if (_avatarUrl.isNotEmpty &&
+                    ref.watch(landingPageProvider).blurProfileEffectEnabled)
                   Positioned.fill(
                     child: ClipRRect(
                       borderRadius: const BorderRadius.only(
@@ -2178,16 +2393,21 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                         topRight: Radius.circular(20),
                       ),
                       child: ImageFiltered(
-                        imageFilter: ImageFilter.blur(sigmaX: 15.0, sigmaY: 15.0),
+                        imageFilter: ImageFilter.blur(
+                          sigmaX: 15.0,
+                          sigmaY: 15.0,
+                        ),
                         child: Image.network(
                           _avatarUrl,
                           fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => const SizedBox(),
+                          errorBuilder: (context, error, stackTrace) =>
+                              const SizedBox(),
                         ),
                       ),
                     ),
                   ),
-                if (_avatarUrl.isNotEmpty && ref.watch(landingPageProvider).blurProfileEffectEnabled)
+                if (_avatarUrl.isNotEmpty &&
+                    ref.watch(landingPageProvider).blurProfileEffectEnabled)
                   Positioned.fill(
                     child: ClipRRect(
                       borderRadius: const BorderRadius.only(
@@ -2505,7 +2725,11 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
               // Header
               Row(
                 children: [
-                  Icon(Icons.person_outline_rounded, color: tealColor, size: 20),
+                  Icon(
+                    Icons.person_outline_rounded,
+                    color: tealColor,
+                    size: 20,
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
@@ -3008,7 +3232,9 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                           GestureDetector(
                             onTap: () {
                               setState(() {
-                                final c = _certificationControllers.removeAt(index);
+                                final c = _certificationControllers.removeAt(
+                                  index,
+                                );
                                 c.dispose();
                                 if (index < _certificationTypes.length) {
                                   _certificationTypes.removeAt(index);
@@ -3031,7 +3257,9 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10),
                           decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF1A1A1E) : Colors.white,
+                            color: isDark
+                                ? const Color(0xFF1A1A1E)
+                                : Colors.white,
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(color: borderColor),
                           ),
@@ -3049,7 +3277,9 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                               ),
                               border: InputBorder.none,
                               isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                              contentPadding: const EdgeInsets.symmetric(
+                                vertical: 10,
+                              ),
                             ),
                           ),
                         )
@@ -3057,12 +3287,17 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                         GestureDetector(
                           onTap: _certificationUploading[index]
                               ? null
-                              : () => _pickAndUploadCertificate(index, controller),
+                              : () => _pickAndUploadCertificate(
+                                  index,
+                                  controller,
+                                ),
                           child: Container(
                             height: 38,
                             padding: const EdgeInsets.symmetric(horizontal: 12),
                             decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF1A1A1E) : Colors.white,
+                              color: isDark
+                                  ? const Color(0xFF1A1A1E)
+                                  : Colors.white,
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
                                 color: tealColor.withOpacity(0.4),
@@ -3091,8 +3326,8 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                                     _certificationUploading[index]
                                         ? 'Mengunggah file...'
                                         : (controller.text.isNotEmpty
-                                            ? _getFileName(controller.text)
-                                            : 'Upload file sertifikat...'),
+                                              ? _getFileName(controller.text)
+                                              : 'Upload file sertifikat...'),
                                     style: GoogleFonts.outfit(
                                       fontSize: 11,
                                       fontWeight: controller.text.isNotEmpty
@@ -3105,7 +3340,8 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
-                                if (!_certificationUploading[index] && controller.text.isNotEmpty) ...[
+                                if (!_certificationUploading[index] &&
+                                    controller.text.isNotEmpty) ...[
                                   const SizedBox(width: 8),
                                   Icon(
                                     Icons.check_circle_rounded,
@@ -3138,9 +3374,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                     height: 44,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: tealColor.withOpacity(0.5),
-                      ),
+                      border: Border.all(color: tealColor.withOpacity(0.5)),
                     ),
                     alignment: Alignment.center,
                     child: Row(
@@ -3168,9 +3402,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
               ElevatedButton.icon(
                 onPressed: _isSaving ? null : _saveProfileAndStatus,
                 icon: Icon(
-                  _isSaving
-                      ? Icons.hourglass_top_rounded
-                      : Icons.save_rounded,
+                  _isSaving ? Icons.hourglass_top_rounded : Icons.save_rounded,
                   size: 16,
                 ),
                 label: Text(_isSaving ? 'Saving...' : 'Save Profile'),
@@ -3798,7 +4030,9 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                         } else {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Please enter a Google Maps link first.'),
+                              content: Text(
+                                'Please enter a Google Maps link first.',
+                              ),
                             ),
                           );
                         }
@@ -3950,8 +4184,8 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                         _faskesController.text.isNotEmpty
                             ? _faskesController.text
                             : (_nameController.text.isNotEmpty
-                                ? 'Praktek ${_nameController.text}'
-                                : 'Dokter Praktek Mandiri'),
+                                  ? 'Praktek ${_nameController.text}'
+                                  : 'Dokter Praktek Mandiri'),
                         style: GoogleFonts.outfit(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
@@ -4337,9 +4571,8 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
     Function(bool) onChanged,
     Color textColor,
     Color subtitleColor,
-    Color activeColor, [
-    VoidCallback? onSavePressed,
-  ]) {
+    Color activeColor,
+  ) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -4368,7 +4601,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
           ),
         ),
         const SizedBox(width: 16),
-        Switch(value: val, onChanged: onChanged, activeColor: activeColor),
+        Switch(value: val, onChanged: onChanged, activeThumbColor: activeColor),
       ],
     );
   }
@@ -4841,6 +5074,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
     Color textColor,
     Color subtitleColor, {
     String? hintText,
+    bool enabled = true,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -4863,6 +5097,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
           ),
           child: TextField(
             controller: controller,
+            enabled: enabled,
             style: GoogleFonts.outfit(
               fontSize: 12,
               fontWeight: FontWeight.bold,
@@ -4891,8 +5126,9 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
     void Function(String?) onChanged,
     Color inputBg,
     Color textColor,
-    Color subtitleColor,
-  ) {
+    Color subtitleColor, {
+    bool enabled = true,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -4914,7 +5150,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
             borderRadius: BorderRadius.circular(10),
           ),
           child: DropdownButtonFormField<String>(
-            value: currentValue,
+            initialValue: currentValue,
             items: items.map((item) {
               return DropdownMenuItem<String>(
                 value: item,
@@ -4928,7 +5164,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                 ),
               );
             }).toList(),
-            onChanged: onChanged,
+            onChanged: enabled ? onChanged : null,
             decoration: const InputDecoration(
               border: InputBorder.none,
               isDense: true,
@@ -5101,7 +5337,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
             // Switch
             Switch(
               value: isActive,
-              activeColor: tealColor,
+              activeThumbColor: tealColor,
               onChanged: (val) {
                 setState(() {
                   dayMap['active'] = val;
@@ -5146,9 +5382,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
 
     final Widget previewChild;
     if (_qrisQrUploading || _qrisBgUploading) {
-      previewChild = Center(
-        child: CircularProgressIndicator(color: tealColor),
-      );
+      previewChild = Center(child: CircularProgressIndicator(color: tealColor));
     } else if (_selectedQrisType == 'AUTOMATIC PAYMENT LINK') {
       previewChild = Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -5174,7 +5408,9 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
       if (qrUrl.isNotEmpty) {
         qrRenderUrl = qrUrl;
       } else {
-        final String qrData = _qrToken.isNotEmpty ? _qrToken : 'StaticQRISPaymentMock';
+        final String qrData = _qrToken.isNotEmpty
+            ? _qrToken
+            : 'StaticQRISPaymentMock';
         qrRenderUrl =
             'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${Uri.encodeComponent(qrData)}';
       }
@@ -5198,7 +5434,9 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                     },
                     errorBuilder: (context, error, stackTrace) {
                       return Container(
-                        color: isDark ? const Color(0xFF1E1E22) : const Color(0xFFF1F5F9),
+                        color: isDark
+                            ? const Color(0xFF1E1E22)
+                            : const Color(0xFFF1F5F9),
                         child: const Center(
                           child: Icon(
                             Icons.broken_image_outlined,
@@ -5214,7 +5452,10 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                       gradient: LinearGradient(
                         colors: isDark
                             ? [const Color(0xFF1B2824), const Color(0xFF0F1715)]
-                            : [const Color(0xFFEAF8F5), const Color(0xFFD1F2EB)],
+                            : [
+                                const Color(0xFFEAF8F5),
+                                const Color(0xFFD1F2EB),
+                              ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
@@ -5294,7 +5535,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                               color: Colors.black.withOpacity(0.6),
                               blurRadius: 4,
                               offset: const Offset(0, 1),
-                            )
+                            ),
                           ]
                         : null,
                   ),
@@ -5315,7 +5556,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                               color: Colors.black.withOpacity(0.6),
                               blurRadius: 4,
                               offset: const Offset(0, 1),
-                            )
+                            ),
                           ]
                         : null,
                   ),
@@ -5463,12 +5704,19 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                     // Dynamic fields based on active QR Code Source Type
                     if (_selectedQrisType == 'AUTOMATIC PAYMENT LINK') ...[
                       Container(
-                        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 24,
+                          horizontal: 16,
+                        ),
                         decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF1E1E22) : const Color(0xFFF8FAFC),
+                          color: isDark
+                              ? const Color(0xFF1E1E22)
+                              : const Color(0xFFF8FAFC),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: isDark ? const Color(0xFF2C2C30) : const Color(0xFFE2E8F0),
+                            color: isDark
+                                ? const Color(0xFF2C2C30)
+                                : const Color(0xFFE2E8F0),
                           ),
                         ),
                         child: Column(
@@ -5531,11 +5779,15 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                         ),
                         const SizedBox(height: 8),
                         GestureDetector(
-                          onTap: _qrisQrUploading ? null : _pickAndUploadQrisPhoto,
+                          onTap: _qrisQrUploading
+                              ? null
+                              : _pickAndUploadQrisPhoto,
                           child: Container(
                             height: 50,
                             decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF1E1E22) : const Color(0xFFFAFAFB),
+                              color: isDark
+                                  ? const Color(0xFF1E1E22)
+                                  : const Color(0xFFFAFAFB),
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
                                 color: tealColor.withOpacity(0.4),
@@ -5554,7 +5806,8 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                                       ),
                                     )
                                   : Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
                                         Icon(
                                           Icons.cloud_upload_outlined,
@@ -5585,7 +5838,8 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                             color: subtitleColor.withOpacity(0.8),
                           ),
                         ),
-                      ] else if (_selectedQrisType == 'QR IMAGE URL / LABEL') ...[
+                      ] else if (_selectedQrisType ==
+                          'QR IMAGE URL / LABEL') ...[
                         _buildInputLabelAndField(
                           'QR Image URL',
                           _qrisQrLinkController,
@@ -5620,7 +5874,9 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                       Container(
                         padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF1E1E22) : const Color(0xFFF1F5F9),
+                          color: isDark
+                              ? const Color(0xFF1E1E22)
+                              : const Color(0xFFF1F5F9),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: borderColor),
                         ),
@@ -5671,11 +5927,15 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                         ),
                         const SizedBox(height: 8),
                         GestureDetector(
-                          onTap: _qrisBgUploading ? null : _pickAndUploadQrisBgPhoto,
+                          onTap: _qrisBgUploading
+                              ? null
+                              : _pickAndUploadQrisBgPhoto,
                           child: Container(
                             height: 50,
                             decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF1E1E22) : const Color(0xFFFAFAFB),
+                              color: isDark
+                                  ? const Color(0xFF1E1E22)
+                                  : const Color(0xFFFAFAFB),
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
                                 color: tealColor.withOpacity(0.4),
@@ -5694,7 +5954,8 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                                       ),
                                     )
                                   : Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
                                         Icon(
                                           Icons.cloud_upload_outlined,
@@ -5732,7 +5993,8 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                           inputBg,
                           textColor,
                           subtitleColor,
-                          hintText: 'https://example.com/your-background-image.png',
+                          hintText:
+                              'https://example.com/your-background-image.png',
                         ),
                         const SizedBox(height: 6),
                         Text(
@@ -5746,7 +6008,9 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF1E2824).withOpacity(0.3) : const Color(0xFFEAF8F5).withOpacity(0.3),
+                            color: isDark
+                                ? const Color(0xFF1E2824).withOpacity(0.3)
+                                : const Color(0xFFEAF8F5).withOpacity(0.3),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Center(
@@ -5931,7 +6195,9 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
     if (pathOrUrl.isEmpty) return '';
     try {
       final uri = Uri.parse(pathOrUrl);
-      final segment = uri.pathSegments.isNotEmpty ? uri.pathSegments.last : pathOrUrl;
+      final segment = uri.pathSegments.isNotEmpty
+          ? uri.pathSegments.last
+          : pathOrUrl;
       final parts = segment.split('_');
       if (parts.length > 1 && int.tryParse(parts[0]) != null) {
         return parts.sublist(1).join('_');
@@ -5942,7 +6208,10 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
     }
   }
 
-  Future<void> _pickAndUploadCertificate(int index, TextEditingController controller) async {
+  Future<void> _pickAndUploadCertificate(
+    int index,
+    TextEditingController controller,
+  ) async {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -5962,7 +6231,8 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
 
       final fileName = file.name;
       final userId = _effectiveUserId;
-      final storagePath = 'certifications/$userId/${DateTime.now().millisecondsSinceEpoch}_$fileName';
+      final storagePath =
+          'certifications/$userId/${DateTime.now().millisecondsSinceEpoch}_$fileName';
 
       String publicUrl;
       bool isMocked = false;
@@ -5984,8 +6254,11 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
       } catch (uploadError) {
         // Fallback: If upload fails (e.g. bucket/RLS policy not configured, or offline),
         // we use a local mock path representation so the user can test the profile save flow locally.
-        print('Supabase upload failed: $uploadError. Falling back to local mock URL.');
-        publicUrl = 'mock_uploads/${DateTime.now().millisecondsSinceEpoch}_$fileName';
+        print(
+          'Supabase upload failed: $uploadError. Falling back to local mock URL.',
+        );
+        publicUrl =
+            'mock_uploads/${DateTime.now().millisecondsSinceEpoch}_$fileName';
         isMocked = true;
       }
 
@@ -5997,9 +6270,11 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(isMocked
-                ? 'File ${file.name} dipilih! (Simulasi Offline)'
-                : 'File ${file.name} berhasil diunggah!'),
+            content: Text(
+              isMocked
+                  ? 'File ${file.name} dipilih! (Simulasi Offline)'
+                  : 'File ${file.name} berhasil diunggah!',
+            ),
             backgroundColor: Colors.green,
           ),
         );
@@ -6037,7 +6312,8 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
 
       final fileName = file.name;
       final userId = _effectiveUserId;
-      final storagePath = 'qris/$userId/${DateTime.now().millisecondsSinceEpoch}_qr_$fileName';
+      final storagePath =
+          'qris/$userId/${DateTime.now().millisecondsSinceEpoch}_qr_$fileName';
 
       String publicUrl;
       bool isMocked = false;
@@ -6059,8 +6335,11 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
       } catch (uploadError) {
         // Fallback: If upload fails (e.g. offline or no bucket/RLS configuration),
         // we use a local mock URL so it remains testable in the profile save flow.
-        print('Supabase upload failed: $uploadError. Falling back to local mock URL.');
-        publicUrl = 'mock_uploads/${DateTime.now().millisecondsSinceEpoch}_qr_$fileName';
+        print(
+          'Supabase upload failed: $uploadError. Falling back to local mock URL.',
+        );
+        publicUrl =
+            'mock_uploads/${DateTime.now().millisecondsSinceEpoch}_qr_$fileName';
         isMocked = true;
       }
 
@@ -6071,9 +6350,11 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(isMocked
-                ? 'File QR ${file.name} dipilih! (Simulasi Offline)'
-                : 'File QR ${file.name} berhasil diunggah!'),
+            content: Text(
+              isMocked
+                  ? 'File QR ${file.name} dipilih! (Simulasi Offline)'
+                  : 'File QR ${file.name} berhasil diunggah!',
+            ),
             backgroundColor: Colors.green,
           ),
         );
@@ -6111,7 +6392,8 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
 
       final fileName = file.name;
       final userId = _effectiveUserId;
-      final storagePath = 'qris/$userId/${DateTime.now().millisecondsSinceEpoch}_bg_$fileName';
+      final storagePath =
+          'qris/$userId/${DateTime.now().millisecondsSinceEpoch}_bg_$fileName';
 
       String publicUrl;
       bool isMocked = false;
@@ -6133,8 +6415,11 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
       } catch (uploadError) {
         // Fallback: If upload fails (e.g. offline or no bucket/RLS configuration),
         // we use a local mock URL so it remains testable in the profile save flow.
-        print('Supabase upload failed: $uploadError. Falling back to local mock URL.');
-        publicUrl = 'mock_uploads/${DateTime.now().millisecondsSinceEpoch}_bg_$fileName';
+        print(
+          'Supabase upload failed: $uploadError. Falling back to local mock URL.',
+        );
+        publicUrl =
+            'mock_uploads/${DateTime.now().millisecondsSinceEpoch}_bg_$fileName';
         isMocked = true;
       }
 
@@ -6145,9 +6430,11 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(isMocked
-                ? 'File Background ${file.name} dipilih! (Simulasi Offline)'
-                : 'File Background ${file.name} berhasil diunggah!'),
+            content: Text(
+              isMocked
+                  ? 'File Background ${file.name} dipilih! (Simulasi Offline)'
+                  : 'File Background ${file.name} berhasil diunggah!',
+            ),
             backgroundColor: Colors.green,
           ),
         );
@@ -6360,10 +6647,7 @@ class MapGraphicsPainter extends CustomPainter {
   final bool isDark;
   final double zoomLevel;
 
-  MapGraphicsPainter({
-    required this.isDark,
-    required this.zoomLevel,
-  });
+  MapGraphicsPainter({required this.isDark, required this.zoomLevel});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -6397,7 +6681,7 @@ class MapGraphicsPainter extends CustomPainter {
 
     final double cx = size.width / 2;
     final double cy = size.height / 2;
-    
+
     // Scale spacing based on zoom level
     final double spacing = 80.0 * (zoomLevel / 15.0);
 
@@ -6442,7 +6726,11 @@ class MapGraphicsPainter extends CustomPainter {
     // Draw some mock building blocks
     final double buildingSize = 25.0 * (zoomLevel / 15.0);
     for (double x = cx - spacing * 3; x < size.width + spacing; x += spacing) {
-      for (double y = cy - spacing * 2; y < size.height + spacing; y += spacing) {
+      for (
+        double y = cy - spacing * 2;
+        y < size.height + spacing;
+        y += spacing
+      ) {
         if ((x - cx).abs() > 10 && (y - cy).abs() > 10) {
           canvas.drawRRect(
             RRect.fromRectAndRadius(

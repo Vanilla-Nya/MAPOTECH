@@ -98,6 +98,15 @@ class LandingPageState {
   final Set<String> syncedTransactions;
   final double defaultServiceFee;
 
+  bool get isAssistant => loggedInUser?['role'] == 'asisten_dokter';
+
+  String? get activeDoctorId {
+    if (isAssistant) {
+      return loggedInUser?['doctor_id'] as String?;
+    }
+    return loggedInUser?['id'] as String?;
+  }
+
   const LandingPageState({
     required this.activeTab,
     required this.language,

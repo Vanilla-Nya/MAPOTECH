@@ -39,16 +39,34 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
   void initState() {
     super.initState();
     final user = ref.read(landingPageProvider).loggedInUser;
-    
+
     _nameController = TextEditingController(text: user?['name'] ?? 'Alvin');
-    _nikController = TextEditingController(text: user?['nik'] ?? '3511081208000003');
-    _phoneController = TextEditingController(text: user?['phone_number'] ?? '08XXXXXXXXXX');
-    _birthDateController = TextEditingController(text: user?['birth_date'] ?? '2000-12-08');
-    _addressDetailController = TextEditingController(text: user?['address'] ?? 'Kel. KEJAYAN, Kec. PUER, KABUPATEN BONDOWOSO, Prov. JAWA TIMUR');
-    _provinceController = TextEditingController(text: user?['province'] ?? 'JAWA TIMUR');
-    _districtController = TextEditingController(text: user?['district'] ?? 'KABUPATEN BONDOWOSO');
-    _subDistrictController = TextEditingController(text: user?['sub_district'] ?? 'PUER');
-    _villageController = TextEditingController(text: user?['village'] ?? 'KEJAYAN');
+    _nikController = TextEditingController(
+      text: user?['nik'] ?? '3511081208000003',
+    );
+    _phoneController = TextEditingController(
+      text: user?['phone_number'] ?? '08XXXXXXXXXX',
+    );
+    _birthDateController = TextEditingController(
+      text: user?['birth_date'] ?? '2000-12-08',
+    );
+    _addressDetailController = TextEditingController(
+      text:
+          user?['address'] ??
+          'Kel. KEJAYAN, Kec. PUER, KABUPATEN BONDOWOSO, Prov. JAWA TIMUR',
+    );
+    _provinceController = TextEditingController(
+      text: user?['province'] ?? 'JAWA TIMUR',
+    );
+    _districtController = TextEditingController(
+      text: user?['district'] ?? 'KABUPATEN BONDOWOSO',
+    );
+    _subDistrictController = TextEditingController(
+      text: user?['sub_district'] ?? 'PUER',
+    );
+    _villageController = TextEditingController(
+      text: user?['village'] ?? 'KEJAYAN',
+    );
     _gender = user?['gender'] ?? 'male';
 
     _loadPatientDetails();
@@ -80,7 +98,7 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
       if (profile != null) {
         // Sync app state
         ref.read(landingPageProvider.notifier).updateUser(profile);
-        
+
         final syncedUser = ref.read(landingPageProvider).loggedInUser;
         _nameController.text = syncedUser?['name'] ?? '';
         _nikController.text = syncedUser?['nik'] ?? '';
@@ -128,20 +146,32 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
 
     try {
       await _db.updatePatientProfile(user['id'], updatedData);
-      
+
       // Update local state
       ref.read(landingPageProvider.notifier).updateUser(updatedData);
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Profil Anda berhasil diperbarui di database!', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white)),
+          content: Text(
+            'Profil Anda berhasil diperbarui di database!',
+            style: GoogleFonts.outfit(
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
           backgroundColor: const Color(0xFF27AE60),
         ),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Gagal memperbarui profil: $e', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white)),
+          content: Text(
+            'Gagal memperbarui profil: $e',
+            style: GoogleFonts.outfit(
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -157,21 +187,24 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
 
     final isDark = state.appearance == 'dark';
     final isRev = state.appearance == 'rev';
-    final cardBg = isDark ? const Color(0xFF161619) : Colors.white;
-    final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
-    final subtitleColor = isDark ? Colors.grey[400]! : const Color(0xFF6F6A8A);
-    final borderColor = isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2);
+    final notifier = ref.read(landingPageProvider.notifier);
+    final cardBg = notifier.getCardColor();
+    final textColor = notifier.getTextColor();
+    final subtitleColor = notifier.getBodyTextColor();
+    final borderColor = notifier.getBorderColor();
     final inputBg = isDark ? const Color(0xFF1E1E22) : const Color(0xFFF3F0FA);
-    final purple = const Color(0xFFB577F2);
+    final purple = notifier.getPrimaryColor();
     final orange = const Color(0xFFF39C12);
     final blue = const Color(0xFF3498DB);
 
     // Retrieve subscription state from user
-    final subStatus = (user?['subscription_status'] ?? 'inactive').toString().toUpperCase();
-    final subExpiry = user?['subscription_expires_at'] != null 
-        ? user!['subscription_expires_at'].toString().split('T').first 
+    final subStatus = (user?['subscription_status'] ?? 'inactive')
+        .toString()
+        .toUpperCase();
+    final subExpiry = user?['subscription_expires_at'] != null
+        ? user!['subscription_expires_at'].toString().split('T').first
         : '-';
-    
+
     int sisaHari = 0;
     if (user?['subscription_expires_at'] != null) {
       try {
@@ -183,17 +216,24 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
 
     // Retrieve patient detail columns
     final bpjsNumber = _patientDetail?['no_bpjs'] ?? 'Belum dihubungkan';
-    final qrToken = _patientDetail?['qr_token'] ?? user?['id'] ?? 'TOKEN-MOCK-123';
+    final qrToken =
+        _patientDetail?['qr_token'] ?? user?['id'] ?? 'TOKEN-MOCK-123';
 
     return _isLoading
-        ? const SkeletonScope(
-            child: SkeletonProfile(isDoctor: false),
-          )
+        ? const SkeletonScope(child: SkeletonProfile(isDoctor: false))
         : Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // ── Hero Banner ───────────────────────────────────────────────────
-              _buildHeroBanner(isDark, isRev, textColor, subtitleColor, purple, cardBg, user),
+              _buildHeroBanner(
+                isDark,
+                isRev,
+                textColor,
+                subtitleColor,
+                purple,
+                cardBg,
+                user,
+              ),
 
               const SizedBox(height: 20),
 
@@ -210,7 +250,9 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
                       label: 'Status:',
                       value: subStatus,
                       subtitleColor: subtitleColor,
-                      valueColor: subStatus == 'ACTIVE' ? const Color(0xFF27AE60) : orange,
+                      valueColor: subStatus == 'ACTIVE'
+                          ? const Color(0xFF27AE60)
+                          : orange,
                       rightBold: true,
                       inputBg: inputBg,
                     ),
@@ -245,10 +287,20 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
                 border: borderColor,
                 textColor: textColor,
                 trailing: TextButton.icon(
-                  icon: Icon(_isSaving ? Icons.hourglass_top_rounded : Icons.save_rounded, size: 13, color: purple),
+                  icon: Icon(
+                    _isSaving
+                        ? Icons.hourglass_top_rounded
+                        : Icons.save_rounded,
+                    size: 13,
+                    color: purple,
+                  ),
                   label: Text(
                     _isSaving ? 'Menyimpan...' : 'Simpan Profil',
-                    style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w700, color: purple),
+                    style: GoogleFonts.outfit(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: purple,
+                    ),
                   ),
                   onPressed: _isSaving ? null : _saveProfileChanges,
                 ),
@@ -257,11 +309,25 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
                     Row(
                       children: [
                         Expanded(
-                          child: _buildEditableField('Nama Lengkap', _nameController, inputBg, textColor, subtitleColor, Icons.person_outline_rounded),
+                          child: _buildEditableField(
+                            'Nama Lengkap',
+                            _nameController,
+                            inputBg,
+                            textColor,
+                            subtitleColor,
+                            Icons.person_outline_rounded,
+                          ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: _buildEditableField('NIK', _nikController, inputBg, textColor, subtitleColor, Icons.badge_outlined),
+                          child: _buildEditableField(
+                            'NIK',
+                            _nikController,
+                            inputBg,
+                            textColor,
+                            subtitleColor,
+                            Icons.badge_outlined,
+                          ),
                         ),
                       ],
                     ),
@@ -269,11 +335,25 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
                     Row(
                       children: [
                         Expanded(
-                          child: _buildEditableField('Nomor Telepon', _phoneController, inputBg, textColor, subtitleColor, Icons.phone_outlined),
+                          child: _buildEditableField(
+                            'Nomor Telepon',
+                            _phoneController,
+                            inputBg,
+                            textColor,
+                            subtitleColor,
+                            Icons.phone_outlined,
+                          ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: _buildEditableField('Tanggal Lahir (YYYY-MM-DD)', _birthDateController, inputBg, textColor, subtitleColor, Icons.cake_outlined),
+                          child: _buildEditableField(
+                            'Tanggal Lahir (YYYY-MM-DD)',
+                            _birthDateController,
+                            inputBg,
+                            textColor,
+                            subtitleColor,
+                            Icons.cake_outlined,
+                          ),
                         ),
                       ],
                     ),
@@ -283,7 +363,11 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
                       children: [
                         Text(
                           'Jenis Kelamin',
-                          style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w700, color: subtitleColor),
+                          style: GoogleFonts.outfit(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: subtitleColor,
+                          ),
                         ),
                         const SizedBox(height: 6),
                         Container(
@@ -299,10 +383,20 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
                               value: _gender,
                               dropdownColor: cardBg,
                               isExpanded: true,
-                              style: GoogleFonts.outfit(fontSize: 12, color: textColor, fontWeight: FontWeight.bold),
+                              style: GoogleFonts.outfit(
+                                fontSize: 12,
+                                color: textColor,
+                                fontWeight: FontWeight.bold,
+                              ),
                               items: const [
-                                DropdownMenuItem(value: 'male', child: Text('Laki-laki')),
-                                DropdownMenuItem(value: 'female', child: Text('Perempuan')),
+                                DropdownMenuItem(
+                                  value: 'male',
+                                  child: Text('Laki-laki'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'female',
+                                  child: Text('Perempuan'),
+                                ),
                               ],
                               onChanged: (val) {
                                 if (val != null) {
@@ -341,11 +435,25 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
                     Row(
                       children: [
                         Expanded(
-                          child: _buildEditableField('Provinsi', _provinceController, inputBg, textColor, subtitleColor, Icons.map_outlined),
+                          child: _buildEditableField(
+                            'Provinsi',
+                            _provinceController,
+                            inputBg,
+                            textColor,
+                            subtitleColor,
+                            Icons.map_outlined,
+                          ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: _buildEditableField('Kota/Kabupaten', _districtController, inputBg, textColor, subtitleColor, Icons.location_city_rounded),
+                          child: _buildEditableField(
+                            'Kota/Kabupaten',
+                            _districtController,
+                            inputBg,
+                            textColor,
+                            subtitleColor,
+                            Icons.location_city_rounded,
+                          ),
                         ),
                       ],
                     ),
@@ -353,18 +461,36 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
                     Row(
                       children: [
                         Expanded(
-                          child: _buildEditableField('Kecamatan', _subDistrictController, inputBg, textColor, subtitleColor, Icons.landscape_outlined),
+                          child: _buildEditableField(
+                            'Kecamatan',
+                            _subDistrictController,
+                            inputBg,
+                            textColor,
+                            subtitleColor,
+                            Icons.landscape_outlined,
+                          ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: _buildEditableField('Kelurahan/Desa', _villageController, inputBg, textColor, subtitleColor, Icons.home_work_outlined),
+                          child: _buildEditableField(
+                            'Kelurahan/Desa',
+                            _villageController,
+                            inputBg,
+                            textColor,
+                            subtitleColor,
+                            Icons.home_work_outlined,
+                          ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 12),
                     Text(
                       'Alamat Detail Jalan',
-                      style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w700, color: subtitleColor),
+                      style: GoogleFonts.outfit(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: subtitleColor,
+                      ),
                     ),
                     const SizedBox(height: 6),
                     Container(
@@ -373,14 +499,24 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: borderColor),
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 4,
+                      ),
                       child: TextField(
                         controller: _addressDetailController,
                         maxLines: 2,
-                        style: GoogleFonts.outfit(fontSize: 12, color: textColor, fontWeight: FontWeight.bold),
+                        style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          color: textColor,
+                          fontWeight: FontWeight.bold,
+                        ),
                         decoration: InputDecoration(
                           hintText: 'Masukkan alamat tinggal detail...',
-                          hintStyle: GoogleFonts.outfit(fontSize: 11, color: subtitleColor.withOpacity(0.5)),
+                          hintStyle: GoogleFonts.outfit(
+                            fontSize: 11,
+                            color: subtitleColor.withOpacity(0.5),
+                          ),
                           border: InputBorder.none,
                         ),
                       ),
@@ -443,7 +579,11 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
                     const SizedBox(height: 12),
                     Text(
                       'Token QR: $qrToken',
-                      style: GoogleFonts.outfit(fontSize: 9, color: subtitleColor, fontWeight: FontWeight.bold),
+                      style: GoogleFonts.outfit(
+                        fontSize: 9,
+                        color: subtitleColor,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     // Large QR mockup
@@ -553,11 +693,13 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
                       ],
                     ),
                     child: ClipOval(
-                      child: (user?['avatar_url'] != null && (user!['avatar_url'] as String).isNotEmpty)
+                      child:
+                          (user?['avatar_url'] != null &&
+                              (user!['avatar_url'] as String).isNotEmpty)
                           ? Image.network(
                               user['avatar_url'] as String,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Center(
+                              errorBuilder: (_, _, _) => Center(
                                 child: Text(
                                   initial,
                                   style: GoogleFonts.outfit(
@@ -567,12 +709,17 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
                                   ),
                                 ),
                               ),
-                              loadingBuilder: (_, child, progress) => progress == null
+                              loadingBuilder: (_, child, progress) =>
+                                  progress == null
                                   ? child
                                   : Center(
                                       child: SizedBox(
-                                        width: 20, height: 20,
-                                        child: CircularProgressIndicator(strokeWidth: 2, color: purple),
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: purple,
+                                        ),
                                       ),
                                     ),
                             )
@@ -597,7 +744,11 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
                       border: Border.all(color: Colors.white, width: 2),
                     ),
                     alignment: Alignment.center,
-                    child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 11),
+                    child: const Icon(
+                      Icons.camera_alt_rounded,
+                      color: Colors.white,
+                      size: 11,
+                    ),
                   ),
                 ],
               ),
@@ -616,7 +767,8 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
                 email,
                 style: GoogleFonts.outfit(
                   fontSize: 11,
-                  color: (isDark ? Colors.white : const Color(0xFF3D1A6E)).withOpacity(0.6),
+                  color: (isDark ? Colors.white : const Color(0xFF3D1A6E))
+                      .withOpacity(0.6),
                 ),
               ),
             ],
@@ -639,7 +791,11 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
       children: [
         Text(
           label,
-          style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w700, color: subtitle),
+          style: GoogleFonts.outfit(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: subtitle,
+          ),
         ),
         const SizedBox(height: 6),
         Container(
@@ -657,7 +813,11 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
               Expanded(
                 child: TextField(
                   controller: controller,
-                  style: GoogleFonts.outfit(fontSize: 12, color: text, fontWeight: FontWeight.bold),
+                  style: GoogleFonts.outfit(
+                    fontSize: 12,
+                    color: text,
+                    fontWeight: FontWeight.bold,
+                  ),
                   decoration: const InputDecoration(
                     border: InputBorder.none,
                     isDense: true,
@@ -685,17 +845,17 @@ class _LargeQrPainter extends CustomPainter {
 
     // A more detailed QR-like pattern
     const grid = [
-      [1,1,1,1,1,1,1,0,1,0,1],
-      [1,0,0,0,0,0,1,0,0,1,0],
-      [1,0,1,1,1,0,1,0,1,1,1],
-      [1,0,1,1,1,0,1,0,0,0,1],
-      [1,0,1,1,1,0,1,0,1,0,0],
-      [1,0,0,0,0,0,1,0,1,1,0],
-      [1,1,1,1,1,1,1,0,1,0,1],
-      [0,0,0,0,0,0,0,0,0,1,0],
-      [1,0,1,1,0,1,1,0,1,1,1],
-      [0,1,0,0,1,0,0,0,0,0,1],
-      [1,1,0,1,1,0,1,0,1,1,1],
+      [1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1],
+      [1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0],
+      [1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1],
+      [1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 1],
+      [1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 0],
+      [1, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0],
+      [1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
+      [1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1],
+      [0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1],
+      [1, 1, 0, 1, 1, 0, 1, 0, 1, 1, 1],
     ];
 
     for (int r = 0; r < 11; r++) {
@@ -703,7 +863,12 @@ class _LargeQrPainter extends CustomPainter {
         if (grid[r][c] == 1) {
           canvas.drawRRect(
             RRect.fromRectAndRadius(
-              Rect.fromLTWH(r * cell + 0.8, c * cell + 0.8, cell - 1.6, cell - 1.6),
+              Rect.fromLTWH(
+                r * cell + 0.8,
+                c * cell + 0.8,
+                cell - 1.6,
+                cell - 1.6,
+              ),
               const Radius.circular(1.5),
             ),
             paint,

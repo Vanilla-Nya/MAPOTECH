@@ -15,12 +15,12 @@ class DokterDashboard extends ConsumerWidget {
 
     final isDark = state.appearance == 'dark';
     final isRev = state.appearance == 'rev';
-    final cardBgColor = isDark ? const Color(0xFF161619) : Colors.white;
-    final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
-    final subtitleColor = isDark ? Colors.grey[400]! : const Color(0xFF6F6A8A);
-    final borderColor = isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2);
+    final cardBgColor = notifier.getCardColor();
+    final textColor = notifier.getTextColor();
+    final subtitleColor = notifier.getBodyTextColor();
+    final borderColor = notifier.getBorderColor();
 
-    final themeAccent = isRev ? const Color(0xFFB577F2) : const Color(0xFF48C9B0);
+    final themeAccent = notifier.getPrimaryColor();
     final isMobile = MediaQuery.of(context).size.width < 768;
 
     return Column(
@@ -60,12 +60,12 @@ class DokterDashboard extends ConsumerWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF48C9B0).withOpacity(0.12),
+                            color: themeAccent.withOpacity(0.12),
                             borderRadius: BorderRadius.circular(100),
                           ),
                           child: Text(
                             notifier.t('SEDANG BERTUGAS'),
-                            style: GoogleFonts.outfit(fontSize: 6.5, fontWeight: FontWeight.w900, color: const Color(0xFF48C9B0)),
+                            style: GoogleFonts.outfit(fontSize: 6.5, fontWeight: FontWeight.w900, color: themeAccent),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -77,11 +77,13 @@ class DokterDashboard extends ConsumerWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'dr. Agoes Soetanto',
+                      state.loggedInName ?? 'dr. Agoes Soetanto',
                       style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w900, color: textColor),
                     ),
                     Text(
-                      'Dokter Praktek Mandiri dr. Agoes Soetanto, dr',
+                      state.isAssistant
+                          ? 'Asisten Praktik dr. Agoes Soetanto'
+                          : 'Dokter Praktek Mandiri ${state.loggedInName ?? "dr. Agoes Soetanto"}',
                       style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
                     ),
                   ],

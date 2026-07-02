@@ -21,39 +21,142 @@ class DrawerMenuItem {
   });
 }
 
-List<DrawerMenuItem> getMenuItemsForRole(String role, String lang) {
+List<DrawerMenuItem> getMenuItemsForRole(String role, String lang, {LandingPageState? state}) {
   final isEn = lang == 'en';
+  List<DrawerMenuItem> items = [];
   if (role == 'dokter') {
-    return [
-      DrawerMenuItem(id: 'dashboard', label: 'Dashboard', icon: Icons.dashboard_rounded),
-      DrawerMenuItem(id: 'pasien', label: isEn ? 'Patients' : 'Pasien', icon: Icons.people_rounded),
-      DrawerMenuItem(id: 'obat', label: isEn ? 'Medicines' : 'Obat', icon: Icons.medication_rounded),
-      DrawerMenuItem(id: 'antrian', label: isEn ? 'Queues' : 'Antrian', icon: Icons.hourglass_empty_rounded),
-      DrawerMenuItem(id: 'pemeriksaan', label: isEn ? 'Examinations' : 'Pemeriksaan', icon: Icons.assignment_rounded),
-      DrawerMenuItem(id: 'pembukuan', label: isEn ? 'Bookkeeping' : 'Pembukuan', icon: Icons.account_balance_wallet_rounded),
-      DrawerMenuItem(id: 'asisten_praktik', label: isEn ? 'Practice Assistant' : 'Asisten Praktik', icon: Icons.badge_rounded),
-      DrawerMenuItem(id: 'profile', label: isEn ? 'Profile' : 'Profil', icon: Icons.person_rounded),
+    items = [
+      DrawerMenuItem(
+        id: 'dashboard',
+        label: 'Dashboard',
+        icon: Icons.dashboard_rounded,
+      ),
+      DrawerMenuItem(
+        id: 'pasien',
+        label: isEn ? 'Patients' : 'Pasien',
+        icon: Icons.people_rounded,
+      ),
+      DrawerMenuItem(
+        id: 'obat',
+        label: isEn ? 'Medicines' : 'Obat',
+        icon: Icons.medication_rounded,
+      ),
+      DrawerMenuItem(
+        id: 'antrian',
+        label: isEn ? 'Queues' : 'Antrian',
+        icon: Icons.hourglass_empty_rounded,
+      ),
+      DrawerMenuItem(
+        id: 'pemeriksaan',
+        label: isEn ? 'Examinations' : 'Pemeriksaan',
+        icon: Icons.assignment_rounded,
+      ),
+      DrawerMenuItem(
+        id: 'pembukuan',
+        label: isEn ? 'Bookkeeping' : 'Pembukuan',
+        icon: Icons.account_balance_wallet_rounded,
+      ),
+      DrawerMenuItem(
+        id: 'asisten_praktik',
+        label: isEn ? 'Practice Assistant' : 'Asisten Praktik',
+        icon: Icons.badge_rounded,
+      ),
+      DrawerMenuItem(
+        id: 'profile',
+        label: isEn ? 'Profile' : 'Profil',
+        icon: Icons.person_rounded,
+      ),
     ];
   } else if (role == 'apotek') {
-    return [
-      DrawerMenuItem(id: 'dashboard', label: 'Dashboard', icon: Icons.dashboard_rounded),
-      DrawerMenuItem(id: 'penjualan', label: isEn ? 'POS (Sales)' : 'POS (Penjualan)', icon: Icons.shopping_cart_rounded),
-      DrawerMenuItem(id: 'inventori', label: isEn ? 'Inventory' : 'Inventori', icon: Icons.inventory_2_rounded),
-      DrawerMenuItem(id: 'pesanan', label: isEn ? 'Incoming Orders' : 'Pesanan Masuk', icon: Icons.description_rounded),
-      DrawerMenuItem(id: 'laporan', label: isEn ? 'Financial Reports' : 'Laporan Keuangan', icon: Icons.bar_chart_rounded),
-      DrawerMenuItem(id: 'staff', label: isEn ? 'Staff Management' : 'Manajemen Staff', icon: Icons.groups_rounded),
-      DrawerMenuItem(id: 'profile', label: isEn ? 'Profile' : 'Profil', icon: Icons.account_circle_rounded),
+    items = [
+      DrawerMenuItem(
+        id: 'dashboard',
+        label: 'Dashboard',
+        icon: Icons.dashboard_rounded,
+      ),
+      DrawerMenuItem(
+        id: 'penjualan',
+        label: isEn ? 'POS (Sales)' : 'POS (Penjualan)',
+        icon: Icons.shopping_cart_rounded,
+      ),
+      DrawerMenuItem(
+        id: 'inventori',
+        label: isEn ? 'Inventory' : 'Inventori',
+        icon: Icons.inventory_2_rounded,
+      ),
+      DrawerMenuItem(
+        id: 'pesanan',
+        label: isEn ? 'Incoming Orders' : 'Pesanan Masuk',
+        icon: Icons.description_rounded,
+      ),
+      DrawerMenuItem(
+        id: 'laporan',
+        label: isEn ? 'Financial Reports' : 'Laporan Keuangan',
+        icon: Icons.bar_chart_rounded,
+      ),
+      DrawerMenuItem(
+        id: 'staff',
+        label: isEn ? 'Staff Management' : 'Manajemen Staff',
+        icon: Icons.groups_rounded,
+      ),
+      DrawerMenuItem(
+        id: 'profile',
+        label: isEn ? 'Profile' : 'Profil',
+        icon: Icons.account_circle_rounded,
+      ),
     ];
   } else {
-    return [
-      DrawerMenuItem(id: 'dashboard', label: 'Dashboard', icon: Icons.dashboard_rounded),
-      DrawerMenuItem(id: 'dokter_search', label: isEn ? 'Search Private Practice' : 'Cari Praktik Mandiri', icon: Icons.search_rounded),
-      DrawerMenuItem(id: 'apotek_search', label: isEn ? 'Search Pharmacy' : 'Cari Apotek', icon: Icons.local_pharmacy_rounded),
-      DrawerMenuItem(id: 'history', label: isEn ? 'History' : 'Riwayat', icon: Icons.history_rounded),
-      DrawerMenuItem(id: 'prescription', label: isEn ? 'Prescriptions' : 'Resep Obat', icon: Icons.medication_rounded),
-      DrawerMenuItem(id: 'profile', label: isEn ? 'Profile' : 'Profil', icon: Icons.person_rounded),
+    items = [
+      DrawerMenuItem(
+        id: 'dashboard',
+        label: 'Dashboard',
+        icon: Icons.dashboard_rounded,
+      ),
+      DrawerMenuItem(
+        id: 'dokter_search',
+        label: isEn ? 'Search Private Practice' : 'Cari Praktik Mandiri',
+        icon: Icons.search_rounded,
+      ),
+      DrawerMenuItem(
+        id: 'apotek_search',
+        label: isEn ? 'Search Pharmacy' : 'Cari Apotek',
+        icon: Icons.local_pharmacy_rounded,
+      ),
+      DrawerMenuItem(
+        id: 'history',
+        label: isEn ? 'History' : 'Riwayat',
+        icon: Icons.history_rounded,
+      ),
+      DrawerMenuItem(
+        id: 'prescription',
+        label: isEn ? 'Prescriptions' : 'Resep Obat',
+        icon: Icons.medication_rounded,
+      ),
+      DrawerMenuItem(
+        id: 'profile',
+        label: isEn ? 'Profile' : 'Profil',
+        icon: Icons.person_rounded,
+      ),
     ];
   }
+
+  if (state != null && state.isAssistant) {
+    final permsList = state.loggedInUser?['permissions'] as List<dynamic>? ?? [];
+    final Set<String> permissions = permsList.map((p) => p.toString().toUpperCase()).toSet();
+
+    return items.where((item) {
+      if (item.id == 'profile' || item.id == 'settings') {
+        return true;
+      }
+      String permKey = item.id.toUpperCase();
+      if (permKey == 'ASISTEN_PRAKTIK') {
+        permKey = 'ASISTEN';
+      }
+      return permissions.contains(permKey);
+    }).toList();
+  }
+
+  return items;
 }
 
 class DashboardDrawer extends ConsumerWidget {
@@ -66,8 +169,8 @@ class DashboardDrawer extends ConsumerWidget {
     required this.onMenuSelected,
   });
 
-  List<DrawerMenuItem> _getMenuItemsForRole(String role, String lang) {
-    return getMenuItemsForRole(role, lang);
+  List<DrawerMenuItem> _getMenuItemsForRole(LandingPageState state) {
+    return getMenuItemsForRole(state.loggedInRole ?? 'pasien', state.language, state: state);
   }
 
   @override
@@ -77,13 +180,17 @@ class DashboardDrawer extends ConsumerWidget {
 
     final isDark = state.appearance == 'dark';
     final isRev = state.appearance == 'rev';
-    final cardBgColor = isDark ? const Color(0xFF161619) : Colors.white;
-    final borderColor = isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2);
-    final themeAccent = isRev ? const Color(0xFFB577F2) : const Color(0xFF48C9B0);
+    final cardBgColor = notifier.getCardColor();
+    final borderColor = notifier.getBorderColor();
+    final themeAccent = notifier.getPrimaryColor();
 
-    final String avatarName = state.loggedInName ?? (state.loggedInRole == 'pasien' 
-        ? 'Alvin' 
-        : (state.loggedInRole == 'dokter' ? 'dr. Agoes Soetanto' : 'CyrenElysia~♪'));
+    final String avatarName =
+        state.loggedInName ??
+        (state.loggedInRole == 'pasien'
+            ? 'Alvin'
+            : (state.loggedInRole == 'dokter'
+                  ? 'dr. Agoes Soetanto'
+                  : 'CyrenElysia~♪'));
 
     String avatarInitials = 'A';
     if (state.loggedInName != null && state.loggedInName!.isNotEmpty) {
@@ -94,14 +201,16 @@ class DashboardDrawer extends ConsumerWidget {
         avatarInitials = parts[0][0].toUpperCase();
       }
     } else {
-      avatarInitials = state.loggedInRole == 'pasien' 
-          ? 'A' 
+      avatarInitials = state.loggedInRole == 'pasien'
+          ? 'A'
           : (state.loggedInRole == 'dokter' ? 'AS' : 'CE');
     }
     final isEn = state.language == 'en';
-    final String avatarRoleLabel = state.loggedInRole == 'pasien' 
-        ? (isEn ? 'PATIENT' : 'PASIEN') 
-        : (state.loggedInRole == 'dokter' ? (isEn ? 'DOCTOR' : 'DOKTER') : (isEn ? 'PHARMACY' : 'APOTEK'));
+    final String avatarRoleLabel = state.loggedInRole == 'pasien'
+        ? (isEn ? 'PATIENT' : 'PASIEN')
+        : (state.loggedInRole == 'dokter'
+              ? (isEn ? 'DOCTOR' : 'DOKTER')
+              : (isEn ? 'PHARMACY' : 'APOTEK'));
 
     final showLabels = state.drawerSize == 1;
 
@@ -124,8 +233,14 @@ class DashboardDrawer extends ConsumerWidget {
                           colors: state.appearance == 'rev'
                               ? const [Color(0xFFEAB7EE), Color(0xFFB577F2)]
                               : (state.appearance == 'dark'
-                                  ? const [Color(0xFF3A3A40), Color(0xFF252528)]
-                                  : const [Color(0xFF7BE5D3), Color(0xFF48C9B0)]),
+                                    ? const [
+                                        Color(0xFF3A3A40),
+                                        Color(0xFF252528),
+                                      ]
+                                    : const [
+                                        Color(0xFF7BE5D3),
+                                        Color(0xFF48C9B0),
+                                      ]),
                         ),
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
@@ -140,7 +255,8 @@ class DashboardDrawer extends ConsumerWidget {
                       child: Stack(
                         children: [
                           if (state.loggedInUser?['avatar_url'] != null &&
-                              (state.loggedInUser!['avatar_url'] as String).isNotEmpty &&
+                              (state.loggedInUser!['avatar_url'] as String)
+                                  .isNotEmpty &&
                               state.blurProfileEffectEnabled)
                             Positioned.fill(
                               child: ShaderMask(
@@ -154,17 +270,21 @@ class DashboardDrawer extends ConsumerWidget {
                                 },
                                 blendMode: BlendMode.dstIn,
                                 child: ImageFiltered(
-                                  imageFilter: ui.ImageFilter.blur(sigmaX: 15.0, sigmaY: 15.0),
+                                  imageFilter: ui.ImageFilter.blur(
+                                    sigmaX: 15.0,
+                                    sigmaY: 15.0,
+                                  ),
                                   child: Image.network(
                                     state.loggedInUser!['avatar_url'] as String,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => const SizedBox(),
+                                    errorBuilder: (_, _, _) => const SizedBox(),
                                   ),
                                 ),
                               ),
                             ),
                           if (state.loggedInUser?['avatar_url'] != null &&
-                              (state.loggedInUser!['avatar_url'] as String).isNotEmpty &&
+                              (state.loggedInUser!['avatar_url'] as String)
+                                  .isNotEmpty &&
                               state.blurProfileEffectEnabled)
                             Positioned.fill(
                               child: ShaderMask(
@@ -185,28 +305,50 @@ class DashboardDrawer extends ConsumerWidget {
                               ),
                             ),
                           Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 12,
+                            ),
                             child: Row(
                               children: [
-                              Container(
-                                width: 40,
-                                height: 40,
-                                decoration: const BoxDecoration(
-                                  color: Colors.white,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: ClipOval(
-                                  child: Stack(
-                                    children: [
-                                      if (state.loggedInUser?['avatar_url'] != null &&
-                                          (state.loggedInUser!['avatar_url'] as String).isNotEmpty &&
-                                          _isCorsafeUrl(state.loggedInUser!['avatar_url'] as String))
-                                        Image.network(
-                                          state.loggedInUser!['avatar_url'] as String,
-                                          fit: BoxFit.cover,
-                                          width: 40,
-                                          height: 40,
-                                          errorBuilder: (_, __, ___) => Center(
+                                Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: const BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: ClipOval(
+                                    child: Stack(
+                                      children: [
+                                        if (state.loggedInUser?['avatar_url'] !=
+                                                null &&
+                                            (state.loggedInUser!['avatar_url']
+                                                    as String)
+                                                .isNotEmpty &&
+                                            _isCorsafeUrl(
+                                              state.loggedInUser!['avatar_url']
+                                                  as String,
+                                            ))
+                                          Image.network(
+                                            state.loggedInUser!['avatar_url']
+                                                as String,
+                                            fit: BoxFit.cover,
+                                            width: 40,
+                                            height: 40,
+                                            errorBuilder: (_, _, _) => Center(
+                                              child: Text(
+                                                avatarInitials,
+                                                style: GoogleFonts.outfit(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w900,
+                                                  color: themeAccent,
+                                                ),
+                                              ),
+                                            ),
+                                          )
+                                        else
+                                          Center(
                                             child: Text(
                                               avatarInitials,
                                               style: GoogleFonts.outfit(
@@ -216,75 +358,71 @@ class DashboardDrawer extends ConsumerWidget {
                                               ),
                                             ),
                                           ),
-                                        )
-                                      else
-                                        Center(
-                                          child: Text(
-                                            avatarInitials,
-                                            style: GoogleFonts.outfit(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w900,
-                                              color: themeAccent,
+                                        Positioned(
+                                          bottom: 0,
+                                          right: 0,
+                                          child: Container(
+                                            width: 10,
+                                            height: 10,
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF48C9B0),
+                                              shape: BoxShape.circle,
+                                              border: Border.all(
+                                                color: Colors.white,
+                                                width: 1.5,
+                                              ),
                                             ),
                                           ),
                                         ),
-                                      Positioned(
-                                        bottom: 0,
-                                        right: 0,
-                                        child: Container(
-                                          width: 10,
-                                          height: 10,
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFF48C9B0),
-                                            shape: BoxShape.circle,
-                                            border: Border.all(color: Colors.white, width: 1.5),
-                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        avatarName,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w900,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      Text(
+                                        avatarRoleLabel,
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 8,
+                                          fontWeight: FontWeight.w900,
+                                          color: Colors.white.withOpacity(0.7),
+                                          letterSpacing: 0.5,
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      avatarName,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w900,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                    Text(
-                                      avatarRoleLabel,
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 8,
-                                        fontWeight: FontWeight.w900,
-                                        color: Colors.white.withOpacity(0.7),
-                                        letterSpacing: 0.5,
-                                      ),
-                                    ),
-                                  ],
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.open_in_full_rounded,
+                                    size: 14,
+                                    color: Colors.white,
+                                  ),
+                                  onPressed: () {
+                                    notifier.toggleFullScreenDrawer();
+                                  },
+                                  visualDensity: VisualDensity.compact,
                                 ),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.open_in_full_rounded, size: 14, color: Colors.white),
-                                onPressed: () {
-                                  notifier.toggleFullScreenDrawer();
-                                },
-                                visualDensity: VisualDensity.compact,
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  )
+                        ],
+                      ),
+                    )
                   : Center(
                       child: InkWell(
                         onTap: () => notifier.setDrawerSize(1),
@@ -297,13 +435,19 @@ class DashboardDrawer extends ConsumerWidget {
                             shape: BoxShape.circle,
                           ),
                           child: ClipOval(
-                            child: (state.loggedInUser?['avatar_url'] != null &&
-                                (state.loggedInUser!['avatar_url'] as String).isNotEmpty &&
-                                _isCorsafeUrl(state.loggedInUser!['avatar_url'] as String))
+                            child:
+                                (state.loggedInUser?['avatar_url'] != null &&
+                                    (state.loggedInUser!['avatar_url']
+                                            as String)
+                                        .isNotEmpty &&
+                                    _isCorsafeUrl(
+                                      state.loggedInUser!['avatar_url']
+                                          as String,
+                                    ))
                                 ? Image.network(
                                     state.loggedInUser!['avatar_url'] as String,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => Center(
+                                    errorBuilder: (_, _, _) => Center(
                                       child: Text(
                                         avatarInitials,
                                         style: GoogleFonts.outfit(
@@ -337,9 +481,18 @@ class DashboardDrawer extends ConsumerWidget {
           Expanded(
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 8),
-              children: _getMenuItemsForRole(state.loggedInRole ?? 'pasien', state.language).map((item) {
-                return _buildMenuItem(context, item.icon, item.label, item.id, showLabels, themeAccent, isDark);
-              }).toList(),
+              children:
+                  _getMenuItemsForRole(state).map((item) {
+                    return _buildMenuItem(
+                      context,
+                      item.icon,
+                      item.label,
+                      item.id,
+                      showLabels,
+                      themeAccent,
+                      isDark,
+                    );
+                  }).toList(),
             ),
           ),
 
@@ -348,11 +501,29 @@ class DashboardDrawer extends ConsumerWidget {
             padding: const EdgeInsets.all(8),
             child: Column(
               children: [
-                _buildMenuItem(context, Icons.settings_rounded, state.language == 'en' ? 'Settings' : 'Pengaturan', 'settings', showLabels, themeAccent, isDark),
+                _buildMenuItem(
+                  context,
+                  Icons.settings_rounded,
+                  state.language == 'en' ? 'Settings' : 'Pengaturan',
+                  'settings',
+                  showLabels,
+                  themeAccent,
+                  isDark,
+                ),
                 const SizedBox(height: 6),
-                _buildMenuItem(context, Icons.logout_rounded, state.language == 'en' ? 'Logout' : 'Keluar', 'logout', showLabels, Colors.redAccent, isDark, isLogout: true, onTap: () {
-                  notifier.logout();
-                }),
+                _buildMenuItem(
+                  context,
+                  Icons.logout_rounded,
+                  state.language == 'en' ? 'Logout' : 'Keluar',
+                  'logout',
+                  showLabels,
+                  Colors.redAccent,
+                  isDark,
+                  isLogout: true,
+                  onTap: () {
+                    notifier.logout();
+                  },
+                ),
               ],
             ),
           ),
@@ -378,9 +549,11 @@ class DashboardDrawer extends ConsumerWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onTap ?? () {
-          onMenuSelected(menuId);
-        },
+        onTap:
+            onTap ??
+            () {
+              onMenuSelected(menuId);
+            },
         borderRadius: BorderRadius.circular(12),
         child: Container(
           height: 48,
@@ -390,11 +563,15 @@ class DashboardDrawer extends ConsumerWidget {
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
-            mainAxisAlignment: showLabels ? MainAxisAlignment.start : MainAxisAlignment.center,
+            mainAxisAlignment: showLabels
+                ? MainAxisAlignment.start
+                : MainAxisAlignment.center,
             children: [
               Icon(
                 icon,
-                color: isSelected ? accentColor : (isLogout ? Colors.redAccent : const Color(0xFF6F6A8A)),
+                color: isSelected
+                    ? accentColor
+                    : (isLogout ? Colors.redAccent : const Color(0xFF6F6A8A)),
                 size: 20,
               ),
               if (showLabels) ...[
@@ -406,12 +583,16 @@ class DashboardDrawer extends ConsumerWidget {
                     overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.outfit(
                       fontSize: 12,
-                      fontWeight: isSelected ? FontWeight.w900 : FontWeight.w500,
-                      color: isSelected 
-                          ? accentColor 
-                          : (isLogout 
-                              ? Colors.redAccent 
-                              : (isDark ? Colors.white70 : const Color(0xFF1B0C3C))),
+                      fontWeight: isSelected
+                          ? FontWeight.w900
+                          : FontWeight.w500,
+                      color: isSelected
+                          ? accentColor
+                          : (isLogout
+                                ? Colors.redAccent
+                                : (isDark
+                                      ? Colors.white70
+                                      : const Color(0xFF1B0C3C))),
                     ),
                   ),
                 ),
@@ -434,8 +615,8 @@ class FullScreenDrawerOverlay extends ConsumerWidget {
     required this.onMenuSelected,
   });
 
-  List<DrawerMenuItem> _getMenuItemsForRole(String role, String lang) {
-    return getMenuItemsForRole(role, lang);
+  List<DrawerMenuItem> _getMenuItemsForRole(LandingPageState state) {
+    return getMenuItemsForRole(state.loggedInRole ?? 'pasien', state.language, state: state);
   }
 
   @override
@@ -445,22 +626,26 @@ class FullScreenDrawerOverlay extends ConsumerWidget {
 
     final isDark = state.appearance == 'dark';
     final isRev = state.appearance == 'rev';
-    final bgColor = isDark ? const Color(0xFF0F0F11) : const Color(0xFFF8FAFC);
-    final cardBgColor = isDark ? const Color(0xFF161619) : Colors.white;
-    final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
-    final subtitleColor = isDark ? Colors.grey[400]! : const Color(0xFF6F6A8A);
-    final borderColor = isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2);
-    final themeAccent = isRev ? const Color(0xFFB577F2) : const Color(0xFF48C9B0);
+    final bgColor = notifier.getBackgroundColor();
+    final cardBgColor = notifier.getCardColor();
+    final textColor = notifier.getTextColor();
+    final subtitleColor = notifier.getBodyTextColor();
+    final borderColor = notifier.getBorderColor();
+    final themeAccent = notifier.getPrimaryColor();
 
     final titleGradient = isDark
         ? const [Color(0xFF2C2C32), Color(0xFF1E1E22)]
         : (isRev
-            ? const [Color(0xFFEAB7EE), Color(0xFFB577F2)]
-            : const [Color(0xFF7BE5D3), Color(0xFF48C9B0)]);
+              ? const [Color(0xFFEAB7EE), Color(0xFFB577F2)]
+              : const [Color(0xFF7BE5D3), Color(0xFF48C9B0)]);
 
-    final String avatarName = state.loggedInName ?? (state.loggedInRole == 'pasien' 
-        ? 'Alvin' 
-        : (state.loggedInRole == 'dokter' ? 'dr. Agoes Soetanto' : 'CyrenElysia~♪'));
+    final String avatarName =
+        state.loggedInName ??
+        (state.loggedInRole == 'pasien'
+            ? 'Alvin'
+            : (state.loggedInRole == 'dokter'
+                  ? 'dr. Agoes Soetanto'
+                  : 'CyrenElysia~♪'));
 
     String avatarInitials = 'A';
     if (state.loggedInName != null && state.loggedInName!.isNotEmpty) {
@@ -471,12 +656,12 @@ class FullScreenDrawerOverlay extends ConsumerWidget {
         avatarInitials = parts[0][0].toUpperCase();
       }
     } else {
-      avatarInitials = state.loggedInRole == 'pasien' 
-          ? 'A' 
+      avatarInitials = state.loggedInRole == 'pasien'
+          ? 'A'
           : (state.loggedInRole == 'dokter' ? 'AS' : 'CE');
     }
-    final String avatarRoleLabel = state.loggedInRole == 'pasien' 
-        ? 'PASIEN' 
+    final String avatarRoleLabel = state.loggedInRole == 'pasien'
+        ? 'PASIEN'
         : (state.loggedInRole == 'dokter' ? 'DOKTER' : 'APOTEK');
 
     final isMobile = MediaQuery.of(context).size.width < 768;
@@ -494,13 +679,15 @@ class FullScreenDrawerOverlay extends ConsumerWidget {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(32)),
+              borderRadius: const BorderRadius.vertical(
+                bottom: Radius.circular(32),
+              ),
               boxShadow: [
                 BoxShadow(
                   color: themeAccent.withOpacity(0.25),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
-                )
+                ),
               ],
             ),
             clipBehavior: Clip.antiAlias,
@@ -526,11 +713,14 @@ class FullScreenDrawerOverlay extends ConsumerWidget {
                       },
                       blendMode: BlendMode.dstIn,
                       child: ImageFiltered(
-                        imageFilter: ui.ImageFilter.blur(sigmaX: 15.0, sigmaY: 15.0),
+                        imageFilter: ui.ImageFilter.blur(
+                          sigmaX: 15.0,
+                          sigmaY: 15.0,
+                        ),
                         child: Image.network(
                           state.loggedInUser!['avatar_url'] as String,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => const SizedBox(),
+                          errorBuilder: (_, _, _) => const SizedBox(),
                         ),
                       ),
                     ),
@@ -583,7 +773,11 @@ class FullScreenDrawerOverlay extends ConsumerWidget {
                             shape: BoxShape.circle,
                           ),
                           alignment: Alignment.center,
-                          child: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
+                          child: const Icon(
+                            Icons.close_rounded,
+                            color: Colors.white,
+                            size: 18,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -611,9 +805,15 @@ class FullScreenDrawerOverlay extends ConsumerWidget {
                             const SizedBox(height: 10),
                             Row(
                               children: [
-                                _buildTranslucentBadge(Icons.calendar_today_rounded, 'Selasa, 26 Mei 2026'),
+                                _buildTranslucentBadge(
+                                  Icons.calendar_today_rounded,
+                                  'Selasa, 26 Mei 2026',
+                                ),
                                 const SizedBox(width: 8),
-                                _buildTranslucentBadge(Icons.access_time_rounded, '13.52'),
+                                _buildTranslucentBadge(
+                                  Icons.access_time_rounded,
+                                  '13.52',
+                                ),
                               ],
                             ),
                           ],
@@ -630,14 +830,17 @@ class FullScreenDrawerOverlay extends ConsumerWidget {
                           child: Stack(
                             children: [
                               if (state.loggedInUser?['avatar_url'] != null &&
-                                  (state.loggedInUser!['avatar_url'] as String).isNotEmpty &&
-                                  _isCorsafeUrl(state.loggedInUser!['avatar_url'] as String))
+                                  (state.loggedInUser!['avatar_url'] as String)
+                                      .isNotEmpty &&
+                                  _isCorsafeUrl(
+                                    state.loggedInUser!['avatar_url'] as String,
+                                  ))
                                 Image.network(
                                   state.loggedInUser!['avatar_url'] as String,
                                   fit: BoxFit.cover,
                                   width: 56,
                                   height: 56,
-                                  errorBuilder: (_, __, ___) => Center(
+                                  errorBuilder: (_, _, _) => Center(
                                     child: Text(
                                       avatarInitials,
                                       style: GoogleFonts.outfit(
@@ -668,7 +871,10 @@ class FullScreenDrawerOverlay extends ConsumerWidget {
                                   decoration: BoxDecoration(
                                     color: const Color(0xFF48C9B0),
                                     shape: BoxShape.circle,
-                                    border: Border.all(color: Colors.white, width: 2.0),
+                                    border: Border.all(
+                                      color: Colors.white,
+                                      width: 2.0,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -691,7 +897,9 @@ class FullScreenDrawerOverlay extends ConsumerWidget {
             child: Container(
               height: 52,
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E1E22) : const Color(0xFFF1EEFA),
+                color: isDark
+                    ? const Color(0xFF1E1E22)
+                    : const Color(0xFFF1EEFA),
                 borderRadius: BorderRadius.circular(100),
                 border: Border.all(color: borderColor),
               ),
@@ -702,10 +910,17 @@ class FullScreenDrawerOverlay extends ConsumerWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: TextField(
-                      style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: textColor),
+                      style: GoogleFonts.outfit(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: textColor,
+                      ),
                       decoration: InputDecoration(
                         hintText: 'Apa yang ingin Anda cari hari ini?',
-                        hintStyle: GoogleFonts.outfit(fontSize: 13, color: subtitleColor.withOpacity(0.5)),
+                        hintStyle: GoogleFonts.outfit(
+                          fontSize: 13,
+                          color: subtitleColor.withOpacity(0.5),
+                        ),
                         border: InputBorder.none,
                       ),
                     ),
@@ -726,13 +941,39 @@ class FullScreenDrawerOverlay extends ConsumerWidget {
               mainAxisSpacing: 16,
               childAspectRatio: 1.1,
               children: [
-                ..._getMenuItemsForRole(state.loggedInRole ?? 'pasien', state.language).map((item) {
-                  return _buildGridMenuCard(ref, item.label, item.icon, item.id, themeAccent, cardBgColor, isDark);
+                ..._getMenuItemsForRole(state).map((item) {
+                  return _buildGridMenuCard(
+                    ref,
+                    item.label,
+                    item.icon,
+                    item.id,
+                    themeAccent,
+                    cardBgColor,
+                    isDark,
+                  );
                 }),
-                _buildGridMenuCard(ref, state.language == 'en' ? 'Settings' : 'Pengaturan', Icons.settings_rounded, 'settings', themeAccent, cardBgColor, isDark),
-                _buildGridMenuCard(ref, state.language == 'en' ? 'Logout' : 'Keluar', Icons.logout_rounded, 'logout', Colors.redAccent, cardBgColor, isDark, isLogout: true, onTap: () {
-                  notifier.logout();
-                }),
+                _buildGridMenuCard(
+                  ref,
+                  state.language == 'en' ? 'Settings' : 'Pengaturan',
+                  Icons.settings_rounded,
+                  'settings',
+                  themeAccent,
+                  cardBgColor,
+                  isDark,
+                ),
+                _buildGridMenuCard(
+                  ref,
+                  state.language == 'en' ? 'Logout' : 'Keluar',
+                  Icons.logout_rounded,
+                  'logout',
+                  Colors.redAccent,
+                  cardBgColor,
+                  isDark,
+                  isLogout: true,
+                  onTap: () {
+                    notifier.logout();
+                  },
+                ),
               ],
             ),
           ),
@@ -787,61 +1028,52 @@ class FullScreenDrawerOverlay extends ConsumerWidget {
     if (isSelected) {
       cardBg = isDark
           ? accentColor.withOpacity(0.24)
-          : (isRev
-              ? const Color(0xFFF9E7F9)
-              : const Color(0xFFE8F8F5));
+          : (isRev ? const Color(0xFFF9E7F9) : const Color(0xFFE8F8F5));
     } else {
       cardBg = isDark
           ? const Color(0xFF1E1E22)
-          : (isRev
-              ? const Color(0xFFF4EDFC)
-              : const Color(0xFFEBF7F5));
+          : (isRev ? const Color(0xFFF4EDFC) : const Color(0xFFEBF7F5));
     }
 
     final Color iconBoxBg = isSelected
         ? accentColor
         : (isDark
-            ? const Color(0xFF2C2C32)
-            : (isRev
-                ? const Color(0xFFD2B4DE)
-                : const Color(0xFFA3E4D7)));
+              ? const Color(0xFF2C2C32)
+              : (isRev ? const Color(0xFFD2B4DE) : const Color(0xFFA3E4D7)));
 
     final Color iconColor = isSelected
         ? Colors.white
         : (isLogout
-            ? Colors.redAccent
-            : (isDark
-                ? Colors.white
-                : (isRev
-                    ? const Color(0xFF5E1B8C)
-                    : const Color(0xFF1B4F42))));
+              ? Colors.redAccent
+              : (isDark
+                    ? Colors.white
+                    : (isRev
+                          ? const Color(0xFF5E1B8C)
+                          : const Color(0xFF1B4F42))));
 
-    final Color borderCol = isSelected
-        ? accentColor
-        : Colors.transparent;
+    final Color borderCol = isSelected ? accentColor : Colors.transparent;
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
-        onTap: onTap ?? () {
-          onMenuSelected(menuId);
-          notifier.setDrawerSize(1);
-        },
+        onTap:
+            onTap ??
+            () {
+              onMenuSelected(menuId);
+              notifier.setDrawerSize(1);
+            },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           decoration: BoxDecoration(
             color: cardBg,
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: borderCol,
-              width: 2,
-            ),
+            border: Border.all(color: borderCol, width: 2),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
-              )
+              ),
             ],
           ),
           padding: const EdgeInsets.all(16),
@@ -856,11 +1088,7 @@ class FullScreenDrawerOverlay extends ConsumerWidget {
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
-                child: Icon(
-                  icon,
-                  color: iconColor,
-                  size: 24,
-                ),
+                child: Icon(icon, color: iconColor, size: 24),
               ),
               const SizedBox(height: 12),
               Text(
@@ -872,10 +1100,10 @@ class FullScreenDrawerOverlay extends ConsumerWidget {
                   color: isLogout
                       ? Colors.redAccent
                       : (isDark
-                          ? Colors.white
-                          : (isRev
-                              ? const Color(0xFF5E1B8C)
-                              : const Color(0xFF1B4F42))),
+                            ? Colors.white
+                            : (isRev
+                                  ? const Color(0xFF5E1B8C)
+                                  : const Color(0xFF1B4F42))),
                 ),
               ),
             ],

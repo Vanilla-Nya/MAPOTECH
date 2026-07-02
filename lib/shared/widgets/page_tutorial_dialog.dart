@@ -49,6 +49,7 @@ class PageTutorialDialog extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(landingPageProvider);
+    final notifier = ref.read(landingPageProvider.notifier);
     final isEn = state.language.toLowerCase() == 'en';
     final tutorial = getTutorialData(role, menuId, menuLabel, state.language);
 
@@ -56,15 +57,13 @@ class PageTutorialDialog extends ConsumerWidget {
     final isDark = state.appearance == 'dark';
     final isRev = state.appearance == 'rev';
 
-    final themeAccent = isRev
-        ? const Color(0xFFB577F2)
-        : (isDark ? const Color(0xFF48C9B0) : const Color(0xFF48C9B0));
+    final themeAccent = notifier.getPrimaryColor();
 
-    final dialogBg = isDark ? const Color(0xFF161619) : Colors.white;
-    final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
-    final secondaryTextColor = isDark ? Colors.white.withOpacity(0.6) : const Color(0xFF1B0C3C).withOpacity(0.65);
-    final cardBg = isDark ? const Color(0xFF252528) : const Color(0xFFF8FAFC);
-    final borderColor = isDark ? const Color(0xFF2E2E32) : const Color(0xFFECEEF2);
+    final dialogBg = notifier.getCardColor();
+    final textColor = notifier.getTextColor();
+    final secondaryTextColor = notifier.getBodyTextColor();
+    final cardBg = isDark ? const Color(0xFF252528) : (isRev ? const Color(0xFFF7F2FE) : const Color(0xFFF8FAFC));
+    final borderColor = notifier.getBorderColor();
     final shadowColor = isDark ? Colors.black.withOpacity(0.4) : Colors.black.withOpacity(0.06);
 
     // Responsive design flag

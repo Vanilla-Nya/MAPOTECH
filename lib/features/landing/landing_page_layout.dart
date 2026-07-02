@@ -31,7 +31,6 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
   final ScrollController _scrollController = ScrollController();
   bool _isScrolled = false;
 
-
   @override
   void initState() {
     super.initState();
@@ -132,7 +131,11 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
                         child: Column(
                           key: ValueKey(state.activeTab),
                           crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: _buildActivePortalViews(context, state, notifier),
+                          children: _buildActivePortalViews(
+                            context,
+                            state,
+                            notifier,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 80),
@@ -155,7 +158,11 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
   }
 
   // --- ACTIVE PORTALS ROUTER ---
-  List<Widget> _buildActivePortalViews(BuildContext context, LandingPageState state, LandingPageNotifier notifier) {
+  List<Widget> _buildActivePortalViews(
+    BuildContext context,
+    LandingPageState state,
+    LandingPageNotifier notifier,
+  ) {
     switch (state.activeTab) {
       case 'pasien':
         return [const MasyarakatPortal()];
@@ -181,7 +188,9 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
 
   // --- MOBILE DRAWER ---
   Widget _buildMobileDrawer(
-      LandingPageState state, LandingPageNotifier notifier) {
+    LandingPageState state,
+    LandingPageNotifier notifier,
+  ) {
     return Drawer(
       backgroundColor: Colors.white,
       child: SafeArea(
@@ -239,10 +248,10 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
                           child: Row(
                             children: [
                               Icon(
-                                  entity.icon,
-                                  color: isSelected
-                                      ? const Color(0xFF1B4F42)
-                                      : Colors.grey[600],
+                                entity.icon,
+                                color: isSelected
+                                    ? const Color(0xFF1B4F42)
+                                    : Colors.grey[600],
                               ),
                               const SizedBox(width: 16),
                               Expanded(
@@ -260,10 +269,13 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
                               if (entity.isSoon)
                                 Container(
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 6, vertical: 2),
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF48C9B0)
-                                        .withOpacity(0.15),
+                                    color: const Color(
+                                      0xFF48C9B0,
+                                    ).withOpacity(0.15),
                                     borderRadius: BorderRadius.circular(4),
                                   ),
                                   child: Text(
@@ -287,46 +299,64 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
               const SizedBox(height: 16),
               if (state.isLoggedIn) ...[
                 // ─── Logged-in user card ───────────────────────────────────
-                Builder(builder: (context) {
-                  final avatarUrl = state.loggedInUser?['avatar_url'] as String?;
-                  final name = state.loggedInName ?? 'User';
-                  final role = (state.loggedInRole ?? 'pasien').toUpperCase();
-                  final initials = name.isNotEmpty
-                      ? name.split(' ').map((p) => p[0]).take(2).join('').toUpperCase()
-                      : 'U';
-                  final accent = const Color(0xFF48C9B0);
+                Builder(
+                  builder: (context) {
+                    final avatarUrl =
+                        state.loggedInUser?['avatar_url'] as String?;
+                    final name = state.loggedInName ?? 'User';
+                    final role = (state.loggedInRole ?? 'pasien').toUpperCase();
+                    final initials = name.isNotEmpty
+                        ? name
+                              .split(' ')
+                              .map((p) => p[0])
+                              .take(2)
+                              .join('')
+                              .toUpperCase()
+                        : 'U';
+                    final accent = const Color(0xFF48C9B0);
 
-                  return Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF7BE5D3), Color(0xFF48C9B0)],
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: accent.withOpacity(0.3),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
+                    return Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF7BE5D3), Color(0xFF48C9B0)],
                         ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        // Avatar circle
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: accent.withOpacity(0.3),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
                           ),
-                          child: ClipOval(
-                            child: (avatarUrl != null && avatarUrl.isNotEmpty)
-                                ? Image.network(
-                                    avatarUrl,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => Center(
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          // Avatar circle
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: const BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                            ),
+                            child: ClipOval(
+                              child: (avatarUrl != null && avatarUrl.isNotEmpty)
+                                  ? Image.network(
+                                      avatarUrl,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, _, _) => Center(
+                                        child: Text(
+                                          initials,
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w900,
+                                            color: accent,
+                                          ),
+                                        ),
+                                      ),
+                                    )
+                                  : Center(
                                       child: Text(
                                         initials,
                                         style: GoogleFonts.outfit(
@@ -336,68 +366,65 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
                                         ),
                                       ),
                                     ),
-                                  )
-                                : Center(
-                                    child: Text(
-                                      initials,
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w900,
-                                        color: accent,
-                                      ),
-                                    ),
-                                  ),
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: GoogleFonts.outfit(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w900,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              Container(
-                                margin: const EdgeInsets.only(top: 3),
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  role,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                   style: GoogleFonts.outfit(
-                                    fontSize: 8,
+                                    fontSize: 13,
                                     fontWeight: FontWeight.w900,
                                     color: Colors.white,
-                                    letterSpacing: 0.5,
                                   ),
                                 ),
-                              ),
-                            ],
+                                Container(
+                                  margin: const EdgeInsets.only(top: 3),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    role,
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 8,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.white,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        // Logout button
-                        IconButton(
-                          icon: const Icon(Icons.logout_rounded, color: Colors.white, size: 18),
-                          onPressed: () {
-                            Navigator.pop(context);
-                            notifier.logout();
-                          },
-                          tooltip: 'Keluar',
-                          visualDensity: VisualDensity.compact,
-                        ),
-                      ],
-                    ),
-                  );
-                }),
+                          // Logout button
+                          IconButton(
+                            icon: const Icon(
+                              Icons.logout_rounded,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                            onPressed: () {
+                              Navigator.pop(context);
+                              notifier.logout();
+                            },
+                            tooltip: 'Keluar',
+                            visualDensity: VisualDensity.compact,
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
               ] else ...[
                 CustomButton(
                   text: notifier.t('login'),
@@ -424,22 +451,25 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
   }
 
   // --- NAVBAR ---
-  Widget _buildNavbar(BuildContext context, LandingPageState state,
-      LandingPageNotifier notifier) {
+  Widget _buildNavbar(
+    BuildContext context,
+    LandingPageState state,
+    LandingPageNotifier notifier,
+  ) {
     final isMobile = ResponsiveLayout.isMobile(context);
     final activeColor = notifier.getPrimaryColor();
 
     final navBgColor = state.appearance == 'dark'
         ? const Color(0xFF161616).withOpacity(0.9)
         : (state.appearance == 'rev'
-            ? const Color(0xFFF0F5FA).withOpacity(0.9)
-            : Colors.white.withOpacity(0.9));
+              ? const Color(0xFFF0F5FA).withOpacity(0.9)
+              : Colors.white.withOpacity(0.9));
 
     final navBorderColor = state.appearance == 'dark'
         ? const Color(0xFF2C2C2C)
         : (state.appearance == 'rev'
-            ? const Color(0xFFE2C4F9)
-            : Colors.grey[200]!);
+              ? const Color(0xFFE2C4F9)
+              : Colors.grey[200]!);
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
@@ -470,8 +500,7 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
           _buildBrandLogo(),
 
           // Desktop capsule selection
-          if (!isMobile)
-            _buildNavbarCapsule(state, notifier),
+          if (!isMobile) _buildNavbarCapsule(state, notifier),
 
           // Desktop menu or Mobile menu
           if (!isMobile)
@@ -479,7 +508,7 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 // Login & Register Buttons
-                 CustomButton(
+                CustomButton(
                   text: notifier.t('login'),
                   isSecondary: true,
                   height: 44,
@@ -487,13 +516,13 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
                   textColor: state.appearance == 'dark'
                       ? Colors.white
                       : (state.appearance == 'rev'
-                          ? const Color(0xFF5E1B8C)
-                          : const Color(0xFF1B4F42)),
+                            ? const Color(0xFF5E1B8C)
+                            : const Color(0xFF1B4F42)),
                   borderColor: state.appearance == 'dark'
                       ? const Color(0xFF333333)
                       : (state.appearance == 'rev'
-                          ? const Color(0xFFE2C4F9)
-                          : const Color(0xFFECECEC)),
+                            ? const Color(0xFFE2C4F9)
+                            : const Color(0xFFECECEC)),
                   onPressed: () {
                     showLoginModal(context, ref);
                   },
@@ -518,7 +547,9 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
               icon: Icon(
                 Icons.menu_rounded,
                 size: 28,
-                color: state.appearance == 'dark' ? Colors.white : const Color(0xFF1B4F42),
+                color: state.appearance == 'dark'
+                    ? Colors.white
+                    : const Color(0xFF1B4F42),
               ),
               onPressed: () {
                 Scaffold.of(context).openDrawer();
@@ -529,16 +560,23 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
     );
   }
 
-  Widget _buildNavbarCapsule(LandingPageState state, LandingPageNotifier notifier) {
+  Widget _buildNavbarCapsule(
+    LandingPageState state,
+    LandingPageNotifier notifier,
+  ) {
     final isDark = state.appearance == 'dark';
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF3EEFC).withOpacity(0.4),
+        color: isDark
+            ? const Color(0xFF1E1E1E)
+            : const Color(0xFFF3EEFC).withOpacity(0.4),
         borderRadius: BorderRadius.circular(100),
         border: Border.all(
-          color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFE2C4F9).withOpacity(0.5),
+          color: isDark
+              ? const Color(0xFF2C2C2C)
+              : const Color(0xFFE2C4F9).withOpacity(0.5),
           width: 1,
         ),
       ),
@@ -546,15 +584,19 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
         mainAxisSize: MainAxisSize.min,
         children: notifier.getEntities().map((entity) {
           final isSelected = state.activeTab == entity.id;
-          
+
           Color textColor;
           Color iconColor;
           Color bgColor;
           FontWeight fontWeight;
-          
+
           if (isSelected) {
             bgColor = isDark ? const Color(0xFF2E2E2E) : Colors.white;
-            textColor = isDark ? Colors.white : (state.appearance == 'rev' ? const Color(0xFF5E1B8C) : const Color(0xFF1B4F42));
+            textColor = isDark
+                ? Colors.white
+                : (state.appearance == 'rev'
+                      ? const Color(0xFF5E1B8C)
+                      : const Color(0xFF1B4F42));
             iconColor = textColor;
             fontWeight = FontWeight.w900;
           } else {
@@ -563,7 +605,7 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
             iconColor = textColor.withOpacity(0.7);
             fontWeight = FontWeight.w600;
           }
-          
+
           return Container(
             margin: const EdgeInsets.symmetric(horizontal: 3),
             child: InkWell(
@@ -573,7 +615,10 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
               borderRadius: BorderRadius.circular(100),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: bgColor,
                   borderRadius: BorderRadius.circular(100),
@@ -602,7 +647,10 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
                     if (entity.isSoon)
                       Container(
                         margin: const EdgeInsets.only(left: 4),
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 1.5,
+                        ),
                         decoration: BoxDecoration(
                           color: const Color(0xFF48C9B0).withOpacity(0.15),
                           borderRadius: BorderRadius.circular(4),
@@ -630,7 +678,7 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
     final notifier = ref.read(landingPageProvider.notifier);
     final activeColor = notifier.getPrimaryColor();
     final darkGreenColor = notifier.getSecondaryColor();
- 
+
     return InkWell(
       onTap: () => notifier.setActiveTab('mapotek'),
       borderRadius: BorderRadius.circular(8),
@@ -678,8 +726,11 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
   }
 
   // --- ACHIEVEMENTS / AWARDS ---
-  Widget _buildAchievementsSection(BuildContext context,
-      LandingPageState state, LandingPageNotifier notifier) {
+  Widget _buildAchievementsSection(
+    BuildContext context,
+    LandingPageState state,
+    LandingPageNotifier notifier,
+  ) {
     final achievements = notifier.getAchievements();
     final isMobile = ResponsiveLayout.isMobile(context);
     final textColor = notifier.getTextColor();
@@ -696,7 +747,10 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
           child: Column(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFFEF5E7),
                   borderRadius: BorderRadius.circular(100),
@@ -744,12 +798,12 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
                         fontSize: 32,
                         fontWeight: FontWeight.w900,
                         foreground: Paint()
-                          ..shader = const LinearGradient(
-                            colors: [
-                              Color(0xFF48C9B0),
-                              Color(0xFFB577F2),
-                            ],
-                          ).createShader(const Rect.fromLTWH(0.0, 0.0, 200.0, 70.0)),
+                          ..shader =
+                              const LinearGradient(
+                                colors: [Color(0xFF48C9B0), Color(0xFFB577F2)],
+                              ).createShader(
+                                const Rect.fromLTWH(0.0, 0.0, 200.0, 70.0),
+                              ),
                       ),
                     ),
                   ],
@@ -773,23 +827,55 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
         const SizedBox(height: 48),
 
         if (isMobile) ...[
-          _buildAchievementCard(0, achievements[0], isDark, borderColor, cardColor, textColor, bodyTextColor),
+          _buildAchievementCard(
+            0,
+            achievements[0],
+            isDark,
+            borderColor,
+            cardColor,
+            textColor,
+            bodyTextColor,
+          ),
           const SizedBox(height: 24),
-          _buildAchievementCard(1, achievements[1], isDark, borderColor, cardColor, textColor, bodyTextColor),
+          _buildAchievementCard(
+            1,
+            achievements[1],
+            isDark,
+            borderColor,
+            cardColor,
+            textColor,
+            bodyTextColor,
+          ),
         ] else ...[
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: _buildAchievementCard(0, achievements[0], isDark, borderColor, cardColor, textColor, bodyTextColor),
+                child: _buildAchievementCard(
+                  0,
+                  achievements[0],
+                  isDark,
+                  borderColor,
+                  cardColor,
+                  textColor,
+                  bodyTextColor,
+                ),
               ),
               const SizedBox(width: 24),
               Expanded(
-                child: _buildAchievementCard(1, achievements[1], isDark, borderColor, cardColor, textColor, bodyTextColor),
+                child: _buildAchievementCard(
+                  1,
+                  achievements[1],
+                  isDark,
+                  borderColor,
+                  cardColor,
+                  textColor,
+                  bodyTextColor,
+                ),
               ),
             ],
           ),
-        ]
+        ],
       ],
     );
   }
@@ -864,9 +950,7 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
           end: Alignment.bottomRight,
         ),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        border: Border(
-          bottom: BorderSide(color: borderColor),
-        ),
+        border: Border(bottom: BorderSide(color: borderColor)),
       ),
       child: Stack(
         children: [
@@ -878,7 +962,10 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
               height: 140,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.black.withOpacity(0.03), width: 8),
+                border: Border.all(
+                  color: Colors.black.withOpacity(0.03),
+                  width: 8,
+                ),
               ),
             ),
           ),
@@ -890,7 +977,10 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
               height: 120,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.black.withOpacity(0.03), width: 8),
+                border: Border.all(
+                  color: Colors.black.withOpacity(0.03),
+                  width: 8,
+                ),
               ),
             ),
           ),
@@ -938,7 +1028,10 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF1B4F42),
                       borderRadius: BorderRadius.circular(4),
@@ -976,7 +1069,7 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
               ),
             ),
           ),
-          
+
           Positioned(
             bottom: 12,
             left: 12,
@@ -1028,9 +1121,7 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
           end: Alignment.bottomRight,
         ),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        border: Border(
-          bottom: BorderSide(color: borderColor),
-        ),
+        border: Border(bottom: BorderSide(color: borderColor)),
       ),
       child: Stack(
         children: [
@@ -1042,7 +1133,10 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
               height: 100,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.blue.withOpacity(0.03), width: 6),
+                border: Border.all(
+                  color: Colors.blue.withOpacity(0.03),
+                  width: 6,
+                ),
               ),
             ),
           ),
@@ -1147,8 +1241,11 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
   }
 
   // --- FOOTER ---
-  Widget _buildFooter(BuildContext context, LandingPageState state,
-      LandingPageNotifier notifier) {
+  Widget _buildFooter(
+    BuildContext context,
+    LandingPageState state,
+    LandingPageNotifier notifier,
+  ) {
     final isMobile = ResponsiveLayout.isMobile(context);
     final borderColor = notifier.getBorderColor();
     final bodyTextColor = notifier.getBodyTextColor();
@@ -1160,7 +1257,9 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
     final sitemap = notifier.getSitemap();
 
     Widget brandColumn = Column(
-      crossAxisAlignment: isMobile ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+      crossAxisAlignment: isMobile
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisSize: MainAxisSize.min,
@@ -1205,13 +1304,27 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
         ),
         const SizedBox(height: 16),
         Row(
-          mainAxisAlignment: isMobile ? MainAxisAlignment.center : MainAxisAlignment.start,
+          mainAxisAlignment: isMobile
+              ? MainAxisAlignment.center
+              : MainAxisAlignment.start,
           children: [
-            _buildPlatformIconButton(Icons.phone_iphone_rounded, isDark, borderColor),
+            _buildPlatformIconButton(
+              Icons.phone_iphone_rounded,
+              isDark,
+              borderColor,
+            ),
             const SizedBox(width: 8),
-            _buildPlatformIconButton(Icons.language_rounded, isDark, borderColor),
+            _buildPlatformIconButton(
+              Icons.language_rounded,
+              isDark,
+              borderColor,
+            ),
             const SizedBox(width: 8),
-            _buildPlatformIconButton(Icons.computer_rounded, isDark, borderColor),
+            _buildPlatformIconButton(
+              Icons.computer_rounded,
+              isDark,
+              borderColor,
+            ),
           ],
         ),
       ],
@@ -1225,7 +1338,9 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
         return SizedBox(
           width: isMobile ? 130 : 140,
           child: Column(
-            crossAxisAlignment: isMobile ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+            crossAxisAlignment: isMobile
+                ? CrossAxisAlignment.center
+                : CrossAxisAlignment.start,
             children: [
               Text(
                 column['title'] as String,
@@ -1269,10 +1384,7 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
     Widget bottomBar = Column(
       children: [
         const SizedBox(height: 24),
-        Container(
-          height: 1.0,
-          color: borderColor,
-        ),
+        Container(height: 1.0, color: borderColor),
         const SizedBox(height: 24),
         isMobile
             ? Column(
@@ -1302,7 +1414,9 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        lang == 'id' ? 'STATUS JARINGAN: OPERASIONAL' : 'NETWORK STATUS: OPERATIONAL',
+                        lang == 'id'
+                            ? 'STATUS JARINGAN: OPERASIONAL'
+                            : 'NETWORK STATUS: OPERATIONAL',
                         style: GoogleFonts.outfit(
                           fontSize: 8,
                           fontWeight: FontWeight.w900,
@@ -1340,7 +1454,9 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        lang == 'id' ? 'STATUS JARINGAN: OPERASIONAL' : 'NETWORK STATUS: OPERATIONAL',
+                        lang == 'id'
+                            ? 'STATUS JARINGAN: OPERASIONAL'
+                            : 'NETWORK STATUS: OPERATIONAL',
                         style: GoogleFonts.outfit(
                           fontSize: 8,
                           fontWeight: FontWeight.w900,
@@ -1358,9 +1474,7 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 60),
       decoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(color: borderColor, width: 1.5),
-        ),
+        border: Border(top: BorderSide(color: borderColor, width: 1.5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1388,7 +1502,11 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
     );
   }
 
-  Widget _buildPlatformIconButton(IconData icon, bool isDark, Color borderColor) {
+  Widget _buildPlatformIconButton(
+    IconData icon,
+    bool isDark,
+    Color borderColor,
+  ) {
     return Container(
       width: 36,
       height: 36,

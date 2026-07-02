@@ -292,7 +292,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
     final isDark = state.appearance == 'dark';
     final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
     final subtitleColor = isDark ? Colors.grey[400]! : const Color(0xFF6F6A8A);
-    final themeAccent = const Color(0xFFB577F2);
+    final themeAccent = ref.read(landingPageProvider.notifier).getPrimaryColor();
     final tabBgColor = isDark ? const Color(0xFF161619) : const Color(0xFFF3F0FA);
 
     return _isLoading

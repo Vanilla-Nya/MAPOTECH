@@ -22,7 +22,8 @@ class _PasienApotekSearchState extends ConsumerState<PasienApotekSearch> {
       'id': '1',
       'name': 'CyrenElysia~♪',
       'address': 'Kel. KEJAYAN, Kec. PUER...',
-      'fullAddress': 'Kel. KEJAYAN, Kec. PUERPO, KABUPATEN PASURUAN, Jawa Timur',
+      'fullAddress':
+          'Kel. KEJAYAN, Kec. PUERPO, KABUPATEN PASURUAN, Jawa Timur',
       'jamBuka': 'Jam buka tidak diatur',
       'isOpen': false,
       'verified': true,
@@ -34,7 +35,8 @@ class _PasienApotekSearchState extends ConsumerState<PasienApotekSearch> {
       'id': '2',
       'name': 'Dani',
       'address': 'Kel. LENGGONG, Kec...',
-      'fullAddress': 'Kel. LENGGONG, Kec. PASREPAN, KABUPATEN PASURUAN, Jawa Timur',
+      'fullAddress':
+          'Kel. LENGGONG, Kec. PASREPAN, KABUPATEN PASURUAN, Jawa Timur',
       'jamBuka': 'Jam buka tidak diatur',
       'isOpen': false,
       'verified': true,
@@ -48,7 +50,9 @@ class _PasienApotekSearchState extends ConsumerState<PasienApotekSearch> {
     return _allApotek.where((a) {
       final q = _searchQuery.toLowerCase();
       final nameMatch = a['name'].toString().toLowerCase().contains(q);
-      final addressMatch = a['fullAddress'].toString().toLowerCase().contains(q);
+      final addressMatch = a['fullAddress'].toString().toLowerCase().contains(
+        q,
+      );
       return q.isEmpty || nameMatch || addressMatch;
     }).toList();
   }
@@ -65,14 +69,15 @@ class _PasienApotekSearchState extends ConsumerState<PasienApotekSearch> {
 
     final isDark = state.appearance == 'dark';
     final isRev = state.appearance == 'rev';
-    final bgColor = isDark ? const Color(0xFF0F0F11) : const Color(0xFFF8FAFC);
-    final cardBgColor = isDark ? const Color(0xFF161619) : Colors.white;
-    final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
-    final subtitleColor = isDark ? Colors.grey[400]! : const Color(0xFF6F6A8A);
-    final borderColor = isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2);
+    final notifier = ref.read(landingPageProvider.notifier);
+    final bgColor = notifier.getBackgroundColor();
+    final cardBgColor = notifier.getCardColor();
+    final textColor = notifier.getTextColor();
+    final subtitleColor = notifier.getBodyTextColor();
+    final borderColor = notifier.getBorderColor();
     final inputBg = isDark ? const Color(0xFF1E1E22) : const Color(0xFFF8FAFD);
-    final themeAccent = isRev ? const Color(0xFFB577F2) : const Color(0xFF48C9B0);
-    final purpleAccent = const Color(0xFFB577F2);
+    final themeAccent = notifier.getPrimaryColor();
+    final purpleAccent = notifier.getPrimaryColor();
 
     final isMobile = MediaQuery.of(context).size.width < 768;
 
@@ -104,7 +109,11 @@ class _PasienApotekSearchState extends ConsumerState<PasienApotekSearch> {
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
-                child: Icon(Icons.local_pharmacy_rounded, color: themeAccent, size: 28),
+                child: Icon(
+                  Icons.local_pharmacy_rounded,
+                  color: themeAccent,
+                  size: 28,
+                ),
               ),
               const SizedBox(height: 14),
               Text(
@@ -145,7 +154,11 @@ class _PasienApotekSearchState extends ConsumerState<PasienApotekSearch> {
           padding: const EdgeInsets.symmetric(horizontal: 18),
           child: Row(
             children: [
-              Icon(Icons.search_rounded, size: 22, color: subtitleColor.withOpacity(0.7)),
+              Icon(
+                Icons.search_rounded,
+                size: 22,
+                color: subtitleColor.withOpacity(0.7),
+              ),
               const SizedBox(width: 14),
               Expanded(
                 child: TextField(
@@ -180,7 +193,11 @@ class _PasienApotekSearchState extends ConsumerState<PasienApotekSearch> {
                       shape: BoxShape.circle,
                     ),
                     alignment: Alignment.center,
-                    child: Icon(Icons.close_rounded, size: 14, color: subtitleColor),
+                    child: Icon(
+                      Icons.close_rounded,
+                      size: 14,
+                      color: subtitleColor,
+                    ),
                   ),
                 ),
             ],
@@ -220,7 +237,14 @@ class _PasienApotekSearchState extends ConsumerState<PasienApotekSearch> {
                   children: _filteredApotek.map((apotek) {
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 14),
-                      child: _buildApotekCard(apotek, cardBgColor, borderColor, textColor, subtitleColor, themeAccent),
+                      child: _buildApotekCard(
+                        apotek,
+                        cardBgColor,
+                        borderColor,
+                        textColor,
+                        subtitleColor,
+                        themeAccent,
+                      ),
                     );
                   }).toList(),
                 )
@@ -300,7 +324,7 @@ class _PasienApotekSearchState extends ConsumerState<PasienApotekSearch> {
                           width: 52,
                           height: 52,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Text(
+                          errorBuilder: (_, _, _) => Text(
                             apotek['initials'],
                             style: GoogleFonts.outfit(
                               fontSize: 16,
@@ -334,7 +358,9 @@ class _PasienApotekSearchState extends ConsumerState<PasienApotekSearch> {
                           height: 8,
                           margin: const EdgeInsets.only(right: 6, top: 1),
                           decoration: BoxDecoration(
-                            color: isOpen ? const Color(0xFF27AE60) : const Color(0xFF95A5A6),
+                            color: isOpen
+                                ? const Color(0xFF27AE60)
+                                : const Color(0xFF95A5A6),
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -344,7 +370,9 @@ class _PasienApotekSearchState extends ConsumerState<PasienApotekSearch> {
                             style: GoogleFonts.outfit(
                               fontSize: 9,
                               fontWeight: FontWeight.w600,
-                              color: isOpen ? const Color(0xFF27AE60) : subtitle,
+                              color: isOpen
+                                  ? const Color(0xFF27AE60)
+                                  : subtitle,
                             ),
                           ),
                         ),
@@ -364,14 +392,21 @@ class _PasienApotekSearchState extends ConsumerState<PasienApotekSearch> {
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        Icon(Icons.location_on_outlined, size: 11, color: subtitle),
+                        Icon(
+                          Icons.location_on_outlined,
+                          size: 11,
+                          color: subtitle,
+                        ),
                         const SizedBox(width: 3),
                         Expanded(
                           child: Text(
                             apotek['address'],
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.outfit(fontSize: 10, color: subtitle),
+                            style: GoogleFonts.outfit(
+                              fontSize: 10,
+                              color: subtitle,
+                            ),
                           ),
                         ),
                       ],
@@ -379,16 +414,25 @@ class _PasienApotekSearchState extends ConsumerState<PasienApotekSearch> {
                     const SizedBox(height: 10),
                     if (verified)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
                         decoration: BoxDecoration(
                           color: const Color(0xFF27AE60).withOpacity(0.08),
                           borderRadius: BorderRadius.circular(100),
-                          border: Border.all(color: const Color(0xFF27AE60).withOpacity(0.2)),
+                          border: Border.all(
+                            color: const Color(0xFF27AE60).withOpacity(0.2),
+                          ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.verified_rounded, size: 10, color: Color(0xFF27AE60)),
+                            const Icon(
+                              Icons.verified_rounded,
+                              size: 10,
+                              color: Color(0xFF27AE60),
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               'Mapotek Verified',

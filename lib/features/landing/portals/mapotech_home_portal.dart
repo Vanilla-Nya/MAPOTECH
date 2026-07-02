@@ -60,8 +60,11 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
   }
 
   // --- HERO SECTION ---
-  Widget _buildHeroSection(BuildContext context, LandingPageState state,
-      LandingPageNotifier notifier) {
+  Widget _buildHeroSection(
+    BuildContext context,
+    LandingPageState state,
+    LandingPageNotifier notifier,
+  ) {
     final isMobile = ResponsiveLayout.isMobile(context);
     final activeColor = notifier.getPrimaryColor();
     final darkGreenColor = notifier.getSecondaryColor();
@@ -72,8 +75,9 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
     final isDark = state.appearance == 'dark';
 
     Widget heroText = Column(
-      crossAxisAlignment:
-          isMobile ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+      crossAxisAlignment: isMobile
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.start,
       children: [
         // Tagline
         Container(
@@ -81,9 +85,7 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
           decoration: BoxDecoration(
             color: cardColor,
             borderRadius: BorderRadius.circular(100),
-            border: Border.all(
-              color: activeColor.withOpacity(0.2),
-            ),
+            border: Border.all(color: activeColor.withOpacity(0.2)),
             boxShadow: [
               BoxShadow(
                 color: activeColor.withOpacity(0.04),
@@ -95,11 +97,7 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                Icons.favorite_rounded,
-                color: activeColor,
-                size: 14,
-              ),
+              Icon(Icons.favorite_rounded, color: activeColor, size: 14),
               const SizedBox(width: 8),
               Text(
                 notifier.getHeroTagline(),
@@ -144,8 +142,9 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
 
         // Action Buttons
         Row(
-          mainAxisAlignment:
-              isMobile ? MainAxisAlignment.center : MainAxisAlignment.start,
+          mainAxisAlignment: isMobile
+              ? MainAxisAlignment.center
+              : MainAxisAlignment.start,
           children: [
             CustomButton(
               text: notifier.t('start_access'),
@@ -171,8 +170,9 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
 
         // Social proof
         Row(
-          mainAxisAlignment:
-              isMobile ? MainAxisAlignment.center : MainAxisAlignment.start,
+          mainAxisAlignment: isMobile
+              ? MainAxisAlignment.center
+              : MainAxisAlignment.start,
           children: [
             SizedBox(
               width: 100,
@@ -187,9 +187,14 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(
-                            color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
-                            width: 2),
-                        color: isDark ? const Color(0xFF222222) : Colors.grey[200],
+                          color: isDark
+                              ? const Color(0xFF2C2C2C)
+                              : Colors.white,
+                          width: 2,
+                        ),
+                        color: isDark
+                            ? const Color(0xFF222222)
+                            : Colors.grey[200],
                       ),
                       child: ClipOval(
                         child: Image.network(
@@ -251,7 +256,11 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
                       width: 320,
                       height: 400,
                       color: activeColor.withOpacity(0.1),
-                      child: Icon(Icons.tablet_rounded, size: 64, color: activeColor),
+                      child: Icon(
+                        Icons.tablet_rounded,
+                        size: 64,
+                        color: activeColor,
+                      ),
                     );
                   },
                 ),
@@ -289,7 +298,10 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
               bottom: -20,
               left: -20,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: isDark ? const Color(0xFF222222) : Colors.white,
                   borderRadius: BorderRadius.circular(16),
@@ -354,11 +366,7 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
 
     if (isMobile) {
       return Column(
-        children: [
-          heroText,
-          const SizedBox(height: 48),
-          heroVisual,
-        ],
+        children: [heroText, const SizedBox(height: 48), heroVisual],
       );
     }
 
@@ -372,7 +380,11 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
   }
 
   // --- FITUR UNGGULAN ---
-  Widget _buildFiturUnggulan(BuildContext context, LandingPageState state, LandingPageNotifier notifier) {
+  Widget _buildFiturUnggulan(
+    BuildContext context,
+    LandingPageState state,
+    LandingPageNotifier notifier,
+  ) {
     final isMobile = ResponsiveLayout.isMobile(context);
     final activeColor = notifier.getPrimaryColor();
     final textColor = notifier.getTextColor();
@@ -483,12 +495,9 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
                   ],
                 ),
               );
-            }).toList(),
+            }),
 
-            if (footer != null) ...[
-              const SizedBox(height: 12),
-              footer,
-            ],
+            if (footer != null) ...[const SizedBox(height: 12), footer],
           ],
         ),
       );
@@ -497,50 +506,64 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
     final providerItems = [
       {
         'title': 'Manajemen Praktik',
-        'desc': 'Kelola operasional harian praktik mandiri, klinik, hingga rumah sakit.'
+        'desc':
+            'Kelola operasional harian praktik mandiri, klinik, hingga rumah sakit.',
       },
       {
         'title': 'Rekam Medis Elektronik',
-        'desc': 'Sentralisasi data kunjungan, diagnosis, tindakan, dan resep pasien. Dilengkapi dengan bridging dengan SatuSehat, BPJS, & Mobile JKN.'
+        'desc':
+            'Sentralisasi data kunjungan, diagnosis, tindakan, dan resep pasien. Dilengkapi dengan bridging dengan SatuSehat, BPJS, & Mobile JKN.',
       },
       {
         'title': 'Antrean & Janji Temu',
-        'desc': 'Atur jadwal konsultasi dan antrean pasien secara real-time.'
+        'desc': 'Atur jadwal konsultasi dan antrean pasien secara real-time.',
       },
       {
         'title': 'Apotek & Inventori',
-        'desc': 'Stok obat, mutasi, dispensing, hingga pelacakan kedaluwarsa.'
+        'desc': 'Stok obat, mutasi, dispensing, hingga pelacakan kedaluwarsa.',
       },
       {
         'title': 'Billing & Transaksi',
-        'desc': 'Kasir layanan, transaksi farmasi, dan laporan keuangan terpadu.'
+        'desc':
+            'Kasir layanan, transaksi farmasi, dan laporan keuangan terpadu.',
       },
     ];
 
     final communityItems = [
       {
         'title': 'Profil Kesehatan',
-        'desc': 'Akses data kesehatan pribadi dan riwayat kunjungan dalam satu akun.'
+        'desc':
+            'Akses data kesehatan pribadi dan riwayat kunjungan dalam satu akun.',
       },
       {
         'title': 'Riwayat Medis',
-        'desc': 'Lihat resep, diagnosis, dan hasil pemeriksaan kapan saja.'
+        'desc': 'Lihat resep, diagnosis, dan hasil pemeriksaan kapan saja.',
       },
       {
         'title': 'Booking Online',
-        'desc': 'Buat janji temu dengan dokter atau faskes pilihan dengan mudah.'
+        'desc':
+            'Buat janji temu dengan dokter atau faskes pilihan dengan mudah.',
       },
       {
         'title': 'Resep Digital',
-        'desc': 'Akses resep obat digital yang dapat digunakan di apotek mitra.'
+        'desc':
+            'Akses resep obat digital yang dapat digunakan di apotek mitra.',
       },
     ];
 
-    final providerCardColor = isDark ? const Color(0xFF1E1C28) : const Color(0xFFF9F6FD);
-    final communityCardColor = isDark ? const Color(0xFF281C22) : const Color(0xFFFDF6FA);
-    
-    final providerBorder = isDark ? const Color(0xFF372C4C) : const Color(0xFFE2C4F9).withOpacity(0.6);
-    final communityBorder = isDark ? const Color(0xFF4C2C39) : const Color(0xFFF9C4E2).withOpacity(0.6);
+    final providerCardColor = isDark
+        ? const Color(0xFF1E1C28)
+        : const Color(0xFFF9F6FD);
+    final communityCardColor = isDark
+        ? const Color(0xFF281C22)
+        : const Color(0xFFFDF6FA);
+
+    final providerBorder = isDark
+        ? const Color(0xFF372C4C)
+        : const Color(0xFFE2C4F9).withOpacity(0.6);
+    final communityBorder = isDark
+        ? const Color(0xFF4C2C39)
+        : const Color(0xFFF9C4E2).withOpacity(0.6);
 
     const purpleThemeColor = Color(0xFFB577F2); // purple
     const pinkThemeColor = Color(0xFFFF8BCC); // pink
@@ -624,7 +647,11 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
                       ],
                     ),
                   ),
-                  const Icon(Icons.arrow_outward_rounded, color: pinkThemeColor, size: 18),
+                  const Icon(
+                    Icons.arrow_outward_rounded,
+                    color: pinkThemeColor,
+                    size: 18,
+                  ),
                 ],
               ),
             ),
@@ -686,7 +713,11 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
                             ],
                           ),
                         ),
-                        const Icon(Icons.arrow_outward_rounded, color: pinkThemeColor, size: 18),
+                        const Icon(
+                          Icons.arrow_outward_rounded,
+                          color: pinkThemeColor,
+                          size: 18,
+                        ),
                       ],
                     ),
                   ),
@@ -700,7 +731,11 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
   }
 
   // --- DUKUNGAN MULTI-PLATFORM SECTION (3D DEVICE SCENE) ---
-  Widget _buildMultiPlatformSection(BuildContext context, LandingPageState state, LandingPageNotifier notifier) {
+  Widget _buildMultiPlatformSection(
+    BuildContext context,
+    LandingPageState state,
+    LandingPageNotifier notifier,
+  ) {
     final isMobile = ResponsiveLayout.isMobile(context);
     final activeColor = notifier.getPrimaryColor();
     final lang = state.language;
@@ -719,7 +754,9 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
               color: isSelected ? const Color(0xFF1E1E24) : Colors.transparent,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: isSelected ? activeColor.withValues(alpha: 0.3) : Colors.transparent,
+                color: isSelected
+                    ? activeColor.withValues(alpha: 0.3)
+                    : Colors.transparent,
               ),
             ),
             child: Row(
@@ -728,29 +765,55 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
                   duration: const Duration(milliseconds: 250),
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: isSelected ? activeColor.withValues(alpha: 0.15) : Colors.white.withValues(alpha: 0.05),
+                    color: isSelected
+                        ? activeColor.withValues(alpha: 0.15)
+                        : Colors.white.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(icon, color: isSelected ? activeColor : Colors.grey, size: 20),
+                  child: Icon(
+                    icon,
+                    color: isSelected ? activeColor : Colors.grey,
+                    size: 20,
+                  ),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(title,
+                      Text(
+                        title,
                         style: GoogleFonts.outfit(
-                          fontSize: 14, fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
                           color: isSelected ? Colors.white : Colors.grey[400]!,
-                        )),
+                        ),
+                      ),
                       if (isSelected) ...[
                         const SizedBox(height: 3),
-                        Row(children: [
-                          Container(width: 5, height: 5, decoration: const BoxDecoration(color: Color(0xFF48C9B0), shape: BoxShape.circle)),
-                          const SizedBox(width: 5),
-                          Text(lang == 'id' ? 'PRATINJAU AKTIF' : 'ACTIVE PREVIEW',
-                            style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.w900, color: const Color(0xFF48C9B0))),
-                        ]),
+                        Row(
+                          children: [
+                            Container(
+                              width: 5,
+                              height: 5,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF48C9B0),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              lang == 'id'
+                                  ? 'PRATINJAU AKTIF'
+                                  : 'ACTIVE PREVIEW',
+                              style: GoogleFonts.outfit(
+                                fontSize: 8,
+                                fontWeight: FontWeight.w900,
+                                color: const Color(0xFF48C9B0),
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ],
                   ),
@@ -781,8 +844,14 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
         children: [
           if (isMobile) ...[
             Text(
-              lang == 'id' ? 'Dukungan Multi-Platform' : 'Multi-Platform Support',
-              style: GoogleFonts.outfit(fontSize: 26, fontWeight: FontWeight.w900, color: Colors.white),
+              lang == 'id'
+                  ? 'Dukungan Multi-Platform'
+                  : 'Multi-Platform Support',
+              style: GoogleFonts.outfit(
+                fontSize: 26,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
@@ -792,11 +861,26 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
               style: GoogleFonts.outfit(fontSize: 12, color: Colors.grey[400]!),
             ),
             const SizedBox(height: 32),
-            SizedBox(height: 260, child: _build3DDeviceScene(activeColor, isMobile)),
+            SizedBox(
+              height: 260,
+              child: _build3DDeviceScene(activeColor, isMobile),
+            ),
             const SizedBox(height: 36),
-            buildOptionRow(0, Icons.phone_iphone_rounded, 'Mobile (Android & iOS)'),
-            buildOptionRow(1, Icons.language_rounded, lang == 'id' ? 'Web Browser' : 'Web Browser'),
-            buildOptionRow(2, Icons.computer_rounded, 'Desktop (Windows, macOS, Linux)'),
+            buildOptionRow(
+              0,
+              Icons.phone_iphone_rounded,
+              'Mobile (Android & iOS)',
+            ),
+            buildOptionRow(
+              1,
+              Icons.language_rounded,
+              lang == 'id' ? 'Web Browser' : 'Web Browser',
+            ),
+            buildOptionRow(
+              2,
+              Icons.computer_rounded,
+              'Desktop (Windows, macOS, Linux)',
+            ),
           ] else ...[
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
@@ -817,38 +901,80 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: activeColor.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(100),
-                          border: Border.all(color: activeColor.withValues(alpha: 0.2)),
+                          border: Border.all(
+                            color: activeColor.withValues(alpha: 0.2),
+                          ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.devices_rounded, size: 12, color: activeColor),
+                            Icon(
+                              Icons.devices_rounded,
+                              size: 12,
+                              color: activeColor,
+                            ),
                             const SizedBox(width: 6),
-                            Text(lang == 'id' ? 'FLUTTER CROSS-PLATFORM' : 'FLUTTER CROSS-PLATFORM',
-                              style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1, color: activeColor)),
+                            Text(
+                              lang == 'id'
+                                  ? 'FLUTTER CROSS-PLATFORM'
+                                  : 'FLUTTER CROSS-PLATFORM',
+                              style: GoogleFonts.outfit(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1,
+                                color: activeColor,
+                              ),
+                            ),
                           ],
                         ),
                       ),
                       const SizedBox(height: 20),
                       Text(
-                        lang == 'id' ? 'Dukungan\nMulti-Platform' : 'Multi-Platform\nSupport',
-                        style: GoogleFonts.outfit(fontSize: 36, fontWeight: FontWeight.w900, color: Colors.white, height: 1.05, letterSpacing: -1.0),
+                        lang == 'id'
+                            ? 'Dukungan\nMulti-Platform'
+                            : 'Multi-Platform\nSupport',
+                        style: GoogleFonts.outfit(
+                          fontSize: 36,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                          height: 1.05,
+                          letterSpacing: -1.0,
+                        ),
                       ),
                       const SizedBox(height: 12),
                       Text(
                         lang == 'id'
                             ? 'Satu basis kode Flutter untuk pengalaman konsisten di semua perangkat — dari smartphone hingga desktop enterprise.'
                             : 'One Flutter codebase for a consistent experience across all devices — from smartphones to enterprise desktops.',
-                        style: GoogleFonts.outfit(fontSize: 13, color: Colors.grey[400]!, height: 1.5),
+                        style: GoogleFonts.outfit(
+                          fontSize: 13,
+                          color: Colors.grey[400]!,
+                          height: 1.5,
+                        ),
                       ),
                       const SizedBox(height: 32),
-                      buildOptionRow(0, Icons.phone_iphone_rounded, 'Mobile (Android & iOS)'),
-                      buildOptionRow(1, Icons.language_rounded, lang == 'id' ? 'Web Browser' : 'Web Browser'),
-                      buildOptionRow(2, Icons.computer_rounded, 'Desktop (Windows, macOS, Linux)'),
+                      buildOptionRow(
+                        0,
+                        Icons.phone_iphone_rounded,
+                        'Mobile (Android & iOS)',
+                      ),
+                      buildOptionRow(
+                        1,
+                        Icons.language_rounded,
+                        lang == 'id' ? 'Web Browser' : 'Web Browser',
+                      ),
+                      buildOptionRow(
+                        2,
+                        Icons.computer_rounded,
+                        'Desktop (Windows, macOS, Linux)',
+                      ),
                     ],
                   ),
                 ),
@@ -934,7 +1060,9 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
                 ..translate(0.0, float),
               child: AnimatedScale(
                 duration: const Duration(milliseconds: 300),
-                scale: _selectedPlatformIndex == 0 ? 1.0 : (isMobile ? 0.85 : 0.75),
+                scale: _selectedPlatformIndex == 0
+                    ? 1.0
+                    : (isMobile ? 0.85 : 0.75),
                 child: _buildPhone3D(activeColor),
               ),
             ),
@@ -990,7 +1118,8 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
               top: -20,
               left: -20,
               child: Container(
-                width: 80, height: 80,
+                width: 80,
+                height: 80,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: Colors.white.withValues(alpha: 0.06),
@@ -1000,10 +1129,12 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
             // Notch
             Positioned(
               top: 8,
-              left: 0, right: 0,
+              left: 0,
+              right: 0,
               child: Center(
                 child: Container(
-                  width: 30, height: 8,
+                  width: 30,
+                  height: 8,
                   decoration: BoxDecoration(
                     color: Colors.black,
                     borderRadius: BorderRadius.circular(4),
@@ -1013,8 +1144,17 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
             ),
             // App UI
             Positioned(
-              top: 28, left: 10,
-              child: Text('MAPOTECH', style: GoogleFonts.outfit(fontSize: 7, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 1)),
+              top: 28,
+              left: 10,
+              child: Text(
+                'MAPOTECH',
+                style: GoogleFonts.outfit(
+                  fontSize: 7,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  letterSpacing: 1,
+                ),
+              ),
             ),
             Center(
               child: Column(
@@ -1026,16 +1166,29 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
                       color: Colors.white.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(Icons.favorite_rounded, size: 22, color: activeColor),
+                    child: Icon(
+                      Icons.favorite_rounded,
+                      size: 22,
+                      color: activeColor,
+                    ),
                   ),
                   const SizedBox(height: 8),
-                  Text('Sehat Digital', style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.w700, color: Colors.white70)),
+                  Text(
+                    'Sehat Digital',
+                    style: GoogleFonts.outfit(
+                      fontSize: 8,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white70,
+                    ),
+                  ),
                 ],
               ),
             ),
             // Bottom button
             Positioned(
-              bottom: 14, left: 14, right: 14,
+              bottom: 14,
+              left: 14,
+              right: 14,
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 7),
                 decoration: BoxDecoration(
@@ -1043,7 +1196,14 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
                   borderRadius: BorderRadius.circular(12),
                 ),
                 alignment: Alignment.center,
-                child: Text('MULAI', style: GoogleFonts.outfit(fontSize: 7, fontWeight: FontWeight.w900, color: Colors.black)),
+                child: Text(
+                  'MULAI',
+                  style: GoogleFonts.outfit(
+                    fontSize: 7,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.black,
+                  ),
+                ),
               ),
             ),
             // Edge gloss
@@ -1111,54 +1271,89 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
               children: [
                 // Glare
                 Positioned(
-                  top: -10, left: -10,
-                  child: Container(width: 50, height: 50, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: 0.05))),
+                  top: -10,
+                  left: -10,
+                  child: Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white.withValues(alpha: 0.05),
+                    ),
+                  ),
                 ),
                 Positioned(
-                  top: 6, left: 6,
-                  child: Row(children: [
-                    Container(width: 4, height: 4, decoration: BoxDecoration(color: activeColor, borderRadius: BorderRadius.circular(2))),
-                    const SizedBox(width: 4),
-                    Text('MAPOTECH Web', style: GoogleFonts.outfit(fontSize: 5, fontWeight: FontWeight.w900, color: Colors.white70)),
-                  ]),
-                ),
-                Positioned(
-                  bottom: 8, left: 8, right: 8,
+                  top: 6,
+                  left: 6,
                   child: Row(
-                    children: List.generate(3, (i) => Expanded(child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 3),
-                      child: Container(
-                        height: 45,
+                    children: [
+                      Container(
+                        width: 4,
+                        height: 4,
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.06),
-                          borderRadius: BorderRadius.circular(4),
+                          color: activeColor,
+                          borderRadius: BorderRadius.circular(2),
                         ),
                       ),
-                    ))),
+                      const SizedBox(width: 4),
+                      Text(
+                        'MAPOTECH Web',
+                        style: GoogleFonts.outfit(
+                          fontSize: 5,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white70,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Positioned(
+                  bottom: 8,
+                  left: 8,
+                  right: 8,
+                  child: Row(
+                    children: List.generate(
+                      3,
+                      (i) => Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 3),
+                          child: Container(
+                            height: 45,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.06),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
                 // Gloss overlay
-                Positioned.fill(child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Colors.white.withValues(alpha: 0.05), Colors.transparent],
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Colors.white.withValues(alpha: 0.05),
+                          Colors.transparent,
+                        ],
+                      ),
                     ),
                   ),
-                )),
+                ),
               ],
             ),
           ),
         ),
         // Hinge
-        Container(
-          width: 194, height: 4,
-          color: const Color(0xFF1A1A22),
-        ),
+        Container(width: 194, height: 4, color: const Color(0xFF1A1A22)),
         // Base
         Container(
-          width: 210, height: 10,
+          width: 210,
+          height: 10,
           decoration: BoxDecoration(
             color: const Color(0xFF151520),
             borderRadius: const BorderRadius.only(
@@ -1170,7 +1365,8 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
         ),
         // Shadow ellipse
         Container(
-          width: 200, height: 6,
+          width: 200,
+          height: 6,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(10),
             boxShadow: [
@@ -1225,41 +1421,101 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
             child: Stack(
               children: [
                 Positioned(
-                  top: -10, left: -10,
-                  child: Container(width: 60, height: 60, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: 0.04))),
+                  top: -10,
+                  left: -10,
+                  child: Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white.withValues(alpha: 0.04),
+                    ),
+                  ),
                 ),
                 // Top bar sim
                 Positioned(
-                  top: 4, left: 4, right: 4,
-                  child: Row(children: [
-                    Container(width: 12, height: 12, decoration: BoxDecoration(color: activeColor.withValues(alpha: 0.3), shape: BoxShape.circle), child: Icon(Icons.bar_chart_rounded, size: 8, color: activeColor)),
-                    const SizedBox(width: 4),
-                    Text('Enterprise', style: GoogleFonts.outfit(fontSize: 5, fontWeight: FontWeight.w900, color: Colors.white60)),
-                    const Spacer(),
-                    Text('99.9% SLA', style: GoogleFonts.outfit(fontSize: 5, fontWeight: FontWeight.w900, color: const Color(0xFF48C9B0))),
-                  ]),
-                ),
-                Positioned(
-                  bottom: 6, left: 6,
-                  child: Text('MAPOTECH', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w900, color: Colors.white.withValues(alpha: 0.15), letterSpacing: 2)),
-                ),
-                Positioned(
-                  bottom: 6, right: 6,
-                  child: Container(
-                    padding: const EdgeInsets.all(5),
-                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(4)),
-                    child: Icon(Icons.lock_outline_rounded, size: 12, color: activeColor),
+                  top: 4,
+                  left: 4,
+                  right: 4,
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: activeColor.withValues(alpha: 0.3),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.bar_chart_rounded,
+                          size: 8,
+                          color: activeColor,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Enterprise',
+                        style: GoogleFonts.outfit(
+                          fontSize: 5,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white60,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '99.9% SLA',
+                        style: GoogleFonts.outfit(
+                          fontSize: 5,
+                          fontWeight: FontWeight.w900,
+                          color: const Color(0xFF48C9B0),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                Positioned.fill(child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Colors.white.withValues(alpha: 0.06), Colors.transparent],
+                Positioned(
+                  bottom: 6,
+                  left: 6,
+                  child: Text(
+                    'MAPOTECH',
+                    style: GoogleFonts.outfit(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white.withValues(alpha: 0.15),
+                      letterSpacing: 2,
                     ),
                   ),
-                )),
+                ),
+                Positioned(
+                  bottom: 6,
+                  right: 6,
+                  child: Container(
+                    padding: const EdgeInsets.all(5),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Icon(
+                      Icons.lock_outline_rounded,
+                      size: 12,
+                      color: activeColor,
+                    ),
+                  ),
+                ),
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Colors.white.withValues(alpha: 0.06),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -1268,7 +1524,8 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
         Container(width: 20, height: 25, color: const Color(0xFF151520)),
         // Stand
         Container(
-          width: 80, height: 8,
+          width: 80,
+          height: 8,
           decoration: BoxDecoration(
             color: const Color(0xFF1A1A25),
             borderRadius: BorderRadius.circular(4),
@@ -1276,10 +1533,17 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
         ),
         // Shadow
         Container(
-          width: 90, height: 6,
+          width: 90,
+          height: 6,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(10),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 12, spreadRadius: 2)],
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.4),
+                blurRadius: 12,
+                spreadRadius: 2,
+              ),
+            ],
           ),
         ),
       ],
@@ -1287,7 +1551,11 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
   }
 
   // --- VISI KAMI ---
-  Widget _buildVisiKamiSection(BuildContext context, LandingPageState state, LandingPageNotifier notifier) {
+  Widget _buildVisiKamiSection(
+    BuildContext context,
+    LandingPageState state,
+    LandingPageNotifier notifier,
+  ) {
     final isMobile = ResponsiveLayout.isMobile(context);
     final isDark = state.appearance == 'dark';
 
@@ -1327,7 +1595,10 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.04),
                     borderRadius: BorderRadius.circular(100),
@@ -1394,10 +1665,7 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
                   text: notifier.t('vision_btn'),
                   textColor: Colors.white,
                   isGradient: true,
-                  gradientColors: const [
-                    Color(0xFFEAB7EE),
-                    Color(0xFFD6A4F2),
-                  ],
+                  gradientColors: const [Color(0xFFEAB7EE), Color(0xFFD6A4F2)],
                   height: 48,
                   onPressed: () {
                     showSelectionModal(context, ref);
@@ -1412,7 +1680,11 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
   }
 
   // --- TIMELINE SECTION ---
-  Widget _buildTimelineSection(BuildContext context, LandingPageState state, LandingPageNotifier notifier) {
+  Widget _buildTimelineSection(
+    BuildContext context,
+    LandingPageState state,
+    LandingPageNotifier notifier,
+  ) {
     final isMobile = ResponsiveLayout.isMobile(context);
     final activeColor = notifier.getPrimaryColor();
     final textColor = notifier.getTextColor();
@@ -1452,7 +1724,7 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
               const SizedBox(height: 24),
               _buildVersionBadge(isDark, borderColor, cardColor, textColor),
             ],
-          )
+          ),
         ] else ...[
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -1467,7 +1739,9 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
                       text: TextSpan(
                         children: [
                           TextSpan(
-                            text: lang == 'id' ? 'Apa yang Baru di ' : 'What\'s New in ',
+                            text: lang == 'id'
+                                ? 'Apa yang Baru di '
+                                : 'What\'s New in ',
                             style: GoogleFonts.outfit(
                               fontSize: 36,
                               fontWeight: FontWeight.w900,
@@ -1480,12 +1754,20 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
                               fontSize: 36,
                               fontWeight: FontWeight.w900,
                               foreground: Paint()
-                                ..shader = const LinearGradient(
-                                  colors: [
-                                    Color(0xFF48C9B0),
-                                    Color(0xFFB577F2),
-                                  ],
-                                ).createShader(const Rect.fromLTWH(0.0, 0.0, 200.0, 70.0)),
+                                ..shader =
+                                    const LinearGradient(
+                                      colors: [
+                                        Color(0xFF48C9B0),
+                                        Color(0xFFB577F2),
+                                      ],
+                                    ).createShader(
+                                      const Rect.fromLTWH(
+                                        0.0,
+                                        0.0,
+                                        200.0,
+                                        70.0,
+                                      ),
+                                    ),
                             ),
                           ),
                         ],
@@ -1520,7 +1802,10 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
               child: isMobile
                   ? Container(width: 2, color: const Color(0xFFE2C4F9))
                   : Center(
-                      child: Container(width: 2, color: const Color(0xFFE2C4F9)),
+                      child: Container(
+                        width: 2,
+                        color: const Color(0xFFE2C4F9),
+                      ),
                     ),
             ),
 
@@ -1549,7 +1834,12 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
         const SizedBox(height: 48),
 
         Center(
-          child: _buildGitHubGitCapsule(isDark, borderColor, cardColor, textColor),
+          child: _buildGitHubGitCapsule(
+            isDark,
+            borderColor,
+            cardColor,
+            textColor,
+          ),
         ),
       ],
     );
@@ -1561,18 +1851,12 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
       decoration: BoxDecoration(
         color: const Color(0xFFF3EEFC),
         borderRadius: BorderRadius.circular(100),
-        border: Border.all(
-          color: const Color(0xFFE2C4F9).withOpacity(0.4),
-        ),
+        border: Border.all(color: const Color(0xFFE2C4F9).withOpacity(0.4)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
-            Icons.history_rounded,
-            color: Color(0xFFB577F2),
-            size: 14,
-          ),
+          const Icon(Icons.history_rounded, color: Color(0xFFB577F2), size: 14),
           const SizedBox(width: 6),
           Text(
             notifier.t('timeline_badge').toUpperCase(),
@@ -1588,7 +1872,12 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
     );
   }
 
-  Widget _buildVersionBadge(bool isDark, Color borderColor, Color cardColor, Color textColor) {
+  Widget _buildVersionBadge(
+    bool isDark,
+    Color borderColor,
+    Color cardColor,
+    Color textColor,
+  ) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -1635,7 +1924,9 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
             decoration: BoxDecoration(
               color: const Color(0xFFF3EEFC),
               shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFFE2C4F9).withOpacity(0.5)),
+              border: Border.all(
+                color: const Color(0xFFE2C4F9).withOpacity(0.5),
+              ),
             ),
             child: const Icon(
               Icons.rocket_launch_rounded,
@@ -1686,7 +1977,9 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
               decoration: BoxDecoration(
                 color: const Color(0xFFF3EEFC),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE2C4F9).withOpacity(0.4)),
+                border: Border.all(
+                  color: const Color(0xFFE2C4F9).withOpacity(0.4),
+                ),
               ),
               child: const Icon(
                 Icons.star_rounded,
@@ -1711,11 +2004,16 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
                   ),
                   const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFE8F8F5),
                       borderRadius: BorderRadius.circular(100),
-                      border: Border.all(color: const Color(0xFF48C9B0).withOpacity(0.3)),
+                      border: Border.all(
+                        color: const Color(0xFF48C9B0).withOpacity(0.3),
+                      ),
                     ),
                     child: Text(
                       'FITUR BARU',
@@ -1830,7 +2128,12 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
     );
   }
 
-  Widget _buildGitHubGitCapsule(bool isDark, Color borderColor, Color cardColor, Color textColor) {
+  Widget _buildGitHubGitCapsule(
+    bool isDark,
+    Color borderColor,
+    Color cardColor,
+    Color textColor,
+  ) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       decoration: BoxDecoration(
@@ -1938,8 +2241,16 @@ class CapsuleGridPainter extends CustomPainter {
     const spacingX = 16.0;
     const spacingY = 16.0;
 
-    for (double x = -capsuleWidth; x < size.width + capsuleWidth; x += capsuleWidth + spacingX) {
-      for (double y = -capsuleHeight; y < size.height + capsuleHeight; y += capsuleHeight + spacingY) {
+    for (
+      double x = -capsuleWidth;
+      x < size.width + capsuleWidth;
+      x += capsuleWidth + spacingX
+    ) {
+      for (
+        double y = -capsuleHeight;
+        y < size.height + capsuleHeight;
+        y += capsuleHeight + spacingY
+      ) {
         final rect = Rect.fromLTWH(x, y, capsuleWidth, capsuleHeight);
         final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(32));
         canvas.drawRRect(rrect, paint);

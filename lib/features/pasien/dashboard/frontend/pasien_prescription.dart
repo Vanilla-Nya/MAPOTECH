@@ -168,7 +168,7 @@ class _PasienPrescriptionState extends ConsumerState<PasienPrescription> {
     final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
     final subtitleColor = isDark ? Colors.grey[400]! : const Color(0xFF6F6A8A);
     final borderColor = isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2);
-    final purpleAccent = const Color(0xFFB577F2);
+    final purpleAccent = ref.read(landingPageProvider.notifier).getPrimaryColor();
 
     return _isLoading
         ? const SkeletonScope(
@@ -406,7 +406,8 @@ class _ResepDetailDialog extends ConsumerWidget {
     final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
     final subtitleColor = isDark ? Colors.grey[400]! : const Color(0xFF6F6A8A);
     final borderColor = isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2);
-    final purpleAccent = const Color(0xFFB577F2);
+    final purpleAccent = ref.read(landingPageProvider.notifier).getPrimaryColor();
+    final appearance = ref.read(landingPageProvider).appearance;
     final greenColor = const Color(0xFF27AE60);
 
     final isMobile = MediaQuery.of(context).size.width < 600;
@@ -439,9 +440,13 @@ class _ResepDetailDialog extends ConsumerWidget {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.fromLTRB(24, 24, 16, 24),
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Color(0xFFCB8FFF), Color(0xFFB577F2)],
+                  colors: appearance == 'rev'
+                      ? const [Color(0xFFCB8FFF), Color(0xFFB577F2)]
+                      : (appearance == 'dark'
+                          ? const [Color(0xFF3A3A40), Color(0xFF252528)]
+                          : const [Color(0xFF7BE5D3), Color(0xFF48C9B0)]),
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),

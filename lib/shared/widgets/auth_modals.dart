@@ -76,10 +76,11 @@ class _LoginModalContentState extends State<_LoginModalContent> {
     final activeTab = state.activeTab;
     final isRev = activeTab == 'pasien';
 
-    const bgColor = Colors.white;
-    const textColor = Color(0xFF1B0C3C);
-    final subtitleColor = const Color(0xFF6F6A8A);
-    const fieldBg = Color(0xFFF6F3FC);
+    final isDark = state.appearance == 'dark';
+    final bgColor = notifier.getCardColor();
+    final textColor = notifier.getTextColor();
+    final subtitleColor = notifier.getBodyTextColor();
+    final fieldBg = isDark ? const Color(0xFF252528) : const Color(0xFFF6F3FC);
 
     final accentPurple = isRev ? const Color(0xFFB577F2) : const Color(0xFF48C9B0);
 
@@ -437,16 +438,38 @@ class _LoginModalContentState extends State<_LoginModalContent> {
                         double defaultFee = 0.0;
                         bool ssAutoSync = true;
 
+                        // Fetch assistant details if role is asisten_dokter
+                        if (user != null && user['role'] == 'asisten_dokter') {
+                          try {
+                            final asisData = await SupabaseService.client
+                                .from('user_detail_doctor_assistant')
+                                .select('doctor_id, permissions')
+                                .eq('id', user['id'])
+                                .maybeSingle();
+                            if (asisData != null) {
+                              user['doctor_id'] = asisData['doctor_id'];
+                              user['permissions'] = asisData['permissions'];
+                            }
+                          } catch (e) {
+                            debugPrint('Error fetching assistant details: $e');
+                          }
+                        }
+
                         if (mappedRole == 'dokter') {
                           try {
-                            final docDetail = await SupabaseService.client
-                                .from('user_detail_doctor')
-                                .select('default_service_fee, satusehat_auto_sync')
-                                .eq('id', user?['id'])
-                                .maybeSingle();
-                            if (docDetail != null) {
-                              defaultFee = double.tryParse(docDetail['default_service_fee']?.toString() ?? '') ?? 0.0;
-                              ssAutoSync = docDetail['satusehat_auto_sync'] as bool? ?? true;
+                            final targetDoctorId = (user?['role'] == 'asisten_dokter')
+                                ? (user?['doctor_id'])
+                                : (user?['id']);
+                            if (targetDoctorId != null) {
+                              final docDetail = await SupabaseService.client
+                                  .from('user_detail_doctor')
+                                  .select('default_service_fee, satusehat_auto_sync')
+                                  .eq('id', targetDoctorId)
+                                  .maybeSingle();
+                              if (docDetail != null) {
+                                defaultFee = double.tryParse(docDetail['default_service_fee']?.toString() ?? '') ?? 0.0;
+                                ssAutoSync = docDetail['satusehat_auto_sync'] as bool? ?? true;
+                              }
                             }
                           } catch (e) {
                             debugPrint('Error loading doctor settings from DB: $e');
@@ -628,10 +651,11 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
 
     final isRev = _selectedRoleId == 'pasien';
 
-    const bgColor = Colors.white;
-    const textColor = Color(0xFF1B0C3C);
-    final subtitleColor = const Color(0xFF6F6A8A);
-    const fieldBg = Color(0xFFF6F3FC);
+    final isDark = state.appearance == 'dark';
+    final bgColor = notifier.getCardColor();
+    final textColor = notifier.getTextColor();
+    final subtitleColor = notifier.getBodyTextColor();
+    final fieldBg = isDark ? const Color(0xFF252528) : const Color(0xFFF6F3FC);
 
     final accentPurple = isRev ? const Color(0xFFB577F2) : const Color(0xFF48C9B0);
 

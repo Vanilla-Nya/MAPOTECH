@@ -54,13 +54,14 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
 
     final isDark = state.appearance == 'dark';
     final isRev = state.appearance == 'rev';
-    final cardBgColor = isDark ? const Color(0xFF161619) : Colors.white;
-    final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
-    final subtitleColor = isDark ? Colors.grey[400]! : const Color(0xFF6F6A8A);
-    final borderColor = isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2);
+    final notifier = ref.read(landingPageProvider.notifier);
+    final cardBgColor = notifier.getCardColor();
+    final textColor = notifier.getTextColor();
+    final subtitleColor = notifier.getBodyTextColor();
+    final borderColor = notifier.getBorderColor();
     final inputBg = isDark ? const Color(0xFF1E1E22) : const Color(0xFFF8FAFD);
-    final themeAccent = isRev ? const Color(0xFFB577F2) : const Color(0xFF48C9B0);
-    final purpleAccent = const Color(0xFFB577F2);
+    final themeAccent = notifier.getPrimaryColor();
+    final purpleAccent = notifier.getPrimaryColor();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -110,7 +111,11 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
                     ),
                     if (_searchQuery.isNotEmpty)
                       IconButton(
-                        icon: Icon(Icons.close_rounded, size: 18, color: subtitleColor),
+                        icon: Icon(
+                          Icons.close_rounded,
+                          size: 18,
+                          color: subtitleColor,
+                        ),
                         onPressed: () {
                           _searchController.clear();
                           setState(() => _searchQuery = '');
@@ -128,16 +133,45 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  _buildFilterChip('Semua', 'semua', subtitleColor, purpleAccent, borderColor, cardBgColor),
+                  _buildFilterChip(
+                    'Semua',
+                    'semua',
+                    subtitleColor,
+                    purpleAccent,
+                    borderColor,
+                    cardBgColor,
+                  ),
                   const SizedBox(width: 8),
-                  _buildFilterChip('Dokter', 'dokter', subtitleColor, purpleAccent, borderColor, cardBgColor),
+                  _buildFilterChip(
+                    'Dokter',
+                    'dokter',
+                    subtitleColor,
+                    purpleAccent,
+                    borderColor,
+                    cardBgColor,
+                  ),
                   const SizedBox(width: 8),
-                  _buildFilterChip('Bidan', 'bidan', subtitleColor, purpleAccent, borderColor, cardBgColor),
+                  _buildFilterChip(
+                    'Bidan',
+                    'bidan',
+                    subtitleColor,
+                    purpleAccent,
+                    borderColor,
+                    cardBgColor,
+                  ),
                   const SizedBox(width: 8),
-                  Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: subtitleColor),
+                  Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: 18,
+                    color: subtitleColor,
+                  ),
                   Text(
                     'Filter Urutan',
-                    style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600, color: subtitleColor),
+                    style: GoogleFonts.outfit(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: subtitleColor,
+                    ),
                   ),
                 ],
               ),
@@ -239,11 +273,11 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? accentColor.withOpacity(0.12) : Colors.transparent,
+          color: isSelected
+              ? accentColor.withOpacity(0.12)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(100),
-          border: Border.all(
-            color: isSelected ? accentColor : borderColor,
-          ),
+          border: Border.all(color: isSelected ? accentColor : borderColor),
         ),
         child: Text(
           label,
@@ -299,7 +333,7 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
                 width: 56,
                 height: 56,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Text(
+                errorBuilder: (_, _, _) => Text(
                   dokter['initials'],
                   style: GoogleFonts.outfit(
                     fontSize: 18,
@@ -328,11 +362,19 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    Icon(Icons.medical_services_outlined, size: 12, color: accent),
+                    Icon(
+                      Icons.medical_services_outlined,
+                      size: 12,
+                      color: accent,
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       dokter['role'],
-                      style: GoogleFonts.outfit(fontSize: 11, color: accent, fontWeight: FontWeight.w700),
+                      style: GoogleFonts.outfit(
+                        fontSize: 11,
+                        color: accent,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ],
                 ),
@@ -346,7 +388,10 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
                         dokter['clinic'],
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.outfit(fontSize: 10, color: subtitle),
+                        style: GoogleFonts.outfit(
+                          fontSize: 10,
+                          color: subtitle,
+                        ),
                       ),
                     ),
                   ],
@@ -363,9 +408,17 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
                       Icons.people_outline_rounded,
                       accent,
                     ),
-                    _buildInfoChip(dokter['role'], Icons.person_outline_rounded, purple),
+                    _buildInfoChip(
+                      dokter['role'],
+                      Icons.person_outline_rounded,
+                      purple,
+                    ),
                     if (dokter['menerimaBpjs'] == true)
-                      _buildInfoChip('Melayani BPJS', Icons.verified_rounded, const Color(0xFF27AE60)),
+                      _buildInfoChip(
+                        'Melayani BPJS',
+                        Icons.verified_rounded,
+                        const Color(0xFF27AE60),
+                      ),
                   ],
                 ),
               ],
@@ -382,7 +435,11 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
               shape: BoxShape.circle,
             ),
             alignment: Alignment.center,
-            child: Icon(Icons.arrow_forward_ios_rounded, size: 14, color: purple),
+            child: Icon(
+              Icons.arrow_forward_ios_rounded,
+              size: 14,
+              color: purple,
+            ),
           ),
         ],
       ),

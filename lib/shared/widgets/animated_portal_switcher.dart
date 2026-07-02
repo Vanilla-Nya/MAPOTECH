@@ -32,14 +32,9 @@ class AnimatedPortalSwitcher extends StatelessWidget {
               // Render outgoing pages as Positioned so they don't affect the container height.
               // This allows AnimatedSize to capture the incoming page's height immediately and animate to it.
               ...previousChildren.map((oldChild) {
-                return Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  child: oldChild,
-                );
+                return Positioned(top: 0, left: 0, right: 0, child: oldChild);
               }),
-              if (currentChild != null) currentChild,
+              ?currentChild,
             ],
           );
         },
@@ -48,21 +43,27 @@ class AnimatedPortalSwitcher extends StatelessWidget {
 
           if (isEntering) {
             // Entering child: Slide up + Spring scale + Fade in
-            final slideAnimation = Tween<Offset>(
-              begin: const Offset(0.0, 0.03),
-              end: Offset.zero,
-            ).animate(CurvedAnimation(
-              parent: animation,
-              curve: const Interval(0.1, 1.0, curve: Curves.easeOutCubic),
-            ));
+            final slideAnimation =
+                Tween<Offset>(
+                  begin: const Offset(0.0, 0.03),
+                  end: Offset.zero,
+                ).animate(
+                  CurvedAnimation(
+                    parent: animation,
+                    curve: const Interval(0.1, 1.0, curve: Curves.easeOutCubic),
+                  ),
+                );
 
-            final scaleAnimation = Tween<double>(
-              begin: 0.97,
-              end: 1.0,
-            ).animate(CurvedAnimation(
-              parent: animation,
-              curve: const Interval(0.0, 1.0, curve: Curves.easeOutBack), // Premium spring overshoot
-            ));
+            final scaleAnimation = Tween<double>(begin: 0.97, end: 1.0).animate(
+              CurvedAnimation(
+                parent: animation,
+                curve: const Interval(
+                  0.0,
+                  1.0,
+                  curve: Curves.easeOutBack,
+                ), // Premium spring overshoot
+              ),
+            );
 
             final opacityAnimation = CurvedAnimation(
               parent: animation,
@@ -73,35 +74,29 @@ class AnimatedPortalSwitcher extends StatelessWidget {
               opacity: opacityAnimation,
               child: ScaleTransition(
                 scale: scaleAnimation,
-                child: SlideTransition(
-                  position: slideAnimation,
-                  child: child,
-                ),
+                child: SlideTransition(position: slideAnimation, child: child),
               ),
             );
           } else {
             // Exiting child: Fade out and slide down slightly (no scale to prevent visual overlapping clutter)
-            final slideAnimation = Tween<Offset>(
-              begin: const Offset(0.0, 0.02),
-              end: Offset.zero,
-            ).animate(CurvedAnimation(
-              parent: animation,
-              curve: const Interval(0.0, 1.0, curve: Curves.easeInCubic),
-            ));
+            final slideAnimation =
+                Tween<Offset>(
+                  begin: const Offset(0.0, 0.02),
+                  end: Offset.zero,
+                ).animate(
+                  CurvedAnimation(
+                    parent: animation,
+                    curve: const Interval(0.0, 1.0, curve: Curves.easeInCubic),
+                  ),
+                );
 
             return FadeTransition(
               opacity: animation,
-              child: SlideTransition(
-                position: slideAnimation,
-                child: child,
-              ),
+              child: SlideTransition(position: slideAnimation, child: child),
             );
           }
         },
-        child: KeyedSubtree(
-          key: ValueKey(switcherKey),
-          child: child,
-        ),
+        child: KeyedSubtree(key: ValueKey(switcherKey), child: child),
       ),
     );
   }

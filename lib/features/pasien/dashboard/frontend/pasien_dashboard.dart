@@ -155,13 +155,15 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(landingPageProvider);
+    final notifier = ref.read(landingPageProvider.notifier);
     final user = state.loggedInUser;
 
     final isDark = state.appearance == 'dark';
-    final cardBgColor = isDark ? const Color(0xFF161619) : Colors.white;
-    final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
-    final subtitleColor = isDark ? Colors.grey[400]! : const Color(0xFF6F6A8A);
-    final borderColor = isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2);
+    final cardBgColor = notifier.getCardColor();
+    final textColor = notifier.getTextColor();
+    final subtitleColor = notifier.getBodyTextColor();
+    final borderColor = notifier.getBorderColor();
+    final themeAccent = notifier.getPrimaryColor();
 
     final isMobile = MediaQuery.of(context).size.width < 768;
 
@@ -195,8 +197,8 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                     Container(
                       width: 70,
                       height: 70,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF48C9B0),
+                      decoration: BoxDecoration(
+                        color: notifier.getPrimaryColor(),
                         shape: BoxShape.circle,
                       ),
                       alignment: Alignment.center,
@@ -280,11 +282,11 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                                 width: 48,
                                 height: 48,
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFB577F2).withOpacity(0.12),
+                                  color: themeAccent.withOpacity(0.12),
                                   shape: BoxShape.circle,
                                 ),
                                 alignment: Alignment.center,
-                                child: const Icon(Icons.sync_rounded, color: Color(0xFFB577F2)),
+                                child: Icon(Icons.sync_rounded, color: themeAccent),
                               ),
                               const SizedBox(width: 16),
                               Expanded(
@@ -303,7 +305,7 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                                   ],
                                 ),
                               ),
-                              const Icon(Icons.chevron_right_rounded, color: Color(0xFFB577F2)),
+                              Icon(Icons.chevron_right_rounded, color: themeAccent),
                             ],
                           ),
                         ),
@@ -338,11 +340,11 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                                 width: 48,
                                 height: 48,
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFB577F2).withOpacity(0.12),
+                                  color: themeAccent.withOpacity(0.12),
                                   shape: BoxShape.circle,
                                 ),
                                 alignment: Alignment.center,
-                                child: const Icon(Icons.qr_code_rounded, color: Color(0xFFB577F2)),
+                                child: Icon(Icons.qr_code_rounded, color: themeAccent),
                               ),
                               const SizedBox(width: 16),
                               Expanded(
@@ -367,7 +369,7 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                                       _activePrescriptionsCount > 0
                                           ? 'LIHAT RESEP SEKARANG >'
                                           : 'BOOKING SEKARANG >',
-                                      style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: const Color(0xFFB577F2)),
+                                      style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: themeAccent),
                                     ),
                                   ],
                                 ),
@@ -412,7 +414,7 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                             children: [
                               Text(
                                 'JANJI TEMU BERIKUTNYA',
-                                style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.w900, color: const Color(0xFFB577F2), letterSpacing: 0.5),
+                                style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.w900, color: themeAccent, letterSpacing: 0.5),
                               ),
                               const SizedBox(height: 20),
                               if (_nextAppointment != null) ...[
@@ -422,7 +424,7 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                                       width: 44,
                                       height: 44,
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFFB577F2).withOpacity(0.12),
+                                        color: themeAccent.withOpacity(0.12),
                                         shape: BoxShape.circle,
                                       ),
                                       alignment: Alignment.center,
@@ -430,7 +432,7 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                                         _doctorName.isNotEmpty && _doctorName.length > 3
                                             ? _doctorName.split(' ').where((e) => e != 'dr.').map((e) => e.isNotEmpty ? e[0] : '').take(2).join().toUpperCase()
                                             : 'DR',
-                                        style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w900, color: const Color(0xFFB577F2)),
+                                        style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w900, color: themeAccent),
                                       ),
                                     ),
                                     const SizedBox(width: 14),
@@ -451,7 +453,7 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                                             const SizedBox(height: 2),
                                             Text(
                                               'Nomor Antrian: #${_nextAppointment!['queue_number']}',
-                                              style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFFB577F2)),
+                                              style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: themeAccent),
                                             ),
                                           ],
                                         ],
@@ -475,13 +477,13 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                                       width: 44,
                                       height: 44,
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFFB577F2).withOpacity(0.12),
+                                        color: themeAccent.withOpacity(0.12),
                                         shape: BoxShape.circle,
                                       ),
                                       alignment: Alignment.center,
                                       child: Text(
                                         'DR',
-                                        style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w900, color: const Color(0xFFB577F2)),
+                                        style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w900, color: themeAccent),
                                       ),
                                     ),
                                     const SizedBox(width: 14),
@@ -532,7 +534,7 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                                 },
                                 child: Text(
                                   'PERBARUI DATA',
-                                  style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: const Color(0xFFB577F2)),
+                                  style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: themeAccent),
                                 ),
                               ),
                             ),

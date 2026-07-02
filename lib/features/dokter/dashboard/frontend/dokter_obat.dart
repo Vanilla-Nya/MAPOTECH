@@ -337,8 +337,8 @@ class _DokterObatState extends ConsumerState<DokterObat> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final userState = ref.read(landingPageProvider).loggedInUser;
-      final userId = userState?['id']?.toString();
+      final userState = ref.read(landingPageProvider);
+      final userId = userState.activeDoctorId;
       final doctorId = (userId == 'mock-id-1234567890' || userId == null)
           ? '8f93471a-74f8-486b-8e85-4002dc44c11c'
           : userId;
@@ -358,7 +358,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
     final subtitleColor = isDark ? Colors.grey[400]! : const Color(0xFF6F6A8A);
     final borderColor = isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2);
     final themeAccent = isRev ? const Color(0xFFB577F2) : const Color(0xFF48C9B0);
-    final purpleAccent = const Color(0xFFB577F2);
+    final purpleAccent = themeAccent;
     final inputBg = isDark ? const Color(0xFF1E1E22) : const Color(0xFFF6F8FA);
 
     // Apply Filter & Search
@@ -860,7 +860,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
 
   void _showDrugDetailModal(BuildContext context, ObatModel drug, bool isDark) {
     final state = ref.read(landingPageProvider);
-    final purple = const Color(0xFFB577F2);
+    final purple = ref.read(landingPageProvider.notifier).getPrimaryColor();
     final green = const Color(0xFF27AE60);
     final cardBg = isDark ? const Color(0xFF161619) : Colors.white;
     final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
@@ -1464,7 +1464,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
   }) {
     final state = ref.read(landingPageProvider);
     final isEn = state.language == 'en';
-    final purple = const Color(0xFFB577F2);
+    final purple = ref.read(landingPageProvider.notifier).getPrimaryColor();
     final cardBg = isDark ? const Color(0xFF161619) : Colors.white;
     final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
     final subtitleColor = isDark ? Colors.grey[400]! : const Color(0xFF6F6A8A);
@@ -1802,7 +1802,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
   void _showAddDrugModal(BuildContext context, bool isDark) {
     final state = ref.read(landingPageProvider);
     final isEn = state.language == 'en';
-    final purple = const Color(0xFFB577F2);
+    final purple = ref.read(landingPageProvider.notifier).getPrimaryColor();
     final cardBg = isDark ? const Color(0xFF161619) : Colors.white;
     final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
     final subtitleColor = isDark ? Colors.grey[400]! : const Color(0xFF6F6A8A);
@@ -2373,7 +2373,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
     bool isDark, {
     required Function(ObatModel) onPriceUpdate,
   }) {
-    final purple = const Color(0xFFB577F2);
+    final purple = ref.read(landingPageProvider.notifier).getPrimaryColor();
     final cardBg = isDark ? const Color(0xFF161619) : Colors.white;
     final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
     final subtitleColor = isDark ? Colors.grey[400]! : const Color(0xFF6F6A8A);

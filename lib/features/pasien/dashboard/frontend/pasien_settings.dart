@@ -15,12 +15,12 @@ class PasienSettings extends ConsumerWidget {
 
     final isEn = state.language == 'en';
     final isDark = state.appearance == 'dark';
-    final cardBg = isDark ? const Color(0xFF161619) : Colors.white;
-    final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
-    final subtitleColor = isDark ? Colors.grey[400]! : const Color(0xFF6F6A8A);
-    final borderColor = isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2);
-    final purple = const Color(0xFFB577F2);
-    final teal = const Color(0xFF48C9B0);
+    final cardBg = notifier.getCardColor();
+    final textColor = notifier.getTextColor();
+    final subtitleColor = notifier.getBodyTextColor();
+    final borderColor = notifier.getBorderColor();
+    final purple = notifier.getPrimaryColor();
+    final teal = notifier.getPrimaryColor();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -83,7 +83,9 @@ class PasienSettings extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          isEn ? 'Profile Photo Blur Effect' : 'Efek Blur Foto Profil',
+                          isEn
+                              ? 'Profile Photo Blur Effect'
+                              : 'Efek Blur Foto Profil',
                           style: GoogleFonts.outfit(
                             fontSize: 13,
                             fontWeight: FontWeight.w900,
@@ -104,7 +106,7 @@ class PasienSettings extends ConsumerWidget {
                   ),
                   Switch(
                     value: state.blurProfileEffectEnabled,
-                    activeColor: purple,
+                    activeThumbColor: purple,
                     onChanged: (val) {
                       notifier.setBlurProfileEffect(val);
                     },
@@ -120,7 +122,9 @@ class PasienSettings extends ConsumerWidget {
         // ── Bahasa ───────────────────────────────────────────────────────
         SettingsSection(
           title: isEn ? 'Language' : 'Bahasa',
-          subtitle: isEn ? 'Select your preferred language' : 'Pilih bahasa pilihan Anda',
+          subtitle: isEn
+              ? 'Select your preferred language'
+              : 'Pilih bahasa pilihan Anda',
           textColor: textColor,
           subtitleColor: subtitleColor,
           child: Row(
@@ -133,7 +137,10 @@ class PasienSettings extends ConsumerWidget {
                 teal: teal,
                 isDark: isDark,
                 borderColor: borderColor,
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 9,
+                ),
               ),
               const SizedBox(width: 10),
               SettingsChip(
@@ -144,7 +151,10 @@ class PasienSettings extends ConsumerWidget {
                 teal: teal,
                 isDark: isDark,
                 borderColor: borderColor,
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 9,
+                ),
               ),
             ],
           ),
@@ -160,13 +170,28 @@ class PasienSettings extends ConsumerWidget {
               : 'Sesuaikan profil Anda dengan fitur premium eksklusif.',
           textColor: textColor,
           subtitleColor: subtitleColor,
-          child: _buildPremiumCard(isEn, isDark, textColor, subtitleColor, borderColor, cardBg, purple),
+          child: _buildPremiumCard(
+            isEn,
+            isDark,
+            textColor,
+            subtitleColor,
+            borderColor,
+            cardBg,
+            purple,
+          ),
         ),
 
         const SizedBox(height: 40),
 
         // ── Laporkan Bug ──────────────────────────────────────────────────
-        _buildBugReportSection(isEn, cardBg, borderColor, textColor, subtitleColor, purple),
+        _buildBugReportSection(
+          isEn,
+          cardBg,
+          borderColor,
+          textColor,
+          subtitleColor,
+          purple,
+        ),
 
         const SizedBox(height: 24),
       ],
@@ -204,7 +229,10 @@ class PasienSettings extends ConsumerWidget {
                 children: [
                   // Orange badge
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: orange.withOpacity(0.10),
                       borderRadius: BorderRadius.circular(6),
@@ -236,7 +264,11 @@ class PasienSettings extends ConsumerWidget {
                     isEn
                         ? 'Unlock exclusive customization features including custom GIF backgrounds and theme colors.'
                         : 'Buka fitur kustomisasi eksklusif termasuk latar belakang GIF kustom dan warna tema.',
-                    style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor, height: 1.5),
+                    style: GoogleFonts.outfit(
+                      fontSize: 11,
+                      color: subtitleColor,
+                      height: 1.5,
+                    ),
                   ),
 
                   const SizedBox(height: 14),
@@ -244,9 +276,17 @@ class PasienSettings extends ConsumerWidget {
                   // Feature bullets
                   Row(
                     children: [
-                      _premiumFeatureBullet(Icons.color_lens_outlined, isEn ? 'Theme Color' : 'Warna Tema', subtitleColor),
+                      _premiumFeatureBullet(
+                        Icons.color_lens_outlined,
+                        isEn ? 'Theme Color' : 'Warna Tema',
+                        subtitleColor,
+                      ),
                       const SizedBox(width: 16),
-                      _premiumFeatureBullet(Icons.image_outlined, isEn ? 'Header Effect' : 'Efek Header', subtitleColor),
+                      _premiumFeatureBullet(
+                        Icons.image_outlined,
+                        isEn ? 'Header Effect' : 'Efek Header',
+                        subtitleColor,
+                      ),
                     ],
                   ),
 
@@ -265,7 +305,10 @@ class PasienSettings extends ConsumerWidget {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: purple,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -334,10 +377,7 @@ class PasienSettings extends ConsumerWidget {
       children: [
         Icon(icon, size: 14, color: color),
         const SizedBox(width: 5),
-        Text(
-          label,
-          style: GoogleFonts.outfit(fontSize: 11, color: color),
-        ),
+        Text(label, style: GoogleFonts.outfit(fontSize: 11, color: color)),
       ],
     );
   }
@@ -369,7 +409,11 @@ class PasienSettings extends ConsumerWidget {
               shape: BoxShape.circle,
             ),
             alignment: Alignment.center,
-            child: Icon(Icons.bug_report_outlined, size: 26, color: purple.withOpacity(0.5)),
+            child: Icon(
+              Icons.bug_report_outlined,
+              size: 26,
+              color: purple.withOpacity(0.5),
+            ),
           ),
           const SizedBox(height: 12),
           Text(
@@ -393,10 +437,7 @@ class PasienSettings extends ConsumerWidget {
                 ),
                 TextSpan(
                   text: isEn ? 'team.' : 'kami.',
-                  style: GoogleFonts.outfit(
-                    fontSize: 11,
-                    color: subtitleColor,
-                  ),
+                  style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor),
                 ),
               ],
             ),
@@ -408,11 +449,16 @@ class PasienSettings extends ConsumerWidget {
               foregroundColor: textColor,
               side: BorderSide(color: border),
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
             child: Text(
               isEn ? 'Report Bug' : 'Laporkan Bug',
-              style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700),
+              style: GoogleFonts.outfit(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],

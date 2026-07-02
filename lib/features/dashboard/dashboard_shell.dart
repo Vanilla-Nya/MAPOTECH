@@ -56,12 +56,32 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     final state = ref.watch(landingPageProvider);
     final notifier = ref.read(landingPageProvider.notifier);
 
+    // Safety redirect: If the logged-in user is an assistant, they should only see permitted menus.
+    if (state.isLoggedIn && state.isAssistant) {
+      final menuItems = getMenuItemsForRole(
+        state.loggedInRole ?? 'dokter',
+        state.language,
+        state: state,
+      );
+      if (menuItems.isNotEmpty &&
+          !menuItems.any((item) => item.id == _activeMenu) &&
+          _activeMenu != 'settings') {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            setState(() {
+              _activeMenu = menuItems.first.id;
+            });
+          }
+        });
+      }
+    }
+
     final isDark = state.appearance == 'dark';
-    final bgColor = isDark ? const Color(0xFF0F0F11) : const Color(0xFFF8FAFC);
-    final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
-    final borderColor = isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2);
     final isRev = state.appearance == 'rev';
-    final themeAccent = isRev ? const Color(0xFFB577F2) : const Color(0xFF48C9B0);
+    final bgColor = notifier.getBackgroundColor();
+    final textColor = notifier.getTextColor();
+    final borderColor = notifier.getBorderColor();
+    final themeAccent = notifier.getPrimaryColor();
 
     final isMobile = MediaQuery.of(context).size.width < 768;
 
@@ -114,7 +134,9 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                     Expanded(
                       child: SingleChildScrollView(
                         padding: EdgeInsets.all(isMobile ? 16 : 28),
-                        child: _buildRoleDashboardBody(state.loggedInRole ?? 'pasien'),
+                        child: _buildRoleDashboardBody(
+                          state.loggedInRole ?? 'pasien',
+                        ),
                       ),
                     ),
                   ],
@@ -148,7 +170,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
               themeAccent,
               textColor,
               textColor.withOpacity(0.65),
-              isDark ? const Color(0xFF161619) : Colors.white,
+              notifier.getCardColor(),
               borderColor,
               Colors.black.withOpacity(isDark ? 0.4 : 0.08),
             ),
@@ -176,218 +198,248 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
         avatarInitials = parts[0][0].toUpperCase();
       }
     } else {
-      avatarInitials = state.loggedInRole == 'pasien' 
-          ? 'A' 
+      avatarInitials = state.loggedInRole == 'pasien'
+          ? 'A'
           : (state.loggedInRole == 'dokter' ? 'AS' : 'CE');
     }
 
     return Container(
       height: 48,
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF161619) : Colors.white,
+        color: notifier.getCardColor(),
         border: Border(bottom: BorderSide(color: borderColor)),
       ),
       child: ClipRect(
         child: Stack(
           children: [
-          if (state.loggedInUser?['avatar_url'] != null &&
-              (state.loggedInUser!['avatar_url'] as String).isNotEmpty &&
-              state.blurProfileEffectEnabled)
-            Positioned.fill(
-              child: ShaderMask(
-                shaderCallback: (rect) {
-                  return const LinearGradient(
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                    colors: [
-                      Colors.transparent,
-                      Colors.black,
-                      Colors.black,
-                      Colors.transparent,
-                    ],
-                    stops: [0.0, 0.35, 0.65, 1.0],
-                  ).createShader(rect);
-                },
-                blendMode: BlendMode.dstIn,
-                child: ImageFiltered(
-                  imageFilter: ui.ImageFilter.blur(sigmaX: 15.0, sigmaY: 15.0),
-                  child: Image.network(
-                    state.loggedInUser!['avatar_url'] as String,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const SizedBox(),
-                  ),
-                ),
-              ),
-            ),
-          if (state.loggedInUser?['avatar_url'] != null &&
-              (state.loggedInUser!['avatar_url'] as String).isNotEmpty &&
-              state.blurProfileEffectEnabled)
-            Positioned.fill(
-              child: ShaderMask(
-                shaderCallback: (rect) {
-                  return const LinearGradient(
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                    colors: [
-                      Colors.transparent,
-                      Colors.black,
-                      Colors.black,
-                      Colors.transparent,
-                    ],
-                    stops: [0.0, 0.35, 0.65, 1.0],
-                  ).createShader(rect);
-                },
-                blendMode: BlendMode.dstIn,
-                child: Container(
-                  color: isDark
-                      ? Colors.black.withOpacity(0.4)
-                      : (state.appearance == 'rev'
-                          ? const Color(0xFFB577F2).withOpacity(0.08)
-                          : const Color(0xFF48C9B0).withOpacity(0.08)),
-                ),
-              ),
-            ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-          // Left section: Drawer trigger or Page title
-          Row(
-            children: [
-              if (isMobile)
-                IconButton(
-                  icon: const Icon(Icons.menu_rounded),
-                  onPressed: () {
-                    // Mobile trigger switches straight to biggest full screen size!
-                    notifier.setDrawerSize(2);
+            if (state.loggedInUser?['avatar_url'] != null &&
+                (state.loggedInUser!['avatar_url'] as String).isNotEmpty &&
+                state.blurProfileEffectEnabled)
+              Positioned.fill(
+                child: ShaderMask(
+                  shaderCallback: (rect) {
+                    return const LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      colors: [
+                        Colors.transparent,
+                        Colors.black,
+                        Colors.black,
+                        Colors.transparent,
+                      ],
+                      stops: [0.0, 0.35, 0.65, 1.0],
+                    ).createShader(rect);
                   },
-                )
-              else
-                IconButton(
-                  icon: Icon(
-                    state.drawerSize == 0 ? Icons.menu_open_rounded : Icons.menu_rounded,
-                    color: textColor.withOpacity(0.7),
-                  ),
-                  onPressed: () {
-                    notifier.toggleDrawerSize();
-                  },
-                ),
-              const SizedBox(width: 8),
-              Builder(
-                builder: (context) {
-                  final role = state.loggedInRole ?? 'pasien';
-                  final menuItems = getMenuItemsForRole(role, state.language);
-                  String displayTitle = _activeMenu.toUpperCase();
-                  for (final item in menuItems) {
-                    if (item.id == _activeMenu) {
-                      displayTitle = item.label.toUpperCase();
-                      break;
-                    }
-                  }
-                  if (_activeMenu == 'settings') {
-                    displayTitle = state.language == 'en' ? 'SETTINGS' : 'PENGATURAN';
-                  }
-                  return Text(
-                    displayTitle,
-                    style: GoogleFonts.outfit(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w900,
-                      color: textColor,
-                      letterSpacing: 1.0,
+                  blendMode: BlendMode.dstIn,
+                  child: ImageFiltered(
+                    imageFilter: ui.ImageFilter.blur(
+                      sigmaX: 15.0,
+                      sigmaY: 15.0,
                     ),
-                  );
-                },
+                    child: Image.network(
+                      state.loggedInUser!['avatar_url'] as String,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => const SizedBox(),
+                    ),
+                  ),
+                ),
               ),
-            ],
-          ),
-
-          // Right section: Info status indicator and avatar shortcut
-          Row(
-            children: [
-              // Time & Sparkle Notification
-              Container(
-                margin: const EdgeInsets.only(right: 12),
-                child: IconButton(
-                  icon: Icon(Icons.help_outline_rounded, size: 20, color: textColor.withOpacity(0.6)),
-                  onPressed: () {
-                    final role = state.loggedInRole ?? 'pasien';
-                    final menuItems = getMenuItemsForRole(role, state.language);
-                    String menuLabel = _activeMenu.toUpperCase();
-                    for (final item in menuItems) {
-                      if (item.id == _activeMenu) {
-                        menuLabel = item.label;
-                        break;
-                      }
-                    }
-                    if (_activeMenu == 'settings') {
-                      menuLabel = state.language.toLowerCase() == 'en' ? 'Settings' : 'Pengaturan';
-                    }
-
-                    PageTutorialDialog.show(
-                      context,
-                      role: role,
-                      menuId: _activeMenu,
-                      menuLabel: menuLabel,
-                      onStartInteractiveGuide: () {
-                        setState(() {
-                          _activeGuideTutorial = getTutorialData(role, _activeMenu, menuLabel, state.language);
-                          _activeGuideStepIndex = 0;
-                          _isGuideActive = true;
-                        });
-                      },
-                    );
+            if (state.loggedInUser?['avatar_url'] != null &&
+                (state.loggedInUser!['avatar_url'] as String).isNotEmpty &&
+                state.blurProfileEffectEnabled)
+              Positioned.fill(
+                child: ShaderMask(
+                  shaderCallback: (rect) {
+                    return const LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      colors: [
+                        Colors.transparent,
+                        Colors.black,
+                        Colors.black,
+                        Colors.transparent,
+                      ],
+                      stops: [0.0, 0.35, 0.65, 1.0],
+                    ).createShader(rect);
                   },
+                  blendMode: BlendMode.dstIn,
+                  child: Container(
+                    color: isDark
+                        ? Colors.black.withOpacity(0.4)
+                        : (state.appearance == 'rev'
+                              ? const Color(0xFFB577F2).withOpacity(0.08)
+                              : const Color(0xFF48C9B0).withOpacity(0.08)),
+                  ),
                 ),
               ),
-              
-              // Status Badge / Avatar
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFB577F2).withOpacity(0.12),
-                  shape: BoxShape.circle,
-                ),
-                child: ClipOval(
-                  child: (state.loggedInUser?['avatar_url'] != null &&
-                      (state.loggedInUser!['avatar_url'] as String).isNotEmpty &&
-                      _isCorsafeUrl(state.loggedInUser!['avatar_url'] as String))
-                      ? Image.network(
-                          state.loggedInUser!['avatar_url'] as String,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Center(
-                            child: Text(
-                              avatarInitials,
-                              style: GoogleFonts.outfit(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w900,
-                                color: const Color(0xFFB577F2),
-                              ),
-                            ),
-                          ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Left section: Drawer trigger or Page title
+                  Row(
+                    children: [
+                      if (isMobile)
+                        IconButton(
+                          icon: const Icon(Icons.menu_rounded),
+                          onPressed: () {
+                            // Mobile trigger switches straight to biggest full screen size!
+                            notifier.setDrawerSize(2);
+                          },
                         )
-                      : Center(
-                          child: Text(
-                            avatarInitials,
-                            style: GoogleFonts.outfit(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w900,
-                              color: const Color(0xFFB577F2),
-                            ),
+                      else
+                        IconButton(
+                          icon: Icon(
+                            state.drawerSize == 0
+                                ? Icons.menu_open_rounded
+                                : Icons.menu_rounded,
+                            color: textColor.withOpacity(0.7),
                           ),
+                          onPressed: () {
+                            notifier.toggleDrawerSize();
+                          },
                         ),
-                ),
+                      const SizedBox(width: 8),
+                      Builder(
+                        builder: (context) {
+                          final role = state.loggedInRole ?? 'pasien';
+                          final menuItems = getMenuItemsForRole(
+                            role,
+                            state.language,
+                            state: state,
+                          );
+                          String displayTitle = _activeMenu.toUpperCase();
+                          for (final item in menuItems) {
+                            if (item.id == _activeMenu) {
+                              displayTitle = item.label.toUpperCase();
+                              break;
+                            }
+                          }
+                          if (_activeMenu == 'settings') {
+                            displayTitle = state.language == 'en'
+                                ? 'SETTINGS'
+                                : 'PENGATURAN';
+                          }
+                          return Text(
+                            displayTitle,
+                            style: GoogleFonts.outfit(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w900,
+                              color: textColor,
+                              letterSpacing: 1.0,
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+
+                  // Right section: Info status indicator and avatar shortcut
+                  Row(
+                    children: [
+                      // Time & Sparkle Notification
+                      Container(
+                        margin: const EdgeInsets.only(right: 12),
+                        child: IconButton(
+                          icon: Icon(
+                            Icons.help_outline_rounded,
+                            size: 20,
+                            color: textColor.withOpacity(0.6),
+                          ),
+                          onPressed: () {
+                            final role = state.loggedInRole ?? 'pasien';
+                            final menuItems = getMenuItemsForRole(
+                              role,
+                              state.language,
+                              state: state,
+                            );
+                            String menuLabel = _activeMenu.toUpperCase();
+                            for (final item in menuItems) {
+                              if (item.id == _activeMenu) {
+                                menuLabel = item.label;
+                                break;
+                              }
+                            }
+                            if (_activeMenu == 'settings') {
+                              menuLabel = state.language.toLowerCase() == 'en'
+                                  ? 'Settings'
+                                  : 'Pengaturan';
+                            }
+
+                            PageTutorialDialog.show(
+                              context,
+                              role: role,
+                              menuId: _activeMenu,
+                              menuLabel: menuLabel,
+                              onStartInteractiveGuide: () {
+                                setState(() {
+                                  _activeGuideTutorial = getTutorialData(
+                                    role,
+                                    _activeMenu,
+                                    menuLabel,
+                                    state.language,
+                                  );
+                                  _activeGuideStepIndex = 0;
+                                  _isGuideActive = true;
+                                });
+                              },
+                            );
+                          },
+                        ),
+                      ),
+
+                      // Status Badge / Avatar
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFB577F2).withOpacity(0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: ClipOval(
+                          child:
+                              (state.loggedInUser?['avatar_url'] != null &&
+                                  (state.loggedInUser!['avatar_url'] as String)
+                                      .isNotEmpty &&
+                                  _isCorsafeUrl(
+                                    state.loggedInUser!['avatar_url'] as String,
+                                  ))
+                              ? Image.network(
+                                  state.loggedInUser!['avatar_url'] as String,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, _, _) => Center(
+                                    child: Text(
+                                      avatarInitials,
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w900,
+                                        color: const Color(0xFFB577F2),
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : Center(
+                                  child: Text(
+                                    avatarInitials,
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w900,
+                                      color: const Color(0xFFB577F2),
+                                    ),
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
-    ),
-  ],
-),
-),
-);
+    );
   }
 
   // ==================== 2. ROLE SPECIFIC DASHBOARDS ROUTER ====================
@@ -466,11 +518,13 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   // ==================== 3. INTERACTIVE GUIDE OVERLAY WIDGETS ====================
 
   Widget _buildGuideFocusTarget(LandingPageState state) {
-    final isRev = state.appearance == 'rev';
-    final themeAccent = isRev ? const Color(0xFFB577F2) : const Color(0xFF48C9B0);
-    
-    final alignment = _getGuideTargetAlignment(_activeGuideTutorial!.title, _activeGuideStepIndex);
-    
+    final themeAccent = ref.read(landingPageProvider.notifier).getPrimaryColor();
+
+    final alignment = _getGuideTargetAlignment(
+      _activeGuideTutorial!.title,
+      _activeGuideStepIndex,
+    );
+
     return Align(
       alignment: alignment,
       child: _PulsingTarget(color: themeAccent),
@@ -489,13 +543,15 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   ) {
     final step = _activeGuideTutorial!.steps[_activeGuideStepIndex];
     final isEn = state.language.toLowerCase() == 'en';
-    
+
     final labelPrev = isEn ? 'BACK' : 'KEMBALI';
-    final labelNext = (_activeGuideStepIndex == _activeGuideTutorial!.steps.length - 1)
+    final labelNext =
+        (_activeGuideStepIndex == _activeGuideTutorial!.steps.length - 1)
         ? (isEn ? 'FINISH' : 'SELESAI')
         : (isEn ? 'NEXT' : 'LANJUT');
     final labelGuide = isEn ? 'INTERACTIVE GUIDE' : 'PANDUAN INTERAKTIF';
-    final stepProgress = (_activeGuideStepIndex + 1) / _activeGuideTutorial!.steps.length;
+    final stepProgress =
+        (_activeGuideStepIndex + 1) / _activeGuideTutorial!.steps.length;
 
     return Positioned(
       bottom: 24,
@@ -504,7 +560,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
         constraints: const BoxConstraints(maxWidth: 400),
         child: Container(
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xEC1E1E22) : Colors.white.withOpacity(0.95),
+            color: ref.read(landingPageProvider.notifier).getCardColor().withOpacity(0.95),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: themeAccent.withOpacity(0.5), width: 1.5),
             boxShadow: [
@@ -522,7 +578,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
             children: [
               LinearProgressIndicator(
                 value: stepProgress,
-                backgroundColor: isDark ? const Color(0xFF2E2E32) : const Color(0xFFECEEF2),
+                backgroundColor: ref.read(landingPageProvider.notifier).getBorderColor(),
                 valueColor: AlwaysStoppedAnimation<Color>(themeAccent),
                 minHeight: 4,
               ),
@@ -544,7 +600,11 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                           ),
                         ),
                         IconButton(
-                          icon: Icon(Icons.close_rounded, size: 18, color: textColor.withOpacity(0.5)),
+                          icon: Icon(
+                            Icons.close_rounded,
+                            size: 18,
+                            color: textColor.withOpacity(0.5),
+                          ),
                           onPressed: () {
                             setState(() {
                               _isGuideActive = false;
@@ -598,7 +658,8 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                         ElevatedButton(
                           onPressed: () {
                             setState(() {
-                              if (_activeGuideStepIndex < _activeGuideTutorial!.steps.length - 1) {
+                              if (_activeGuideStepIndex <
+                                  _activeGuideTutorial!.steps.length - 1) {
                                 _activeGuideStepIndex++;
                               } else {
                                 _isGuideActive = false;
@@ -606,13 +667,20 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                                   SnackBar(
                                     content: Row(
                                       children: [
-                                        const Icon(Icons.check_circle_outline_rounded, color: Colors.white, size: 18),
+                                        const Icon(
+                                          Icons.check_circle_outline_rounded,
+                                          color: Colors.white,
+                                          size: 18,
+                                        ),
                                         const SizedBox(width: 8),
                                         Text(
                                           isEn
                                               ? 'Guide completed successfully!'
                                               : 'Panduan berhasil diselesaikan!',
-                                          style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700),
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -626,7 +694,10 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: themeAccent,
                             foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
@@ -658,25 +729,38 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     final t = title.toLowerCase();
     if (t.contains('dokter') || t.contains('doctor')) {
       if (t.contains('profil') || t.contains('profile')) {
-        return stepIndex == 0 ? const Alignment(-0.6, -0.2) : const Alignment(-0.6, 0.3);
+        return stepIndex == 0
+            ? const Alignment(-0.6, -0.2)
+            : const Alignment(-0.6, 0.3);
       }
       if (t.contains('dashboard')) {
-        return stepIndex == 0 ? const Alignment(-0.1, -0.4) : const Alignment(-0.5, 0.4);
+        return stepIndex == 0
+            ? const Alignment(-0.1, -0.4)
+            : const Alignment(-0.5, 0.4);
       }
     } else if (t.contains('pasien') || t.contains('patient')) {
-      if (t.contains('portal') || t.contains('layanan') || t.contains('services')) {
-        return stepIndex == 0 ? const Alignment(0.0, -0.4) : const Alignment(0.0, 0.3);
+      if (t.contains('portal') ||
+          t.contains('layanan') ||
+          t.contains('services')) {
+        return stepIndex == 0
+            ? const Alignment(0.0, -0.4)
+            : const Alignment(0.0, 0.3);
       }
     } else if (t.contains('apotek') || t.contains('pharmacy')) {
       if (t.contains('dashboard') || t.contains('operasional')) {
-        return stepIndex == 0 ? const Alignment(0.0, -0.3) : const Alignment(0.0, 0.4);
+        return stepIndex == 0
+            ? const Alignment(0.0, -0.3)
+            : const Alignment(0.0, 0.4);
       }
     }
-    
+
     switch (stepIndex % 4) {
-      case 0: return const Alignment(-0.3, -0.3);
-      case 1: return const Alignment(0.3, 0.3);
-      case 2: return const Alignment(-0.3, 0.3);
+      case 0:
+        return const Alignment(-0.3, -0.3);
+      case 1:
+        return const Alignment(0.3, 0.3);
+      case 2:
+        return const Alignment(-0.3, 0.3);
       case 3:
       default:
         return const Alignment(0.3, -0.3);
@@ -692,7 +776,8 @@ class _PulsingTarget extends StatefulWidget {
   State<_PulsingTarget> createState() => _PulsingTargetState();
 }
 
-class _PulsingTargetState extends State<_PulsingTarget> with SingleTickerProviderStateMixin {
+class _PulsingTargetState extends State<_PulsingTarget>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
 
   @override

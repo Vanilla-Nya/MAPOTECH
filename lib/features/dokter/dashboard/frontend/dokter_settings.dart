@@ -39,12 +39,12 @@ class _DokterSettingsState extends ConsumerState<DokterSettings> {
 
     final isEn = state.language == 'en';
     final isDark = state.appearance == 'dark';
-    final cardBg = isDark ? const Color(0xFF161619) : Colors.white;
-    final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
-    final subtitleColor = isDark ? Colors.grey[400]! : const Color(0xFF6F6A8A);
-    final borderColor = isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2);
-    final purple = const Color(0xFFB577F2);
-    final teal = const Color(0xFF48C9B0);
+    final cardBg = notifier.getCardColor();
+    final textColor = notifier.getTextColor();
+    final subtitleColor = notifier.getBodyTextColor();
+    final borderColor = notifier.getBorderColor();
+    final purple = notifier.getPrimaryColor();
+    final teal = notifier.getPrimaryColor();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -107,7 +107,9 @@ class _DokterSettingsState extends ConsumerState<DokterSettings> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          isEn ? 'Profile Photo Blur Effect' : 'Efek Blur Foto Profil',
+                          isEn
+                              ? 'Profile Photo Blur Effect'
+                              : 'Efek Blur Foto Profil',
                           style: GoogleFonts.outfit(
                             fontSize: 13,
                             fontWeight: FontWeight.w900,
@@ -128,7 +130,7 @@ class _DokterSettingsState extends ConsumerState<DokterSettings> {
                   ),
                   Switch(
                     value: state.blurProfileEffectEnabled,
-                    activeColor: teal,
+                    activeThumbColor: teal,
                     onChanged: (val) {
                       notifier.setBlurProfileEffect(val);
                     },
@@ -159,7 +161,10 @@ class _DokterSettingsState extends ConsumerState<DokterSettings> {
                 teal: teal,
                 isDark: isDark,
                 borderColor: borderColor,
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 9,
+                ),
               ),
               const SizedBox(width: 10),
               SettingsChip(
@@ -170,7 +175,10 @@ class _DokterSettingsState extends ConsumerState<DokterSettings> {
                 teal: teal,
                 isDark: isDark,
                 borderColor: borderColor,
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 9,
+                ),
               ),
             ],
           ),
@@ -235,7 +243,9 @@ class _DokterSettingsState extends ConsumerState<DokterSettings> {
 
         // ── Integrasi SatuSehat Kemenkes ──────────────────────────────────
         SettingsSection(
-          title: isEn ? 'SatuSehat Integration (EMR)' : 'Integrasi SatuSehat (RME)',
+          title: isEn
+              ? 'SatuSehat Integration (EMR)'
+              : 'Integrasi SatuSehat (RME)',
           subtitle: isEn
               ? 'Connect doctor\'s medical record database with ministry of health server.'
               : 'Sambungkan database rekam medis dokter dengan server kemenkes.',
@@ -259,21 +269,30 @@ class _DokterSettingsState extends ConsumerState<DokterSettings> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            isEn ? 'SatuSehat Auto Sync' : 'Sinkronisasi Otomatis SatuSehat',
-                            style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w900, color: textColor),
+                            isEn
+                                ? 'SatuSehat Auto Sync'
+                                : 'Sinkronisasi Otomatis SatuSehat',
+                            style: GoogleFonts.outfit(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w900,
+                              color: textColor,
+                            ),
                           ),
                           Text(
                             isEn
                                 ? 'Send prescription & diagnosis data every time an examination is finished'
                                 : 'Kirim data resep & diagnosis setiap kali pemeriksaan selesai',
-                            style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
+                            style: GoogleFonts.outfit(
+                              fontSize: 10,
+                              color: subtitleColor,
+                            ),
                           ),
                         ],
                       ),
                     ),
                     Switch(
                       value: state.satusehatAutoSync,
-                      activeColor: teal,
+                      activeThumbColor: teal,
                       onChanged: (val) {
                         notifier.setSatusehatAutoSync(val);
                       },
@@ -286,18 +305,30 @@ class _DokterSettingsState extends ConsumerState<DokterSettings> {
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: teal.withOpacity(0.12),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
                         _satuSehatStatus == 'TERHUBUNG (ID KLINIK VALID)'
-                            ? (isEn ? 'CONNECTED (VALID CLINIC ID)' : 'TERHUBUNG (ID KLINIK VALID)')
-                            : (_satuSehatStatus == 'KONEKSI AKTIF (PING 42ms) - OK'
-                                ? (isEn ? 'CONNECTION ACTIVE (PING 42ms) - OK' : 'KONEKSI AKTIF (PING 42ms) - OK')
-                                : _satuSehatStatus),
-                        style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.w900, color: teal),
+                            ? (isEn
+                                  ? 'CONNECTED (VALID CLINIC ID)'
+                                  : 'TERHUBUNG (ID KLINIK VALID)')
+                            : (_satuSehatStatus ==
+                                      'KONEKSI AKTIF (PING 42ms) - OK'
+                                  ? (isEn
+                                        ? 'CONNECTION ACTIVE (PING 42ms) - OK'
+                                        : 'KONEKSI AKTIF (PING 42ms) - OK')
+                                  : _satuSehatStatus),
+                        style: GoogleFonts.outfit(
+                          fontSize: 8.5,
+                          fontWeight: FontWeight.w900,
+                          color: teal,
+                        ),
                       ),
                     ),
                     const Spacer(),
@@ -306,19 +337,32 @@ class _DokterSettingsState extends ConsumerState<DokterSettings> {
                           ? const SizedBox(
                               width: 10,
                               height: 10,
-                              child: CircularProgressIndicator(strokeWidth: 1.5, color: Colors.indigo),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 1.5,
+                                color: Colors.indigo,
+                              ),
                             )
                           : const Icon(Icons.sync_rounded, size: 12),
                       label: Text(
                         _isTestingSS
                             ? (isEn ? 'Connecting...' : 'Menghubungkan...')
-                            : (isEn ? 'Test EMR Connection' : 'Tes Koneksi RME'),
-                        style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900),
+                            : (isEn
+                                  ? 'Test EMR Connection'
+                                  : 'Tes Koneksi RME'),
+                        style: GoogleFonts.outfit(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(color: borderColor),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
                       onPressed: _isTestingSS
                           ? null
@@ -329,12 +373,13 @@ class _DokterSettingsState extends ConsumerState<DokterSettings> {
                               await Future.delayed(const Duration(seconds: 1));
                               setState(() {
                                 _isTestingSS = false;
-                                _satuSehatStatus = 'KONEKSI AKTIF (PING 42ms) - OK';
+                                _satuSehatStatus =
+                                    'KONEKSI AKTIF (PING 42ms) - OK';
                               });
                             },
                     ),
                   ],
-                )
+                ),
               ],
             ),
           ),
@@ -361,11 +406,17 @@ class _DokterSettingsState extends ConsumerState<DokterSettings> {
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
-                child: Icon(Icons.help_outline_rounded, size: 26, color: purple.withOpacity(0.5)),
+                child: Icon(
+                  Icons.help_outline_rounded,
+                  size: 26,
+                  color: purple.withOpacity(0.5),
+                ),
               ),
               const SizedBox(height: 12),
               Text(
-                isEn ? 'Contact Admin / EMR Support' : 'Hubungi Admin / Support RME',
+                isEn
+                    ? 'Contact Admin / EMR Support'
+                    : 'Hubungi Admin / Support RME',
                 style: GoogleFonts.outfit(
                   fontSize: 14,
                   fontWeight: FontWeight.w900,
@@ -378,7 +429,11 @@ class _DokterSettingsState extends ConsumerState<DokterSettings> {
                     ? 'Experiencing synchronization issues with BPJS / SatuSehat?\nContact Mapotech admin for integration assistance.'
                     : 'Mengalami kendala sinkronisasi dengan BPJS / SatuSehat?\nHubungi admin Mapotech untuk bantuan integrasi.',
                 textAlign: TextAlign.center,
-                style: GoogleFonts.outfit(fontSize: 10.5, color: subtitleColor, height: 1.5),
+                style: GoogleFonts.outfit(
+                  fontSize: 10.5,
+                  color: subtitleColor,
+                  height: 1.5,
+                ),
               ),
               const SizedBox(height: 16),
               OutlinedButton(
@@ -386,12 +441,20 @@ class _DokterSettingsState extends ConsumerState<DokterSettings> {
                 style: OutlinedButton.styleFrom(
                   foregroundColor: textColor,
                   side: BorderSide(color: borderColor),
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 10,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
                 child: Text(
                   isEn ? 'Send Help Message' : 'Kirim Pesan Bantuan',
-                  style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700),
+                  style: GoogleFonts.outfit(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ],

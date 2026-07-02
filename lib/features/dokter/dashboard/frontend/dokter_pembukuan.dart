@@ -130,7 +130,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
   Future<void> _loadTransactions() async {
     try {
       final userState = ref.read(landingPageProvider);
-      final doctorId = userState.loggedInUser?['id'];
+      final doctorId = userState.activeDoctorId;
       if (doctorId != null) {
         final txs = await _db.fetchDoctorFinancialTransactions(doctorId);
         final List<BukuKasEntry> loaded = [];
@@ -158,7 +158,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
   Future<void> _loadPatientSyncList() async {
     try {
       final userState = ref.read(landingPageProvider);
-      final doctorId = userState.loggedInUser?['id'];
+      final doctorId = userState.activeDoctorId;
       if (doctorId != null) {
         final encounters = await _db.fetchDoctorClinicalEncounters(doctorId);
         final queues = await _db.fetchDoctorQueues(doctorId);
@@ -270,7 +270,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
       }
 
       final doctorId =
-          ref.read(landingPageProvider).loggedInUser?['id'] ??
+          ref.read(landingPageProvider).activeDoctorId ??
           '8f93471a-74f8-486b-8e85-4002dc44c11c';
       final docDetail = await SupabaseService.client
           .from('user_detail_doctor')
@@ -378,7 +378,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
       }
 
       final doctorId =
-          ref.read(landingPageProvider).loggedInUser?['id'] ??
+          ref.read(landingPageProvider).activeDoctorId ??
           '8f93471a-74f8-486b-8e85-4002dc44c11c';
       final doctorName =
           ref.read(landingPageProvider).loggedInUser?['name']?.toString() ??
@@ -553,7 +553,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
 
     try {
       final doctorId =
-          ref.read(landingPageProvider).loggedInUser?['id'] ??
+          ref.read(landingPageProvider).activeDoctorId ??
           '8f93471a-74f8-486b-8e85-4002dc44c11c';
       final doctorName =
           ref.read(landingPageProvider).loggedInUser?['name']?.toString() ??
@@ -858,7 +858,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
 
     try {
       final userState = ref.read(landingPageProvider);
-      final doctorId = userState.loggedInUser?['id'];
+      final doctorId = userState.activeDoctorId;
       if (doctorId == null) {
         throw Exception('Doctor ID tidak ditemukan. Harap login kembali.');
       }
@@ -951,7 +951,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
               style: GoogleFonts.outfit(
                 fontSize: 11,
                 fontWeight: FontWeight.w900,
-                color: const Color(0xFFB577F2),
+                color: ref.read(landingPageProvider.notifier).getPrimaryColor(),
               ),
             ),
           ),
@@ -1007,7 +1007,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
         : const Color(0xFFECEEF2);
     final inputBg = isDark ? const Color(0xFF1E1E22) : const Color(0xFFF6F8FA);
 
-    final purple = const Color(0xFFB577F2);
+    final purple = ref.read(landingPageProvider.notifier).getPrimaryColor();
     final activeGreen = const Color(0xFF48C9B0);
     final isMobile = MediaQuery.of(context).size.width < 768;
 
@@ -1170,7 +1170,8 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                           ],
                         ),
                         Text(
-                          'Ringkasan arus kas masuk, pengeluaran klinik, dan e-resep diintegrasi'.tr(state),
+                          'Ringkasan arus kas masuk, pengeluaran klinik, dan e-resep diintegrasi'
+                              .tr(state),
                           style: GoogleFonts.outfit(
                             fontSize: 10,
                             color: subtitleColor,
@@ -1314,10 +1315,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                   cardBg,
                   borderColor,
                   'BPJS vs General Split',
-                  patientsBadges: [
-                    'BPJS ${bpjsCount}',
-                    'General ${generalCount}',
-                  ],
+                  patientsBadges: ['BPJS $bpjsCount', 'General $generalCount'],
                 ),
               ],
             ),
@@ -1717,7 +1715,9 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                                 const SizedBox(width: 8),
                                 Text(
                                   _selectedDateRange == null
-                                      ? (state.language == 'en' ? 'Select Date' : 'Pilih Tanggal')
+                                      ? (state.language == 'en'
+                                            ? 'Select Date'
+                                            : 'Pilih Tanggal')
                                       : '${_formatDateShort(_selectedDateRange!.start, state.language == 'en')} - ${_formatDateShort(_selectedDateRange!.end, state.language == 'en')}',
                                   style: GoogleFonts.outfit(
                                     fontSize: 10,
@@ -1844,9 +1844,9 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
           builder: (context) => Positioned.fill(
             child: Container(
               color: Colors.black.withOpacity(0.15),
-              child: const Center(
+              child: Center(
                 child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFB577F2)),
+                  valueColor: AlwaysStoppedAnimation<Color>(purple),
                 ),
               ),
             ),
@@ -1945,7 +1945,9 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
     }).toList();
 
     final totalItems = groupedLedger.length;
-    final startIndex = (totalItems == 0) ? 0 : (_ledgerCurrentPage - 1) * _ledgerItemsPerPage;
+    final startIndex = (totalItems == 0)
+        ? 0
+        : (_ledgerCurrentPage - 1) * _ledgerItemsPerPage;
     final endIndex = (startIndex + _ledgerItemsPerPage) > totalItems
         ? totalItems
         : (startIndex + _ledgerItemsPerPage);
@@ -2038,7 +2040,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                   final String netText =
                       '$amountSign Rp ${_formatAmount(net.abs())}';
 
-                  final onTap = () => setState(() => _selectedGroupedDay = group);
+                  void onTap() => setState(() => _selectedGroupedDay = group);
 
                   return TableRow(
                     decoration: BoxDecoration(
@@ -2073,13 +2075,15 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              group.transactions.map((t) => t.deskripsi).join(', '),
+                              group.transactions
+                                  .map((t) => t.deskripsi)
+                                  .join(', '),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: GoogleFonts.outfit(
-                                  fontSize: 8.5,
-                                  color: subtitleColor,
-                                  fontWeight: FontWeight.bold,
+                                fontSize: 8.5,
+                                color: subtitleColor,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
                           ],
@@ -2249,7 +2253,9 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
     }).toList();
 
     final totalSyncItems = filteredEncounters.length;
-    final syncStartIndex = (totalSyncItems == 0) ? 0 : (_syncCurrentPage - 1) * _syncItemsPerPage;
+    final syncStartIndex = (totalSyncItems == 0)
+        ? 0
+        : (_syncCurrentPage - 1) * _syncItemsPerPage;
     final syncEndIndex = (syncStartIndex + _syncItemsPerPage) > totalSyncItems
         ? totalSyncItems
         : (syncStartIndex + _syncItemsPerPage);
@@ -2464,7 +2470,9 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                           const SizedBox(width: 8),
                           Text(
                             _syncSelectedDateRange == null
-                                ? (state.language == 'en' ? 'Select Date' : 'Pilih Tanggal')
+                                ? (state.language == 'en'
+                                      ? 'Select Date'
+                                      : 'Pilih Tanggal')
                                 : '${_formatDateShort(_syncSelectedDateRange!.start, state.language == 'en')} - ${_formatDateShort(_syncSelectedDateRange!.end, state.language == 'en')}',
                             style: GoogleFonts.outfit(
                               fontSize: 10,
@@ -2631,7 +2639,8 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                                 2: FlexColumnWidth(1.0), // TYPE
                                 3: FlexColumnWidth(1.5), // SYNC STATUS
                               },
-                        defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+                        defaultVerticalAlignment:
+                            TableCellVerticalAlignment.middle,
                         children: [
                           // Header Row
                           TableRow(
@@ -2689,12 +2698,12 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                               statusLabel = 'Failed';
                             }
 
-                            final onTap = () {
+                            void onTap() {
                               setState(() {
                                 _selectedSyncEncounter = p;
                               });
                               _loadEncounterDetails(p['id']);
-                            };
+                            }
 
                             return TableRow(
                               decoration: BoxDecoration(
@@ -2740,7 +2749,8 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                                 ),
                                 _tableCellClickable(
                                   Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         p['name']?.toString() ?? '-',
@@ -2778,7 +2788,8 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Text(
-                                      p['type']?.toString().toUpperCase() ?? 'UMUM',
+                                      p['type']?.toString().toUpperCase() ??
+                                          'UMUM',
                                       style: GoogleFonts.outfit(
                                         fontSize: 7.5,
                                         fontWeight: FontWeight.w900,
@@ -3994,12 +4005,32 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
 
   String _getMonthNameShort(int month, bool isEnglish) {
     const monthsId = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
-      'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'Mei',
+      'Jun',
+      'Jul',
+      'Agt',
+      'Sep',
+      'Okt',
+      'Nov',
+      'Des',
     ];
     const monthsEn = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     if (month >= 1 && month <= 12) {
       return isEnglish ? monthsEn[month - 1] : monthsId[month - 1];
@@ -4097,8 +4128,8 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                       color: text,
                     ),
                     decoration: InputDecoration(
-                      hintText:
-                          'cth. Pembelian Reagen Golongan Darah & Syringe'.tr(state),
+                      hintText: 'cth. Pembelian Reagen Golongan Darah & Syringe'
+                          .tr(state),
                       hintStyle: GoogleFonts.outfit(
                         fontSize: 11,
                         color: subtitle.withOpacity(0.5),
@@ -4160,8 +4191,9 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                                   ),
                                   dropdownColor: cardBg,
                                   onChanged: (val) {
-                                    if (val != null)
+                                    if (val != null) {
                                       setState(() => _expCategory = val);
+                                    }
                                   },
                                   items:
                                       [
@@ -5174,9 +5206,9 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
             children: [
               Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.cloud_sync_rounded,
-                    color: Color(0xFFB577F2),
+                    color: ref.read(landingPageProvider.notifier).getPrimaryColor(),
                     size: 16,
                   ),
                   const SizedBox(width: 8),
@@ -5688,11 +5720,7 @@ class ViewportOverlay extends StatefulWidget {
   final bool show;
   final WidgetBuilder builder;
 
-  const ViewportOverlay({
-    super.key,
-    required this.show,
-    required this.builder,
-  });
+  const ViewportOverlay({super.key, required this.show, required this.builder});
 
   @override
   State<ViewportOverlay> createState() => _ViewportOverlayState();

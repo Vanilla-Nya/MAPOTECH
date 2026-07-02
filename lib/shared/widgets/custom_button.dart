@@ -38,8 +38,8 @@ class _CustomButtonState extends State<CustomButton> {
 
   @override
   Widget build(BuildContext context) {
-    final defaultPrimaryColor = widget.primaryColor ?? const Color(0xFF48C9B0);
-    final defaultTextColor = widget.textColor ?? const Color(0xFF1B4F42);
+    final defaultPrimaryColor = widget.primaryColor ?? Theme.of(context).colorScheme.primary;
+    final defaultTextColor = widget.textColor ?? Theme.of(context).colorScheme.secondary;
     final defaultBorderColor = widget.borderColor ?? Colors.grey[300]!;
 
     Color buttonColor;
@@ -47,7 +47,11 @@ class _CustomButtonState extends State<CustomButton> {
     Border? border;
 
     if (widget.isSecondary) {
-      buttonColor = _isHovered ? Colors.grey[100]! : Colors.transparent;
+      buttonColor = _isHovered
+          ? (Theme.of(context).brightness == Brightness.dark
+              ? Colors.grey[800]!
+              : Colors.grey[100]!)
+          : Colors.transparent;
       buttonTextColor = defaultTextColor;
       border = Border.all(color: defaultBorderColor, width: 1.5);
     } else {
@@ -77,7 +81,7 @@ class _CustomButtonState extends State<CustomButton> {
               gradient: widget.isGradient
                   ? LinearGradient(
                       colors: widget.gradientColors ??
-                          [const Color(0xFF48C9B0), const Color(0xFF1B4F42)],
+                          [Theme.of(context).colorScheme.primary, Theme.of(context).colorScheme.secondary],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     )

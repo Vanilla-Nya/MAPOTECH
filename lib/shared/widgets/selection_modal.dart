@@ -41,13 +41,13 @@ class _SelectionModalContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bgColor = isDark ? const Color(0xFF141416) : Colors.white;
-    final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C); // Deep dark purple/indigo
-    final subtitleColor = isDark ? Colors.grey[400]! : const Color(0xFF6F6A8A);
-    final cardColor = isDark ? const Color(0xFF1E1E22) : const Color(0xFFF7F5FC);
-    final iconBoxBg = isDark ? const Color(0xFF2C2C32) : Colors.white;
     final isRev = state.appearance == 'rev';
-    final accentPurple = isRev ? const Color(0xFFB577F2) : const Color(0xFF48C9B0); // Dynamic theme seed color
+    final bgColor = notifier.getBackgroundColor();
+    final textColor = notifier.getTextColor(); // Deep dark purple/indigo or white/silver
+    final subtitleColor = notifier.getBodyTextColor();
+    final cardColor = isDark ? const Color(0xFF1E1E22) : (isRev ? const Color(0xFFF7F2FE) : const Color(0xFFF7F5FC));
+    final iconBoxBg = isDark ? const Color(0xFF2C2C32) : Colors.white;
+    final accentPurple = notifier.getPrimaryColor(); // Dynamic theme seed color
 
     final isMobile = MediaQuery.of(context).size.width < 768;
 

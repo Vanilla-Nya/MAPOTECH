@@ -25,8 +25,8 @@ class _EntityChipState extends State<EntityChip> {
 
   @override
   Widget build(BuildContext context) {
-    final activeColor = const Color(0xFF48C9B0);
-    final activeTextColor = const Color(0xFF1B4F42);
+    final activeColor = Theme.of(context).colorScheme.primary;
+    final activeTextColor = Theme.of(context).colorScheme.secondary;
     final inactiveColor = Colors.grey[500]!;
 
     return MouseRegion(

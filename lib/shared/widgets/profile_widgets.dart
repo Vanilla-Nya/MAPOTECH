@@ -49,7 +49,7 @@ class ProfileSectionCard extends StatelessWidget {
                   ),
                 ),
               ),
-              if (trailing != null) trailing!,
+              ?trailing,
             ],
           ),
           const SizedBox(height: 16),
@@ -93,7 +93,10 @@ class ProfileInfoRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor)),
+          Text(
+            label,
+            style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor),
+          ),
           Row(
             children: [
               if (icon != null) ...[
@@ -104,7 +107,9 @@ class ProfileInfoRow extends StatelessWidget {
                 value,
                 style: GoogleFonts.outfit(
                   fontSize: icon != null ? 13 : 11,
-                  fontWeight: rightBold || icon != null ? FontWeight.w900 : FontWeight.w600,
+                  fontWeight: rightBold || icon != null
+                      ? FontWeight.w900
+                      : FontWeight.w600,
                   color: valueColor,
                 ),
               ),
@@ -229,7 +234,11 @@ class ProfileDropdownField extends StatelessWidget {
       children: [
         Text(
           label,
-          style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w700, color: subtitleColor),
+          style: GoogleFonts.outfit(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: subtitleColor,
+          ),
         ),
         const SizedBox(height: 4),
         Container(
@@ -244,11 +253,19 @@ class ProfileDropdownField extends StatelessWidget {
               Expanded(
                 child: Text(
                   value,
-                  style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: textColor),
+                  style: GoogleFonts.outfit(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: textColor,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: subtitleColor),
+              Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 16,
+                color: subtitleColor,
+              ),
             ],
           ),
         ),

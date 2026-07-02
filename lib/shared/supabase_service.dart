@@ -3,12 +3,18 @@ import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:bcrypt/bcrypt.dart';
 
 class SupabaseService {
-  static const String _baseUrl =
-      'https://abdburxhqqwsobmzuwmz.supabase.co/rest/v1';
-  static const String _anonKey =
+  static String get _baseUrl {
+    final url = dotenv.env['SUPABASE_URL'] ?? 'https://abdburxhqqwsobmzuwmz.supabase.co';
+    final cleanUrl = url.endsWith('/') ? url.substring(0, url.length - 1) : url;
+    return '$cleanUrl/rest/v1';
+  }
+  static String get _anonKey => dotenv.env['SUPABASE_ANON_KEY'] ??
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFiZGJ1cnhocXF3c29ibXp1d216Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0OTMyNjYsImV4cCI6MjA5MjA2OTI2Nn0.mB3qIJAHjtWe5UKxE9Oj-RNLQCbQKFYHUZBLaF4nQwk';
+
 
   /// Convenience getter for the Supabase client (requires Supabase.initialize() called at startup)
   static SupabaseClient get client => Supabase.instance.client;
@@ -484,7 +490,7 @@ class SupabaseService {
   ) async {
     try {
       final rows = await _get(
-        'user_detail_doctor_assistant?select=*,user:id(name,email,nik,phone_number)&doctor_id=eq.$doctorId',
+        'user_detail_doctor_assistant?select=*,user:id(name,email,nik,phone_number,username,gender,birth_place,birth_date,address,province,district,sub_district,village,created_at)&doctor_id=eq.$doctorId',
         schema: 'public',
       );
 
@@ -502,6 +508,16 @@ class SupabaseService {
             'email': userMap['email'] ?? '',
             'nik': userMap['nik'] ?? '',
             'telepon': userMap['phone_number'] ?? '',
+            'username': userMap['username'] ?? '',
+            'gender': userMap['gender'] ?? 'Male',
+            'birth_place': userMap['birth_place'] ?? '',
+            'birth_date': userMap['birth_date'] ?? '',
+            'address': userMap['address'] ?? '',
+            'province': userMap['province'] ?? '',
+            'district': userMap['district'] ?? '',
+            'sub_district': userMap['sub_district'] ?? '',
+            'village': userMap['village'] ?? '',
+            'created_at': userMap['created_at'] ?? '',
             'sip': rowMap['sip'] ?? '-',
             'peran': rowMap['peran'] ?? 'Perawat',
             'is_bertugas': rowMap['is_bertugas'] ?? true,
@@ -526,6 +542,16 @@ class SupabaseService {
     required String sip,
     required String peran,
     required List<String> permissions,
+    required String username,
+    required String password,
+    required String gender,
+    required String birthPlace,
+    required String birthDate,
+    required String address,
+    required String province,
+    required String district,
+    required String subDistrict,
+    required String village,
   }) async {
     try {
       // 1. Fetch doctor's instance_id from user_role
@@ -540,6 +566,9 @@ class SupabaseService {
                 as String?;
       }
 
+      // Hash password using Bcrypt
+      final hashedPassword = BCrypt.hashpw(password, BCrypt.gensalt());
+
       // 2. Insert into public.user
       final userData = {
         'id': assistantId,
@@ -548,6 +577,16 @@ class SupabaseService {
         'nik': nik,
         'phone_number': phone,
         'role': 'asisten_dokter',
+        'username': username,
+        'password': hashedPassword,
+        'gender': gender,
+        'birth_place': birthPlace,
+        'birth_date': birthDate.isEmpty ? null : birthDate,
+        'address': address,
+        'province': province,
+        'district': district,
+        'sub_district': subDistrict,
+        'village': village,
       };
       await _post('user', userData, schema: 'public');
 
@@ -556,7 +595,7 @@ class SupabaseService {
         'id_user': assistantId,
         'id_role': 4, // 4 is 'assistant'
         'type': 'assistant',
-        if (instanceId != null) 'id_instance': instanceId,
+        'id_instance': instanceId,
       };
       await _post('user_role', roleData, schema: 'public');
 
@@ -576,6 +615,62 @@ class SupabaseService {
       );
     } catch (e) {
       throw Exception('Gagal mendaftarkan asisten: $e');
+    }
+  }
+
+  // Update assistant personal data
+  Future<void> updateDoctorAssistant({
+    required String assistantId,
+    required String name,
+    required String email,
+    required String nik,
+    required String phone,
+    required String sip,
+    required String peran,
+    required String username,
+    required String gender,
+    required String birthPlace,
+    required String birthDate,
+    required String address,
+    required String province,
+    required String district,
+    required String subDistrict,
+    required String village,
+    String? password,
+  }) async {
+    try {
+      // 1. Update user table
+      final userData = {
+        'name': name,
+        'email': email.isEmpty || email == '-' ? null : email,
+        'nik': nik,
+        'phone_number': phone,
+        'username': username,
+        'gender': gender,
+        'birth_place': birthPlace,
+        'birth_date': birthDate.isEmpty ? null : birthDate,
+        'address': address,
+        'province': province,
+        'district': district,
+        'sub_district': subDistrict,
+        'village': village,
+        if (password != null && password.isNotEmpty)
+          'password': BCrypt.hashpw(password, BCrypt.gensalt()),
+      };
+      await _patch('user?id=eq.$assistantId', userData, schema: 'public');
+
+      // 2. Update user_detail_doctor_assistant table
+      final assistantData = {
+        'sip': sip,
+        'peran': peran,
+      };
+      await _patch(
+        'user_detail_doctor_assistant?id=eq.$assistantId',
+        assistantData,
+        schema: 'public',
+      );
+    } catch (e) {
+      throw Exception('Gagal memperbarui data asisten: $e');
     }
   }
 
