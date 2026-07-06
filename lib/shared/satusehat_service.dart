@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:math';
 import 'package:http/http.dart' as http;
+import 'package:mapotech/shared/supabase_service.dart';
+
 
 class SatuSehatService {
   final String? clientId;
@@ -562,6 +564,64 @@ class SatuSehatService {
       return {'status': false, 'message': 'Gagal membuat MedicationRequest: ${response.body}'};
     } catch (e) {
       return {'status': false, 'message': 'MedicationRequest exception: $e'};
+    }
+  }
+
+  /// Search KFA products by keyword using SatuSehat KFA v2 API
+  Future<Map<String, dynamic>> searchKfaProducts({
+    required String keyword,
+    int page = 1,
+    int size = 20,
+  }) async {
+    final token = await getToken();
+    if (token == null) {
+      return {'status': false, 'message': 'Failed to obtain SatuSehat token'};
+    }
+
+    final environment = (env ?? 'production').toLowerCase();
+    final kfaBaseUrl = (environment == 'development' || environment == 'dev' || environment == 'stg')
+        ? 'https://api-satusehat-stg.dto.kemkes.go.id/kfa-v2'
+        : 'https://api-satusehat.kemkes.go.id/kfa-v2';
+
+    // 1. Try Direct Call first (works if not on web, or web with disabled CORS)
+    try {
+      final response = await http.get(
+        Uri.parse('$kfaBaseUrl/products/all?keyword=${Uri.encodeComponent(keyword)}&page=$page&size=$size&product_type=farmasi'),
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final data = jsonDecode(response.body);
+        return {'status': true, 'data': data};
+      }
+      
+      // If we got blocked by Cloudflare (403) or other errors, trigger the fallback to Edge Function proxy
+      if (response.statusCode == 403 || response.statusCode == 401) {
+        throw Exception('API ${response.statusCode}');
+      }
+      return {'status': false, 'message': 'API Error ${response.statusCode}: ${response.body}'};
+    } catch (e) {
+      // 2. Fallback: Call Supabase Edge Function to bypass CORS and Geo-Blocking
+      try {
+        final edgeResponse = await SupabaseService.client.functions.invoke(
+          'kfa-search',
+          body: {
+            'keyword': keyword,
+            'token': token,
+            'env': environment,
+          },
+        );
+
+        final data = edgeResponse.data as Map<String, dynamic>?;
+        if (data != null && data['status'] == true) {
+          return {'status': true, 'data': data['data']};
+        }
+        return {'status': false, 'message': data?['message']?.toString() ?? 'Gagal mengambil data dari proxy Edge Function'};
+      } catch (edgeErr) {
+        return {'status': false, 'message': 'Direct call failed ($e) and proxy call failed ($edgeErr)'};
+      }
     }
   }
 }

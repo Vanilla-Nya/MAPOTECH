@@ -3,18 +3,134 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/widgets/ui.dart';
+import 'package:mapotech/features/dokter/dashboard/frontend/dokter_pasien.dart';
+import 'package:mapotech/features/dokter/dashboard/frontend/dokter_obat.dart';
+import 'package:mapotech/features/dokter/dashboard/frontend/dokter_antrian.dart';
+import 'package:mapotech/shared/supabase_service.dart';
 
-
-class DokterDashboard extends ConsumerWidget {
+class DokterDashboard extends ConsumerStatefulWidget {
   const DokterDashboard({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DokterDashboard> createState() => _DokterDashboardState();
+}
+
+class _DokterDashboardState extends ConsumerState<DokterDashboard> {
+  List<Map<String, dynamic>> _rawTransactions = [];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fetchData();
+    });
+  }
+
+  Future<void> _fetchData() async {
+    final userState = ref.read(landingPageProvider);
+    final doctorId = userState.activeDoctorId ?? '8f93471a-74f8-486b-8e85-4002dc44c11c';
+    
+    // Load medicines (since it's not automatically loaded)
+    try {
+      ref.read(dokterObatListProvider.notifier).loadMedicines(doctorId);
+    } catch (e) {
+      debugPrint('Error triggering loadMedicines: $e');
+    }
+    
+    // Load queues (to ensure latest data)
+    try {
+      ref.read(dokterAntrianListProvider.notifier).loadQueues();
+    } catch (e) {
+      debugPrint('Error triggering loadQueues: $e');
+    }
+
+    // Load patients
+    try {
+      ref.read(dokterPasienListProvider.notifier).loadPatients();
+    } catch (e) {
+      debugPrint('Error triggering loadPatients: $e');
+    }
+
+    try {
+      final txs = await SupabaseService().fetchDoctorFinancialTransactions(doctorId);
+      if (mounted) {
+        setState(() {
+          _rawTransactions = txs;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching dashboard transactions: $e');
+    }
+  }
+
+  DateTime? _parseExpDate(String expDate) {
+    try {
+      if (expDate.contains('/')) {
+        final parts = expDate.split('/').map((p) => p.trim()).toList();
+        if (parts.length == 3) {
+          final day = int.parse(parts[0]);
+          final month = int.parse(parts[1]);
+          final year = int.parse(parts[2]);
+          return DateTime(year, month, day);
+        }
+      } else if (expDate.contains('-')) {
+        return DateTime.tryParse(expDate);
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  String _getDayName(DateTime dt, String lang) {
+    final weekday = dt.weekday;
+    if (lang == 'en') {
+      switch (weekday) {
+        case 1: return 'Mon';
+        case 2: return 'Tue';
+        case 3: return 'Wed';
+        case 4: return 'Thu';
+        case 5: return 'Fri';
+        case 6: return 'Sat';
+        case 7: return 'Sun';
+      }
+    } else {
+      switch (weekday) {
+        case 1: return 'Sen';
+        case 2: return 'Sel';
+        case 3: return 'Rab';
+        case 4: return 'Kam';
+        case 5: return 'Jum';
+        case 6: return 'Sab';
+        case 7: return 'Min';
+      }
+    }
+    return '';
+  }
+
+  String _formatToday(String lang) {
+    final now = DateTime.now();
+    final dayNamesEn = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    final dayNamesId = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
+    final monthNamesEn = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    final monthNamesId = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+
+    final dayName = lang == 'en' ? dayNamesEn[now.weekday - 1] : dayNamesId[now.weekday - 1];
+    final monthName = lang == 'en' ? monthNamesEn[now.month - 1] : monthNamesId[now.month - 1];
+
+    return '$dayName, ${now.day} $monthName ${now.year}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(landingPageProvider);
     final notifier = ref.read(landingPageProvider.notifier);
 
     final isDark = state.appearance == 'dark';
-    final isRev = state.appearance == 'rev';
     final cardBgColor = notifier.getCardColor();
     final textColor = notifier.getTextColor();
     final subtitleColor = notifier.getBodyTextColor();
@@ -22,6 +138,131 @@ class DokterDashboard extends ConsumerWidget {
 
     final themeAccent = notifier.getPrimaryColor();
     final isMobile = MediaQuery.of(context).size.width < 768;
+
+    // ─── Watch Providers ───
+    final allPatients = ref.watch(dokterPasienListProvider);
+    final allQueues = ref.watch(dokterAntrianListProvider);
+    final allDrugs = ref.watch(dokterObatListProvider);
+
+    // ─── Calculate Stats ───
+    final totalPatients = allPatients.length;
+
+    final now = DateTime.now();
+    final todayQueues = allQueues.where((q) {
+      if (q.dateQueue == null) return false;
+      return q.dateQueue!.year == now.year &&
+             q.dateQueue!.month == now.month &&
+             q.dateQueue!.day == now.day;
+    }).toList();
+
+    int expiredObatCount = 0;
+    int stokMinimCount = 0;
+
+    for (final drug in allDrugs) {
+      if (drug.totalStok <= 5) {
+        stokMinimCount++;
+      }
+      for (final batch in drug.batches) {
+        final exp = _parseExpDate(batch.expDate);
+        if (exp != null && exp.isBefore(now)) {
+          expiredObatCount++;
+        }
+      }
+    }
+
+    // ─── Calculate Patients Per Day Bar Chart (Last 7 Days) ───
+    final last7Days = List.generate(7, (index) => now.subtract(Duration(days: 6 - index)));
+    final List<double> barPercents = [];
+    final List<int> barCounts = [];
+    int maxQueueCount = 0;
+
+    for (final day in last7Days) {
+      final count = allQueues.where((q) {
+        if (q.dateQueue == null) return false;
+        return q.dateQueue!.year == day.year &&
+               q.dateQueue!.month == day.month &&
+               q.dateQueue!.day == day.day;
+      }).length;
+      barCounts.add(count);
+      if (count > maxQueueCount) maxQueueCount = count;
+    }
+
+    for (final count in barCounts) {
+      if (maxQueueCount == 0) {
+        barPercents.add(0.0);
+      } else {
+        barPercents.add(count / maxQueueCount);
+      }
+    }
+
+    // ─── Calculate Income Trend (Last 7 Days) ───
+    final List<double> dailyIncomes = [];
+    double maxIncome = 0.0;
+
+    for (final day in last7Days) {
+      double totalIncomeOfDay = 0.0;
+      for (final tx in _rawTransactions) {
+        if (tx['transaction_type'] != 'expense') {
+          try {
+            final txDate = DateTime.tryParse(tx['created_at'].toString());
+            if (txDate != null &&
+                txDate.year == day.year &&
+                txDate.month == day.month &&
+                txDate.day == day.day) {
+              final amount = double.tryParse(tx['amount']?.toString() ?? '0') ?? 0.0;
+              totalIncomeOfDay += amount;
+            }
+          } catch (_) {}
+        }
+      }
+      dailyIncomes.add(totalIncomeOfDay);
+      if (totalIncomeOfDay > maxIncome) {
+        maxIncome = totalIncomeOfDay;
+      }
+    }
+
+    final List<double> normalizedIncomes = [];
+    for (final income in dailyIncomes) {
+      if (maxIncome == 0.0) {
+        normalizedIncomes.add(0.0);
+      } else {
+        normalizedIncomes.add(income / maxIncome);
+      }
+    }
+
+    // ─── Calculate Weekly Income Comparison ───
+    double thisWeekIncome = 0.0;
+    double lastWeekIncome = 0.0;
+    final sevenDaysAgo = now.subtract(const Duration(days: 7));
+    final fourteenDaysAgo = now.subtract(const Duration(days: 14));
+
+    for (final tx in _rawTransactions) {
+      if (tx['transaction_type'] != 'expense') {
+        try {
+          final txDate = DateTime.tryParse(tx['created_at'].toString());
+          if (txDate != null) {
+            final amount = double.tryParse(tx['amount']?.toString() ?? '0') ?? 0.0;
+            if (txDate.isAfter(sevenDaysAgo)) {
+              thisWeekIncome += amount;
+            } else if (txDate.isAfter(fourteenDaysAgo)) {
+              lastWeekIncome += amount;
+            }
+          }
+        } catch (_) {}
+      }
+    }
+
+    String percentChangeText = '+0% ${state.language == 'en' ? 'from last week' : 'dari minggu lalu'}';
+    Color percentColor = const Color(0xFF48C9B0);
+    if (lastWeekIncome > 0) {
+      final change = ((thisWeekIncome - lastWeekIncome) / lastWeekIncome) * 100;
+      final prefix = change >= 0 ? '+' : '';
+      percentChangeText = '$prefix${change.toStringAsFixed(1)}% ${state.language == 'en' ? 'from last week' : 'dari minggu lalu'}';
+      percentColor = change >= 0 ? const Color(0xFF48C9B0) : Colors.redAccent;
+    } else if (thisWeekIncome > 0) {
+      percentChangeText = '+100% ${state.language == 'en' ? 'from last week' : 'dari minggu lalu'}';
+      percentColor = const Color(0xFF48C9B0);
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -45,9 +286,33 @@ class DokterDashboard extends ConsumerWidget {
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
-                child: Text(
-                  'VN',
-                  style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.white),
+                child: ClipOval(
+                  child: (state.loggedInUser?['avatar_url'] != null &&
+                          (state.loggedInUser!['avatar_url'] as String).isNotEmpty &&
+                          ((state.loggedInUser!['avatar_url'] as String).startsWith('http://') ||
+                           (state.loggedInUser!['avatar_url'] as String).startsWith('https://')))
+                      ? Image.network(
+                          state.loggedInUser!['avatar_url'] as String,
+                          width: 60,
+                          height: 60,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => Center(
+                            child: Text(
+                              state.loggedInName != null && state.loggedInName!.isNotEmpty
+                                  ? state.loggedInName!.split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join().toUpperCase()
+                                  : 'DR',
+                              style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.white),
+                            ),
+                          ),
+                        )
+                      : Center(
+                          child: Text(
+                            state.loggedInName != null && state.loggedInName!.isNotEmpty
+                                ? state.loggedInName!.split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join().toUpperCase()
+                                : 'DR',
+                            style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.white),
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(width: 16),
@@ -60,7 +325,7 @@ class DokterDashboard extends ConsumerWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: themeAccent.withOpacity(0.12),
+                            color: themeAccent.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(100),
                           ),
                           child: Text(
@@ -70,7 +335,7 @@ class DokterDashboard extends ConsumerWidget {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          notifier.t('Selasa, 26 Mei 2026'),
+                          _formatToday(state.language),
                           style: GoogleFonts.outfit(fontSize: 9, color: subtitleColor, fontWeight: FontWeight.bold),
                         ),
                       ],
@@ -89,13 +354,6 @@ class DokterDashboard extends ConsumerWidget {
                   ],
                 ),
               ),
-              if (!isMobile)
-                CustomButton(
-                  text: notifier.t('Lihat Profil'),
-                  icon: Icons.person_outline_rounded,
-                  height: 38,
-                  onPressed: () {},
-                ),
             ],
           ),
         ),
@@ -119,7 +377,7 @@ class DokterDashboard extends ConsumerWidget {
             MetricCard(
               icon: Icons.people_rounded,
               label: notifier.t('TOTAL PASIEN'),
-              count: '3',
+              count: '$totalPatients',
               subtitleColor: subtitleColor,
               countColor: textColor,
               cardBgColor: cardBgColor,
@@ -128,7 +386,7 @@ class DokterDashboard extends ConsumerWidget {
             MetricCard(
               icon: Icons.calendar_today_rounded,
               label: notifier.t('ANTREAN HARI INI'),
-              count: '0',
+              count: '${todayQueues.length}',
               subtitleColor: subtitleColor,
               countColor: textColor,
               cardBgColor: cardBgColor,
@@ -137,18 +395,18 @@ class DokterDashboard extends ConsumerWidget {
             MetricCard(
               icon: Icons.warning_amber_rounded,
               label: notifier.t('OBAT KEDALUWARSA'),
-              count: '00',
+              count: expiredObatCount.toString().padLeft(2, '0'),
               subtitleColor: subtitleColor,
-              countColor: Colors.redAccent,
+              countColor: expiredObatCount > 0 ? Colors.redAccent : textColor,
               cardBgColor: cardBgColor,
               borderColor: borderColor,
             ),
             MetricCard(
               icon: Icons.inventory_rounded,
               label: notifier.t('STOK MENIPIS'),
-              count: '0',
+              count: '$stokMinimCount',
               subtitleColor: subtitleColor,
-              countColor: Colors.amber,
+              countColor: stokMinimCount > 0 ? Colors.amber : textColor,
               cardBgColor: cardBgColor,
               borderColor: borderColor,
             ),
@@ -180,8 +438,8 @@ class DokterDashboard extends ConsumerWidget {
                       style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: subtitleColor),
                     ),
                     Text(
-                      notifier.t('+0% dari bulan lalu'),
-                      style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900, color: const Color(0xFF48C9B0)),
+                      percentChangeText,
+                      style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900, color: percentColor),
                     ),
                     const Spacer(),
                     
@@ -200,7 +458,7 @@ class DokterDashboard extends ConsumerWidget {
                           // Curved income shape
                           Positioned.fill(
                             child: CustomPaint(
-                              painter: _IncomeTrendLinePainter(themeAccent),
+                              painter: _IncomeTrendLinePainter(themeAccent, normalizedIncomes),
                             ),
                           ),
                         ],
@@ -209,10 +467,8 @@ class DokterDashboard extends ConsumerWidget {
                     const Spacer(),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: (state.language == 'en'
-                              ? ['Wed', 'Thu', 'Fri', 'Sat', 'Sun', 'Mon', 'Tue']
-                              : ['Rab', 'Kam', 'Jum', 'Sab', 'Min', 'Sen', 'Sel'])
-                          .map((day) => Text(day, style: TextStyle(color: subtitleColor, fontSize: 9)))
+                      children: last7Days
+                          .map((day) => Text(_getDayName(day, state.language), style: TextStyle(color: subtitleColor, fontSize: 9)))
                           .toList(),
                     ),
                   ],
@@ -249,15 +505,13 @@ class DokterDashboard extends ConsumerWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        _buildChartBar(state.language == 'en' ? 'Wed' : 'Rab', 0.0, themeAccent, subtitleColor),
-                        _buildChartBar(state.language == 'en' ? 'Thu' : 'Kam', 0.0, themeAccent, subtitleColor),
-                        _buildChartBar(state.language == 'en' ? 'Fri' : 'Jum', 0.0, themeAccent, subtitleColor),
-                        _buildChartBar(state.language == 'en' ? 'Sat' : 'Sab', 0.8, themeAccent, subtitleColor), // Alvin logged in
-                        _buildChartBar(state.language == 'en' ? 'Sun' : 'Min', 0.0, themeAccent, subtitleColor),
-                        _buildChartBar(state.language == 'en' ? 'Mon' : 'Sen', 0.0, themeAccent, subtitleColor),
-                        _buildChartBar(state.language == 'en' ? 'Tue' : 'Sel', 0.0, themeAccent, subtitleColor),
-                      ],
+                      children: List.generate(7, (i) {
+                        final d = last7Days[i];
+                        final label = _getDayName(d, state.language);
+                        final percent = barPercents[i];
+                        final count = barCounts[i];
+                        return _buildChartBar(label, percent, themeAccent, subtitleColor, count: count);
+                      }),
                     ),
                   ],
                 ),
@@ -299,27 +553,174 @@ class DokterDashboard extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        notifier.t('TOTAL ANTREAN'),
+                        notifier.t('TOTAL ANTREAN HARI INI'),
                         style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.bold, color: subtitleColor),
                       ),
                       Text(
-                        notifier.t('0 pasien'),
+                        notifier.t('${todayQueues.length} pasien'),
                         style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w900, color: textColor),
                       ),
                     ],
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
               const Divider(),
-              const SizedBox(height: 48),
-              Center(
-                child: Text(
-                  notifier.t('Belum ada pasien dalam antrean hari ini.'),
-                  style: GoogleFonts.outfit(fontSize: 12, color: subtitleColor, fontWeight: FontWeight.bold),
+              if (todayQueues.isEmpty) ...[
+                const SizedBox(height: 48),
+                Center(
+                  child: Text(
+                    notifier.t('Belum ada pasien dalam antrean hari ini.'),
+                    style: GoogleFonts.outfit(fontSize: 12, color: subtitleColor, fontWeight: FontWeight.bold),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 48),
+                const SizedBox(height: 48),
+              ] else ...[
+                const SizedBox(height: 16),
+                // Table header
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E1E22) : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          notifier.t('NO.'),
+                          style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: subtitleColor),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 5,
+                        child: Text(
+                          notifier.t('NAMA PASIEN'),
+                          style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: subtitleColor),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 3,
+                        child: Text(
+                          notifier.t('TIPE'),
+                          style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: subtitleColor),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 3,
+                        child: Text(
+                          notifier.t('WAKTU'),
+                          style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: subtitleColor),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 3,
+                        child: Text(
+                          notifier.t('STATUS'),
+                          style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: subtitleColor),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: todayQueues.length,
+                  separatorBuilder: (context, index) => Divider(color: borderColor, height: 1),
+                  itemBuilder: (context, index) {
+                    final antrian = todayQueues[index];
+                    Color statusColor = Colors.grey;
+                    if (antrian.status == 'Menunggu') {
+                      statusColor = Colors.amber[700]!;
+                    } else if (antrian.status == 'Memproses...') {
+                      statusColor = themeAccent;
+                    } else if (antrian.status == 'Pembayaran') {
+                      statusColor = Colors.indigo;
+                    } else if (antrian.status == 'Selesai') {
+                      statusColor = const Color(0xFF27AE60);
+                    }
+
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              antrian.no,
+                              style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: textColor),
+                            ),
+                          ),
+                          Expanded(
+                            flex: 5,
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 24,
+                                  height: 24,
+                                  decoration: BoxDecoration(
+                                    color: antrian.avatarBg.withValues(alpha: 0.12),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    antrian.nama.isNotEmpty ? antrian.nama[0] : 'P',
+                                    style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: antrian.avatarBg),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    antrian.nama,
+                                    style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: textColor),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Expanded(
+                            flex: 3,
+                            child: Text(
+                              antrian.tipe,
+                              style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: subtitleColor),
+                            ),
+                          ),
+                          Expanded(
+                            flex: 3,
+                            child: Text(
+                              antrian.waktu,
+                              style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
+                            ),
+                          ),
+                          Expanded(
+                            flex: 3,
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: BoxDecoration(
+                                    color: statusColor,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  antrian.status,
+                                  style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: statusColor),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
             ],
           ),
         ),
@@ -327,21 +728,26 @@ class DokterDashboard extends ConsumerWidget {
     );
   }
 
-  Widget _buildChartBar(String day, double percent, Color barColor, Color subtitleColor) {
+  Widget _buildChartBar(String day, double percent, Color barColor, Color subtitleColor, {int count = 0}) {
     return Column(
       children: [
+        Text(
+          count > 0 ? '$count' : '',
+          style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.bold, color: barColor),
+        ),
+        const SizedBox(height: 4),
         Container(
           width: 24,
-          height: 180,
+          height: 160,
           decoration: BoxDecoration(
-            color: barColor.withOpacity(0.05),
+            color: barColor.withValues(alpha: 0.05),
             borderRadius: BorderRadius.circular(6),
           ),
           alignment: Alignment.bottomCenter,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 600),
             width: 24,
-            height: 180 * percent,
+            height: 160 * percent,
             decoration: BoxDecoration(
               color: barColor,
               borderRadius: BorderRadius.circular(6),
@@ -358,11 +764,14 @@ class DokterDashboard extends ConsumerWidget {
 // Income Trend Line Custom Painter
 class _IncomeTrendLinePainter extends CustomPainter {
   final Color lineColor;
+  final List<double> dataPoints;
 
-  _IncomeTrendLinePainter(this.lineColor);
+  _IncomeTrendLinePainter(this.lineColor, this.dataPoints);
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (dataPoints.isEmpty) return;
+
     final paint = Paint()
       ..color = lineColor
       ..strokeWidth = 3.0
@@ -370,45 +779,44 @@ class _IncomeTrendLinePainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
 
     final fillPaint = Paint()
-      ..color = lineColor.withOpacity(0.08)
+      ..color = lineColor.withValues(alpha: 0.08)
       ..style = PaintingStyle.fill;
 
     final path = Path();
     final fillPath = Path();
 
-    // Standard smooth bezier curve simulation
-    path.moveTo(0, size.height);
+    final stepX = size.width / (dataPoints.length - 1);
+
+    // Map each data point to its corresponding (x, y) coordinates
+    final points = <Offset>[];
+    for (int i = 0; i < dataPoints.length; i++) {
+      final x = i * stepX;
+      final y = size.height - (size.height * 0.8 * dataPoints[i]) - (size.height * 0.1);
+      points.add(Offset(x, y));
+    }
+
+    path.moveTo(points[0].dx, points[0].dy);
     fillPath.moveTo(0, size.height);
+    fillPath.lineTo(points[0].dx, points[0].dy);
 
-    final controlPoint1 = Offset(size.width * 0.35, size.height);
-    final controlPoint2 = Offset(size.width * 0.42, size.height * 0.15);
-    final endPoint = Offset(size.width * 0.5, size.height * 0.15);
+    // Draw smooth bezier curve
+    for (int i = 0; i < points.length - 1; i++) {
+      final p0 = points[i];
+      final p1 = points[i + 1];
+      final controlPoint1 = Offset(p0.dx + stepX / 2, p0.dy);
+      final controlPoint2 = Offset(p1.dx - stepX / 2, p1.dy);
 
-    path.cubicTo(
-      controlPoint1.dx, controlPoint1.dy,
-      controlPoint2.dx, controlPoint2.dy,
-      endPoint.dx, endPoint.dy,
-    );
-    fillPath.cubicTo(
-      controlPoint1.dx, controlPoint1.dy,
-      controlPoint2.dx, controlPoint2.dy,
-      endPoint.dx, endPoint.dy,
-    );
-
-    final controlPoint3 = Offset(size.width * 0.58, size.height * 0.15);
-    final controlPoint4 = Offset(size.width * 0.65, size.height);
-    final endPoint2 = Offset(size.width, size.height);
-
-    path.cubicTo(
-      controlPoint3.dx, controlPoint3.dy,
-      controlPoint4.dx, controlPoint4.dy,
-      endPoint2.dx, endPoint2.dy,
-    );
-    fillPath.cubicTo(
-      controlPoint3.dx, controlPoint3.dy,
-      controlPoint4.dx, controlPoint4.dy,
-      endPoint2.dx, endPoint2.dy,
-    );
+      path.cubicTo(
+        controlPoint1.dx, controlPoint1.dy,
+        controlPoint2.dx, controlPoint2.dy,
+        p1.dx, p1.dy,
+      );
+      fillPath.cubicTo(
+        controlPoint1.dx, controlPoint1.dy,
+        controlPoint2.dx, controlPoint2.dy,
+        p1.dx, p1.dy,
+      );
+    }
 
     fillPath.lineTo(size.width, size.height);
     fillPath.close();
@@ -418,5 +826,7 @@ class _IncomeTrendLinePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _IncomeTrendLinePainter oldDelegate) {
+    return oldDelegate.lineColor != lineColor || oldDelegate.dataPoints != dataPoints;
+  }
 }

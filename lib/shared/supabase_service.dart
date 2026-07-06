@@ -756,6 +756,8 @@ class SupabaseService {
     required String? barcode,
     required double sellPrice,
     required Map<String, dynamic> initialBatch,
+    String? kfaCode,
+    String? kfaName,
   }) async {
     try {
       final rpcData = {
@@ -768,6 +770,17 @@ class SupabaseService {
         'p_initial_batch': initialBatch,
       };
       await _post('rpc/add_doctor_medicine', rpcData, schema: 'public');
+
+      if (kfaCode != null || kfaName != null) {
+        await _patch(
+          'medicine?id=eq.${Uri.encodeComponent(medicineId)}',
+          {
+            if (kfaCode != null) 'kfa_code': kfaCode,
+            if (kfaName != null) 'kfa_name': kfaName,
+          },
+          schema: 'private_doctor',
+        );
+      }
     } catch (e) {
       throw Exception('Gagal menambahkan obat dokter baru: $e');
     }
@@ -1320,7 +1333,7 @@ class SupabaseService {
             'medicine_name': manual['nama'] ?? '',
             'quantity': (manual['jumlah'] ?? 1).toString(),
             'dosage_instructions': manual['aturan'] ?? '',
-            'kfa_code': null,
+            'kfa_code': manual['kfa_code'],
             'notes': '',
             'created_at': nowStr,
           };
@@ -1359,7 +1372,7 @@ class SupabaseService {
             'medicine_name': obatRaw.nama,
             'quantity': (rx['jumlah'] ?? 1).toString(),
             'dosage_instructions': rx['aturan'] ?? '',
-            'kfa_code': null,
+            'kfa_code': obatRaw.kfaCode,
             'notes': '',
             'created_at': nowStr,
           };
@@ -1409,6 +1422,105 @@ class SupabaseService {
       return encounterId;
     } catch (e) {
       throw Exception('Gagal menyimpan Rekam Medis (EMR): $e');
+    }
+  }
+
+  // Fetch all doctors with their user profile details and queues
+  Future<List<Map<String, dynamic>>> fetchAllDoctors() async {
+    try {
+      final doctorsRaw = await _get('user_detail_doctor?select=*,user:id(*)', schema: 'public');
+      
+      List<dynamic> queuesRaw = [];
+      try {
+        queuesRaw = await _get('doctor_queues?select=*', schema: 'public');
+      } catch (e) {
+        print('Error fetching doctor queues statistics: $e');
+      }
+
+      final Map<String, Map<String, dynamic>> queuesMap = {
+        for (var q in queuesRaw) 
+          if (q is Map && q['id_doctor'] != null)
+            (q['id_doctor'] as String): Map<String, dynamic>.from(q),
+      };
+
+      final List<Map<String, dynamic>> doctorsList = [];
+      for (final doc in doctorsRaw) {
+        if (doc is! Map) continue;
+        final docMap = Map<String, dynamic>.from(doc);
+        final userRaw = docMap['user'];
+        if (userRaw != null && userRaw is Map) {
+          final userMap = Map<String, dynamic>.from(userRaw);
+          
+          final doctorId = docMap['id'] as String;
+          final queueInfo = queuesMap[doctorId];
+
+          doctorsList.add({
+            'id': doctorId,
+            'name': userMap['name'] ?? '',
+            'email': userMap['email'] ?? '',
+            'avatar_url': userMap['avatar_url'] ?? docMap['satusehat_photo_url'],
+            'nama_faskes': docMap['nama_faskes'] ?? 'Praktek Mandiri',
+            'profession': docMap['profession'] ?? 'Dokter',
+            'is_visible': docMap['is_visible'] ?? true,
+            'is_bpjs': docMap['is_bpjs'] ?? false,
+            'about': docMap['about'] ?? '',
+            'whatsapp_number': docMap['whatsapp_number'] ?? userMap['phone_number'] ?? '',
+            'latitude': docMap['latitude'],
+            'longitude': docMap['longitude'],
+            'default_service_fee': docMap['default_service_fee'] ?? 0.0,
+            'address': userMap['address'] ?? docMap['nama_faskes'] ?? '',
+            'province': userMap['province'] ?? '',
+            'district': userMap['district'] ?? '',
+            'sub_district': userMap['sub_district'] ?? '',
+            'village': userMap['village'] ?? '',
+            'active_today': queueInfo?['active_today'] ?? 0,
+            'finished_total': queueInfo?['finished_total'] ?? 0,
+            'practice_licenses': docMap['practice_licenses'],
+            'google_maps_link': docMap['google_maps_link'] ?? '',
+          });
+        }
+      }
+      return doctorsList;
+    } catch (e) {
+      throw Exception('Gagal mengambil daftar dokter: $e');
+    }
+  }
+
+  // Create a booking (queue) for a patient with a specific doctor on a given date
+  Future<void> createBooking({
+    required String doctorId,
+    required String patientId,
+    required DateTime date,
+  }) async {
+    try {
+      final dateStr = '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+      // Get count of existing queues for that doctor on that date to assign no_queue
+      final existing = await _get(
+        'queue?id_doctor=eq.${Uri.encodeComponent(doctorId)}&date_queue=eq.$dateStr&select=id',
+        schema: 'private_doctor',
+      );
+      final noQueue = (existing.length + 1).toString().padLeft(3, '0');
+      await _post('queue', {
+        'id_doctor': doctorId,
+        'id_patient': patientId,
+        'no_queue': noQueue,
+        'patient_type': 'umum',
+        'date_queue': dateStr,
+        'date_queue_ts': '${dateStr}T00:00:00',
+      }, schema: 'private_doctor');
+    } catch (e) {
+      throw Exception('Gagal membuat booking: $e');
+    }
+  }
+
+  // Fetch schedules for a specific doctor
+  Future<List<Map<String, dynamic>>> fetchDoctorSchedules(String doctorId) async {
+    try {
+      final safeDoctorId = Uri.encodeComponent(doctorId);
+      final schedules = await _get('doctor_schedules?select=*&id_doctor=eq.$safeDoctorId', schema: 'public');
+      return schedules.map((s) => Map<String, dynamic>.from(s as Map)).toList();
+    } catch (e) {
+      throw Exception('Gagal mengambil jadwal dokter: $e');
     }
   }
 }

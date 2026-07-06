@@ -754,73 +754,37 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
 
             const SizedBox(height: 12),
 
-            // Footer actions: isBertugas toggle & nonaktifkan
+            // Footer actions: nonaktifkan & izin akses
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                // isBertugas Switch
-                Row(
-                  children: [
-                    Text(
-                      a.isBertugas ? 'BERTUGAS' : 'LIBUR',
-                      style: GoogleFonts.outfit(
-                        fontSize: 8,
-                        fontWeight: FontWeight.w900,
-                        color: a.isBertugas
-                            ? const Color(0xFF48C9B0)
-                            : subtitle,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    SizedBox(
-                      height: 18,
-                      width: 32,
-                      child: Switch(
-                        value: a.isBertugas,
-                        activeThumbColor: const Color(0xFF48C9B0),
-                        onChanged: (val) {
-                          ref
-                              .read(dokterAsistenListProvider.notifier)
-                              .toggleDuty(a.id);
-                        },
-                      ),
-                    ),
-                  ],
+                IconButton(
+                  icon: Icon(
+                    Icons.security_rounded,
+                    size: 14,
+                    color: subtitle,
+                  ),
+                  onPressed: () {
+                    _showAssistantDetailDialog(
+                      context,
+                      a,
+                      startTabIndex: 1,
+                    );
+                  },
+                  tooltip: 'Ubah Izin Akses',
+                  visualDensity: VisualDensity.compact,
                 ),
-
-                // Modify/Remove Row
-                Row(
-                  children: [
-                    IconButton(
-                      icon: Icon(
-                        Icons.security_rounded,
-                        size: 14,
-                        color: subtitle,
-                      ),
-                      onPressed: () {
-                        _showAssistantDetailDialog(
-                          context,
-                          a,
-                          startTabIndex: 1,
-                        );
-                      },
-                      tooltip: 'Ubah Izin Akses',
-                      visualDensity: VisualDensity.compact,
-                    ),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.delete_outline_rounded,
-                        size: 14,
-                        color: Colors.redAccent,
-                      ),
-                      onPressed: () {
-                        _confirmDelete(context, a);
-                      },
-                      tooltip: 'Hapus Asisten',
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ],
+                IconButton(
+                  icon: const Icon(
+                    Icons.delete_outline_rounded,
+                    size: 14,
+                    color: Colors.redAccent,
+                  ),
+                  onPressed: () {
+                    _confirmDelete(context, a);
+                  },
+                  tooltip: 'Hapus Asisten',
+                  visualDensity: VisualDensity.compact,
                 ),
               ],
             ),
@@ -943,6 +907,7 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                     children: [
                       // Purple Header Area
                       Stack(
+                        clipBehavior: Clip.none,
                         children: [
                           Container(
                             height: 120,

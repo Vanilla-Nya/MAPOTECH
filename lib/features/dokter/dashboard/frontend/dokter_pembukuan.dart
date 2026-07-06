@@ -8,6 +8,7 @@ import 'package:mapotech/shared/supabase_service.dart';
 import 'package:mapotech/features/dokter/dashboard/frontend/dokter_pasien.dart';
 import 'package:mapotech/shared/satusehat_service.dart';
 import 'package:mapotech/shared/widgets/common_pagination.dart';
+import 'package:mapotech/shared/widgets/skeleton_loading.dart';
 
 class BukuKasEntry {
   final String id;
@@ -86,6 +87,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
   bool _showExpenseWizard = false;
   bool _isExporting = false;
   bool _isLoading = true;
+  bool _isSaving = false;
 
   // Tab control: 'overview' or 'satusehat'
   String _activeTab = 'overview';
@@ -546,7 +548,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
   Future<void> _triggerBulkSync() async {
     if (_selectedEncounters.isEmpty) return;
 
-    setState(() => _isLoading = true);
+    setState(() => _isSaving = true);
     int successCount = 0;
     int failedCount = 0;
     String lastError = '';
@@ -726,7 +728,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
     } finally {
       setState(() {
         _isBulkSyncMode = false;
-        _isLoading = false;
+        _isSaving = false;
       });
     }
   }
@@ -854,7 +856,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
       return;
     }
 
-    setState(() => _isLoading = true);
+    setState(() => _isSaving = true);
 
     try {
       final userState = ref.read(landingPageProvider);
@@ -907,7 +909,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
         'Terjadi kesalahan saat menyimpan pengeluaran: $e',
       );
     } finally {
-      setState(() => _isLoading = false);
+      setState(() => _isSaving = false);
     }
   }
 
@@ -1075,6 +1077,10 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
     final double bpjsRatio = totalPatientsWithRecords > 0
         ? (bpjsCount / totalPatientsWithRecords) * 100
         : 22.0;
+
+    if (_isLoading) {
+      return const SkeletonScope(child: SkeletonPembukuan());
+    }
 
     return Stack(
       children: [
@@ -1838,23 +1844,12 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
           ),
         ),
 
-        // LOADING OVERLAY
-        ViewportOverlay(
-          show: _isLoading,
-          builder: (context) => Positioned.fill(
-            child: Container(
-              color: Colors.black.withOpacity(0.15),
-              child: Center(
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(purple),
-                ),
-              ),
-            ),
-          ),
-        ),
+
       ],
     );
   }
+
+
 
   // ─── TAB NAVIGATION BUTTON ──────────────────────────────────────────────────
   Widget _buildTabButton(
@@ -4270,8 +4265,9 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       TextButton(
-                        onPressed: () =>
-                            setState(() => _showExpenseWizard = false),
+                        onPressed: _isSaving
+                            ? null
+                            : () => setState(() => _showExpenseWizard = false),
                         child: Text(
                           'Batal'.tr(state),
                           style: GoogleFonts.outfit(
@@ -4283,7 +4279,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                       ),
                       const SizedBox(width: 14),
                       ElevatedButton(
-                        onPressed: _saveExpense,
+                        onPressed: _isSaving ? null : _saveExpense,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: purple,
                           foregroundColor: Colors.white,
@@ -4296,14 +4292,23 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                             vertical: 14,
                           ),
                         ),
-                        child: Text(
-                          'Simpan Pengeluaran'.tr(state),
-                          style: GoogleFonts.outfit(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                          ),
-                        ),
+                        child: _isSaving
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              )
+                            : Text(
+                                'Simpan Pengeluaran'.tr(state),
+                                style: GoogleFonts.outfit(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
+                                ),
+                              ),
                       ),
                     ],
                   ),
@@ -5769,7 +5774,12 @@ class _ViewportOverlayState extends State<ViewportOverlay> {
   Widget build(BuildContext context) {
     return OverlayPortal(
       controller: _controller,
-      overlayChildBuilder: (context) => widget.builder(context),
+      overlayChildBuilder: (context) {
+        if (!widget.show) {
+          return const SizedBox.shrink();
+        }
+        return widget.builder(context);
+      },
       child: const SizedBox.shrink(),
     );
   }

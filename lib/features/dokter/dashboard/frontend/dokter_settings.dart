@@ -241,6 +241,39 @@ class _DokterSettingsState extends ConsumerState<DokterSettings> {
 
         const SizedBox(height: 28),
 
+        // ── Ukuran Kertas Struk ──────────────────────────────────────────────
+        SettingsSection(
+          title: isEn ? 'Receipt Paper Size' : 'Ukuran Kertas Struk',
+          subtitle: isEn
+              ? 'Set the paper size used when printing patient payment invoices.'
+              : 'Atur ukuran kertas yang digunakan saat mencetak invoice pembayaran pasien.',
+          textColor: textColor,
+          subtitleColor: subtitleColor,
+          child: Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              for (final size in ['A4', 'A5', 'Thermal 58mm', 'Thermal 80mm'])
+                SettingsChip(
+                  label: size,
+                  icon: Icons.description_outlined,
+                  isSelected: state.receiptPaperSize == size,
+                  onTap: () => notifier.setReceiptPaperSize(size),
+                  purple: purple,
+                  teal: teal,
+                  isDark: isDark,
+                  borderColor: borderColor,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 9,
+                  ),
+                ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 28),
+
         // ── Integrasi SatuSehat Kemenkes ──────────────────────────────────
         SettingsSection(
           title: isEn

@@ -7,6 +7,9 @@ import 'package:mapotech/features/dokter/dashboard/frontend/dokter_pasien.dart';
 import 'package:mapotech/shared/widgets/custom_button.dart';
 import 'package:mapotech/shared/supabase_service.dart';
 import 'package:mapotech/shared/widgets/common_pagination.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:js' as js;
 
 // ─── Data Models ─────────────────────────────────────────────────────────────
 
@@ -416,7 +419,15 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
           qDate.year == _selectedDate.year &&
           qDate.month == _selectedDate.month &&
           qDate.day == _selectedDate.day;
-      if (!matchDate) return false;
+
+      // Show pending payments if the selected date is today (so cashiers don't miss them)
+      final now = DateTime.now();
+      final isTodaySelected = _selectedDate.year == now.year &&
+          _selectedDate.month == now.month &&
+          _selectedDate.day == now.day;
+      final isPendingPayment = q.status == 'Pembayaran';
+
+      if (!matchDate && !(isTodaySelected && isPendingPayment)) return false;
 
       final query = _searchQuery.toLowerCase();
       final matchQuery =
@@ -3606,6 +3617,8 @@ class _CashierPaymentDialogState extends ConsumerState<CashierPaymentDialog> {
   double _totalPrice = 10000;
   List<Map<String, dynamic>> _medicines = [];
   String _paymentMethod = 'CASH'; // 'CASH' or 'QRIS'
+  String? _encounterId;
+  String? _electronicPrescriptionId;
   final TextEditingController _receivedController = TextEditingController(
     text: '0',
   );
@@ -3627,13 +3640,16 @@ class _CashierPaymentDialogState extends ConsumerState<CashierPaymentDialog> {
           .maybeSingle();
 
       if (ceRes != null) {
-        final encounterId = ceRes['id'];
+        final encounterId = ceRes['id'] as String;
+        _encounterId = encounterId;
         _doctorPrice =
             double.tryParse(ceRes['doctor_price']?.toString() ?? '10000') ??
             10000.0;
         _totalPrice =
             double.tryParse(ceRes['total_price']?.toString() ?? '10000') ??
             10000.0;
+
+        List<Map<String, dynamic>> loadedMedicines = [];
 
         // 2. Fetch medicines
         final medicinesRes = await SupabaseService.client
@@ -3643,7 +3659,6 @@ class _CashierPaymentDialogState extends ConsumerState<CashierPaymentDialog> {
             .eq('id_clinical_encounters', encounterId);
 
         if (medicinesRes.isNotEmpty) {
-          List<Map<String, dynamic>> loadedMedicines = [];
           for (final medRow in medicinesRes) {
             final qty =
                 double.tryParse(medRow['quantity']?.toString() ?? '0') ?? 0.0;
@@ -3681,12 +3696,44 @@ class _CashierPaymentDialogState extends ConsumerState<CashierPaymentDialog> {
                   'name': medicineName,
                   'quantity': qty,
                   'price': sellPrice,
+                  'isManual': false,
                 });
               }
             }
           }
-          _medicines = loadedMedicines;
         }
+
+        // 3. Fetch manual prescriptions
+        try {
+          final epRes = await SupabaseService.client
+              .schema('private_doctor')
+              .from('electronic_prescriptions')
+              .select('*, electronic_prescription_items(*)')
+              .eq('id_clinical_encounter', encounterId)
+              .maybeSingle();
+
+          if (epRes != null) {
+            _electronicPrescriptionId = epRes['id']?.toString();
+            final items = epRes['electronic_prescription_items'] as List<dynamic>?;
+            if (items != null) {
+              for (final item in items) {
+                if (item['id_catalog_item'] == null) {
+                  final qty = double.tryParse(item['quantity']?.toString() ?? '1') ?? 1.0;
+                  loadedMedicines.add({
+                    'name': item['medicine_name']?.toString() ?? 'Obat Resep',
+                    'quantity': qty,
+                    'price': 0.0,
+                    'isManual': true,
+                  });
+                }
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('Error loading manual prescriptions: $e');
+        }
+
+        _medicines = loadedMedicines;
       }
     } catch (e) {
       debugPrint('Error loading billing data: $e');
@@ -4010,7 +4057,7 @@ class _CashierPaymentDialogState extends ConsumerState<CashierPaymentDialog> {
                             m['name'],
                             _formatCurrency(m['price']),
                             'x${m['quantity'].toInt()}',
-                            'OBAT',
+                            m['isManual'] == true ? 'RESEP MANUAL' : 'OBAT',
                           ),
                         ),
                       ],
@@ -4121,7 +4168,27 @@ class _CashierPaymentDialogState extends ConsumerState<CashierPaymentDialog> {
                         children: [
                           IconButton(
                             icon: const Icon(Icons.print_outlined, size: 18),
-                            onPressed: () {},
+                            tooltip: 'Print Invoice',
+                            onPressed: () {
+                              showDialog(
+                                context: context,
+                                barrierColor: Colors.black54,
+                                builder: (_) => Dialog(
+                                  backgroundColor: Colors.transparent,
+                                  insetPadding: const EdgeInsets.all(24),
+                                  child: InvoicePrintPreviewDialog(
+                                    queue: widget.queue,
+                                    encounterId: _encounterId,
+                                    electronicPrescriptionId: _electronicPrescriptionId,
+                                    doctorPrice: _doctorPrice,
+                                    totalPrice: _totalPrice,
+                                    medicines: _medicines,
+                                    invoiceNo: invoiceNo,
+                                    isDark: widget.isDark,
+                                  ),
+                                ),
+                              );
+                            },
                           ),
                           IconButton(
                             icon: const Icon(Icons.close_rounded, size: 18),
@@ -4741,6 +4808,729 @@ class _CashierPaymentDialogState extends ConsumerState<CashierPaymentDialog> {
             color: const Color(0xFF6F6A8A),
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ─── InvoicePrintPreviewDialog ────────────────────────────────────────────────
+class InvoicePrintPreviewDialog extends ConsumerStatefulWidget {
+  final AntrianModel queue;
+  final String? encounterId;
+  final String? electronicPrescriptionId;
+  final double doctorPrice;
+  final double totalPrice;
+  final List<Map<String, dynamic>> medicines;
+  final String invoiceNo;
+  final bool isDark;
+
+  const InvoicePrintPreviewDialog({
+    super.key,
+    required this.queue,
+    required this.encounterId,
+    required this.electronicPrescriptionId,
+    required this.doctorPrice,
+    required this.totalPrice,
+    required this.medicines,
+    required this.invoiceNo,
+    required this.isDark,
+  });
+
+  @override
+  ConsumerState<InvoicePrintPreviewDialog> createState() =>
+      _InvoicePrintPreviewDialogState();
+}
+
+class _InvoicePrintPreviewDialogState
+    extends ConsumerState<InvoicePrintPreviewDialog> {
+  bool _isPrinting = false;
+
+  String _formatCurrency(double amount) {
+    final parts = amount.toInt().toString().split('');
+    var result = '';
+    var count = 0;
+    for (var i = parts.length - 1; i >= 0; i--) {
+      result = parts[i] + result;
+      count++;
+      if (count == 3 && i > 0) {
+        result = '.$result';
+        count = 0;
+      }
+    }
+    return 'Rp $result';
+  }
+
+  String _formatDate(DateTime? dt) {
+    if (dt == null) return '-';
+    const months = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+    ];
+    return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
+  }
+
+  void _triggerPrint(String paperSize) async {
+    setState(() => _isPrinting = true);
+
+    // Inject @page CSS so the browser prints at the right paper size
+    String pageSize;
+    switch (paperSize) {
+      case 'A5':
+        pageSize = 'A5';
+        break;
+      case 'Thermal 58mm':
+        pageSize = '58mm 297mm';
+        break;
+      case 'Thermal 80mm':
+        pageSize = '80mm 297mm';
+        break;
+      default:
+        pageSize = 'A4';
+    }
+
+    try {
+      js.context.callMethod('eval', [
+        '''
+        (function() {
+          var old = document.getElementById("__mapotech_print_style");
+          if (old) old.remove();
+          var s = document.createElement("style");
+          s.id = "__mapotech_print_style";
+          s.innerText = "@page { size: $pageSize; margin: 10mm; }";
+          document.head.appendChild(s);
+          window.print();
+        })();
+        '''
+      ]);
+    } catch (_) {}
+
+    await Future.delayed(const Duration(milliseconds: 500));
+    if (mounted) setState(() => _isPrinting = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = ref.watch(landingPageProvider);
+    final notifier = ref.read(landingPageProvider.notifier);
+    final paperSize = state.receiptPaperSize;
+    final isDark = widget.isDark;
+    final cardBg = isDark ? const Color(0xFF1A1A1D) : Colors.white;
+    final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
+    final subtitleColor = isDark ? const Color(0xFF9E9EB0) : const Color(0xFF6F6A8A);
+    final borderColor = isDark ? const Color(0xFF2D2D32) : const Color(0xFFECEEF2);
+    final green = const Color(0xFF0F9D58);
+
+    final hasEResep = widget.electronicPrescriptionId != null;
+    final qrData = hasEResep
+        ? 'https://mapotech.id/resep/${widget.electronicPrescriptionId}'
+        : null;
+
+    // Determine paper width for preview
+    double previewWidth;
+    switch (paperSize) {
+      case 'A5':
+        previewWidth = 420;
+        break;
+      case 'Thermal 58mm':
+        previewWidth = 220;
+        break;
+      case 'Thermal 80mm':
+        previewWidth = 300;
+        break;
+      default: // A4
+        previewWidth = 560;
+    }
+
+    final bool isThermal =
+        paperSize == 'Thermal 58mm' || paperSize == 'Thermal 80mm';
+
+    final doctorName =
+        state.loggedInUser?['name']?.toString() ?? 'Dr. -';
+    final doctorSpecialty =
+        state.loggedInUser?['specialty']?.toString() ?? 'Dokter Umum';
+
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 860, maxHeight: 680),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: borderColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.15),
+            blurRadius: 40,
+            offset: const Offset(0, 16),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // ── Dialog Toolbar ──────────────────────────────────────────────
+          Container(
+            padding: const EdgeInsets.fromLTRB(24, 16, 16, 16),
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: borderColor)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: green.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(Icons.print_outlined, color: green, size: 16),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Print Preview Invoice',
+                        style: GoogleFonts.outfit(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                          color: textColor,
+                        ),
+                      ),
+                      Text(
+                        widget.invoiceNo,
+                        style: GoogleFonts.outfit(
+                          fontSize: 10,
+                          color: subtitleColor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Paper size chips
+                Row(
+                  children: [
+                    Text(
+                      'Kertas: ',
+                      style: GoogleFonts.outfit(
+                        fontSize: 10,
+                        color: subtitleColor,
+                      ),
+                    ),
+                    for (final sz in ['A4', 'A5', 'Thermal 58mm', 'Thermal 80mm'])
+                      Padding(
+                        padding: const EdgeInsets.only(left: 6),
+                        child: GestureDetector(
+                          onTap: () => notifier.setReceiptPaperSize(sz),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: paperSize == sz
+                                  ? green.withOpacity(0.12)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: paperSize == sz ? green : borderColor,
+                              ),
+                            ),
+                            child: Text(
+                              sz,
+                              style: GoogleFonts.outfit(
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                                color: paperSize == sz ? green : subtitleColor,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+
+                const SizedBox(width: 12),
+
+                // Print button
+                ElevatedButton.icon(
+                  icon: _isPrinting
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.print_rounded, size: 14),
+                  label: Text(
+                    _isPrinting ? 'Mencetak...' : 'Cetak',
+                    style: GoogleFonts.outfit(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: green,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  onPressed: _isPrinting ? null : () => _triggerPrint(paperSize),
+                ),
+
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, size: 18),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+          ),
+
+          // ── Preview Area ────────────────────────────────────────────────
+          Expanded(
+            child: Container(
+              color: isDark ? const Color(0xFF111114) : const Color(0xFFF4F6FA),
+              alignment: Alignment.topCenter,
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: SingleChildScrollView(
+                child: Center(
+                  child: Container(
+                    width: previewWidth,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: isThermal
+                          ? BorderRadius.circular(4)
+                          : BorderRadius.circular(8),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.10),
+                          blurRadius: 20,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    padding: EdgeInsets.all(isThermal ? 12 : 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // ── Clinic Header ───────────────────────────────
+                        Center(
+                          child: Column(
+                            children: [
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: green.withOpacity(0.12),
+                                  shape: BoxShape.circle,
+                                ),
+                                alignment: Alignment.center,
+                                child: Icon(
+                                  Icons.local_hospital_rounded,
+                                  color: green,
+                                  size: 20,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Praktik Mandiri',
+                                style: GoogleFonts.outfit(
+                                  fontSize: isThermal ? 10 : 14,
+                                  fontWeight: FontWeight.w900,
+                                  color: const Color(0xFF1B0C3C),
+                                ),
+                              ),
+                              Text(
+                                doctorName,
+                                style: GoogleFonts.outfit(
+                                  fontSize: isThermal ? 8 : 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: const Color(0xFF6F6A8A),
+                                ),
+                              ),
+                              Text(
+                                doctorSpecialty,
+                                style: GoogleFonts.outfit(
+                                  fontSize: isThermal ? 7 : 9,
+                                  color: const Color(0xFF9E9EB0),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 12),
+                        Divider(color: const Color(0xFFECEEF2), thickness: 1),
+                        const SizedBox(height: 8),
+
+                        // ── Invoice Meta ────────────────────────────────
+                        _invoiceRow('No. Invoice', widget.invoiceNo, isThermal),
+                        _invoiceRow(
+                          'Tanggal',
+                          _formatDate(widget.queue.dateQueue ?? DateTime.now()),
+                          isThermal,
+                        ),
+                        _invoiceRow('Nama Pasien', widget.queue.nama, isThermal),
+                        _invoiceRow('NIK', widget.queue.nik, isThermal),
+                        _invoiceRow('Jenis', widget.queue.tipe, isThermal),
+
+                        const SizedBox(height: 10),
+                        Divider(color: const Color(0xFFECEEF2), thickness: 1),
+                        const SizedBox(height: 8),
+
+                        // ── Section Label ───────────────────────────────
+                        Text(
+                          'RINCIAN TAGIHAN',
+                          style: GoogleFonts.outfit(
+                            fontSize: isThermal ? 7 : 8.5,
+                            fontWeight: FontWeight.w900,
+                            color: const Color(0xFF6F6A8A),
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+
+                        // ── Consultation fee ────────────────────────────
+                        _billRow(
+                          'Jasa Dokter / Konsultasi',
+                          _formatCurrency(widget.doctorPrice),
+                          'x1',
+                          isThermal,
+                          isManual: false,
+                        ),
+
+                        // ── Medicines ────────────────────────────────────
+                        ...widget.medicines.map((m) => _billRow(
+                              m['name']?.toString() ?? 'Obat',
+                              m['isManual'] == true
+                                  ? 'Lihat Resep'
+                                  : _formatCurrency(
+                                      (m['price'] as double?) ?? 0),
+                              'x${((m['quantity'] as double?) ?? 1).toInt()}',
+                              isThermal,
+                              isManual: m['isManual'] == true,
+                            )),
+
+                        const SizedBox(height: 8),
+                        Divider(color: const Color(0xFFECEEF2), thickness: 1),
+                        const SizedBox(height: 8),
+
+                        // ── Total ────────────────────────────────────────
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'TOTAL',
+                              style: GoogleFonts.outfit(
+                                fontSize: isThermal ? 9 : 12,
+                                fontWeight: FontWeight.w900,
+                                color: const Color(0xFF1B0C3C),
+                              ),
+                            ),
+                            Text(
+                              _formatCurrency(widget.totalPrice),
+                              style: GoogleFonts.outfit(
+                                fontSize: isThermal ? 10 : 14,
+                                fontWeight: FontWeight.w900,
+                                color: green,
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        // ── E-Resep QR Section ───────────────────────────
+                        if (hasEResep) ...[
+                          const SizedBox(height: 16),
+                          Divider(color: const Color(0xFFECEEF2), thickness: 1),
+                          const SizedBox(height: 12),
+
+                          Center(
+                            child: Column(
+                              children: [
+                                Text(
+                                  'E-RESEP / ELECTRONIC PRESCRIPTION',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: isThermal ? 7 : 8.5,
+                                    fontWeight: FontWeight.w900,
+                                    color: const Color(0xFF6F6A8A),
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+
+                                // Clean scannable QR — access control is handled
+                                // server-side: non-apotek users see "No Permission"
+                                Stack(
+                                  alignment: Alignment.topRight,
+                                  children: [
+                                    QrImageView(
+                                      data: qrData!,
+                                      version: QrVersions.auto,
+                                      size: isThermal ? 80 : 120,
+                                      eyeStyle: const QrEyeStyle(
+                                        eyeShape: QrEyeShape.square,
+                                        color: Color(0xFF1B0C3C),
+                                      ),
+                                      dataModuleStyle: const QrDataModuleStyle(
+                                        dataModuleShape: QrDataModuleShape.square,
+                                        color: Color(0xFF1B0C3C),
+                                      ),
+                                    ),
+                                    // Small badge: apotek-only indicator
+                                    Container(
+                                      margin: const EdgeInsets.only(top: 2, right: 2),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 4,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF1B0C3C),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        'APOTEK',
+                                        style: GoogleFonts.outfit(
+                                          fontSize: isThermal ? 4.5 : 6,
+                                          fontWeight: FontWeight.w900,
+                                          color: Colors.white,
+                                          letterSpacing: 0.3,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Scan dengan aplikasi Apotek untuk membuka resep',
+                                  textAlign: TextAlign.center,
+                                  style: GoogleFonts.outfit(
+                                    fontSize: isThermal ? 6.5 : 8.5,
+                                    color: const Color(0xFF9E9EB0),
+                                  ),
+                                ),
+                                Text(
+                                  'ID: ${widget.electronicPrescriptionId ?? "-"}',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: isThermal ? 6 : 7.5,
+                                    color: const Color(0xFFBBBBCC),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+
+                                // List manual prescription items
+                                if (widget.medicines.any((m) => m['isManual'] == true)) ...[
+                                  const SizedBox(height: 10),
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF8F9FF),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: const Color(0xFFE8E8F0),
+                                      ),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'DAFTAR RESEP MANUAL',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: isThermal ? 6.5 : 8,
+                                            fontWeight: FontWeight.w900,
+                                            color: const Color(0xFF6F6A8A),
+                                            letterSpacing: 0.3,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        ...widget.medicines
+                                            .where((m) => m['isManual'] == true)
+                                            .map(
+                                              (m) => Padding(
+                                                padding: const EdgeInsets.only(
+                                                    bottom: 4),
+                                                child: Row(
+                                                  children: [
+                                                    const Icon(
+                                                      Icons.circle,
+                                                      size: 4,
+                                                      color: Color(0xFF9E9EB0),
+                                                    ),
+                                                    const SizedBox(width: 6),
+                                                    Expanded(
+                                                      child: Text(
+                                                        '${m['name']} × ${((m['quantity'] as double?) ?? 1).toInt()}',
+                                                        style: GoogleFonts.outfit(
+                                                          fontSize: isThermal
+                                                              ? 6.5
+                                                              : 9,
+                                                          color: const Color(
+                                                              0xFF3D3D5C),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
+
+                        const SizedBox(height: 16),
+                        Divider(color: const Color(0xFFECEEF2), thickness: 1),
+                        const SizedBox(height: 8),
+
+                        // ── Footer ───────────────────────────────────────
+                        Center(
+                          child: Column(
+                            children: [
+                              Text(
+                                'Terima kasih atas kepercayaan Anda.',
+                                style: GoogleFonts.outfit(
+                                  fontSize: isThermal ? 7 : 9,
+                                  color: const Color(0xFF9E9EB0),
+                                ),
+                              ),
+                              Text(
+                                'Powered by MAPOTECH',
+                                style: GoogleFonts.outfit(
+                                  fontSize: isThermal ? 6 : 8,
+                                  fontWeight: FontWeight.bold,
+                                  color: const Color(0xFFBBBBCC),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _invoiceRow(String label, String value, bool isThermal) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: isThermal ? 60 : 110,
+            child: Text(
+              label,
+              style: GoogleFonts.outfit(
+                fontSize: isThermal ? 7 : 9,
+                color: const Color(0xFF9E9EB0),
+              ),
+            ),
+          ),
+          Text(
+            ': ',
+            style: GoogleFonts.outfit(
+              fontSize: isThermal ? 7 : 9,
+              color: const Color(0xFF9E9EB0),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: GoogleFonts.outfit(
+                fontSize: isThermal ? 7 : 9,
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFF1B0C3C),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _billRow(
+    String name,
+    String price,
+    String qty,
+    bool isThermal, {
+    required bool isManual,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: GoogleFonts.outfit(
+                    fontSize: isThermal ? 7.5 : 10,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF1B0C3C),
+                  ),
+                ),
+                if (isManual)
+                  Text(
+                    'RESEP MANUAL',
+                    style: GoogleFonts.outfit(
+                      fontSize: isThermal ? 6 : 7.5,
+                      fontWeight: FontWeight.w900,
+                      color: const Color(0xFF9B59B6),
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                price,
+                style: GoogleFonts.outfit(
+                  fontSize: isThermal ? 8 : 10,
+                  fontWeight: FontWeight.w900,
+                  color: isManual
+                      ? const Color(0xFF9B59B6)
+                      : const Color(0xFF1B0C3C),
+                ),
+              ),
+              Text(
+                qty,
+                style: GoogleFonts.outfit(
+                  fontSize: isThermal ? 6 : 8,
+                  color: const Color(0xFF9E9EB0),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

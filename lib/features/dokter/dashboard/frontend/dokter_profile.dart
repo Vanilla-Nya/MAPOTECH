@@ -3,6 +3,7 @@ import 'dart:math';
 import 'dart:ui';
 import 'dart:typed_data';
 import 'dart:io' as io;
+import 'dart:html' as html;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,6 +16,7 @@ import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/supabase_service.dart';
 import 'package:mapotech/shared/widgets/skeleton_loading.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'web_map_widget.dart';
 import 'package:image/image.dart' as img;
 
@@ -1987,6 +1989,59 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
 
   // --- DUITKU INTEGRATION ---
 
+  // Keys for localStorage persistence of pending QRIS payment
+  static const String _kPendingOrderId   = 'duitku_pending_order_id';
+  static const String _kPendingPaymentUrl = 'duitku_pending_payment_url';
+  static const String _kPendingQrString  = 'duitku_pending_qr_string';
+  static const String _kPendingAmount    = 'duitku_pending_amount';
+  static const String _kPendingUserId    = 'duitku_pending_user_id';
+
+  /// Save pending payment info to localStorage (including raw QRIS string)
+  void _savePendingPayment({
+    required String orderId,
+    required String paymentUrl,
+    required String qrString,
+    required int amount,
+    required String userId,
+  }) {
+    if (kIsWeb) {
+      html.window.localStorage[_kPendingOrderId]    = orderId;
+      html.window.localStorage[_kPendingPaymentUrl] = paymentUrl;
+      html.window.localStorage[_kPendingQrString]   = qrString;
+      html.window.localStorage[_kPendingAmount]     = amount.toString();
+      html.window.localStorage[_kPendingUserId]     = userId;
+    }
+  }
+
+  /// Load pending payment from localStorage (returns null if none for this user)
+  Map<String, String>? _loadPendingPayment(String userId) {
+    if (!kIsWeb) return null;
+    final orderId    = html.window.localStorage[_kPendingOrderId];
+    final paymentUrl = html.window.localStorage[_kPendingPaymentUrl];
+    final qrString   = html.window.localStorage[_kPendingQrString] ?? '';
+    final amount     = html.window.localStorage[_kPendingAmount];
+    final savedUserId = html.window.localStorage[_kPendingUserId];
+    if (orderId == null || paymentUrl == null || amount == null) return null;
+    if (savedUserId != null && savedUserId != userId) return null;
+    return {
+      'orderId': orderId,
+      'paymentUrl': paymentUrl,
+      'qrString': qrString,
+      'amount': amount,
+    };
+  }
+
+  /// Clear pending payment from localStorage
+  void _clearPendingPayment() {
+    if (kIsWeb) {
+      html.window.localStorage.remove(_kPendingOrderId);
+      html.window.localStorage.remove(_kPendingPaymentUrl);
+      html.window.localStorage.remove(_kPendingQrString);
+      html.window.localStorage.remove(_kPendingAmount);
+      html.window.localStorage.remove(_kPendingUserId);
+    }
+  }
+
   Future<void> _buySubscriptionWithDuitku() async {
     if (_isAssistant) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -2001,18 +2056,41 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
     final userState = ref.read(landingPageProvider).loggedInUser;
     final email = userState?['email'] ?? 'agoes.soetanto@gmail.com';
 
+    // ── Check if there is already a saved pending payment for this user ──
+    final pending = _loadPendingPayment(userId);
+    if (pending != null) {
+      final savedOrderId    = pending['orderId']!;
+      final savedPaymentUrl = pending['paymentUrl']!;
+      final savedQrString   = pending['qrString'] ?? '';
+      final savedAmount     = int.tryParse(pending['amount'] ?? '1000') ?? 1000;
+      // Re-open QRIS dialog with the saved order (no new API call)
+      _showQrisPaymentDialog(
+        orderId: savedOrderId,
+        paymentUrl: savedPaymentUrl,
+        qrString: savedQrString,
+        amount: savedAmount,
+        userId: userId,
+        isResume: true,
+      );
+      return;
+    }
+
     setState(() => _isSaving = true);
 
     final String orderId =
         'SUBS_${userId.toString().substring(0, 8)}_${DateTime.now().millisecondsSinceEpoch ~/ 1000}';
-    final int amount = 150000; // Rp 150.000
+    final int amount = 1000; // Rp 1.000
 
-    // Credentials from environment
-    final String merchantCode = dotenv.env['DUITKU_MERCHANT_CODE'] ?? 'DS18306';
-    final String merchantKey = dotenv.env['DUITKU_MERCHANT_KEY'] ?? 'e0f7e44015ef056b406e1dfd7b1ce05c';
-    final String inquiryUrl = dotenv.env['DUITKU_INQUIRY_URL'] ?? 'https://sandbox.duitku.com/webapi/api/merchant/v2/inquiry';
-    final String callbackUrl = dotenv.env['DUITKU_CALLBACK_URL'] ?? 'https://abdburxhqqwsobmzuwmz.supabase.co/functions/v1/duitku-callback';
-    final String returnUrl = dotenv.env['DUITKU_RETURN_URL'] ?? 'https://mapotech.app/payment-success';
+    // Credentials from environment (Production by default)
+    final String merchantCode = dotenv.env['DUITKU_MERCHANT_CODE'] ?? 'DS24853';
+    final String merchantKey = dotenv.env['DUITKU_MERCHANT_KEY'] ?? '';
+    final String inquiryUrl = dotenv.env['DUITKU_INQUIRY_URL'] ??
+        'https://passport.duitku.com/webapi/api/merchant/v2/inquiry';
+    final String callbackUrl = dotenv.env['DUITKU_CALLBACK_URL'] ??
+        'https://abdburxhqqwsobmzuwmz.supabase.co/functions/v1/duitku-callback';
+    final String returnUrl =
+        dotenv.env['DUITKU_RETURN_URL'] ?? 'https://mapotech.app/payment-success';
+    final String paymentMethod = dotenv.env['DUITKU_PAYMENT_METHOD'] ?? 'NQ'; // QRIS by Nobu
 
     // Signature formula: md5(merchantCode + merchantOrderId + paymentAmount + merchantKey)
     final signatureStr = '$merchantCode$orderId$amount$merchantKey';
@@ -2026,33 +2104,47 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
         body: jsonEncode({
           'merchantCode': merchantCode,
           'paymentAmount': amount,
+          'paymentMethod': paymentMethod,
           'merchantOrderId': orderId,
           'productDetails': 'Perpanjang Layanan Mandiri 30 Hari',
           'email': email,
           'callbackUrl': callbackUrl,
           'returnUrl': returnUrl,
           'signature': signature,
+          'expiryPeriod': 60, // 60 minutes expiry
         }),
       );
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
-      final statusCode = data['statusCode']?.toString();
-      final paymentUrl = data['paymentUrl']?.toString();
-      final statusMessage =
-          data['statusMessage']?.toString() ?? 'Error initializing payment';
+      debugPrint('Duitku response: ${response.body}');
 
-      if (statusCode == '00' && paymentUrl != null) {
-        // Open Duitku Checkout Page
-        final uri = Uri.parse(paymentUrl);
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
+      final statusCode    = data['statusCode']?.toString();
+      final paymentUrl    = data['paymentUrl']?.toString() ?? '';
+      final statusMessage = data['statusMessage']?.toString() ?? 'Error';
+      // vaNumber holds the raw QRIS string for NQ (Nobu QRIS) payment method
+      final qrString = data['vaNumber']?.toString() ??
+          data['qrString']?.toString() ??
+          data['qrCode']?.toString() ?? '';
 
-          // Show local simulation dialog so user can test sandbox success locally
-          if (mounted) {
-            _showLocalPaymentSimulationDialog(orderId);
-          }
-        } else {
-          throw Exception('Failed to open payment URL: $paymentUrl');
+      if (statusCode == '00') {
+        // Save everything to localStorage so it survives dialog close
+        _savePendingPayment(
+          orderId: orderId,
+          paymentUrl: paymentUrl,
+          qrString: qrString,
+          amount: amount,
+          userId: userId,
+        );
+
+        if (mounted) {
+          _showQrisPaymentDialog(
+            orderId: orderId,
+            paymentUrl: paymentUrl,
+            qrString: qrString,
+            amount: amount,
+            userId: userId,
+            isResume: false,
+          );
         }
       } else {
         throw Exception('$statusCode: $statusMessage');
@@ -2060,16 +2152,13 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
     } catch (e) {
       debugPrint('Duitku API error: $e');
       if (mounted) {
-        // Fallback to local simulation dialog directly on API error (e.g. sandbox credentials error/network error)
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              'Duitku API failed: $e. Falling back to simulator...',
-            ),
-            backgroundColor: Colors.orangeAccent,
+            content: Text('Pembayaran gagal dimulai: $e'),
+            backgroundColor: Colors.redAccent,
+            duration: const Duration(seconds: 5),
           ),
         );
-        _showLocalPaymentSimulationDialog(orderId);
       }
     } finally {
       if (mounted) {
@@ -2078,63 +2167,356 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
     }
   }
 
-  void _showLocalPaymentSimulationDialog(String orderId) {
+  /// Check Duitku transaction status (dynamic environment resolution)
+  Future<bool> _checkDuitkuPaymentStatus(String orderId, int amount) async {
+    final String merchantCode = dotenv.env['DUITKU_MERCHANT_CODE'] ?? 'DS24853';
+    final String merchantKey = dotenv.env['DUITKU_MERCHANT_KEY'] ?? '';
+    final String inquiryUrl = dotenv.env['DUITKU_INQUIRY_URL'] ?? 'https://passport.duitku.com/webapi/api/merchant/v2/inquiry';
+    final String statusUrl = inquiryUrl.contains('sandbox.duitku.com')
+        ? 'https://sandbox.duitku.com/webapi/api/merchant/transactionStatus'
+        : 'https://passport.duitku.com/webapi/api/merchant/transactionStatus';
+
+    // Signature: md5(merchantCode + merchantOrderId + merchantKey)
+    final signatureStr = '$merchantCode$orderId$merchantKey';
+    final signatureBytes = utf8.encode(signatureStr);
+    final signature = md5.convert(signatureBytes).toString();
+
+    final response = await http.post(
+      Uri.parse(statusUrl),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'merchantCode': merchantCode,
+        'merchantOrderId': orderId,
+        'signature': signature,
+      }),
+    );
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    // statusCode '00' means success / paid
+    return data['statusCode']?.toString() == '00';
+  }
+
+  void _showQrisPaymentDialog({
+    required String orderId,
+    required String paymentUrl,
+    required String qrString,
+    required int amount,
+    required String userId,
+    required bool isResume,
+  }) {
+    final formattedAmount =
+        'Rp ${amount.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}';
+
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF1E1E22),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: Row(
-            children: [
-              const Icon(Icons.payment, color: Color(0xFF00A67E)),
-              const SizedBox(width: 8),
-              Text(
-                'Duitku Payment Simulator',
-                style: GoogleFonts.outfit(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+      builder: (dialogContext) {
+        bool isCheckingPayment = false;
+        bool checkButtonUsed = false;
+
+        return StatefulBuilder(
+          builder: (sbContext, setStateDialog) {
+            Future<void> onCheckPayment() async {
+              if (checkButtonUsed) return;
+              setStateDialog(() { isCheckingPayment = true; checkButtonUsed = true; });
+              try {
+                final isPaid = await _checkDuitkuPaymentStatus(orderId, amount);
+                if (!mounted) return;
+                if (isPaid) {
+                  _clearPendingPayment();
+                  if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+                  await _renewSubscription();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Pembayaran QRIS berhasil! Langganan diperpanjang.'),
+                        backgroundColor: Colors.green, duration: Duration(seconds: 4)),
+                    );
+                  }
+                } else {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Pembayaran belum diterima. Silakan selesaikan scan QRIS.'),
+                        backgroundColor: Colors.orangeAccent, duration: Duration(seconds: 4)),
+                    );
+                  }
+                  setStateDialog(() { isCheckingPayment = false; });
+                }
+              } catch (e) {
+                debugPrint('Payment status check error: $e');
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Gagal cek status: $e'), backgroundColor: Colors.redAccent));
+                }
+                setStateDialog(() { isCheckingPayment = false; });
+              }
+            }
+
+            Future<void> onCloseDialog() async {
+              final shouldClose = await showDialog<bool>(
+                context: sbContext,
+                builder: (warnCtx) => AlertDialog(
+                  backgroundColor: const Color(0xFF1E1E22),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  title: Row(children: [
+                    const Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 22),
+                    const SizedBox(width: 8),
+                    Text('Tutup Pembayaran?',
+                      style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                  ]),
+                  content: Text(
+                    'Pembayaran QRIS belum selesai.\n\nQR code tersimpan — tekan "Renew" kembali untuk melanjutkan.',
+                    style: GoogleFonts.outfit(color: Colors.grey[300], fontSize: 13, height: 1.5)),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(warnCtx).pop(false),
+                      child: Text('Lanjutkan Bayar',
+                        style: GoogleFonts.outfit(color: const Color(0xFF00A67E), fontWeight: FontWeight.bold))),
+                    TextButton(
+                      onPressed: () => Navigator.of(warnCtx).pop(true),
+                      child: Text('Tutup', style: GoogleFonts.outfit(color: Colors.grey))),
+                  ],
+                ),
+              );
+              if (shouldClose == true && dialogContext.mounted) Navigator.of(dialogContext).pop();
+            }
+
+            Future<void> onResetPayment() async {
+              final confirmReset = await showDialog<bool>(
+                context: sbContext,
+                builder: (confirmCtx) => AlertDialog(
+                  backgroundColor: const Color(0xFF1E1E22),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  title: Row(children: [
+                    const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 22),
+                    const SizedBox(width: 8),
+                    Text('Reset Pembayaran?',
+                      style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                  ]),
+                  content: Text(
+                    'Apakah Anda yakin ingin membatalkan tagihan QRIS yang sekarang dan membuat tagihan baru?',
+                    style: GoogleFonts.outfit(color: Colors.grey[300], fontSize: 13, height: 1.5)),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(confirmCtx).pop(false),
+                      child: Text('Batal', style: GoogleFonts.outfit(color: Colors.grey))),
+                    TextButton(
+                      onPressed: () => Navigator.of(confirmCtx).pop(true),
+                      child: Text('Ya, Reset',
+                        style: GoogleFonts.outfit(color: Colors.redAccent, fontWeight: FontWeight.bold))),
+                  ],
+                ),
+              );
+
+              if (confirmReset == true) {
+                _clearPendingPayment();
+                if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Pembayaran berhasil direset. Silakan tekan tombol "Renew" kembali.'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              }
+            }
+
+            final bool hasQr = qrString.isNotEmpty;
+
+            return Dialog(
+              backgroundColor: const Color(0xFF1E1E22),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 380),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF00A67E).withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.qr_code_2_rounded, color: Color(0xFF00A67E), size: 22),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              isResume ? 'Lanjutkan Pembayaran QRIS' : 'Scan & Bayar via QRIS',
+                              style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14)),
+                            Text('Berlaku 60 menit · $formattedAmount',
+                              style: GoogleFonts.outfit(color: Colors.grey[400], fontSize: 11)),
+                          ],
+                        )),
+                      ]),
+                      const SizedBox(height: 14),
+                      if (isResume)
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+                          ),
+                          child: Row(children: [
+                            const Icon(Icons.history_rounded, color: Colors.amber, size: 16),
+                            const SizedBox(width: 8),
+                            Expanded(child: Text('QR sebelumnya masih bisa digunakan.',
+                              style: GoogleFonts.outfit(color: Colors.amber, fontSize: 11))),
+                          ]),
+                        ),
+                      if (hasQr)
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [BoxShadow(
+                              color: const Color(0xFF00A67E).withValues(alpha: 0.25),
+                              blurRadius: 24, spreadRadius: 2)],
+                          ),
+                          child: QrImageView(
+                            data: qrString,
+                            version: QrVersions.auto,
+                            size: 220,
+                            backgroundColor: Colors.white,
+                            errorCorrectionLevel: QrErrorCorrectLevel.M,
+                          ),
+                        )
+                      else
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2A2A2E),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
+                          ),
+                          child: Column(children: [
+                            const Icon(Icons.qr_code_outlined, color: Colors.grey, size: 48),
+                            const SizedBox(height: 8),
+                            Text('QR code tidak tersedia.\nGunakan tombol di bawah untuk membuka halaman pembayaran.',
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.outfit(color: Colors.grey[400], fontSize: 12, height: 1.5)),
+                          ]),
+                        ),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2A2A2E),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFF00A67E).withValues(alpha: 0.25)),
+                        ),
+                        child: Column(children: [
+                          _buildQrisInfoRow(Icons.receipt_long, 'Order ID', orderId),
+                          const Divider(color: Color(0xFF3A3A3E), height: 14),
+                          _buildQrisInfoRow(Icons.payments_rounded, 'Total', formattedAmount),
+                        ]),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(children: [
+                        const Icon(Icons.info_outline, size: 13, color: Colors.amber),
+                        const SizedBox(width: 6),
+                        Expanded(child: Text(
+                          hasQr ? 'Scan QR di atas, lalu tekan "Cek Pembayaran".'
+                                : 'Buka halaman pembayaran, lalu scan & bayar.',
+                          style: GoogleFonts.outfit(color: Colors.amber, fontSize: 11, height: 1.4))),
+                      ]),
+                      if (!hasQr && paymentUrl.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              final uri = Uri.parse(paymentUrl);
+                              if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+                            },
+                            icon: const Icon(Icons.open_in_new_rounded, size: 15),
+                            label: Text('Buka Halaman Pembayaran', style: GoogleFonts.outfit(fontSize: 12)),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF00A67E),
+                              side: BorderSide(color: const Color(0xFF00A67E).withValues(alpha: 0.5)),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 16),
+                      Row(children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: onCloseDialog,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.grey,
+                              side: const BorderSide(color: Color(0xFF3A3A3E)),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            child: Text('Tutup', style: GoogleFonts.outfit(fontWeight: FontWeight.w500)),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton.icon(
+                            onPressed: (checkButtonUsed || isCheckingPayment) ? null : onCheckPayment,
+                            icon: isCheckingPayment
+                                ? const SizedBox(width: 14, height: 14,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                : const Icon(Icons.verified_rounded, size: 16),
+                            label: Text(
+                              isCheckingPayment ? 'Memeriksa...' : checkButtonUsed ? 'Sudah Dicek' : 'Cek Pembayaran',
+                              style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: checkButtonUsed ? Colors.grey[700] : const Color(0xFF00A67E),
+                              foregroundColor: Colors.white,
+                              disabledBackgroundColor: Colors.grey[800],
+                              disabledForegroundColor: Colors.grey[500],
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          ),
+                        ),
+                      ]),
+                      const SizedBox(height: 10),
+                      TextButton.icon(
+                        onPressed: onResetPayment,
+                        icon: const Icon(Icons.refresh_rounded, size: 14, color: Colors.redAccent),
+                        label: Text(
+                          'Batalkan & Buat Pembayaran Baru',
+                          style: GoogleFonts.outfit(color: Colors.redAccent, fontSize: 11, fontWeight: FontWeight.w500),
+                        ),
+                        style: TextButton.styleFrom(
+                          minimumSize: Size.zero,
+                          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ],
-          ),
-          content: Text(
-            'Halaman pembayaran Duitku (Sandbox) telah dibuka.\n\nOrderId: $orderId\nTotal: Rp 150.000\n\nIngin mensimulasikan pembayaran BERHASIL di database sekarang?',
-            style: GoogleFonts.outfit(
-              color: Colors.grey[300],
-              fontSize: 13,
-              height: 1.4,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(
-                'Nanti Saja',
-                style: GoogleFonts.outfit(color: Colors.grey),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                Navigator.of(context).pop();
-                await _renewSubscription();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00A67E),
-                foregroundColor: Colors.white,
-              ),
-              child: Text(
-                'Simulasikan Sukses',
-                style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
+            );
+          },
         );
       },
     );
+  }
+
+  Widget _buildQrisInfoRow(IconData icon, String label, String value) {
+    return Row(children: [
+      Icon(icon, size: 14, color: Colors.grey[500]),
+      const SizedBox(width: 8),
+      Text(label, style: GoogleFonts.outfit(color: Colors.grey[500], fontSize: 12)),
+      const Spacer(),
+      Text(value, style: GoogleFonts.outfit(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+    ]);
   }
 
   @override
@@ -3254,35 +3636,136 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                       ),
                       const SizedBox(height: 10),
                       if (isLinkType)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
-                          decoration: BoxDecoration(
-                            color: isDark
-                                ? const Color(0xFF1A1A1E)
-                                : Colors.white,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: borderColor),
-                          ),
-                          child: TextField(
-                            controller: controller,
-                            style: GoogleFonts.outfit(
-                              fontSize: 12,
-                              color: textColor,
-                            ),
-                            decoration: InputDecoration(
-                              hintText: 'https://example.com/sertifikat.pdf',
-                              hintStyle: GoogleFonts.outfit(
-                                fontSize: 12,
-                                color: subtitleColor.withOpacity(0.4),
+                        Builder(builder: (ctx) {
+                          final isStorageUrl = controller.text.contains(
+                                '.supabase.co/storage/v1/object/public/',
+                              ) ||
+                              controller.text.startsWith('mock_uploads/');
+                          if (isStorageUrl && controller.text.isNotEmpty) {
+                            // The value is a hidden storage URL — show a
+                            // friendly filename chip instead of the raw URL.
+                            return Container(
+                              height: 38,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
                               ),
-                              border: InputBorder.none,
-                              isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(
-                                vertical: 10,
+                              decoration: BoxDecoration(
+                                color: isDark
+                                    ? const Color(0xFF1A1A1E)
+                                    : Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: borderColor),
                               ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.link_rounded,
+                                    size: 13,
+                                    color: tealColor,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      _getFileName(controller.text),
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: textColor,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  GestureDetector(
+                                    onTap: () => _previewCertificate(
+                                      context,
+                                      controller.text,
+                                      isDark,
+                                      tealColor,
+                                    ),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: BoxDecoration(
+                                        color: tealColor.withOpacity(0.12),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Icon(
+                                        Icons.visibility_outlined,
+                                        size: 13,
+                                        color: tealColor,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+                          // Normal user-entered URL — show editable text field
+                          // with an optional preview button when a URL is present.
+                          return Container(
+                            padding: const EdgeInsets.only(left: 10),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? const Color(0xFF1A1A1E)
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: borderColor),
                             ),
-                          ),
-                        )
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: controller,
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 12,
+                                      color: textColor,
+                                    ),
+                                    decoration: InputDecoration(
+                                      hintText:
+                                          'https://example.com/sertifikat.pdf',
+                                      hintStyle: GoogleFonts.outfit(
+                                        fontSize: 12,
+                                        color: subtitleColor.withOpacity(0.4),
+                                      ),
+                                      border: InputBorder.none,
+                                      isDense: true,
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                        vertical: 10,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                if (controller.text.isNotEmpty) ...[
+                                  const SizedBox(width: 4),
+                                  GestureDetector(
+                                    onTap: () => _previewCertificate(
+                                      context,
+                                      controller.text,
+                                      isDark,
+                                      tealColor,
+                                    ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(right: 8),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(4),
+                                        decoration: BoxDecoration(
+                                          color: tealColor.withOpacity(0.12),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Icon(
+                                          Icons.visibility_outlined,
+                                          size: 13,
+                                          color: tealColor,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          );
+                        })
                       else
                         GestureDetector(
                           onTap: _certificationUploading[index]
@@ -3348,11 +3831,45 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                                     size: 14,
                                     color: tealColor,
                                   ),
+                                  const SizedBox(width: 4),
+                                  GestureDetector(
+                                    onTap: () => _previewCertificate(
+                                      context,
+                                      controller.text,
+                                      isDark,
+                                      tealColor,
+                                    ),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: BoxDecoration(
+                                        color: tealColor.withOpacity(0.12),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Icon(
+                                        Icons.visibility_outlined,
+                                        size: 13,
+                                        color: tealColor,
+                                      ),
+                                    ),
+                                  ),
                                 ],
                               ],
                             ),
                           ),
                         ),
+                        // ── FILE PREVIEW (below upload row) ─────────────────
+                        if (!_certificationUploading[index] &&
+                            controller.text.isNotEmpty &&
+                            !controller.text.startsWith('mock_uploads/')) ...[
+                          const SizedBox(height: 8),
+                          _buildCertPreview(
+                            controller.text,
+                            isDark,
+                            tealColor,
+                            subtitleColor,
+                            borderColor,
+                          ),
+                        ],
                     ],
                   ),
                 );
@@ -6205,6 +6722,308 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
       return segment;
     } catch (_) {
       return pathOrUrl.split('/').last;
+    }
+  }
+
+  bool _isImageFile(String url) {
+    final lower = url.toLowerCase().split('?').first;
+    return lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg') ||
+        lower.endsWith('.png') ||
+        lower.endsWith('.gif') ||
+        lower.endsWith('.webp');
+  }
+
+  /// Shows a preview dialog for an uploaded certificate file.
+  void _previewCertificate(
+    BuildContext context,
+    String url,
+    bool isDark,
+    Color tealColor,
+  ) {
+    if (url.isEmpty || url.startsWith('mock_uploads/')) return;
+    if (_isImageFile(url)) {
+      // Show in-app image preview dialog (image loads via network, no URL bar exposed)
+      showDialog(
+        context: context,
+        builder: (_) => Dialog(
+          backgroundColor: Colors.transparent,
+          child: GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            child: Container(
+              constraints: const BoxConstraints(
+                maxWidth: 700,
+                maxHeight: 600,
+              ),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E1E2A) : Colors.white,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Header
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.image_outlined,
+                          size: 16,
+                          color: tealColor,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _getFileName(url),
+                            style: GoogleFonts.outfit(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white : const Color(0xFF1E293B),
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded, size: 18),
+                          color: isDark ? Colors.white60 : Colors.black54,
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  // Image shown directly in dialog (URL stays hidden)
+                  Flexible(
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Image.network(
+                          url,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.broken_image_outlined,
+                                size: 48,
+                                color: tealColor.withOpacity(0.5),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Gambar tidak dapat dimuat',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 12,
+                                  color: isDark ? Colors.white54 : Colors.black45,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    } else {
+      // For PDFs and other files: open via blob URL to hide the Supabase path
+      // from the browser address bar.
+      _openAsBlobUrl(url);
+    }
+  }
+
+  /// Fetches [url] as bytes, wraps them in a blob, and opens the resulting
+  /// blob:// URL in a new tab.  This prevents the original Supabase storage
+  /// URL from appearing in the browser address bar.
+  Future<void> _openAsBlobUrl(String url) async {
+    if (!kIsWeb) {
+      // On non-web platforms just launch normally
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      return;
+    }
+    try {
+      // Determine MIME type from the file extension
+      final lower = url.toLowerCase().split('?').first;
+      String mimeType = 'application/octet-stream';
+      if (lower.endsWith('.pdf')) {
+        mimeType = 'application/pdf';
+      } else if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) {
+        mimeType = 'image/jpeg';
+      } else if (lower.endsWith('.png')) {
+        mimeType = 'image/png';
+      } else if (lower.endsWith('.gif')) {
+        mimeType = 'image/gif';
+      } else if (lower.endsWith('.webp')) {
+        mimeType = 'image/webp';
+      }
+
+      // Fetch the raw bytes
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode != 200) {
+        throw Exception('HTTP ${response.statusCode}');
+      }
+
+      // Build a temporary blob URL
+      final blob = html.Blob([response.bodyBytes], mimeType);
+      final blobUrl = html.Url.createObjectUrlFromBlob(blob);
+
+      // Open the blob URL — address bar shows blob:http://... instead
+      html.window.open(blobUrl, '_blank');
+
+      // Revoke the object URL after 60 s to free browser memory
+      Future.delayed(const Duration(seconds: 60), () {
+        html.Url.revokeObjectUrl(blobUrl);
+      });
+    } catch (e) {
+      // If the fetch/blob creation fails, fall back gracefully
+      debugPrint('_openAsBlobUrl failed: $e — falling back to direct URL');
+      html.window.open(url, '_blank');
+    }
+  }
+
+  /// Builds an inline preview area below the upload row.
+  Widget _buildCertPreview(
+    String url,
+    bool isDark,
+    Color tealColor,
+    Color subtitleColor,
+    Color borderColor,
+  ) {
+    final isImage = _isImageFile(url);
+    if (isImage) {
+      return GestureDetector(
+        onTap: () => _previewCertificate(
+          context,
+          url,
+          isDark,
+          tealColor,
+        ),
+        child: Container(
+          height: 100,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: tealColor.withOpacity(0.3)),
+            color: isDark ? const Color(0xFF13131A) : const Color(0xFFF8FAFB),
+          ),
+          child: Stack(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(7),
+                child: Image.network(
+                  url,
+                  width: double.infinity,
+                  height: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Center(
+                    child: Icon(
+                      Icons.broken_image_outlined,
+                      size: 32,
+                      color: subtitleColor.withOpacity(0.4),
+                    ),
+                  ),
+                ),
+              ),
+              // Overlay hint
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 5),
+                  decoration: BoxDecoration(
+                    borderRadius: const BorderRadius.vertical(
+                      bottom: Radius.circular(7),
+                    ),
+                    color: Colors.black.withOpacity(0.45),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.zoom_in_rounded,
+                        size: 12,
+                        color: Colors.white70,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Klik untuk preview',
+                        style: GoogleFonts.outfit(
+                          fontSize: 10,
+                          color: Colors.white70,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    } else {
+      // PDF / other non-image file
+      return GestureDetector(
+        onTap: () => _previewCertificate(
+          context,
+          url,
+          isDark,
+          tealColor,
+        ),
+        child: Container(
+          height: 52,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: tealColor.withOpacity(0.3)),
+            color: isDark ? const Color(0xFF13131A) : const Color(0xFFF8FAFB),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.picture_as_pdf_outlined,
+                size: 24,
+                color: Colors.redAccent.withOpacity(0.8),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _getFileName(url),
+                      style: GoogleFonts.outfit(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white70 : const Color(0xFF334155),
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      'Klik untuk buka file',
+                      style: GoogleFonts.outfit(
+                        fontSize: 9.5,
+                        color: subtitleColor.withOpacity(0.6),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.open_in_new,
+                size: 14,
+                color: tealColor,
+              ),
+            ],
+          ),
+        ),
+      );
     }
   }
 

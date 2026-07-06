@@ -597,3 +597,207 @@ class SkeletonApotekDashboard extends StatelessWidget {
     );
   }
 }
+
+// 8. SkeletonPembukuan - Doctor Bookkeeping / Pembukuan Screen loading
+class SkeletonPembukuan extends StatelessWidget {
+  const SkeletonPembukuan({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final isMobile = width < 768;
+
+    return SingleChildScrollView(
+      physics: const NeverScrollableScrollPhysics(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Header Banner
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+            margin: const EdgeInsets.only(bottom: 20),
+            child: Row(
+              children: [
+                const SkeletonBox(width: 38, height: 38, borderRadius: BorderRadius.all(Radius.circular(12))),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      SkeletonBox(height: 20, width: 140),
+                      SizedBox(height: 6),
+                      SkeletonBox(height: 12, width: 220),
+                    ],
+                  ),
+                ),
+                if (!isMobile) ...[
+                  const SkeletonBox(height: 36, width: 110, borderRadius: BorderRadius.all(Radius.circular(10))),
+                  const SizedBox(width: 12),
+                  const SkeletonBox(height: 36, width: 140, borderRadius: BorderRadius.all(Radius.circular(10))),
+                ],
+              ],
+            ),
+          ),
+
+          // Metric Cards Grid
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: isMobile ? 2 : 4,
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+            childAspectRatio: 1.6,
+            children: List.generate(
+              4,
+              (i) => Card(
+                elevation: 0,
+                margin: EdgeInsets.zero,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: const [
+                          SkeletonBox(width: 22, height: 22, borderRadius: BorderRadius.all(Radius.circular(6))),
+                          SizedBox(width: 8),
+                          SkeletonBox(height: 12, width: 70),
+                        ],
+                      ),
+                      const SkeletonBox(height: 22, width: 100),
+                      const SkeletonBox(height: 12, width: 80),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          // Tab toggles
+          Row(
+            children: const [
+              SkeletonBox(height: 36, width: 160, borderRadius: BorderRadius.all(Radius.circular(100))),
+              SizedBox(width: 12),
+              SkeletonBox(height: 36, width: 180, borderRadius: BorderRadius.all(Radius.circular(100))),
+            ],
+          ),
+
+          const SizedBox(height: 20),
+
+          // Charts area
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 2,
+                child: Card(
+                  elevation: 0,
+                  margin: EdgeInsets.zero,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        SkeletonBox(height: 14, width: 160),
+                        SizedBox(height: 8),
+                        SkeletonBox(height: 12, width: 220),
+                        SizedBox(height: 20),
+                        SkeletonBox(height: 160, width: double.infinity),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              if (!isMobile)
+                Expanded(
+                  flex: 1,
+                  child: Card(
+                    elevation: 0,
+                    margin: EdgeInsets.zero,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(20.0),
+                      child: Column(
+                        children: [
+                          const Align(
+                            alignment: Alignment.centerLeft,
+                            child: SkeletonBox(height: 14, width: 100),
+                          ),
+                          const SizedBox(height: 20),
+                          const SkeletonBox(width: 130, height: 130, shape: BoxShape.circle),
+                          const SizedBox(height: 20),
+                          const SkeletonBox(height: 12, width: double.infinity),
+                          const SizedBox(height: 8),
+                          const SkeletonBox(height: 12, width: double.infinity),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+
+          const SizedBox(height: 20),
+
+          // Table card
+          Card(
+            elevation: 0,
+            margin: EdgeInsets.zero,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            child: Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Table controls row
+                  Row(
+                    children: const [
+                      SkeletonBox(height: 12, width: 60),
+                      SizedBox(width: 16),
+                      SkeletonBox(height: 12, width: 120),
+                      Spacer(),
+                      SkeletonBox(height: 28, width: 80),
+                      SizedBox(width: 8),
+                      SkeletonBox(height: 28, width: 100),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  // Table columns header row
+                  const SkeletonBox(height: 36, width: double.infinity),
+                  const SizedBox(height: 12),
+                  // Rows
+                  ...List.generate(
+                    5,
+                    (i) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12.0),
+                      child: Row(
+                        children: const [
+                          SkeletonBox(height: 14, width: 80),
+                          SizedBox(width: 16),
+                          Expanded(child: SkeletonBox(height: 14, width: double.infinity)),
+                          SizedBox(width: 16),
+                          SkeletonBox(height: 14, width: 60),
+                          SizedBox(width: 16),
+                          SkeletonBox(height: 14, width: 70),
+                          SizedBox(width: 16),
+                          SkeletonBox(height: 14, width: 80),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+

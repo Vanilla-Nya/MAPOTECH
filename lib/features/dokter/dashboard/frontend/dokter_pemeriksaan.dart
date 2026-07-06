@@ -5612,21 +5612,9 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
         final localSearchController = TextEditingController();
         final localDoseController = TextEditingController();
         final localQtyController = TextEditingController(text: '1');
-        bool isSearchingKfa = false;
-        List<Map<String, String>> kfaResults = [];
-
-        final mockKfa = [
-          {'code': '930001', 'name': 'Paracetamol 500 mg Tablet'},
-          {'code': '930002', 'name': 'Amoxicillin 500 mg Kaplet'},
-          {'code': '930003', 'name': 'Cetirizine 10 mg Tablet'},
-          {'code': '930004', 'name': 'Amlodipine 5 mg Tablet'},
-          {'code': '930005', 'name': 'Amlodipine 10 mg Tablet'},
-          {'code': '930006', 'name': 'Metformin 500 mg Tablet'},
-          {'code': '930007', 'name': 'Ibuprofen 400 mg Tablet'},
-          {'code': '930008', 'name': 'Cefadroxil 500 mg Kapsul'},
-          {'code': '930009', 'name': 'Salbutamol 2 mg Tablet'},
-          {'code': '930010', 'name': 'Asam Mefenamat 500 mg Kaplet'},
-        ];
+        String? selectedKfaCode;
+        String? selectedKfaName;
+        int selectedTab = 0; // 0 = KFA, 1 = Manual
 
         return Dialog(
           backgroundColor: Colors.white,
@@ -5636,7 +5624,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
           child: StatefulBuilder(
             builder: (context, setDialogState) {
               final bool isValid =
-                  localSearchController.text.trim().isNotEmpty &&
+                  (selectedTab == 0 ? selectedKfaName != null : localSearchController.text.trim().isNotEmpty) &&
                   localDoseController.text.trim().isNotEmpty &&
                   (int.tryParse(localQtyController.text) ?? 0) > 0;
 
@@ -5665,133 +5653,210 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                       ],
                     ),
                     const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: localSearchController,
-                            style: GoogleFonts.outfit(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            decoration: InputDecoration(
-                              hintText: 'Cari nama resep manual...',
-                              hintStyle: GoogleFonts.outfit(
-                                fontSize: 11,
-                                color: subtitleCol.withOpacity(0.5),
-                              ),
-                              prefixIcon: const Icon(
-                                Icons.medication_outlined,
-                                size: 16,
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                vertical: 8,
-                              ),
-                              isDense: true,
-                              filled: true,
-                              fillColor: inputBg,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide: BorderSide(color: borderCol),
-                              ),
-                            ),
-                            onChanged: (val) => setDialogState(() {}),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        OutlinedButton(
-                          onPressed: () {
-                            setDialogState(() {
-                              isSearchingKfa = true;
-                              kfaResults.clear();
-                            });
-                            Timer(const Duration(seconds: 1), () {
-                              setDialogState(() {
-                                isSearchingKfa = false;
-                                final query = localSearchController.text
-                                    .toLowerCase();
-                                kfaResults = mockKfa
-                                    .where(
-                                      (m) => m['name']!.toLowerCase().contains(
-                                        query,
+
+                    // Tab Selector
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: inputBg,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      padding: const EdgeInsets.all(4),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setDialogState(() { selectedTab = 0; }),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: selectedTab == 0 ? Colors.white : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(8),
+                                  boxShadow: selectedTab == 0
+                                      ? [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(0.05),
+                                            blurRadius: 4,
+                                            offset: const Offset(0, 2),
+                                          )
+                                        ]
+                                      : null,
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.medication_rounded,
+                                      size: 14,
+                                      color: selectedTab == 0 ? activeGreen : subtitleCol,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Cari KFA',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                        color: selectedTab == 0 ? activeGreen : subtitleCol,
                                       ),
-                                    )
-                                    .toList();
-                              });
-                            });
-                          },
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: activeGreen,
-                            side: BorderSide(color: activeGreen),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 10,
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
                           ),
-                          child: Text(
-                            'Cari KFA',
-                            style: GoogleFonts.outfit(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.bold,
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setDialogState(() { selectedTab = 1; }),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: selectedTab == 1 ? Colors.white : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(8),
+                                  boxShadow: selectedTab == 1
+                                      ? [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(0.05),
+                                            blurRadius: 4,
+                                            offset: const Offset(0, 2),
+                                          )
+                                        ]
+                                      : null,
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.edit_note_rounded,
+                                      size: 14,
+                                      color: selectedTab == 1 ? activeGreen : subtitleCol,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Tulis Manual',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                        color: selectedTab == 1 ? activeGreen : subtitleCol,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 8),
-                    if (isSearchingKfa)
-                      const Expanded(
-                        child: Center(
-                          child: SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+
+                    if (selectedTab == 0) ...[
+                      // KFA SEARCH TAB
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          icon: Icon(Icons.search_rounded, size: 16, color: activeGreen),
+                          label: Text(
+                            selectedKfaCode != null
+                                ? 'Ganti dari Katalog KFA'
+                                : 'Cari dari Katalog KFA',
+                            style: GoogleFonts.outfit(
+                              fontSize: 12,
+                              color: activeGreen,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: activeGreen.withOpacity(0.5)),
+                            backgroundColor: activeGreen.withOpacity(0.05),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          onPressed: () async {
+                            final result = await _showKfaSearchModal(
+                              context,
+                              Theme.of(context).brightness == Brightness.dark,
+                            );
+                            if (result != null) {
+                              setDialogState(() {
+                                selectedKfaName = result['nama'];
+                                selectedKfaCode = result['code'];
+                              });
+                            }
+                          },
                         ),
-                      )
-                    else if (kfaResults.isNotEmpty)
-                      Expanded(
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 12),
+                      ),
+                      const SizedBox(height: 10),
+                      if (selectedKfaCode != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           decoration: BoxDecoration(
-                            border: Border.all(color: borderCol),
+                            color: activeGreen.withOpacity(0.08),
                             borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: activeGreen.withOpacity(0.3)),
                           ),
-                          child: ListView(
-                            shrinkWrap: true,
-                            children: kfaResults.map((r) {
-                              return ListTile(
-                                dense: true,
-                                title: Text(
-                                  r['name']!,
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.verified_rounded, size: 14, color: activeGreen),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  '$selectedKfaName  •  KFA: $selectedKfaCode',
+                                  style: GoogleFonts.outfit(fontSize: 10.5, color: activeGreen, fontWeight: FontWeight.w700),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                subtitle: Text(
-                                  'KFA: ${r['code']}',
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 8.5,
-                                    color: subtitleCol,
-                                  ),
-                                ),
-                                onTap: () {
-                                  setDialogState(() {
-                                    localSearchController.text = r['name']!;
-                                    kfaResults.clear();
-                                  });
-                                },
-                              );
-                            }).toList(),
+                              ),
+                              GestureDetector(
+                                onTap: () => setDialogState(() {
+                                  selectedKfaCode = null;
+                                  selectedKfaName = null;
+                                }),
+                                child: Icon(Icons.close_rounded, size: 14, color: activeGreen),
+                              ),
+                            ],
                           ),
                         ),
-                      )
-                    else
                       const Spacer(),
+                    ] else ...[
+                      // MANUAL TAB
+                      Text(
+                        'NAMA OBAT MANUAL *',
+                        style: GoogleFonts.outfit(
+                          fontSize: 8.5,
+                          fontWeight: FontWeight.w900,
+                          color: subtitleCol,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: localSearchController,
+                        style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: 'cth. Paracetamol 500mg (Tulis manual)...',
+                          hintStyle: GoogleFonts.outfit(
+                            fontSize: 11,
+                            color: subtitleCol.withOpacity(0.4),
+                          ),
+                          prefixIcon: const Icon(
+                            Icons.medication_outlined,
+                            size: 16,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 8,
+                          ),
+                          isDense: true,
+                          filled: true,
+                          fillColor: inputBg,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide(color: borderCol),
+                          ),
+                        ),
+                        onChanged: (val) => setDialogState(() {}),
+                      ),
+                      const Spacer(),
+                    ],
                     Text(
                       'DOSIS / ATURAN PAKAI *',
                       style: GoogleFonts.outfit(
@@ -5855,11 +5920,12 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                           ? () {
                               setState(() {
                                 _manualPrescriptions.add({
-                                  "nama": localSearchController.text,
+                                  "nama": selectedTab == 0 ? selectedKfaName : localSearchController.text,
                                   "aturan": localDoseController.text,
                                   "jumlah":
                                       int.tryParse(localQtyController.text) ??
                                       1,
+                                  "kfa_code": selectedTab == 0 ? selectedKfaCode : null,
                                 });
                               });
                               Navigator.pop(context);
@@ -7492,6 +7558,380 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // ─── KFA Search Modal ────────────────────────────────────────────────────────
+
+  /// Opens a dedicated KFA search dialog. Returns the selected product map
+  /// (keys: nama, code, jenis, satuan) or null if dismissed.
+  Future<Map<String, dynamic>?> _showKfaSearchModal(
+    BuildContext context,
+    bool isDark,
+  ) async {
+    final state = ref.read(landingPageProvider);
+    final purple = ref.read(landingPageProvider.notifier).getPrimaryColor();
+    final cardBg = isDark ? const Color(0xFF161619) : Colors.white;
+    final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
+    final subtitleColor = isDark ? Colors.grey[400]! : const Color(0xFF6F6A8A);
+    final borderColor = isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2);
+    final inputBg = isDark ? const Color(0xFF1E1E22) : const Color(0xFFF6F8FA);
+
+    final searchController = TextEditingController();
+    List<Map<String, dynamic>> results = [];
+    bool isLoading = false;
+    String? errorMsg;
+
+    return showDialog<Map<String, dynamic>>(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) {
+          Future<void> doSearch() async {
+            final keyword = searchController.text.trim();
+            if (keyword.isEmpty) return;
+            setState(() { isLoading = true; errorMsg = null; results = []; });
+
+            try {
+              final doctorId = ref.read(landingPageProvider).activeDoctorId ?? '';
+              final docDetail = await SupabaseService.client
+                  .from('user_detail_doctor')
+                  .select('satu_sehat_api, id_satusehat')
+                  .eq('id', doctorId)
+                  .maybeSingle();
+
+              final ssConfig = docDetail?['satu_sehat_api'] as Map<String, dynamic>?;
+              if (ssConfig == null || ssConfig['client_id'] == null) {
+                setState(() { errorMsg = 'Konfigurasi API SatuSehat belum lengkap.'; isLoading = false; });
+                return;
+              }
+
+              final ssService = SatuSehatService(
+                clientId: ssConfig['client_id']?.toString(),
+                clientSecret: ssConfig['client_secret']?.toString(),
+                organizationId: ssConfig['organization_id']?.toString(),
+                locationId: ssConfig['location_id']?.toString() ?? docDetail?['id_satusehat']?.toString(),
+                env: ssConfig['env']?.toString(),
+              );
+
+              final searchRes = await ssService.searchKfaProducts(keyword: keyword);
+              if (searchRes['status'] != true) {
+                setState(() { errorMsg = searchRes['message']?.toString() ?? 'Gagal mengambil data KFA.'; isLoading = false; });
+                return;
+              }
+
+              final searchData = searchRes['data'];
+              List<dynamic> dataList = [];
+              if (searchData is Map && searchData['items'] is Map) {
+                final items = searchData['items'];
+                if (items['data'] is List) dataList = items['data'] as List;
+              } else if (searchData is Map && searchData['items'] is List) {
+                dataList = searchData['items'] as List;
+              }
+
+              final mapped = dataList.map<Map<String, dynamic>>((e) => {
+                'nama': e['name']?.toString() ?? '',
+                'code': e['kfa_code']?.toString() ?? '',
+                'jenis': e['farmalkes_type']?['name']?.toString() ?? 'Generik',
+                'satuan': e['uom']?['name']?.toString() ?? 'Tablet',
+              }).toList();
+
+              setState(() {
+                results = mapped;
+                errorMsg = mapped.isEmpty ? 'Produk tidak ditemukan.' : null;
+                isLoading = false;
+              });
+            } catch (e) {
+              setState(() { errorMsg = 'Error: $e'; isLoading = false; });
+            }
+          }
+
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+            child: Container(
+              width: 560,
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.82,
+              ),
+              decoration: BoxDecoration(
+                color: cardBg,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 40,
+                    offset: const Offset(0, 16),
+                  ),
+                ],
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Header
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [purple.withOpacity(0.12), purple.withOpacity(0.04)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: purple.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          alignment: Alignment.center,
+                          child: Icon(Icons.medication_liquid_rounded, color: purple, size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Katalog KFA SatuSehat'.tr(state),
+                                style: GoogleFonts.outfit(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w900,
+                                  color: textColor,
+                                ),
+                              ),
+                              Text(
+                                'Cari obat dari database resmi Kemenkes'.tr(state),
+                                style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded, size: 18),
+                          onPressed: () => Navigator.of(ctx).pop(),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Search bar
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: inputBg,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: borderColor),
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            child: Row(
+                              children: [
+                                Icon(Icons.search_rounded, size: 18, color: subtitleColor),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: TextField(
+                                    controller: searchController,
+                                    autofocus: true,
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: textColor,
+                                    ),
+                                    decoration: InputDecoration(
+                                      hintText: 'cth. Paracetamol, Amoxicillin...'.tr(state),
+                                      hintStyle: GoogleFonts.outfit(
+                                        fontSize: 12,
+                                        color: subtitleColor.withOpacity(0.5),
+                                      ),
+                                      border: InputBorder.none,
+                                      isDense: true,
+                                    ),
+                                    onSubmitted: (_) => doSearch(),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: purple,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
+                          ),
+                          onPressed: isLoading ? null : doSearch,
+                          child: isLoading
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : Text(
+                                  'Cari'.tr(state),
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Divider
+                  Divider(height: 1, color: borderColor),
+
+                  // Results
+                  Flexible(
+                    child: errorMsg != null
+                        ? Padding(
+                            padding: const EdgeInsets.all(32),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.search_off_rounded, size: 40, color: subtitleColor.withOpacity(0.4)),
+                                const SizedBox(height: 12),
+                                Text(
+                                  errorMsg!,
+                                  textAlign: TextAlign.center,
+                                  style: GoogleFonts.outfit(fontSize: 12, color: subtitleColor),
+                                ),
+                              ],
+                            ),
+                          )
+                        : results.isEmpty && !isLoading
+                            ? Padding(
+                                padding: const EdgeInsets.all(32),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.medication_liquid_rounded, size: 40, color: subtitleColor.withOpacity(0.25)),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      'Ketik nama obat lalu tekan Cari'.tr(state),
+                                      textAlign: TextAlign.center,
+                                      style: GoogleFonts.outfit(fontSize: 12, color: subtitleColor.withOpacity(0.6)),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : ListView.separated(
+                                padding: const EdgeInsets.all(12),
+                                shrinkWrap: true,
+                                itemCount: results.length,
+                                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                                itemBuilder: (_, idx) {
+                                  final item = results[idx];
+                                  return InkWell(
+                                    onTap: () => Navigator.of(ctx).pop(item),
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(14),
+                                      decoration: BoxDecoration(
+                                        color: inputBg,
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(color: borderColor),
+                                      ),
+                                      child: Row(
+                                        crossAxisAlignment: CrossAxisAlignment.center,
+                                        children: [
+                                          Container(
+                                            width: 38,
+                                            height: 38,
+                                            decoration: BoxDecoration(
+                                              color: purple.withOpacity(0.1),
+                                              borderRadius: BorderRadius.circular(9),
+                                            ),
+                                            alignment: Alignment.center,
+                                            child: Icon(Icons.medication_rounded, color: purple, size: 20),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  item['nama'] ?? '',
+                                                  style: GoogleFonts.outfit(
+                                                    fontSize: 12.5,
+                                                    fontWeight: FontWeight.w800,
+                                                    color: textColor,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Row(
+                                                  children: [
+                                                    _kfaChip(item['jenis'] ?? '', purple.withOpacity(0.12), purple),
+                                                    const SizedBox(width: 6),
+                                                    _kfaChip(item['satuan'] ?? '', subtitleColor.withOpacity(0.1), subtitleColor),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  'KFA: ${item['code'] ?? '-'}',
+                                                  style: GoogleFonts.outfit(
+                                                    fontSize: 9.5,
+                                                    color: subtitleColor,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          Icon(
+                                            Icons.arrow_forward_ios_rounded,
+                                            size: 13,
+                                            color: subtitleColor.withOpacity(0.5),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                  ),
+
+                  const SizedBox(height: 8),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _kfaChip(String label, Color bg, Color fg) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.outfit(
+          fontSize: 9,
+          fontWeight: FontWeight.w700,
+          color: fg,
+        ),
       ),
     );
   }

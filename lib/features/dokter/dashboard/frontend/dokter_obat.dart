@@ -4,7 +4,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/widgets/custom_button.dart';
 import 'package:mapotech/shared/supabase_service.dart';
+import 'package:mapotech/shared/satusehat_service.dart';
 import 'package:mapotech/shared/widgets/common_pagination.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'dart:math';
 
 
@@ -1810,7 +1813,6 @@ class _DokterObatState extends ConsumerState<DokterObat> {
     final inputBg = isDark ? const Color(0xFF1E1E22) : const Color(0xFFF6F8FA);
 
     final formKey = GlobalKey<FormState>();
-    final kfaController = TextEditingController();
     final nameController = TextEditingController();
     final skuController = TextEditingController();
     final batchController = TextEditingController(text: _generateBatchNo());
@@ -1823,14 +1825,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
     String typeSelection = 'Pilih Jenis / Generic';
     String unitSelection = 'Pilih Satuan';
     double hargaBeliSatuanVal = 0.0;
-
-    final List<Map<String, dynamic>> kfaCatalog = [
-      {'nama': 'Paracetamol 500mg', 'jenis': 'Generik', 'satuan': 'Tablet', 'sku': '8993601452'},
-      {'nama': 'Amoxicillin 500mg', 'jenis': 'Generik', 'satuan': 'Tablet', 'sku': '8994503212'},
-      {'nama': 'Omeprazole 20mg', 'jenis': 'Generik', 'satuan': 'Kapsul', 'sku': '8991204562'},
-      {'nama': 'Ibuprofen 400mg', 'jenis': 'Generik', 'satuan': 'Tablet', 'sku': '8997801234'},
-      {'nama': 'Degirol Lozenges', 'jenis': 'Paten', 'satuan': 'Tablet', 'sku': '8994630211'},
-    ];
+    String? selectedKfaCode;
 
     final isMobile = MediaQuery.of(context).size.width < 650;
 
@@ -1914,75 +1909,101 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            // CARI DARI KATALOG SATUSEHAT KFA (Opcional)
+                            // CARI DARI KATALOG SATUSEHAT KFA
                             _buildModalSectionHeader('CARI DARI KATALOG SATUSEHAT KFA'.tr(state), purple),
                             const SizedBox(height: 3),
                             Text(
                               'Opsional — isi otomatis nama, bentuk & kode KFA'.tr(state),
                               style: GoogleFonts.outfit(fontSize: 9, color: subtitleColor, fontWeight: FontWeight.w600),
                             ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Container(
-                                    height: 40,
-                                    decoration: BoxDecoration(
-                                      color: inputBg,
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: borderColor),
+                            const SizedBox(height: 10),
+
+                            // Badge shown when a KFA product is selected
+                            if (selectedKfaCode != null)
+                              Container(
+                                margin: const EdgeInsets.only(bottom: 10),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: purple.withOpacity(0.08),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: purple.withOpacity(0.3)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.verified_rounded, size: 14, color: purple),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        '${nameController.text}  •  KFA: $selectedKfaCode',
+                                        style: GoogleFonts.outfit(fontSize: 10.5, color: purple, fontWeight: FontWeight.w700),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
                                     ),
-                                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.search_rounded, size: 16, color: subtitleColor),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: TextField(
-                                            controller: kfaController,
-                                            style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: textColor),
-                                            decoration: InputDecoration(
-                                              hintText: 'cth. Paracetamol, Amoxicillin...'.tr(state),
-                                              hintStyle: GoogleFonts.outfit(fontSize: 11.5, color: subtitleColor.withOpacity(0.4)),
-                                              border: InputBorder.none,
-                                              isDense: true,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
+                                    GestureDetector(
+                                      onTap: () => setDialogState(() {
+                                        selectedKfaCode = null;
+                                        nameController.clear();
+                                        skuController.clear();
+                                      }),
+                                      child: Icon(Icons.close_rounded, size: 14, color: purple),
                                     ),
+                                  ],
+                                ),
+                              ),
+
+                            SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                icon: Icon(Icons.search_rounded, size: 16, color: purple),
+                                label: Text(
+                                  selectedKfaCode != null
+                                      ? 'Ganti dari Katalog KFA'.tr(state)
+                                      : 'Cari dari Katalog KFA'.tr(state),
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 12,
+                                    color: purple,
+                                    fontWeight: FontWeight.w800,
                                   ),
                                 ),
-                                const SizedBox(width: 12),
-                                OutlinedButton(
-                                  style: OutlinedButton.styleFrom(
-                                    side: BorderSide(color: borderColor),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                  ),
-                                  child: Text('Cari KFA'.tr(state), style: GoogleFonts.outfit(fontSize: 11, color: purple, fontWeight: FontWeight.w900)),
-                                  onPressed: () {
-                                    final query = kfaController.text.toLowerCase();
-                                    if (query.isNotEmpty) {
-                                      final match = kfaCatalog.firstWhere(
-                                        (e) => e['nama'].toLowerCase().contains(query),
-                                        orElse: () => <String, dynamic>{},
-                                      );
-                                      if (match.isNotEmpty) {
-                                        setDialogState(() {
-                                          nameController.text = match['nama'];
-                                          skuController.text = 'SKU-${match['sku']}';
-                                          typeSelection = match['jenis'];
-                                          unitSelection = match['satuan'];
-                                        });
-                                        _showSuccessSnackBar(context, isEn ? 'KFA data successfully integrated!' : 'Data KFA berhasil terintegrasi!');
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide(color: purple.withOpacity(0.5)),
+                                  backgroundColor: purple.withOpacity(0.05),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                ),
+                                onPressed: () async {
+                                  final result = await _showKfaSearchModal(context, isDark);
+                                  if (result != null) {
+                                    setDialogState(() {
+                                      nameController.text = result['nama'] ?? '';
+                                      skuController.text = 'KFA-${result['code'] ?? ''}';
+                                      selectedKfaCode = result['code'];
+                                      final typeStr = (result['jenis'] ?? '').toLowerCase();
+                                      if (typeStr.contains('generik') || typeStr.contains('generic')) {
+                                        typeSelection = 'Generik';
+                                      } else if (typeStr.contains('paten')) {
+                                        typeSelection = 'Paten';
                                       } else {
-                                        _showSuccessSnackBar(context, isEn ? 'KFA keyword does not match.' : 'Kata kunci KFA tidak cocok.');
+                                        typeSelection = 'Umum';
                                       }
-                                    }
-                                  },
-                                ),
-                              ],
+                                      final uomStr = (result['satuan'] ?? '').toLowerCase();
+                                      if (uomStr.contains('tablet') || uomStr.contains('tab')) {
+                                        unitSelection = 'Tablet';
+                                      } else if (uomStr.contains('kapsul') || uomStr.contains('cap')) {
+                                        unitSelection = 'Kapsul';
+                                      } else if (uomStr.contains('botol') || uomStr.contains('btl')) {
+                                        unitSelection = 'Botol';
+                                      } else if (uomStr.contains('tube') || uomStr.contains('tub')) {
+                                        unitSelection = 'Tube';
+                                      } else if (uomStr.contains('pcs') || uomStr.contains('pieces')) {
+                                        unitSelection = 'Pcs';
+                                      } else {
+                                        unitSelection = 'Tablet';
+                                      }
+                                    });
+                                  }
+                                },
+                              ),
                             ),
 
                             const SizedBox(height: 20),
@@ -2655,5 +2676,381 @@ class _DokterObatState extends ConsumerState<DokterObat> {
       }
     }
     return buffer.toString().split('').reversed.join('');
+  }
+
+  // ─── KFA Search Modal ────────────────────────────────────────────────────────
+
+  /// Opens a dedicated KFA search dialog. Returns the selected product map
+  /// (keys: nama, code, jenis, satuan) or null if dismissed.
+  Future<Map<String, dynamic>?> _showKfaSearchModal(
+    BuildContext context,
+    bool isDark,
+  ) async {
+    final state = ref.read(landingPageProvider);
+    final purple = ref.read(landingPageProvider.notifier).getPrimaryColor();
+    final cardBg = isDark ? const Color(0xFF161619) : Colors.white;
+    final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
+    final subtitleColor = isDark ? Colors.grey[400]! : const Color(0xFF6F6A8A);
+    final borderColor = isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2);
+    final inputBg = isDark ? const Color(0xFF1E1E22) : const Color(0xFFF6F8FA);
+
+    final searchController = TextEditingController();
+    List<Map<String, dynamic>> results = [];
+    bool isLoading = false;
+    String? errorMsg;
+
+    return showDialog<Map<String, dynamic>>(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) {
+          Future<void> doSearch() async {
+            final keyword = searchController.text.trim();
+            if (keyword.isEmpty) return;
+            setState(() { isLoading = true; errorMsg = null; results = []; });
+
+            try {
+              final doctorId = ref.read(landingPageProvider).activeDoctorId ?? '';
+              final docDetail = await SupabaseService.client
+                  .from('user_detail_doctor')
+                  .select('satu_sehat_api, id_satusehat')
+                  .eq('id', doctorId)
+                  .maybeSingle();
+
+              final ssConfig = docDetail?['satu_sehat_api'] as Map<String, dynamic>?;
+              if (ssConfig == null || ssConfig['client_id'] == null) {
+                setState(() { errorMsg = 'Konfigurasi API SatuSehat belum lengkap.'; isLoading = false; });
+                return;
+              }
+
+              // Get search results using the centralized searchKfaProducts method
+              // which automatically handles direct/proxy fallback, CORS, and geo-blocking.
+              final ssService = SatuSehatService(
+                clientId: ssConfig['client_id']?.toString(),
+                clientSecret: ssConfig['client_secret']?.toString(),
+                organizationId: ssConfig['organization_id']?.toString(),
+                locationId: ssConfig['location_id']?.toString() ?? docDetail?['id_satusehat']?.toString(),
+                env: ssConfig['env']?.toString(),
+              );
+
+              final searchRes = await ssService.searchKfaProducts(keyword: keyword);
+              if (searchRes['status'] != true) {
+                setState(() { errorMsg = searchRes['message']?.toString() ?? 'Gagal mengambil data KFA.'; isLoading = false; });
+                return;
+              }
+
+              final searchData = searchRes['data'];
+              List<dynamic> dataList = [];
+              if (searchData is Map && searchData['items'] is Map) {
+                final items = searchData['items'];
+                if (items['data'] is List) dataList = items['data'] as List;
+              } else if (searchData is Map && searchData['items'] is List) {
+                dataList = searchData['items'] as List;
+              }
+
+              final mapped = dataList.map<Map<String, dynamic>>((e) => {
+                'nama': e['name']?.toString() ?? '',
+                'code': e['kfa_code']?.toString() ?? '',
+                'jenis': e['farmalkes_type']?['name']?.toString() ?? 'Generik',
+                'satuan': e['uom']?['name']?.toString() ?? 'Tablet',
+              }).toList();
+
+              setState(() {
+                results = mapped;
+                errorMsg = mapped.isEmpty ? 'Produk tidak ditemukan.' : null;
+                isLoading = false;
+              });
+            } catch (e) {
+              setState(() { errorMsg = 'Error: $e'; isLoading = false; });
+            }
+          }
+
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+            child: Container(
+              width: 560,
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.82,
+              ),
+              decoration: BoxDecoration(
+                color: cardBg,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 40,
+                    offset: const Offset(0, 16),
+                  ),
+                ],
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Header
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [purple.withOpacity(0.12), purple.withOpacity(0.04)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: purple.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          alignment: Alignment.center,
+                          child: Icon(Icons.medication_liquid_rounded, color: purple, size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Katalog KFA SatuSehat'.tr(state),
+                                style: GoogleFonts.outfit(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w900,
+                                  color: textColor,
+                                ),
+                              ),
+                              Text(
+                                'Cari obat dari database resmi Kemenkes'.tr(state),
+                                style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded, size: 18),
+                          onPressed: () => Navigator.of(ctx).pop(),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Search bar
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: inputBg,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: borderColor),
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            child: Row(
+                              children: [
+                                Icon(Icons.search_rounded, size: 18, color: subtitleColor),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: TextField(
+                                    controller: searchController,
+                                    autofocus: true,
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: textColor,
+                                    ),
+                                    decoration: InputDecoration(
+                                      hintText: 'cth. Paracetamol, Amoxicillin...'.tr(state),
+                                      hintStyle: GoogleFonts.outfit(
+                                        fontSize: 12,
+                                        color: subtitleColor.withOpacity(0.5),
+                                      ),
+                                      border: InputBorder.none,
+                                      isDense: true,
+                                    ),
+                                    onSubmitted: (_) => doSearch(),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: purple,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
+                          ),
+                          onPressed: isLoading ? null : doSearch,
+                          child: isLoading
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : Text(
+                                  'Cari'.tr(state),
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Divider
+                  Divider(height: 1, color: borderColor),
+
+                  // Results
+                  Flexible(
+                    child: errorMsg != null
+                        ? Padding(
+                            padding: const EdgeInsets.all(32),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.search_off_rounded, size: 40, color: subtitleColor.withOpacity(0.4)),
+                                const SizedBox(height: 12),
+                                Text(
+                                  errorMsg!,
+                                  textAlign: TextAlign.center,
+                                  style: GoogleFonts.outfit(fontSize: 12, color: subtitleColor),
+                                ),
+                              ],
+                            ),
+                          )
+                        : results.isEmpty && !isLoading
+                            ? Padding(
+                                padding: const EdgeInsets.all(32),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.medication_liquid_rounded, size: 40, color: subtitleColor.withOpacity(0.25)),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      'Ketik nama obat lalu tekan Cari'.tr(state),
+                                      textAlign: TextAlign.center,
+                                      style: GoogleFonts.outfit(fontSize: 12, color: subtitleColor.withOpacity(0.6)),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : ListView.separated(
+                                padding: const EdgeInsets.all(12),
+                                shrinkWrap: true,
+                                itemCount: results.length,
+                                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                                itemBuilder: (_, idx) {
+                                  final item = results[idx];
+                                  return InkWell(
+                                    onTap: () => Navigator.of(ctx).pop(item),
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(14),
+                                      decoration: BoxDecoration(
+                                        color: inputBg,
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(color: borderColor),
+                                      ),
+                                      child: Row(
+                                        crossAxisAlignment: CrossAxisAlignment.center,
+                                        children: [
+                                          Container(
+                                            width: 38,
+                                            height: 38,
+                                            decoration: BoxDecoration(
+                                              color: purple.withOpacity(0.1),
+                                              borderRadius: BorderRadius.circular(9),
+                                            ),
+                                            alignment: Alignment.center,
+                                            child: Icon(Icons.medication_rounded, color: purple, size: 20),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  item['nama'] ?? '',
+                                                  style: GoogleFonts.outfit(
+                                                    fontSize: 12.5,
+                                                    fontWeight: FontWeight.w800,
+                                                    color: textColor,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Row(
+                                                  children: [
+                                                    _kfaChip(item['jenis'] ?? '', purple.withOpacity(0.12), purple),
+                                                    const SizedBox(width: 6),
+                                                    _kfaChip(item['satuan'] ?? '', subtitleColor.withOpacity(0.1), subtitleColor),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  'KFA: ${item['code'] ?? '-'}',
+                                                  style: GoogleFonts.outfit(
+                                                    fontSize: 9.5,
+                                                    color: subtitleColor,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          Icon(
+                                            Icons.arrow_forward_ios_rounded,
+                                            size: 13,
+                                            color: subtitleColor.withOpacity(0.5),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                  ),
+
+                  const SizedBox(height: 8),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _kfaChip(String label, Color bg, Color fg) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.outfit(
+          fontSize: 9,
+          fontWeight: FontWeight.w700,
+          color: fg,
+        ),
+      ),
+    );
   }
 }

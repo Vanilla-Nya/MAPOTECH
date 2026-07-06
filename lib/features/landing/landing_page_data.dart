@@ -97,6 +97,7 @@ class LandingPageState {
   final bool satusehatAutoSync;
   final Set<String> syncedTransactions;
   final double defaultServiceFee;
+  final String receiptPaperSize; // 'A4', 'A5', 'Thermal 58mm', 'Thermal 80mm'
 
   bool get isAssistant => loggedInUser?['role'] == 'asisten_dokter';
 
@@ -120,6 +121,7 @@ class LandingPageState {
     this.satusehatAutoSync = true,
     this.syncedTransactions = const {},
     this.defaultServiceFee = 0.0,
+    this.receiptPaperSize = 'A4',
   });
 
   LandingPageState copyWith({
@@ -135,6 +137,7 @@ class LandingPageState {
     bool? satusehatAutoSync,
     Set<String>? syncedTransactions,
     double? defaultServiceFee,
+    String? receiptPaperSize,
   }) {
     return LandingPageState(
       activeTab: activeTab ?? this.activeTab,
@@ -149,6 +152,7 @@ class LandingPageState {
       satusehatAutoSync: satusehatAutoSync ?? this.satusehatAutoSync,
       syncedTransactions: syncedTransactions ?? this.syncedTransactions,
       defaultServiceFee: defaultServiceFee ?? this.defaultServiceFee,
+      receiptPaperSize: receiptPaperSize ?? this.receiptPaperSize,
     );
   }
 }
@@ -295,6 +299,21 @@ class LandingPageNotifier extends StateNotifier<LandingPageState> {
             .eq('id', userId);
       } catch (e) {
         debugPrint('Failed to save default_service_fee: $e');
+      }
+    }
+  }
+
+  void setReceiptPaperSize(String val) async {
+    state = state.copyWith(receiptPaperSize: val);
+    final userId = state.loggedInUser?['id'];
+    if (userId != null && state.loggedInRole == 'dokter') {
+      try {
+        await SupabaseService.client
+            .from('user_detail_doctor')
+            .update({'receipt_paper_size': val})
+            .eq('id', userId);
+      } catch (e) {
+        debugPrint('Failed to save receipt_paper_size: $e');
       }
     }
   }

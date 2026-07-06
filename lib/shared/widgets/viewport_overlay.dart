@@ -57,7 +57,12 @@ class _ViewportOverlayState extends State<ViewportOverlay> {
   Widget build(BuildContext context) {
     return OverlayPortal(
       controller: _controller,
-      overlayChildBuilder: (context) => widget.builder(context),
+      overlayChildBuilder: (context) {
+        if (!widget.show) {
+          return const SizedBox.shrink();
+        }
+        return widget.builder(context);
+      },
       child: const SizedBox.shrink(),
     );
   }
