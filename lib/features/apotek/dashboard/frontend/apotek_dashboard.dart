@@ -26,124 +26,145 @@ class ApotekDashboard extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // Welcome Header
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: cardBgColor,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: borderColor),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Selamat datang, CyrenElysia~♪',
-                style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w900, color: textColor),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Selasa, 26 Mei 2026',
-                style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
-              ),
-            ],
+        AnimatedEntrance(
+          delay: Duration.zero,
+          type: EntranceAnimationType.slideUp,
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: cardBgColor,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: borderColor),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Selamat datang, CyrenElysia~♪',
+                  style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w900, color: textColor),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Selasa, 26 Mei 2026',
+                  style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
+                ),
+              ],
+            ),
           ),
         ),
 
         const SizedBox(height: 24),
 
         // Metrics Grid Penjualan Hari Ini, Resep Pending, Stok Menipis, Expiring
-        GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: isMobile ? 2 : 4,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          childAspectRatio: 1.6,
-          children: [
-            MetricCard(
-              icon: Icons.monetization_on_rounded,
-              label: 'PENJUALAN HARI INI',
-              count: 'Rp 0',
-              subtitleColor: subtitleColor,
-              countColor: textColor,
-              cardBgColor: cardBgColor,
-              borderColor: borderColor,
-            ),
-            MetricCard(
-              icon: Icons.receipt_long_rounded,
-              label: 'RESEP PENDING',
-              count: 'SEGERA',
-              subtitleColor: subtitleColor,
-              countColor: themeAccent,
-              cardBgColor: cardBgColor,
-              borderColor: borderColor,
-            ),
-            MetricCard(
-              icon: Icons.warning_amber_rounded,
-              label: 'STOK MENIPIS',
-              count: '0',
-              subtitleColor: subtitleColor,
-              countColor: Colors.amber,
-              cardBgColor: cardBgColor,
-              borderColor: borderColor,
-            ),
-            MetricCard(
-              icon: Icons.hourglass_empty_rounded,
-              label: 'OBAT HAMPIR EXPIRED',
-              count: '0',
-              subtitleColor: subtitleColor,
-              countColor: Colors.redAccent,
-              cardBgColor: cardBgColor,
-              borderColor: borderColor,
-            ),
-          ],
+        AnimatedEntrance(
+          delay: const Duration(milliseconds: 100),
+          type: EntranceAnimationType.scale,
+          child: GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: isMobile ? 2 : 4,
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+            childAspectRatio: 1.6,
+            children: [
+              MetricCard(
+                icon: Icons.monetization_on_rounded,
+                label: 'PENJUALAN HARI INI',
+                count: 'Rp 0',
+                subtitleColor: subtitleColor,
+                countColor: textColor,
+                cardBgColor: cardBgColor,
+                borderColor: borderColor,
+              ),
+              MetricCard(
+                icon: Icons.receipt_long_rounded,
+                label: 'RESEP PENDING',
+                count: 'SEGERA',
+                subtitleColor: subtitleColor,
+                countColor: themeAccent,
+                cardBgColor: cardBgColor,
+                borderColor: borderColor,
+              ),
+              MetricCard(
+                icon: Icons.warning_amber_rounded,
+                label: 'STOK MENIPIS',
+                count: '0',
+                subtitleColor: subtitleColor,
+                countColor: Colors.amber,
+                cardBgColor: cardBgColor,
+                borderColor: borderColor,
+              ),
+              MetricCard(
+                icon: Icons.hourglass_empty_rounded,
+                label: 'OBAT HAMPIR EXPIRED',
+                count: '0',
+                subtitleColor: subtitleColor,
+                countColor: Colors.redAccent,
+                cardBgColor: cardBgColor,
+                borderColor: borderColor,
+              ),
+            ],
+          ),
         ),
 
         const SizedBox(height: 28),
 
         // Aksi Cepat Row (Quick Action links: Tambah Obat, Cetak Laporan, Data Pelanggan)
-        Text(
-          'Aksi Cepat',
-          style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w900, color: textColor),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            _buildQuickActionCard('Tambah Obat', Icons.add_circle_outline_rounded, cardBgColor, borderColor, textColor),
-            const SizedBox(width: 14),
-            _buildQuickActionCard('Cetak Laporan', Icons.print_outlined, cardBgColor, borderColor, textColor),
-            const SizedBox(width: 14),
-            _buildQuickActionCard('Data Pelanggan', Icons.people_outline_rounded, cardBgColor, borderColor, textColor),
-          ],
+        AnimatedEntrance(
+          delay: const Duration(milliseconds: 200),
+          type: EntranceAnimationType.slideUp,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Aksi Cepat',
+                style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w900, color: textColor),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  _buildQuickActionCard('Tambah Obat', Icons.add_circle_outline_rounded, cardBgColor, borderColor, textColor),
+                  const SizedBox(width: 14),
+                  _buildQuickActionCard('Cetak Laporan', Icons.print_outlined, cardBgColor, borderColor, textColor),
+                  const SizedBox(width: 14),
+                  _buildQuickActionCard('Data Pelanggan', Icons.people_outline_rounded, cardBgColor, borderColor, textColor),
+                ],
+              ),
+            ],
+          ),
         ),
 
         const SizedBox(height: 28),
 
         // Revenue vs Estimated Profit Visual Chart
-        Container(
-          height: 300,
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: cardBgColor,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: borderColor),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Revenue vs Estimated Profit',
-                style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w900, color: textColor),
-              ),
-              const Spacer(),
-              Center(
-                child: Text(
-                  'Belum ada data transaksi hari ini.',
-                  style: GoogleFonts.outfit(fontSize: 12, color: subtitleColor, fontWeight: FontWeight.bold),
+        AnimatedEntrance(
+          delay: const Duration(milliseconds: 300),
+          type: EntranceAnimationType.slideUp,
+          child: Container(
+            height: 300,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: cardBgColor,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: borderColor),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Revenue vs Estimated Profit',
+                  style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w900, color: textColor),
                 ),
-              ),
-              const Spacer(),
-            ],
+                const Spacer(),
+                Center(
+                  child: Text(
+                    'Belum ada data transaksi hari ini.',
+                    style: GoogleFonts.outfit(fontSize: 12, color: subtitleColor, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const Spacer(),
+              ],
+            ),
           ),
         ),
       ],

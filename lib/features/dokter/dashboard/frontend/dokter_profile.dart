@@ -460,6 +460,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
   // --- FETCH DATA FROM SUPABASE ---
   Future<void> _fetchDbData() async {
     final userId = _effectiveUserId;
+    if (!mounted) return;
     setState(() => _isLoading = true);
 
     try {
@@ -472,6 +473,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
           .eq('id', userId)
           .maybeSingle();
 
+      if (!mounted) return;
       if (userRes != null) {
         // Sync local provider state
         ref.read(landingPageProvider.notifier).updateUser(userRes);
@@ -542,6 +544,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
           .eq('id', _effectiveDoctorId)
           .maybeSingle();
 
+      if (!mounted) return;
       if (detailRes != null) {
         _faskesController.text = detailRes['nama_faskes']?.toString() ?? '';
         _aboutController.text = detailRes['about']?.toString() ?? '';
@@ -742,6 +745,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
           .select()
           .eq('id_doctor', userId);
 
+      if (!mounted) return;
       if ((schedulesRes as List).isNotEmpty) {
         final List<dynamic> schedulesList = schedulesRes;
         for (var dayMap in _scheduleDays) {
@@ -762,7 +766,9 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
     } catch (e) {
       debugPrint('Error loading doctor details: $e');
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 

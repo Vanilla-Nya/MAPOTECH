@@ -268,35 +268,47 @@ class _DokterDashboardState extends ConsumerState<DokterDashboard> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // Doctor profile card welcome banner
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: cardBgColor,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: borderColor),
-          ),
-          child: Row(
-            children: [
-              // Avatar
-              Container(
-                width: 60,
-                height: 60,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFEAB7EE),
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: ClipOval(
-                  child: (state.loggedInUser?['avatar_url'] != null &&
-                          (state.loggedInUser!['avatar_url'] as String).isNotEmpty &&
-                          ((state.loggedInUser!['avatar_url'] as String).startsWith('http://') ||
-                           (state.loggedInUser!['avatar_url'] as String).startsWith('https://')))
-                      ? Image.network(
-                          state.loggedInUser!['avatar_url'] as String,
-                          width: 60,
-                          height: 60,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => Center(
+        AnimatedEntrance(
+          delay: Duration.zero,
+          type: EntranceAnimationType.slideUp,
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: cardBgColor,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: borderColor),
+            ),
+            child: Row(
+              children: [
+                // Avatar
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFEAB7EE),
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: ClipOval(
+                    child: (state.loggedInUser?['avatar_url'] != null &&
+                            (state.loggedInUser!['avatar_url'] as String).isNotEmpty &&
+                            ((state.loggedInUser!['avatar_url'] as String).startsWith('http://') ||
+                             (state.loggedInUser!['avatar_url'] as String).startsWith('https://')))
+                        ? Image.network(
+                            state.loggedInUser!['avatar_url'] as String,
+                            width: 60,
+                            height: 60,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => Center(
+                              child: Text(
+                                state.loggedInName != null && state.loggedInName!.isNotEmpty
+                                    ? state.loggedInName!.split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join().toUpperCase()
+                                    : 'DR',
+                                style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.white),
+                              ),
+                            ),
+                          )
+                        : Center(
                             child: Text(
                               state.loggedInName != null && state.loggedInName!.isNotEmpty
                                   ? state.loggedInName!.split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join().toUpperCase()
@@ -304,424 +316,415 @@ class _DokterDashboardState extends ConsumerState<DokterDashboard> {
                               style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.white),
                             ),
                           ),
-                        )
-                      : Center(
-                          child: Text(
-                            state.loggedInName != null && state.loggedInName!.isNotEmpty
-                                ? state.loggedInName!.split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join().toUpperCase()
-                                : 'DR',
-                            style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.white),
-                          ),
-                        ),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: themeAccent.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(100),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: themeAccent.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(100),
+                            ),
+                            child: Text(
+                              notifier.t('SEDANG BERTUGAS'),
+                              style: GoogleFonts.outfit(fontSize: 6.5, fontWeight: FontWeight.w900, color: themeAccent),
+                            ),
                           ),
-                          child: Text(
-                            notifier.t('SEDANG BERTUGAS'),
-                            style: GoogleFonts.outfit(fontSize: 6.5, fontWeight: FontWeight.w900, color: themeAccent),
+                          const SizedBox(width: 8),
+                          Text(
+                            _formatToday(state.language),
+                            style: GoogleFonts.outfit(fontSize: 9, color: subtitleColor, fontWeight: FontWeight.bold),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          _formatToday(state.language),
-                          style: GoogleFonts.outfit(fontSize: 9, color: subtitleColor, fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      state.loggedInName ?? 'dr. Agoes Soetanto',
-                      style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w900, color: textColor),
-                    ),
-                    Text(
-                      state.isAssistant
-                          ? 'Asisten Praktik dr. Agoes Soetanto'
-                          : 'Dokter Praktek Mandiri ${state.loggedInName ?? "dr. Agoes Soetanto"}',
-                      style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
-                    ),
-                  ],
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        state.loggedInName ?? 'dr. Agoes Soetanto',
+                        style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w900, color: textColor),
+                      ),
+                      Text(
+                        state.isAssistant
+                            ? 'Asisten Praktik dr. Agoes Soetanto'
+                            : 'Dokter Praktek Mandiri ${state.loggedInName ?? "dr. Agoes Soetanto"}',
+                        style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
 
         const SizedBox(height: 24),
 
         // Indikator Kinerja Utama Cards Grid (metrics)
-        Text(
-          notifier.t('INDIKATOR KINERJA UTAMA'),
-          style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: subtitleColor, letterSpacing: 0.5),
-        ),
-        const SizedBox(height: 12),
-        GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: isMobile ? 2 : 4,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          childAspectRatio: 1.6,
-          children: [
-            MetricCard(
-              icon: Icons.people_rounded,
-              label: notifier.t('TOTAL PASIEN'),
-              count: '$totalPatients',
-              subtitleColor: subtitleColor,
-              countColor: textColor,
-              cardBgColor: cardBgColor,
-              borderColor: borderColor,
-            ),
-            MetricCard(
-              icon: Icons.calendar_today_rounded,
-              label: notifier.t('ANTREAN HARI INI'),
-              count: '${todayQueues.length}',
-              subtitleColor: subtitleColor,
-              countColor: textColor,
-              cardBgColor: cardBgColor,
-              borderColor: borderColor,
-            ),
-            MetricCard(
-              icon: Icons.warning_amber_rounded,
-              label: notifier.t('OBAT KEDALUWARSA'),
-              count: expiredObatCount.toString().padLeft(2, '0'),
-              subtitleColor: subtitleColor,
-              countColor: expiredObatCount > 0 ? Colors.redAccent : textColor,
-              cardBgColor: cardBgColor,
-              borderColor: borderColor,
-            ),
-            MetricCard(
-              icon: Icons.inventory_rounded,
-              label: notifier.t('STOK MENIPIS'),
-              count: '$stokMinimCount',
-              subtitleColor: subtitleColor,
-              countColor: stokMinimCount > 0 ? Colors.amber : textColor,
-              cardBgColor: cardBgColor,
-              borderColor: borderColor,
-            ),
-          ],
+        AnimatedEntrance(
+          delay: const Duration(milliseconds: 100),
+          type: EntranceAnimationType.scale,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                notifier.t('INDIKATOR KINERJA UTAMA'),
+                style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: subtitleColor, letterSpacing: 0.5),
+              ),
+              const SizedBox(height: 12),
+              GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: isMobile ? 2 : 4,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+                childAspectRatio: 1.6,
+                children: [
+                  MetricCard(
+                    icon: Icons.people_rounded,
+                    label: notifier.t('TOTAL PASIEN'),
+                    count: '$totalPatients',
+                    subtitleColor: subtitleColor,
+                    countColor: textColor,
+                    cardBgColor: cardBgColor,
+                    borderColor: borderColor,
+                  ),
+                  MetricCard(
+                    icon: Icons.calendar_today_rounded,
+                    label: notifier.t('ANTREAN HARI INI'),
+                    count: '${todayQueues.length}',
+                    subtitleColor: subtitleColor,
+                    countColor: textColor,
+                    cardBgColor: cardBgColor,
+                    borderColor: borderColor,
+                  ),
+                  MetricCard(
+                    icon: Icons.warning_amber_rounded,
+                    label: notifier.t('OBAT KEDALUWARSA'),
+                    count: expiredObatCount.toString().padLeft(2, '0'),
+                    subtitleColor: subtitleColor,
+                    countColor: expiredObatCount > 0 ? Colors.redAccent : textColor,
+                    cardBgColor: cardBgColor,
+                    borderColor: borderColor,
+                  ),
+                  MetricCard(
+                    icon: Icons.inventory_rounded,
+                    label: notifier.t('STOK MENIPIS'),
+                    count: '$stokMinimCount',
+                    subtitleColor: subtitleColor,
+                    countColor: stokMinimCount > 0 ? Colors.amber : textColor,
+                    cardBgColor: cardBgColor,
+                    borderColor: borderColor,
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
 
         const SizedBox(height: 28),
 
         // Row housing Line Chart (Tren Pemasukan) & Bar Chart (Pasien per Hari)
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Tren Pemasukan line chart mockup
-            Expanded(
-              flex: 6,
-              child: Container(
-                height: 360,
-                decoration: BoxDecoration(
-                  color: cardBgColor,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: borderColor),
-                ),
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      notifier.t('TREN PEMASUKAN'),
-                      style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: subtitleColor),
-                    ),
-                    Text(
-                      percentChangeText,
-                      style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900, color: percentColor),
-                    ),
-                    const Spacer(),
-                    
-                    // Simple custom line vector drawing simulation
-                    Container(
-                      height: 180,
-                      width: double.infinity,
-                      alignment: Alignment.center,
-                      child: Stack(
-                        children: [
-                          // Dotted grid lines
-                          Column(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: List.generate(4, (index) => const Divider(color: Colors.grey, height: 1, thickness: 0.2)),
-                          ),
-                          // Curved income shape
-                          Positioned.fill(
-                            child: CustomPaint(
-                              painter: _IncomeTrendLinePainter(themeAccent, normalizedIncomes),
-                            ),
-                          ),
-                        ],
+        AnimatedEntrance(
+          delay: const Duration(milliseconds: 200),
+          type: EntranceAnimationType.slideUp,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Tren Pemasukan line chart mockup
+              Expanded(
+                flex: 6,
+                child: Container(
+                  height: 360,
+                  decoration: BoxDecoration(
+                    color: cardBgColor,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: borderColor),
+                  ),
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        notifier.t('TREN PEMASUKAN'),
+                        style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: subtitleColor),
                       ),
-                    ),
-                    const Spacer(),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: last7Days
-                          .map((day) => Text(_getDayName(day, state.language), style: TextStyle(color: subtitleColor, fontSize: 9)))
-                          .toList(),
-                    ),
-                  ],
+                      Text(
+                        percentChangeText,
+                        style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900, color: percentColor),
+                      ),
+                      const Spacer(),
+                      
+                      // Simple custom line vector drawing simulation
+                      Container(
+                        height: 180,
+                        width: double.infinity,
+                        alignment: Alignment.center,
+                        child: Stack(
+                          children: [
+                            // Dotted grid lines
+                            Column(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: List.generate(4, (index) => const Divider(color: Colors.grey, height: 1, thickness: 0.2)),
+                            ),
+                            // Curved income shape
+                            Positioned.fill(
+                              child: CustomPaint(
+                                painter: _IncomeTrendLinePainter(themeAccent, normalizedIncomes),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Spacer(),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: last7Days
+                            .map((day) => Text(_getDayName(day, state.language), style: TextStyle(color: subtitleColor, fontSize: 9)))
+                            .toList(),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 20),
+              const SizedBox(width: 20),
 
-            // Pasien per Hari bar chart mockup
-            Expanded(
-              flex: 4,
-              child: Container(
-                height: 360,
-                decoration: BoxDecoration(
-                  color: cardBgColor,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: borderColor),
-                ),
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      notifier.t('PASIEN PER HARI'),
-                      style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: subtitleColor),
-                    ),
-                    Text(
-                      notifier.t('7 hari terakhir'),
-                      style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor),
-                    ),
-                    const Spacer(),
-                    
-                    // Column Bar visual
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: List.generate(7, (i) {
-                        final d = last7Days[i];
-                        final label = _getDayName(d, state.language);
-                        final percent = barPercents[i];
-                        final count = barCounts[i];
-                        return _buildChartBar(label, percent, themeAccent, subtitleColor, count: count);
-                      }),
-                    ),
-                  ],
+              // Pasien per Hari bar chart mockup
+              Expanded(
+                flex: 4,
+                child: Container(
+                  height: 360,
+                  decoration: BoxDecoration(
+                    color: cardBgColor,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: borderColor),
+                  ),
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        notifier.t('PASIEN PER HARI'),
+                        style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: subtitleColor),
+                      ),
+                      Text(
+                        notifier.t('7 hari terakhir'),
+                        style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor),
+                      ),
+                      const Spacer(),
+                      
+                      // Column Bar visual
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: List.generate(7, (i) {
+                          final d = last7Days[i];
+                          final label = _getDayName(d, state.language);
+                          final percent = barPercents[i];
+                          final count = barCounts[i];
+                          return _buildChartBar(label, percent, themeAccent, subtitleColor, count: count);
+                        }),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
 
         const SizedBox(height: 28),
 
         // Bottom Patients Queue List Table
-        Container(
-          decoration: BoxDecoration(
-            color: cardBgColor,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: borderColor),
-          ),
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        notifier.t('Daftar Antrean'),
-                        style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w900, color: textColor),
-                      ),
-                      Text(
-                        notifier.t('Status konsultasi secara real-time'),
-                        style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
-                      ),
-                    ],
+        AnimatedEntrance(
+          delay: const Duration(milliseconds: 300),
+          type: EntranceAnimationType.slideUp,
+          child: Container(
+            decoration: BoxDecoration(
+              color: cardBgColor,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: borderColor),
+            ),
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      notifier.t('DAFTAR ANTRIAN HARI INI'),
+                      style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w900, color: textColor),
+                    ),
+                    Text(
+                      notifier.t('${todayQueues.length} pasien'),
+                      style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w900, color: textColor),
+                    ),
+                  ],
+                ),
+                const Divider(),
+                if (todayQueues.isEmpty) ...[
+                  const SizedBox(height: 48),
+                  Center(
+                    child: Text(
+                      notifier.t('Belum ada pasien dalam antrean hari ini.'),
+                      style: GoogleFonts.outfit(fontSize: 12, color: subtitleColor, fontWeight: FontWeight.bold),
+                    ),
                   ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        notifier.t('TOTAL ANTREAN HARI INI'),
-                        style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.bold, color: subtitleColor),
-                      ),
-                      Text(
-                        notifier.t('${todayQueues.length} pasien'),
-                        style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w900, color: textColor),
-                      ),
-                    ],
+                  const SizedBox(height: 48),
+                ] else ...[
+                  const SizedBox(height: 16),
+                  // Table header
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E1E22) : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: Text(
+                            notifier.t('NO.'),
+                            style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: subtitleColor),
+                          ),
+                        ),
+                        Expanded(
+                          flex: 5,
+                          child: Text(
+                            notifier.t('NAMA PASIEN'),
+                            style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: subtitleColor),
+                          ),
+                        ),
+                        Expanded(
+                          flex: 3,
+                          child: Text(
+                            notifier.t('TIPE'),
+                            style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: subtitleColor),
+                          ),
+                        ),
+                        Expanded(
+                          flex: 3,
+                          child: Text(
+                            notifier.t('WAKTU'),
+                            style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: subtitleColor),
+                          ),
+                        ),
+                        Expanded(
+                          flex: 3,
+                          child: Text(
+                            notifier.t('STATUS'),
+                            style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: subtitleColor),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: todayQueues.length,
+                    separatorBuilder: (context, index) => Divider(color: borderColor, height: 1),
+                    itemBuilder: (context, index) {
+                      final antrian = todayQueues[index];
+                      Color statusColor = Colors.grey;
+                      if (antrian.status == 'Menunggu') {
+                        statusColor = Colors.amber[700]!;
+                      } else if (antrian.status == 'Memproses...') {
+                        statusColor = themeAccent;
+                      } else if (antrian.status == 'Pembayaran') {
+                        statusColor = Colors.indigo;
+                      } else if (antrian.status == 'Selesai') {
+                        statusColor = const Color(0xFF27AE60);
+                      }
+
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              flex: 2,
+                              child: Text(
+                                antrian.no,
+                                style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: textColor),
+                              ),
+                            ),
+                            Expanded(
+                              flex: 5,
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 24,
+                                    height: 24,
+                                    decoration: BoxDecoration(
+                                      color: antrian.avatarBg.withValues(alpha: 0.12),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      antrian.nama.isNotEmpty ? antrian.nama[0] : 'P',
+                                      style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: antrian.avatarBg),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      antrian.nama,
+                                      style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: textColor),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Expanded(
+                              flex: 3,
+                              child: Text(
+                                antrian.tipe,
+                                style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: subtitleColor),
+                              ),
+                            ),
+                            Expanded(
+                              flex: 3,
+                              child: Text(
+                                antrian.waktu,
+                                style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
+                              ),
+                            ),
+                            Expanded(
+                              flex: 3,
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: BoxDecoration(
+                                      color: statusColor,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    antrian.status,
+                                    style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: statusColor),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
                   ),
                 ],
-              ),
-              const Divider(),
-              if (todayQueues.isEmpty) ...[
-                const SizedBox(height: 48),
-                Center(
-                  child: Text(
-                    notifier.t('Belum ada pasien dalam antrean hari ini.'),
-                    style: GoogleFonts.outfit(fontSize: 12, color: subtitleColor, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                const SizedBox(height: 48),
-              ] else ...[
-                const SizedBox(height: 16),
-                // Table header
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF1E1E22) : const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          notifier.t('NO.'),
-                          style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: subtitleColor),
-                        ),
-                      ),
-                      Expanded(
-                        flex: 5,
-                        child: Text(
-                          notifier.t('NAMA PASIEN'),
-                          style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: subtitleColor),
-                        ),
-                      ),
-                      Expanded(
-                        flex: 3,
-                        child: Text(
-                          notifier.t('TIPE'),
-                          style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: subtitleColor),
-                        ),
-                      ),
-                      Expanded(
-                        flex: 3,
-                        child: Text(
-                          notifier.t('WAKTU'),
-                          style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: subtitleColor),
-                        ),
-                      ),
-                      Expanded(
-                        flex: 3,
-                        child: Text(
-                          notifier.t('STATUS'),
-                          style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: subtitleColor),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: todayQueues.length,
-                  separatorBuilder: (context, index) => Divider(color: borderColor, height: 1),
-                  itemBuilder: (context, index) {
-                    final antrian = todayQueues[index];
-                    Color statusColor = Colors.grey;
-                    if (antrian.status == 'Menunggu') {
-                      statusColor = Colors.amber[700]!;
-                    } else if (antrian.status == 'Memproses...') {
-                      statusColor = themeAccent;
-                    } else if (antrian.status == 'Pembayaran') {
-                      statusColor = Colors.indigo;
-                    } else if (antrian.status == 'Selesai') {
-                      statusColor = const Color(0xFF27AE60);
-                    }
-
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            flex: 2,
-                            child: Text(
-                              antrian.no,
-                              style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: textColor),
-                            ),
-                          ),
-                          Expanded(
-                            flex: 5,
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 24,
-                                  height: 24,
-                                  decoration: BoxDecoration(
-                                    color: antrian.avatarBg.withValues(alpha: 0.12),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  alignment: Alignment.center,
-                                  child: Text(
-                                    antrian.nama.isNotEmpty ? antrian.nama[0] : 'P',
-                                    style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: antrian.avatarBg),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    antrian.nama,
-                                    style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: textColor),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Expanded(
-                            flex: 3,
-                            child: Text(
-                              antrian.tipe,
-                              style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: subtitleColor),
-                            ),
-                          ),
-                          Expanded(
-                            flex: 3,
-                            child: Text(
-                              antrian.waktu,
-                              style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
-                            ),
-                          ),
-                          Expanded(
-                            flex: 3,
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 6,
-                                  height: 6,
-                                  decoration: BoxDecoration(
-                                    color: statusColor,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  antrian.status,
-                                  style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: statusColor),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
               ],
-            ],
+            ),
           ),
         ),
       ],

@@ -880,6 +880,10 @@ class _DokterObatState extends ConsumerState<DokterObat> {
       opnameControllers[batch.batchNo] = TextEditingController();
     }
 
+    // Barcode controller (editable SKU / BARCODE field)
+    final barcodeController = TextEditingController(text: drug.sku);
+    bool isSavingBarcode = false;
+
     final isMobile = MediaQuery.of(context).size.width < 650;
 
     showDialog(
@@ -998,10 +1002,110 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                         style: GoogleFonts.outfit(
                                             fontSize: 10, color: subtitleColor, fontWeight: FontWeight.bold),
                                       ),
-                                      const SizedBox(height: 10),
+                                      const SizedBox(height: 8),
                                       Row(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          _buildDetailGridCell('SKU / BARCODE'.tr(state), drug.sku, subtitleColor, textColor),
+                                          // ── Editable Barcode Field ──
+                                          Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                'SKU / BARCODE'.tr(state),
+                                                style: GoogleFonts.outfit(fontSize: 7.5, fontWeight: FontWeight.w900, color: subtitleColor, letterSpacing: 0.5),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Row(
+                                                children: [
+                                                  Container(
+                                                    width: 160,
+                                                    height: 30,
+                                                    decoration: BoxDecoration(
+                                                      color: itemBg,
+                                                      borderRadius: BorderRadius.circular(6),
+                                                      border: Border.all(color: borderColor),
+                                                    ),
+                                                    child: TextField(
+                                                      controller: barcodeController,
+                                                      autofocus: false,
+                                                      style: GoogleFonts.outfit(fontSize: 10.5, color: textColor, fontWeight: FontWeight.bold),
+                                                      decoration: InputDecoration(
+                                                        hintText: 'Scan / ketik barcode...',
+                                                        hintStyle: GoogleFonts.outfit(fontSize: 9.5, color: subtitleColor.withOpacity(0.5)),
+                                                        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                                                        border: InputBorder.none,
+                                                        prefixIcon: Icon(Icons.qr_code_scanner_rounded, size: 14, color: subtitleColor),
+                                                        prefixIconConstraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                                                      ),
+                                                      onSubmitted: (val) async {
+                                                        final trimmed = val.trim();
+                                                        if (trimmed.isEmpty || trimmed == drug.sku) return;
+                                                        setDialogState(() => isSavingBarcode = true);
+                                                        try {
+                                                          await SupabaseService().updateMedicineBarcode(
+                                                            medicineId: drug.id,
+                                                            barcode: trimmed,
+                                                          );
+                                                          final updatedDrug = drug.copyWith(sku: trimmed);
+                                                          setDialogState(() {
+                                                            drug = updatedDrug;
+                                                            isSavingBarcode = false;
+                                                          });
+                                                          ref.read(dokterObatListProvider.notifier).updateDrug(updatedDrug);
+                                                          setState(() => _searchQuery = trimmed);
+                                                          _showSuccessSnackBar(context, 'Barcode berhasil diperbarui!');
+                                                        } catch (_) {
+                                                          setDialogState(() => isSavingBarcode = false);
+                                                          barcodeController.text = drug.sku;
+                                                        }
+                                                      },
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  isSavingBarcode
+                                                      ? const SizedBox(
+                                                          width: 20,
+                                                          height: 20,
+                                                          child: CircularProgressIndicator(strokeWidth: 2),
+                                                        )
+                                                      : InkWell(
+                                                          borderRadius: BorderRadius.circular(6),
+                                                          onTap: () async {
+                                                            final trimmed = barcodeController.text.trim();
+                                                            if (trimmed.isEmpty || trimmed == drug.sku) return;
+                                                            setDialogState(() => isSavingBarcode = true);
+                                                            try {
+                                                              await SupabaseService().updateMedicineBarcode(
+                                                                medicineId: drug.id,
+                                                                barcode: trimmed,
+                                                              );
+                                                              final updatedDrug = drug.copyWith(sku: trimmed);
+                                                              setDialogState(() {
+                                                                drug = updatedDrug;
+                                                                isSavingBarcode = false;
+                                                              });
+                                                              ref.read(dokterObatListProvider.notifier).updateDrug(updatedDrug);
+                                                              setState(() => _searchQuery = trimmed);
+                                                              _showSuccessSnackBar(context, 'Barcode berhasil diperbarui!');
+                                                            } catch (_) {
+                                                              setDialogState(() => isSavingBarcode = false);
+                                                              barcodeController.text = drug.sku;
+                                                            }
+                                                          },
+                                                          child: Container(
+                                                            width: 28,
+                                                            height: 28,
+                                                            decoration: BoxDecoration(
+                                                              color: purple.withOpacity(0.12),
+                                                              borderRadius: BorderRadius.circular(6),
+                                                            ),
+                                                            child: Icon(Icons.check_rounded, size: 14, color: purple),
+                                                          ),
+                                                        ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
                                           const SizedBox(width: 20),
                                           _buildDetailGridCell('HARGA SATUAN'.tr(state), drug.hargaSatuan == 0 ? 'Rp 0' : 'Rp ${_formatPrice(drug.hargaSatuan)}', subtitleColor, textColor),
                                         ],

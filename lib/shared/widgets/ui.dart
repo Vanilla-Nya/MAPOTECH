@@ -6,3 +6,4 @@ export 'viewport_overlay.dart';
 export 'animated_portal_switcher.dart';
 export 'skeleton_loading.dart';
 export 'metric_card.dart';
+export 'animated_transitions.dart';

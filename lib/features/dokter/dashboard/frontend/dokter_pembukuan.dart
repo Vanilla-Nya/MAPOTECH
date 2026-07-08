@@ -129,6 +129,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
   Future<void> _loadAllData() async {
     setState(() => _isLoading = true);
     await Future.wait([_loadTransactions(), _loadPatientSyncList()]);
+    if (!mounted) return;
     setState(() => _isLoading = false);
   }
 
@@ -142,17 +143,20 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
         for (final tx in txs) {
           loaded.add(_mapDbToBukuKasEntry(tx));
         }
+        if (!mounted) return;
         setState(() {
           _ledger.clear();
           _ledger.addAll(loaded);
         });
       } else {
+        if (!mounted) return;
         setState(() {
           _ledger.clear();
         });
       }
     } catch (e) {
       debugPrint('Error loading transactions: $e');
+      if (!mounted) return;
       _showWarningDialog(
         'Gagal Memuat Data',
         'Gagal mengambil riwayat pembukuan dari database.',
@@ -234,6 +238,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
           });
         }
 
+        if (!mounted) return;
         setState(() {
           _patientSyncList = list;
         });
@@ -1034,6 +1039,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
   }
 
   void _showWarningDialog(String title, String message) {
+    if (!mounted) return;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(

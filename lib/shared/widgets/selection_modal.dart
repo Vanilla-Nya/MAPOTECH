@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
+import 'package:mapotech/shared/widgets/animated_transitions.dart';
 
 /// Shows the premium role selection modal dialog.
 void showSelectionModal(BuildContext context, WidgetRef ref) {
@@ -9,7 +10,7 @@ void showSelectionModal(BuildContext context, WidgetRef ref) {
   final notifier = ref.read(landingPageProvider.notifier);
   final isDark = state.appearance == 'dark';
 
-  showDialog(
+  showAnimatedDialog(
     context: context,
     barrierColor: Colors.black.withOpacity(0.65),
     barrierDismissible: true,

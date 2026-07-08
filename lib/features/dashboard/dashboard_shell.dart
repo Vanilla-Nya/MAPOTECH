@@ -5,6 +5,7 @@ import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'dart:ui' as ui;
 import 'package:mapotech/shared/widgets/page_tutorial_data.dart';
 import 'package:mapotech/shared/widgets/page_tutorial_dialog.dart';
+import 'package:mapotech/shared/widgets/animated_portal_switcher.dart';
 // Import split widgets and views
 import 'package:mapotech/features/dashboard/widgets/dashboard_drawer.dart';
 import 'package:mapotech/features/pasien/dashboard/frontend/pasien_dashboard.dart';
@@ -134,8 +135,11 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                     Expanded(
                       child: SingleChildScrollView(
                         padding: EdgeInsets.all(isMobile ? 16 : 28),
-                        child: _buildRoleDashboardBody(
-                          state.loggedInRole ?? 'pasien',
+                        child: AnimatedPortalSwitcher(
+                          switcherKey: _activeMenu,
+                          child: _buildRoleDashboardBody(
+                            state.loggedInRole ?? 'pasien',
+                          ),
                         ),
                       ),
                     ),

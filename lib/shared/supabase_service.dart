@@ -804,6 +804,22 @@ class SupabaseService {
     }
   }
 
+  // Update the barcode field of a medicine record
+  Future<void> updateMedicineBarcode({
+    required String medicineId,
+    required String barcode,
+  }) async {
+    try {
+      await _patch(
+        'medicine?id=eq.${Uri.encodeComponent(medicineId)}',
+        {'barcode': barcode},
+        schema: 'private_doctor',
+      );
+    } catch (e) {
+      throw Exception('Gagal memperbarui barcode obat: $e');
+    }
+  }
+
   // Fetch financial transactions for the doctor from the view
   Future<List<Map<String, dynamic>>> fetchDoctorFinancialTransactions(
     String doctorId,
