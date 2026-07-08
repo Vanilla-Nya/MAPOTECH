@@ -7,6 +7,8 @@ import 'package:mapotech/shared/supabase_service.dart';
 import 'package:mapotech/shared/satusehat_service.dart';
 import 'package:mapotech/shared/widgets/common_pagination.dart';
 import 'package:http/http.dart' as http;
+import 'package:mapotech/shared/thousands_formatter.dart';
+import 'package:flutter/services.dart';
 import 'dart:convert';
 import 'dart:math';
 
@@ -1480,7 +1482,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
     final expController = TextEditingController();
     final locationController = TextEditingController();
     final totalBuyController = TextEditingController();
-    final sellPriceController = TextEditingController(text: drug.hargaSatuan.toInt().toString());
+    final sellPriceController = TextEditingController(text: formatPrice(drug.hargaSatuan));
 
     double hargaBeliSatuanVal = 0.0;
 
@@ -1718,6 +1720,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                   textColor,
                                   subtitleColor,
                                   keyboardType: TextInputType.number,
+                                  inputFormatters: [ThousandsFormatter()],
                                   validator: (v) => v!.isEmpty ? (isEn ? 'Sale price is required' : 'Harga jual wajib diisi') : null,
                                 ),
                               ],
@@ -1757,9 +1760,9 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                             child: Text('Tambah Stok'.tr(state), style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900)),
                             onPressed: () {
                               if (formKey.currentState!.validate()) {
+                                final priceSell = parseFormattedPrice(sellPriceController.text);
+                                final priceBuyTotal = parseFormattedPrice(totalBuyController.text);
                                 final stockIn = int.parse(stockController.text);
-                                final priceSell = double.parse(sellPriceController.text);
-                                final priceBuyTotal = double.tryParse(totalBuyController.text) ?? 0.0;
                                 final buyUnitPrice = stockIn > 0 ? (priceBuyTotal / stockIn) : 0.0;
 
                                 final newBatch = BatchModel(
@@ -2170,7 +2173,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                         keyboardType: TextInputType.number,
                                         onChanged: (val) {
                                           final stock = double.tryParse(val) ?? 0;
-                                          final total = double.tryParse(buyPriceController.text) ?? 0;
+                                          final total = parseFormattedPrice(buyPriceController.text);
                                           setDialogState(() {
                                             hargaBeliSatuanVal = stock > 0 ? (total / stock) : 0.0;
                                           });
@@ -2201,8 +2204,9 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                         textColor,
                                         subtitleColor,
                                         keyboardType: TextInputType.number,
+                                        inputFormatters: [ThousandsFormatter()],
                                         onChanged: (val) {
-                                          final total = double.tryParse(val) ?? 0;
+                                          final total = parseFormattedPrice(val);
                                           final stock = double.tryParse(initialStockController.text) ?? 0;
                                           setDialogState(() {
                                             hargaBeliSatuanVal = stock > 0 ? (total / stock) : 0.0;
@@ -2228,7 +2232,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                         ),
                                         alignment: Alignment.centerLeft,
                                         child: Text(
-                                          'Rp ${hargaBeliSatuanVal.toInt()}',
+                                          'Rp ${formatPrice(hargaBeliSatuanVal)}',
                                           style: GoogleFonts.outfit(
                                               fontSize: 12, fontWeight: FontWeight.w900, color: subtitleColor),
                                         ),
@@ -2257,6 +2261,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                         textColor,
                                         subtitleColor,
                                         keyboardType: TextInputType.number,
+                                        inputFormatters: [ThousandsFormatter()],
                                         validator: (v) => v!.isEmpty ? (isEn ? 'Selling price is required' : 'Harga jual wajib diisi') : null,
                                       ),
                                     ],
@@ -2340,17 +2345,17 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                                   return;
                                 }
 
+                                final priceSell = parseFormattedPrice(sellPriceController.text);
+                                final priceBuyTotal = parseFormattedPrice(buyPriceController.text);
                                 final stok = int.parse(initialStockController.text);
-                                final priceSell = double.parse(sellPriceController.text);
-                                final priceBuyTotal = double.tryParse(buyPriceController.text) ?? 0.0;
-                                final buyUnitPrice = stok > 0 ? (priceBuyTotal / stok) : 0.0;
+                                final unitCost = stok > 0 ? (priceBuyTotal / stok) : 0.0;
 
                                 final initialBatch = BatchModel(
                                   batchNo: batchController.text,
                                   stok: stok,
                                   expDate: expController.text.isEmpty ? '26 / 05 / 2028' : expController.text,
                                   lokasi: locationController.text.isEmpty ? 'Shelf A-01' : locationController.text,
-                                  hargaBeli: buyUnitPrice,
+                                  hargaBeli: unitCost,
                                   hargaJual: priceSell,
                                 );
 
@@ -2402,7 +2407,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
     final inputBg = isDark ? const Color(0xFF1E1E22) : const Color(0xFFF6F8FA);
 
     final formKey = GlobalKey<FormState>();
-    final controller = TextEditingController(text: drug.hargaSatuan.toInt().toString());
+    final controller = TextEditingController(text: formatPrice(drug.hargaSatuan));
 
     showDialog(
       context: context,
@@ -2435,6 +2440,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
                 textColor,
                 subtitleColor,
                 keyboardType: TextInputType.number,
+                inputFormatters: [ThousandsFormatter()],
                 validator: (v) => v!.isEmpty ? 'Harga wajib diisi' : null,
               ),
             ],
@@ -2454,7 +2460,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
             ),
             onPressed: () {
               if (formKey.currentState!.validate()) {
-                final newPrice = double.parse(controller.text);
+                final newPrice = parseFormattedPrice(controller.text);
                 final updatedDrug = drug.copyWith(hargaSatuan: newPrice);
                 Navigator.of(ctx).pop();
                 onPriceUpdate(updatedDrug);
@@ -2543,6 +2549,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
     String? Function(String?)? validator,
     Function(String)? onChanged,
     bool readOnly = false,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return TextFormField(
       controller: controller,
@@ -2552,6 +2559,7 @@ class _DokterObatState extends ConsumerState<DokterObat> {
       validator: validator,
       onChanged: onChanged,
       readOnly: readOnly,
+      inputFormatters: inputFormatters,
       style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: readOnly ? text.withOpacity(0.6) : text),
       decoration: InputDecoration(
         hintText: hint,

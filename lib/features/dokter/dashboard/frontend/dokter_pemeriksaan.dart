@@ -11,6 +11,9 @@ import 'package:mapotech/features/dokter/dashboard/frontend/dokter_obat.dart';
 import 'package:mapotech/shared/icd_codes.dart';
 import 'package:mapotech/shared/supabase_service.dart';
 import 'package:mapotech/shared/satusehat_service.dart';
+import 'package:mapotech/shared/thousands_formatter.dart';
+import 'package:mapotech/shared/widgets/skeleton_loading.dart';
+import 'package:mapotech/shared/widgets/custom_button.dart';
 
 class DokterPemeriksaan extends ConsumerStatefulWidget {
   const DokterPemeriksaan({super.key});
@@ -92,11 +95,9 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
   @override
   void initState() {
     super.initState();
-    _serviceFeeController.text = ref
-        .read(landingPageProvider)
-        .defaultServiceFee
-        .toInt()
-        .toString();
+    _serviceFeeController.text = formatPrice(
+      ref.read(landingPageProvider).defaultServiceFee,
+    );
     _tensiSysController.addListener(_updateTensiController);
     _tensiDiaController.addListener(_updateTensiController);
     _serviceFeeController.addListener(() {
@@ -554,11 +555,9 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
       _addedPrescriptions.clear();
       _manualPrescriptions.clear();
       _selectedApotek = null;
-      _serviceFeeController.text = ref
-          .read(landingPageProvider)
-          .defaultServiceFee
-          .toInt()
-          .toString();
+      _serviceFeeController.text = formatPrice(
+        ref.read(landingPageProvider).defaultServiceFee,
+      );
       _wantReferral = false;
       _generatedReferralNo = 'REF/2026/05/${1000 + Random().nextInt(9000)}';
 
@@ -834,11 +833,9 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
       _addedPrescriptions.clear();
       _manualPrescriptions.clear();
       _selectedApotek = null;
-      _serviceFeeController.text = ref
-          .read(landingPageProvider)
-          .defaultServiceFee
-          .toInt()
-          .toString();
+      _serviceFeeController.text = formatPrice(
+        ref.read(landingPageProvider).defaultServiceFee,
+      );
       _wantReferral = false;
       _currentStep = 1;
       _step5TabIndex = 0;
@@ -911,11 +908,9 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
       _addedPrescriptions.clear();
       _manualPrescriptions.clear();
       _selectedApotek = null;
-      _serviceFeeController.text = ref
-          .read(landingPageProvider)
-          .defaultServiceFee
-          .toInt()
-          .toString();
+      _serviceFeeController.text = formatPrice(
+        ref.read(landingPageProvider).defaultServiceFee,
+      );
       _wantReferral = false;
       _currentStep = 1;
       _step5TabIndex = 0;
@@ -986,9 +981,9 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
         (sum, item) =>
             sum + ((item["obat"] as ObatModel).hargaSatuan * item["jumlah"]),
       );
-      final double serviceFee =
-          double.tryParse(_serviceFeeController.text) ??
-          ref.read(landingPageProvider).defaultServiceFee;
+      final double serviceFee = _serviceFeeController.text.isEmpty
+          ? ref.read(landingPageProvider).defaultServiceFee
+          : parseFormattedPrice(_serviceFeeController.text);
       final double totalBill = serviceFee + subtotalObat;
 
       String? recommendedApotekId;
@@ -1306,9 +1301,9 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
           (sum, item) =>
               sum + ((item["obat"] as ObatModel).hargaSatuan * item["jumlah"]),
         );
-        final double serviceFee =
-            double.tryParse(_serviceFeeController.text) ??
-            ref.read(landingPageProvider).defaultServiceFee;
+        final double serviceFee = _serviceFeeController.text.isEmpty
+            ? ref.read(landingPageProvider).defaultServiceFee
+            : parseFormattedPrice(_serviceFeeController.text);
         final double totalBill = serviceFee + subtotalObat;
 
         return AlertDialog(
@@ -1444,14 +1439,14 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
 
                   // 6. Billing
                   _buildReviewSectionTitle('Total Tagihan'),
-                  _buildReviewRow('Jasa Layanan', 'Rp ${serviceFee.toInt()}'),
+                  _buildReviewRow('Jasa Layanan', 'Rp ${formatPrice(serviceFee)}'),
                   _buildReviewRow(
                     'Subtotal Obat',
-                    'Rp ${subtotalObat.toInt()}',
+                    'Rp ${formatPrice(subtotalObat)}',
                   ),
                   _buildReviewRow(
                     'Total Tagihan',
-                    'Rp ${totalBill.toInt()}',
+                    'Rp ${formatPrice(totalBill)}',
                     isBold: true,
                   ),
                 ],
@@ -2357,6 +2352,593 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
     }
   }
 
+  Future<Map<String, dynamic>> _fetchEncounterDetails(String queueId) async {
+    final db = SupabaseService();
+    // 1. Fetch queue to get doctorId & date_queue
+    final queue = await SupabaseService.client
+        .from('v_queues')
+        .select('*')
+        .eq('id', queueId)
+        .maybeSingle();
+
+    final doctorId = queue?['id_doctor'] as String?;
+    String doctorName = 'dr. Agoes Soetanto';
+    if (doctorId != null && doctorId.isNotEmpty) {
+      final docUser = await db.fetchUserById(doctorId);
+      if (docUser != null) {
+        doctorName = docUser['name'] ?? doctorName;
+      }
+    }
+
+    // 2. Fetch clinical encounter
+    final ce = await SupabaseService.client
+        .schema('private_doctor')
+        .from('clinical_encounters')
+        .select('*')
+        .eq('id_queue', queueId)
+        .maybeSingle();
+
+    if (ce == null) {
+      return {
+        'doctorName': doctorName,
+        'date': queue?['date_queue'] ?? '-',
+        'encounter': null,
+      };
+    }
+
+    final encounterId = ce['id'] as String;
+
+    // 3. Fetch anamnesis
+    final anamnesis = await SupabaseService.client
+        .schema('private_doctor')
+        .from('anamnesis_ecounter')
+        .select('*')
+        .eq('id_clinical_ecounter', encounterId)
+        .maybeSingle();
+
+    // 4. Fetch vitals
+    final vitals = await SupabaseService.client
+        .schema('private_doctor')
+        .from('vital_signs')
+        .select('*')
+        .eq('id_clinical_ecounter', encounterId)
+        .maybeSingle();
+
+    // 5. Fetch diagnoses
+    final diagnoses = await SupabaseService.client
+        .schema('private_doctor')
+        .from('icdx_ecounter')
+        .select('*')
+        .eq('id_clinical_ecounters', encounterId);
+
+    // 6. Fetch medicines
+    final List<Map<String, dynamic>> medicinesList = [];
+    final medicinesRes = await SupabaseService.client
+        .schema('private_doctor')
+        .from('medicine_ecounter')
+        .select('quantity, id_detail_medicine')
+        .eq('id_clinical_encounters', encounterId);
+
+    for (final medRow in medicinesRes) {
+      final qty = double.tryParse(medRow['quantity']?.toString() ?? '0') ?? 0.0;
+      final detailMedId = medRow['id_detail_medicine'];
+      if (detailMedId != null) {
+        final dmRes = await SupabaseService.client
+            .schema('private_doctor')
+            .from('detail_medicine')
+            .select('id_medicine')
+            .eq('id', detailMedId)
+            .maybeSingle();
+
+        if (dmRes != null) {
+          final medId = dmRes['id_medicine'];
+          String medicineName = 'Obat';
+          if (medId != null) {
+            final mRes = await SupabaseService.client
+                .schema('private_doctor')
+                .from('medicine')
+                .select('medicine_name')
+                .eq('id', medId)
+                .maybeSingle();
+            if (mRes != null) {
+              medicineName = mRes['medicine_name']?.toString() ?? 'Obat';
+            }
+          }
+          medicinesList.add({
+            'name': medicineName,
+            'quantity': qty,
+          });
+        }
+      }
+    }
+
+    // 7. Fetch manual prescriptions
+    try {
+      final epRes = await SupabaseService.client
+          .schema('private_doctor')
+          .from('electronic_prescriptions')
+          .select('*, electronic_prescription_items(*)')
+          .eq('id_clinical_encounter', encounterId)
+          .maybeSingle();
+
+      if (epRes != null) {
+        final items = epRes['electronic_prescription_items'] as List<dynamic>?;
+        if (items != null) {
+          for (final item in items) {
+            if (item['id_catalog_item'] == null) {
+              final qty = double.tryParse(item['quantity']?.toString() ?? '1') ?? 1.0;
+              medicinesList.add({
+                'name': item['medicine_name']?.toString() ?? 'Obat Resep',
+                'quantity': qty,
+              });
+            }
+          }
+        }
+      }
+    } catch (_) {}
+
+    return {
+      'doctorName': doctorName,
+      'date': queue?['date_queue'] ?? '-',
+      'encounter': ce,
+      'anamnesis': anamnesis,
+      'vitals': vitals,
+      'diagnoses': diagnoses,
+      'medicines': medicinesList,
+    };
+  }
+
+  void _showEncounterDetailDialog(BuildContext context, String queueId, String formattedDate, PasienModel patient, bool isDark) {
+    final themeAccent = ref.read(landingPageProvider.notifier).getPrimaryColor();
+    final cardBg = isDark ? const Color(0xFF161619) : Colors.white;
+    final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
+    final subtitleColor = isDark ? Colors.grey[400]! : const Color(0xFF6F6A8A);
+    final borderColor = isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2);
+    final inputBg = isDark ? const Color(0xFF1E1E22) : const Color(0xFFF6F8FA);
+
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.4),
+      builder: (ctx) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          backgroundColor: cardBg,
+          clipBehavior: Clip.antiAlias,
+          child: SizedBox(
+            width: 480,
+            child: FutureBuilder<Map<String, dynamic>>(
+              future: _fetchEncounterDetails(queueId),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Container(
+                    padding: const EdgeInsets.all(24),
+                    child: SkeletonScope(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const SkeletonBox(height: 14, width: 100),
+                          const SizedBox(height: 8),
+                          const SkeletonBox(height: 50, width: double.infinity),
+                          const SizedBox(height: 20),
+                          const SkeletonBox(height: 14, width: 140),
+                          const SizedBox(height: 8),
+                          const SkeletonBox(height: 60, width: double.infinity),
+                          const SizedBox(height: 20),
+                          const SkeletonBox(height: 14, width: 120),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(child: const SkeletonBox(height: 30)),
+                              const SizedBox(width: 8),
+                              Expanded(child: const SkeletonBox(height: 30)),
+                              const SizedBox(width: 8),
+                              Expanded(child: const SkeletonBox(height: 30)),
+                            ],
+                          ),
+                          const SizedBox(height: 20),
+                          const SkeletonBox(height: 14, width: 80),
+                          const SizedBox(height: 8),
+                          const SkeletonBox(height: 40, width: double.infinity),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
+                if (snapshot.hasError || !snapshot.hasData) {
+                  return Container(
+                    height: 200,
+                    alignment: Alignment.center,
+                    padding: const EdgeInsets.all(24),
+                    child: Text(
+                      'Gagal memuat detail pemeriksaan.',
+                      style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.redAccent,
+                      ),
+                    ),
+                  );
+                }
+
+                final data = snapshot.data!;
+                final ce = data['encounter'];
+                final doctorName = data['doctorName'] as String;
+
+                if (ce == null) {
+                  return Container(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Pemeriksaan Rutin',
+                          style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: textColor),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Pemeriksaan pada tanggal $formattedDate oleh $doctorName tidak memiliki catatan EMR terperinci.',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.outfit(fontSize: 12, color: subtitleColor),
+                        ),
+                        const SizedBox(height: 16),
+                        CustomButton(
+                          text: 'Tutup',
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                final anamnesis = data['anamnesis'];
+                final vitals = data['vitals'];
+                final diagnoses = data['diagnoses'] as List<dynamic>;
+                final medicines = data['medicines'] as List<dynamic>;
+                final isRujukan = ce['is_rujukan'] == true;
+
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                      color: isDark ? const Color(0xFF1A1A1E) : const Color(0xFFF8F5FF),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 38,
+                            height: 38,
+                            decoration: BoxDecoration(
+                              color: themeAccent.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            alignment: Alignment.center,
+                            child: Icon(
+                              Icons.assignment_turned_in_rounded,
+                              color: themeAccent,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Hasil Pemeriksaan Medis',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w900,
+                                    color: textColor,
+                                  ),
+                                ),
+                                Text(
+                                  '$formattedDate • Pasien: ${patient.nama}',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 10,
+                                    color: subtitleColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded, size: 18),
+                            onPressed: () => Navigator.of(ctx).pop(),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Flexible(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _buildDetailSectionTitle('Dokter Pemeriksa', textColor),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: inputBg,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: borderColor),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 32,
+                                    height: 32,
+                                    decoration: BoxDecoration(
+                                      color: themeAccent.withOpacity(0.12),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(Icons.person_rounded, color: themeAccent, size: 16),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          doctorName,
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            color: textColor,
+                                          ),
+                                        ),
+                                        Text(
+                                          'Dokter Pemeriksa',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 9,
+                                            color: subtitleColor.withOpacity(0.8),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            if (anamnesis != null) ...[
+                              _buildDetailSectionTitle('Keluhan & Anamnesis', textColor),
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: inputBg,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: borderColor),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (anamnesis['main_complaint'] != null && anamnesis['main_complaint'].toString().isNotEmpty) ...[
+                                      Text(
+                                        'Keluhan Utama:',
+                                        style: GoogleFonts.outfit(fontSize: 9.5, fontWeight: FontWeight.bold, color: subtitleColor),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        anamnesis['main_complaint'],
+                                        style: GoogleFonts.outfit(fontSize: 11.5, color: textColor),
+                                      ),
+                                      const SizedBox(height: 10),
+                                    ],
+                                    if (anamnesis['anamnesis'] != null && anamnesis['anamnesis'].toString().isNotEmpty) ...[
+                                      Text(
+                                        'Catatan Anamnesis:',
+                                        style: GoogleFonts.outfit(fontSize: 9.5, fontWeight: FontWeight.bold, color: subtitleColor),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        anamnesis['anamnesis'],
+                                        style: GoogleFonts.outfit(fontSize: 11.5, color: textColor),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+                            if (vitals != null) ...[
+                              _buildDetailSectionTitle('Tanda-tanda Vital', textColor),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  if (vitals['blood_pressure'] != null && vitals['blood_pressure'].toString().isNotEmpty)
+                                    _buildVitalChip('Tensi', '${vitals['blood_pressure']} mmHg', Icons.speed_rounded, themeAccent, isDark),
+                                  if (vitals['body_temperature'] != null && vitals['body_temperature'].toString().isNotEmpty)
+                                    _buildVitalChip('Suhu', '${vitals['body_temperature']} °C', Icons.thermostat_rounded, themeAccent, isDark),
+                                  if (vitals['heart_rate'] != null && vitals['heart_rate'].toString().isNotEmpty)
+                                    _buildVitalChip('Nadi', '${vitals['heart_rate']} bpm', Icons.favorite_rounded, themeAccent, isDark),
+                                  if (vitals['oxygen_saturation'] != null && vitals['oxygen_saturation'].toString().isNotEmpty)
+                                    _buildVitalChip('SpO2', '${vitals['oxygen_saturation']} %', Icons.bubble_chart_rounded, themeAccent, isDark),
+                                  if (vitals['body_weight'] != null && vitals['body_weight'].toString().isNotEmpty)
+                                    _buildVitalChip('Berat', '${vitals['body_weight']} kg', Icons.monitor_weight_rounded, themeAccent, isDark),
+                                  if (vitals['body_height'] != null && vitals['body_height'].toString().isNotEmpty)
+                                    _buildVitalChip('Tinggi', '${vitals['body_height']} cm', Icons.height_rounded, themeAccent, isDark),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+                            if (diagnoses.isNotEmpty) ...[
+                              _buildDetailSectionTitle('Diagnosis (ICD-10)', textColor),
+                              Column(
+                                children: diagnoses.map((diag) {
+                                  return Container(
+                                    margin: const EdgeInsets.only(bottom: 6),
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: isDark ? const Color(0xFF1E1E22) : const Color(0xFFF9F9FB),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: borderColor),
+                                    ),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.redAccent.withOpacity(0.12),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            diag['icdx_code'] ?? '',
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.redAccent,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Text(
+                                            diag['description'] ?? '',
+                                            style: GoogleFonts.outfit(fontSize: 11, color: textColor, fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+                            if (medicines.isNotEmpty) ...[
+                              _buildDetailSectionTitle('Resep Obat', textColor),
+                              Column(
+                                children: medicines.map((med) {
+                                  return Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 4),
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.medication_rounded, size: 14, color: themeAccent),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            med['name'],
+                                            style: GoogleFonts.outfit(fontSize: 11.5, color: textColor, fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                        Text(
+                                          '${med['quantity'].toString().replaceAll('.0', '')} unit',
+                                          style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor, fontWeight: FontWeight.bold),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+                            if (isRujukan) ...[
+                              _buildDetailSectionTitle('Surat Rujukan', textColor),
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.blueAccent.withOpacity(0.06),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.blueAccent.withOpacity(0.15)),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(Icons.launch_rounded, size: 14, color: Colors.blueAccent),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'RUJUKAN OUT PATIENT',
+                                          style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.blueAccent),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'RS Rujukan: ${ce['rujukan_rumah_sakit'] ?? '-'}',
+                                      style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: textColor),
+                                    ),
+                                    Text(
+                                      'Poli Rujukan: ${ce['rujukan_poli'] ?? '-'}',
+                                      style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor, fontWeight: FontWeight.bold),
+                                    ),
+                                    Text(
+                                      'Nomor Rujukan: ${ce['rujukan_nomor'] ?? '-'}',
+                                      style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor, fontWeight: FontWeight.bold),
+                                    ),
+                                    if (ce['rujukan_catatan'] != null && ce['rujukan_catatan'].toString().isNotEmpty) ...[
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        'Catatan Rujukan: ${ce['rujukan_catatan']}',
+                                        style: GoogleFonts.outfit(fontSize: 10.5, fontStyle: FontStyle.italic, color: textColor),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDetailSectionTitle(String title, Color textColor) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8, left: 2),
+      child: Text(
+        title.toUpperCase(),
+        style: GoogleFonts.outfit(
+          fontSize: 8.5,
+          fontWeight: FontWeight.w900,
+          color: textColor.withOpacity(0.5),
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVitalChip(String label, String value, IconData icon, Color accent, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E22) : const Color(0xFFF5F6F8),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: accent),
+          const SizedBox(width: 6),
+          Text(
+            '$label: ',
+            style: GoogleFonts.outfit(fontSize: 10, color: isDark ? Colors.grey[400] : const Color(0xFF6F6A8A)),
+          ),
+          Text(
+            value,
+            style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF1B0C3C)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildStep1(
     Color textCol,
     Color subtitleCol,
@@ -2366,6 +2948,8 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
     Color purple,
   ) {
     final patient = _activePatient!;
+    final isDark = ref.read(landingPageProvider).appearance == 'dark';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -2528,6 +3112,61 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
             ],
           ),
         ),
+        if (patient.history.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'RIWAYAT PEMERIKSAAN SEBELUMNYA',
+                style: GoogleFonts.outfit(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  color: textCol.withOpacity(0.5),
+                  letterSpacing: 0.5,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: purple.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${patient.history.length} Record${patient.history.length > 1 ? 's' : ''}',
+                  style: GoogleFonts.outfit(
+                    fontSize: 8,
+                    fontWeight: FontWeight.w900,
+                    color: purple,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: patient.history.take(2).length,
+            itemBuilder: (context, index) {
+              final historyItem = patient.history[index];
+              final parts = historyItem.split('|');
+              final queueId = parts[0];
+              final formattedDate = parts.length > 1 ? parts[1] : parts[0];
+
+              return HistoryItemCard(
+                formattedDate: formattedDate,
+                queueId: queueId,
+                border: borderCol,
+                text: textCol,
+                subtitle: subtitleCol,
+                colorTheme: purple,
+                isDark: isDark,
+                onTap: () => _showEncounterDetailDialog(context, queueId, formattedDate, patient, isDark),
+              );
+            },
+          ),
+        ],
       ],
     );
   }
@@ -4164,9 +4803,9 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
       (sum, item) =>
           sum + ((item["obat"] as ObatModel).hargaSatuan * item["jumlah"]),
     );
-    final double serviceFee =
-        double.tryParse(_serviceFeeController.text) ??
-        ref.read(landingPageProvider).defaultServiceFee;
+    final double serviceFee = _serviceFeeController.text.isEmpty
+        ? ref.read(landingPageProvider).defaultServiceFee
+        : parseFormattedPrice(_serviceFeeController.text);
     final double totalBill = serviceFee + subtotalObat;
 
     final tabs = [
@@ -4400,9 +5039,9 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                             _tableCellText(drug.nama, textCol, isBold: true),
                             _tableCellText(item["aturan"], textCol),
                             _tableCellText('${item["jumlah"]}', textCol),
-                            _tableCellText('Rp ${itemPrice.toInt()}', textCol),
+                            _tableCellText('Rp ${formatPrice(itemPrice)}', textCol),
                             _tableCellText(
-                              'Rp ${itemSubtotal.toInt()}',
+                              'Rp ${formatPrice(itemSubtotal)}',
                               textCol,
                             ),
                             TableCell(
@@ -4428,7 +5067,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: Text(
-                    'Subtotal Obat  Rp ${subtotalObat.toInt()}',
+                    'Subtotal Obat  Rp ${formatPrice(subtotalObat)}',
                     style: GoogleFonts.outfit(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w900,
@@ -5044,9 +5683,9 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
       (sum, item) =>
           sum + ((item["obat"] as ObatModel).hargaSatuan * item["jumlah"]),
     );
-    final double serviceFee =
-        double.tryParse(_serviceFeeController.text) ??
-        ref.read(landingPageProvider).defaultServiceFee;
+    final double serviceFee = _serviceFeeController.text.isEmpty
+        ? ref.read(landingPageProvider).defaultServiceFee
+        : parseFormattedPrice(_serviceFeeController.text);
     final double totalBill = serviceFee + subtotalObat;
 
     return Container(
@@ -5103,6 +5742,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                       child: TextField(
                         controller: _serviceFeeController,
                         keyboardType: TextInputType.number,
+                        inputFormatters: [ThousandsFormatter()],
                         style: GoogleFonts.outfit(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
@@ -5122,7 +5762,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
               Text('•', style: GoogleFonts.outfit(color: borderCol)),
               const SizedBox(width: 12),
               Text(
-                'Subtotal Obat: Rp ${subtotalObat.toInt()}',
+                'Subtotal Obat: Rp ${formatPrice(subtotalObat)}',
                 style: GoogleFonts.outfit(
                   fontSize: 10.5,
                   fontWeight: FontWeight.bold,
@@ -5144,7 +5784,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                 ),
               ),
               Text(
-                'Rp ${totalBill.toInt()}',
+                'Rp ${formatPrice(totalBill)}',
                 style: GoogleFonts.outfit(
                   fontSize: 18,
                   fontWeight: FontWeight.w900,
@@ -5368,7 +6008,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Text(
-                                          'Rp ${d.hargaSatuan.toInt()}',
+                                          'Rp ${formatPrice(d.hargaSatuan)}',
                                           style: GoogleFonts.outfit(
                                             fontSize: 11,
                                             fontWeight: FontWeight.w900,
@@ -5441,7 +6081,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                               ),
                             ),
                             Text(
-                              'Rp ${localSelectedDrug!.hargaSatuan.toInt()} / unit',
+                              'Rp ${formatPrice(localSelectedDrug!.hargaSatuan)} / unit',
                               style: GoogleFonts.outfit(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w900,

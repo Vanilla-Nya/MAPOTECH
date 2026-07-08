@@ -9,6 +9,8 @@ import 'package:mapotech/features/dokter/dashboard/frontend/dokter_pasien.dart';
 import 'package:mapotech/shared/satusehat_service.dart';
 import 'package:mapotech/shared/widgets/common_pagination.dart';
 import 'package:mapotech/shared/widgets/skeleton_loading.dart';
+import 'package:mapotech/shared/thousands_formatter.dart';
+import 'package:flutter/services.dart';
 
 class BukuKasEntry {
   final String id;
@@ -116,6 +118,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
   final _expDescController = TextEditingController();
   final _expAmountController = TextEditingController();
   String _expCategory = 'Obat & Medis';
+  String _txType = 'expense'; // 'expense' or 'income'
 
   @override
   void initState() {
@@ -838,20 +841,33 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
     super.dispose();
   }
 
+  void _closeExpenseWizard() {
+    setState(() {
+      _showExpenseWizard = false;
+      _expDescController.clear();
+      _expAmountController.clear();
+      _txType = 'expense';
+      _expCategory = 'Obat & Medis';
+    });
+  }
+
   void _saveExpense() async {
     final desc = _expDescController.text.trim();
-    final amt = double.tryParse(_expAmountController.text) ?? 0.0;
+    final amt = parseFormattedPrice(_expAmountController.text);
+    final state = ref.read(landingPageProvider);
+    final actionWord = _txType == 'expense' ? 'pengeluaran' : 'pemasukan';
+
     if (desc.isEmpty) {
       _showWarningDialog(
-        'Form Belum Lengkap',
-        'Harap isi deskripsi pengeluaran klinik.',
+        'Form Belum Lengkap'.tr(state),
+        'Harap isi deskripsi $actionWord klinik.'.tr(state),
       );
       return;
     }
     if (amt <= 0) {
       _showWarningDialog(
-        'Jumlah Salah',
-        'Harap masukkan jumlah nominal pengeluaran yang valid.',
+        'Jumlah Salah'.tr(state),
+        'Harap masukkan jumlah nominal $actionWord yang valid.'.tr(state),
       );
       return;
     }
@@ -865,38 +881,45 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
         throw Exception('Doctor ID tidak ditemukan. Harap login kembali.');
       }
 
-      await _db.addDoctorExpense(
+      await _db.addDoctorManualTransaction(
         doctorId: doctorId,
         amount: amt,
         description: desc,
         category: _expCategory,
+        transactionType: _txType,
       );
 
       await _loadTransactions();
 
-      setState(() {
-        _showExpenseWizard = false;
-        _expDescController.clear();
-        _expAmountController.clear();
-      });
+      final activeGreen = const Color(0xFF48C9B0);
+      final isExpense = _txType == 'expense';
+      final snackbarColor = isExpense ? Colors.redAccent : activeGreen;
+      final snackbarIcon = isExpense ? Icons.outbox_rounded : Icons.inbox_rounded;
+      final successMsg = isExpense
+          ? 'Pengeluaran "$desc" sebesar Rp ${_formatAmount(amt)} berhasil dicatat.'.tr(state)
+          : 'Pemasukan "$desc" sebesar Rp ${_formatAmount(amt)} berhasil dicatat.'.tr(state);
+
+      _closeExpenseWizard();
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
-          backgroundColor: Colors.redAccent,
+          backgroundColor: snackbarColor,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
           content: Row(
             children: [
-              const Icon(Icons.outbox_rounded, color: Colors.white, size: 18),
+              Icon(snackbarIcon, color: Colors.white, size: 18),
               const SizedBox(width: 10),
-              Text(
-                'Pengeluaran "$desc" sebesar Rp ${amt.toInt()} berhasil dicatat.',
-                style: GoogleFonts.outfit(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+              Expanded(
+                child: Text(
+                  successMsg,
+                  style: GoogleFonts.outfit(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ],
@@ -905,12 +928,109 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
       );
     } catch (e) {
       _showWarningDialog(
-        'Gagal Menyimpan',
-        'Terjadi kesalahan saat menyimpan pengeluaran: $e',
+        'Gagal Menyimpan'.tr(state),
+        'Terjadi kesalahan saat menyimpan transaksi: $e'.tr(state),
       );
     } finally {
       setState(() => _isSaving = false);
     }
+  }
+
+  void _confirmSave() {
+    final desc = _expDescController.text.trim();
+    final amt = parseFormattedPrice(_expAmountController.text);
+    final state = ref.read(landingPageProvider);
+    final actionWord = _txType == 'expense' ? 'pengeluaran' : 'pemasukan';
+
+    if (desc.isEmpty) {
+      _showWarningDialog(
+        'Form Belum Lengkap'.tr(state),
+        'Harap isi deskripsi $actionWord klinik.'.tr(state),
+      );
+      return;
+    }
+    if (amt <= 0) {
+      _showWarningDialog(
+        'Jumlah Salah'.tr(state),
+        'Harap masukkan jumlah nominal $actionWord yang valid.'.tr(state),
+      );
+      return;
+    }
+
+    final activeGreen = const Color(0xFF48C9B0);
+    final confirmMsg = _txType == 'expense'
+        ? 'Apakah Anda yakin ingin menyimpan pengeluaran ini?'
+        : 'Apakah Anda yakin ingin menyimpan pemasukan ini?';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Theme.of(context).cardColor,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(
+              Icons.help_outline_rounded,
+              color: _txType == 'expense' ? Colors.redAccent : activeGreen,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Apakah Anda yakin?'.tr(state),
+              style: GoogleFonts.outfit(
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          confirmMsg.tr(state),
+          style: GoogleFonts.outfit(
+            fontSize: 11,
+            color: Colors.grey[600],
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(
+              'Batal'.tr(state),
+              style: GoogleFonts.outfit(
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+                color: Colors.grey,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _saveExpense();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _txType == 'expense' ? Colors.redAccent : activeGreen,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            ),
+            child: Text(
+              'Ya, Simpan'.tr(state),
+              style: GoogleFonts.outfit(
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showWarningDialog(String title, String message) {
@@ -1279,7 +1399,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                 _buildMetricCard(
                   Icons.trending_up_rounded,
                   'TOTAL INCOME',
-                  'Rp ${totalPemasukan.toInt()}',
+                  'Rp ${_formatAmount(totalPemasukan)}',
                   subtitleColor,
                   activeGreen,
                   cardBg,
@@ -1291,7 +1411,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                 _buildMetricCard(
                   Icons.trending_down_rounded,
                   'TOTAL EXPENSES',
-                  'Rp ${totalPengeluaran.toInt()}',
+                  'Rp ${_formatAmount(totalPengeluaran)}',
                   subtitleColor,
                   Colors.redAccent,
                   cardBg,
@@ -1303,7 +1423,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                 _buildMetricCard(
                   Icons.account_balance_wallet_rounded,
                   'NET PROFIT',
-                  'Rp ${saldoBersih.toInt()}',
+                  'Rp ${_formatAmount(saldoBersih)}',
                   subtitleColor,
                   activeGreen,
                   cardBg,
@@ -4042,6 +4162,11 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
     Color purple,
   ) {
     final state = ref.read(landingPageProvider);
+    final activeGreen = const Color(0xFF48C9B0);
+    final isExpense = _txType == 'expense';
+    final accentColor = isExpense ? Colors.redAccent : activeGreen;
+    final wizardIcon = isExpense ? Icons.outbox_rounded : Icons.inbox_rounded;
+
     return Positioned.fill(
       child: Container(
         color: Colors.black.withOpacity(0.3),
@@ -4076,19 +4201,21 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                             width: 32,
                             height: 32,
                             decoration: BoxDecoration(
-                              color: Colors.redAccent.withOpacity(0.12),
+                              color: accentColor.withOpacity(0.12),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             alignment: Alignment.center,
-                            child: const Icon(
-                              Icons.outbox_rounded,
-                              color: Colors.redAccent,
+                            child: Icon(
+                              wizardIcon,
+                              color: accentColor,
                               size: 16,
                             ),
                           ),
                           const SizedBox(width: 12),
                           Text(
-                            'Catat Pengeluaran Baru'.tr(state),
+                            isExpense
+                                ? 'Catat Pengeluaran Baru'.tr(state)
+                                : 'Catat Pemasukan Baru'.tr(state),
                             style: GoogleFonts.outfit(
                               fontSize: 14,
                               fontWeight: FontWeight.w900,
@@ -4099,15 +4226,124 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                       ),
                       IconButton(
                         icon: const Icon(Icons.close_rounded, size: 18),
-                        onPressed: () =>
-                            setState(() => _showExpenseWizard = false),
+                        onPressed: _isSaving ? null : _closeExpenseWizard,
                       ),
                     ],
                   ),
                   const Divider(height: 24),
 
+                  // Segmented Choice Toggle between Pemasukan & Pengeluaran
+                  Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: _isSaving
+                              ? null
+                              : () {
+                                  setState(() {
+                                    _txType = 'income';
+                                    _expCategory = 'Konsultasi';
+                                  });
+                                },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            decoration: BoxDecoration(
+                              color: !isExpense
+                                  ? activeGreen.withOpacity(0.15)
+                                  : inputBg,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: !isExpense
+                                    ? activeGreen
+                                    : border,
+                                width: 1.5,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.inbox_rounded,
+                                  size: 14,
+                                  color: !isExpense
+                                      ? activeGreen
+                                      : subtitle,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Pemasukan'.tr(state),
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w900,
+                                    color: !isExpense
+                                        ? activeGreen
+                                        : subtitle,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: _isSaving
+                              ? null
+                              : () {
+                                  setState(() {
+                                    _txType = 'expense';
+                                    _expCategory = 'Obat & Medis';
+                                  });
+                                },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            decoration: BoxDecoration(
+                              color: isExpense
+                                  ? Colors.redAccent.withOpacity(0.15)
+                                  : inputBg,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: isExpense
+                                    ? Colors.redAccent
+                                    : border,
+                                width: 1.5,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.outbox_rounded,
+                                  size: 14,
+                                  color: isExpense
+                                      ? Colors.redAccent
+                                      : subtitle,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Pengeluaran'.tr(state),
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w900,
+                                    color: isExpense
+                                        ? Colors.redAccent
+                                        : subtitle,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
                   Text(
-                    'Deskripsi Pengeluaran *'.tr(state),
+                    isExpense
+                        ? 'Deskripsi Pengeluaran *'.tr(state)
+                        : 'Deskripsi Pemasukan *'.tr(state),
                     style: GoogleFonts.outfit(
                       fontSize: 9.5,
                       fontWeight: FontWeight.w900,
@@ -4123,8 +4359,9 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                       color: text,
                     ),
                     decoration: InputDecoration(
-                      hintText: 'cth. Pembelian Reagen Golongan Darah & Syringe'
-                          .tr(state),
+                      hintText: isExpense
+                          ? 'cth. Pembelian Reagen Golongan Darah & Syringe'.tr(state)
+                          : 'cth. Pendapatan Tambahan / Klaim'.tr(state),
                       hintStyle: GoogleFonts.outfit(
                         fontSize: 11,
                         color: subtitle.withOpacity(0.5),
@@ -4140,7 +4377,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: purple),
+                        borderSide: BorderSide(color: accentColor),
                       ),
                     ),
                   ),
@@ -4154,7 +4391,9 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Kategori Pengeluaran *'.tr(state),
+                              isExpense
+                                  ? 'Kategori Pengeluaran *'.tr(state)
+                                  : 'Kategori Pemasukan *'.tr(state),
                               style: GoogleFonts.outfit(
                                 fontSize: 9.5,
                                 fontWeight: FontWeight.w900,
@@ -4190,20 +4429,25 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                                       setState(() => _expCategory = val);
                                     }
                                   },
-                                  items:
-                                      [
-                                            'Obat & Medis',
-                                            'Operasional',
-                                            'Gaji Staff',
-                                            'Lain-lain',
-                                          ]
-                                          .map(
-                                            (c) => DropdownMenuItem(
-                                              value: c,
-                                              child: Text(c.tr(state)),
-                                            ),
-                                          )
-                                          .toList(),
+                                  items: (isExpense
+                                          ? [
+                                              'Obat & Medis',
+                                              'Operasional',
+                                              'Gaji Staff',
+                                              'Lain-lain',
+                                            ]
+                                          : [
+                                              'Konsultasi',
+                                              'Farmasi',
+                                              'Lain-lain',
+                                            ])
+                                      .map(
+                                        (c) => DropdownMenuItem(
+                                          value: c,
+                                          child: Text(c.tr(state)),
+                                        ),
+                                      )
+                                      .toList(),
                                 ),
                               ),
                             ),
@@ -4227,13 +4471,14 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                             TextField(
                               controller: _expAmountController,
                               keyboardType: TextInputType.number,
+                              inputFormatters: [ThousandsFormatter()],
                               style: GoogleFonts.outfit(
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
                                 color: text,
                               ),
                               decoration: InputDecoration(
-                                hintText: 'cth. 150000'.tr(state),
+                                hintText: 'cth. 150.000'.tr(state),
                                 hintStyle: GoogleFonts.outfit(
                                   fontSize: 11,
                                   color: subtitle.withOpacity(0.5),
@@ -4249,7 +4494,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
-                                  borderSide: BorderSide(color: purple),
+                                  borderSide: BorderSide(color: accentColor),
                                 ),
                               ),
                             ),
@@ -4265,9 +4510,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       TextButton(
-                        onPressed: _isSaving
-                            ? null
-                            : () => setState(() => _showExpenseWizard = false),
+                        onPressed: _isSaving ? null : _closeExpenseWizard,
                         child: Text(
                           'Batal'.tr(state),
                           style: GoogleFonts.outfit(
@@ -4279,9 +4522,9 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                       ),
                       const SizedBox(width: 14),
                       ElevatedButton(
-                        onPressed: _isSaving ? null : _saveExpense,
+                        onPressed: _isSaving ? null : _confirmSave,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: purple,
+                          backgroundColor: accentColor,
                           foregroundColor: Colors.white,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
@@ -4302,7 +4545,9 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                                 ),
                               )
                             : Text(
-                                'Simpan Pengeluaran'.tr(state),
+                                isExpense
+                                    ? 'Simpan Pengeluaran'.tr(state)
+                                    : 'Simpan Pemasukan'.tr(state),
                                 style: GoogleFonts.outfit(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w900,
@@ -5011,21 +5256,21 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                             if (isPemasukan) ...[
                               _invoiceItemRow(
                                 'Jasa Pemeriksaan & Konsultasi Medis',
-                                'Rp ${consultFee.toInt()}',
+                                'Rp ${_formatAmount(consultFee)}',
                                 text,
                               ),
                               if (drugFee > 0) ...[
                                 const SizedBox(height: 6),
                                 _invoiceItemRow(
                                   'Resep Digital & Terapi Obat',
-                                  'Rp ${drugFee.toInt()}',
+                                  'Rp ${_formatAmount(drugFee)}',
                                   text,
                                 ),
                               ],
                             ] else ...[
                               _invoiceItemRow(
                                 entry.deskripsi,
-                                'Rp ${entry.jumlah.toInt()}',
+                                'Rp ${_formatAmount(entry.jumlah)}',
                                 text,
                               ),
                             ],
@@ -5047,7 +5292,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                                   ),
                                 ),
                                 Text(
-                                  'Rp ${entry.jumlah.toInt()}',
+                                  'Rp ${_formatAmount(entry.jumlah)}',
                                   style: GoogleFonts.outfit(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w900,

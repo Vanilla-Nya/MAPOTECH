@@ -1019,7 +1019,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
     }
   }
 
-  Future<void> _renewSubscription() async {
+  Future<void> _renewSubscription([int amount = 1000]) async {
     if (_isAssistant) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -1062,6 +1062,22 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
             'subscription_expired_at': newExpiryStr,
           })
           .eq('id', userId);
+
+      // Automatically record subscription renewal as expense in doctor's financial_transactions
+      try {
+        final txData = {
+          'id_user': userId,
+          'transaction_type': 'expense',
+          'source_type': 'manual',
+          'amount': amount.toDouble(),
+          'description': 'Perpanjangan Langganan Praktik Mandiri 30 Hari',
+          'category': 'Operasional',
+          'status': 'active',
+        };
+        await client.schema('private_doctor').from('financial_transactions').insert(txData);
+      } catch (dbErr) {
+        debugPrint('Failed to auto-record subscription expense: $dbErr');
+      }
 
       await _fetchDbData();
 
@@ -2225,7 +2241,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                 if (isPaid) {
                   _clearPendingPayment();
                   if (dialogContext.mounted) Navigator.of(dialogContext).pop();
-                  await _renewSubscription();
+                  await _renewSubscription(amount);
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Pembayaran QRIS berhasil! Langganan diperpanjang.'),

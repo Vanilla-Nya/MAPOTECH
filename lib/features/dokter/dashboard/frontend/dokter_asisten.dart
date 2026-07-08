@@ -181,7 +181,9 @@ class DokterAsistenListNotifier extends StateNotifier<List<AsistenModel>> {
               ? const Color(0xFF48C9B0)
               : (da['peran'] == 'Front Desk'
                     ? const Color(0xFFB577F2)
-                    : const Color(0xFFF39C12)),
+                    : (da['peran'] == 'Administrator'
+                          ? const Color(0xFFF39C12)
+                          : const Color(0xFF3498DB))),
           username: da['username'] as String? ?? '',
           gender: da['gender'] as String? ?? 'Male',
           birthPlace: da['birth_place'] as String? ?? '',
@@ -624,7 +626,9 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
         ? const Color(0xFF48C9B0)
         : (a.peran == 'Front Desk'
               ? const Color(0xFFB577F2)
-              : const Color(0xFFF39C12));
+              : (a.peran == 'Administrator'
+                    ? const Color(0xFFF39C12)
+                    : const Color(0xFF3498DB)));
 
     return GestureDetector(
       onTap: () {
@@ -1668,6 +1672,7 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                                             'Perawat',
                                             'Front Desk',
                                             'Administrator',
+                                            'Lain-lain',
                                           ].map((String role) {
                                             return DropdownMenuItem<String>(
                                               value: role,
@@ -2436,17 +2441,17 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                                                     fontWeight: FontWeight.bold,
                                                   ),
                                                   isExpanded: true,
-                                                  items:
-                                                      [
-                                                        'Perawat',
-                                                        'Front Desk',
-                                                        'Administrator',
-                                                      ].map((String role) {
-                                                        return DropdownMenuItem(
-                                                          value: role,
-                                                          child: Text(role),
-                                                        );
-                                                      }).toList(),
+                                                  items: [
+                                                    'Perawat',
+                                                    'Front Desk',
+                                                    'Administrator',
+                                                    'Lain-lain',
+                                                  ].map((String role) {
+                                                    return DropdownMenuItem(
+                                                      value: role,
+                                                      child: Text(role),
+                                                    );
+                                                  }).toList(),
                                                   onChanged: (val) {
                                                     setModalState(() {
                                                       selectedRole =
@@ -2468,7 +2473,8 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                                                           'PASIEN',
                                                           'ANTRIAN',
                                                         ];
-                                                      } else {
+                                                      } else if (selectedRole ==
+                                                          'Administrator') {
                                                         selectedPerms = [
                                                           'DASHBOARD',
                                                           'PASIEN',
@@ -2477,6 +2483,10 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                                                           'PEMERIKSAAN',
                                                           'PEMBUKUAN',
                                                           'ASISTEN',
+                                                        ];
+                                                      } else {
+                                                        selectedPerms = [
+                                                          'DASHBOARD',
                                                         ];
                                                       }
                                                     });
@@ -3393,7 +3403,9 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                                     ? const Color(0xFF48C9B0)
                                     : (selectedRole == 'Front Desk'
                                           ? const Color(0xFFB577F2)
-                                          : const Color(0xFFF39C12)),
+                                          : (selectedRole == 'Administrator'
+                                                ? const Color(0xFFF39C12)
+                                                : const Color(0xFF3498DB))),
                                 username: username,
                                 gender: selectedGender,
                                 birthPlace: birthPlaceController.text.trim(),

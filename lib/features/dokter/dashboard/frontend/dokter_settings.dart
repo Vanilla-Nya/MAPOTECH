@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/widgets/settings_widgets.dart';
+import 'package:mapotech/shared/thousands_formatter.dart';
 
 /// Pengaturan Dokter — dedicated settings page for the dokter/praktek mandiri role.
 class DokterSettings extends ConsumerStatefulWidget {
@@ -22,7 +23,7 @@ class _DokterSettingsState extends ConsumerState<DokterSettings> {
     super.initState();
     final state = ref.read(landingPageProvider);
     _feeController = TextEditingController(
-      text: state.defaultServiceFee.toInt().toString(),
+      text: formatPrice(state.defaultServiceFee),
     );
   }
 
@@ -218,6 +219,7 @@ class _DokterSettingsState extends ConsumerState<DokterSettings> {
                   child: TextField(
                     controller: _feeController,
                     keyboardType: TextInputType.number,
+                    inputFormatters: [ThousandsFormatter()],
                     style: GoogleFonts.outfit(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
@@ -229,7 +231,7 @@ class _DokterSettingsState extends ConsumerState<DokterSettings> {
                       contentPadding: EdgeInsets.zero,
                     ),
                     onChanged: (val) {
-                      final double fee = double.tryParse(val) ?? 0.0;
+                      final double fee = parseFormattedPrice(val);
                       notifier.setDefaultServiceFee(fee);
                     },
                   ),
