@@ -1170,6 +1170,12 @@ class SupabaseService {
     required String referralPoli,
     required String referralNotes,
     required String referralNo,
+    String? suratKeteranganType,
+    String? suratKeperluan,
+    String? suratRiwayatPenyakit,
+    int? suratSakitHari,
+    String? suratSakitMulai,
+    String? suratSakitSelesai,
   }) async {
     try {
       final nowStr = DateTime.now().toUtc().toIso8601String();
@@ -1192,6 +1198,12 @@ class SupabaseService {
         'satusehat_last_error': null,
         'satusehat_encounter_id': null,
         'created_at': nowStr,
+        'surat_keterangan_type': suratKeteranganType,
+        'surat_keperluan': suratKeperluan,
+        'surat_riwayat_penyakit': suratRiwayatPenyakit,
+        'surat_sakit_hari': suratSakitHari,
+        'surat_sakit_mulai': suratSakitMulai,
+        'surat_sakit_selesai': suratSakitSelesai,
       };
 
       final encounterPrevHash = await _getPreviousHash('clinical_encounters');
