@@ -197,7 +197,17 @@ class KlinikPortal extends ConsumerWidget {
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         child: Column(
                           children: [
-                            Container(width: 28, height: 28, decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), shape: BoxShape.circle), child: const Icon(Icons.local_hospital_rounded, size: 14, color: Colors.white)),
+                            Image.asset(
+                              'assets/images/logo.png',
+                              width: 28,
+                              height: 28,
+                              fit: BoxFit.contain,
+                              errorBuilder: (context, error, stackTrace) => Container(
+                                width: 28, height: 28,
+                                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), shape: BoxShape.circle),
+                                child: const Icon(Icons.local_hospital_rounded, size: 14, color: Colors.white),
+                              ),
+                            ),
                             const SizedBox(height: 20),
                             const Icon(Icons.dashboard_rounded, size: 16, color: Colors.white),
                             const SizedBox(height: 16),

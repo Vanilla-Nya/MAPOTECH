@@ -23,6 +23,17 @@ class DrawerMenuItem {
 
 List<DrawerMenuItem> getMenuItemsForRole(String role, String lang, {LandingPageState? state}) {
   final isEn = lang == 'en';
+  
+  if (state != null && !state.isSubscribed && (role == 'dokter' || role == 'apotek')) {
+    return [
+      DrawerMenuItem(
+        id: 'profile',
+        label: isEn ? 'Profile' : 'Profil',
+        icon: role == 'dokter' ? Icons.person_rounded : Icons.account_circle_rounded,
+      ),
+    ];
+  }
+
   List<DrawerMenuItem> items = [];
   if (role == 'dokter') {
     items = [
@@ -209,7 +220,16 @@ class DashboardDrawer extends ConsumerWidget {
     final String avatarRoleLabel = state.loggedInRole == 'pasien'
         ? (isEn ? 'PATIENT' : 'PASIEN')
         : (state.loggedInRole == 'dokter'
-              ? (isEn ? 'DOCTOR' : 'DOKTER')
+              ? (() {
+                  final prof = (state.loggedInUser?['profession'] as String?)?.toLowerCase();
+                  if (prof == 'midwife') {
+                    return isEn ? 'MIDWIFE' : 'BIDAN';
+                  } else if (prof == 'nurse') {
+                    return isEn ? 'NURSE' : 'PERAWAT';
+                  } else {
+                    return isEn ? 'DOCTOR' : 'DOKTER';
+                  }
+                })()
               : (isEn ? 'PHARMACY' : 'APOTEK'));
 
     final showLabels = state.drawerSize == 1;
@@ -662,7 +682,18 @@ class FullScreenDrawerOverlay extends ConsumerWidget {
     }
     final String avatarRoleLabel = state.loggedInRole == 'pasien'
         ? 'PASIEN'
-        : (state.loggedInRole == 'dokter' ? 'DOKTER' : 'APOTEK');
+        : (state.loggedInRole == 'dokter'
+              ? (() {
+                  final prof = (state.loggedInUser?['profession'] as String?)?.toLowerCase();
+                  if (prof == 'midwife') {
+                    return 'BIDAN';
+                  } else if (prof == 'nurse') {
+                    return 'PERAWAT';
+                  } else {
+                    return 'DOKTER';
+                  }
+                })()
+              : 'APOTEK');
 
     final isMobile = MediaQuery.of(context).size.width < 768;
 

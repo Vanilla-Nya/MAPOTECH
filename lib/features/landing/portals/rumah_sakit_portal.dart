@@ -134,7 +134,17 @@ class RumahSakitPortal extends ConsumerWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Row(
                     children: [
-                      const Icon(Icons.corporate_fare_rounded, size: 16, color: Colors.white70),
+                      Image.asset(
+                        'assets/images/logo.png',
+                        width: 16,
+                        height: 16,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) => const Icon(
+                          Icons.corporate_fare_rounded,
+                          size: 16,
+                          color: Colors.white70,
+                        ),
+                      ),
                       const SizedBox(width: 8),
                       Text(lang == 'id' ? 'MAPOTECH Hospital ERP' : 'MAPOTECH Hospital ERP', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900, color: Colors.white)),
                       const Spacer(),

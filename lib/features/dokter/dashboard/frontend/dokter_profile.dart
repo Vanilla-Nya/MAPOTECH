@@ -15,6 +15,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/supabase_service.dart';
 import 'package:mapotech/shared/widgets/skeleton_loading.dart';
+import 'package:mapotech/shared/widgets/location_selector_widget.dart';
+import 'package:mapotech/shared/location_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'web_map_widget.dart';
@@ -588,6 +590,10 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
           _selectedProfession = 'Doctor';
         }
 
+        ref.read(landingPageProvider.notifier).updateUser({
+          'profession': prof,
+        });
+
         // Parse JSONB API credentials
         final ssApiRaw = detailRes['satu_sehat_api'];
         final Map<String, dynamic>? ssApi = ssApiRaw is Map
@@ -736,6 +742,12 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
           _selectedQrisBgType = 'BACKGROUND URL';
           _qrisBgPath = '';
           _qrisBgLinkController.text = bgValRaw;
+        }
+
+        // Force _showProfileInSearch to false if subscription is inactive or expired
+        final bool isSubActive = _subStatus == 'ACTIVE' && _subExpiryDate != null && _subExpiryDate!.isAfter(DateTime.now());
+        if (!isSubActive) {
+          _showProfileInSearch = false;
         }
       }
 
@@ -908,12 +920,15 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
 
       final maxVal = int.tryParse(_maxQueueController.text) ?? 20;
 
+      final bool isSubActive = _subStatus == 'ACTIVE' && _subExpiryDate != null && _subExpiryDate!.isAfter(DateTime.now());
+      final isVisibleToSave = isSubActive && _showProfileInSearch;
+
       await client
           .from('user_detail_doctor')
           .update({
             'google_maps_link': _mapsLinkController.text.trim(),
             'max_antrian': maxVal,
-            'is_visible': _showProfileInSearch,
+            'is_visible': isVisibleToSave,
             'is_bpjs': _serveBPJSPatients,
             'profession': _selectedProfession,
             'qris_type': qrisTypeDb,
@@ -3060,12 +3075,28 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
     bool isDark,
   ) {
     final isSelected = _activeTab == index;
+    final isSubActive = _subStatus == 'ACTIVE' && _subExpiryDate != null && _subExpiryDate!.isAfter(DateTime.now());
+    final isEnabled = isSubActive || index == 0;
+
     return GestureDetector(
-      onTap: () {
-        setState(() {
-          _activeTab = index;
-        });
-      },
+      onTap: isEnabled
+          ? () {
+              setState(() {
+                _activeTab = index;
+              });
+            }
+          : () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    ref.read(landingPageProvider).language == 'en'
+                        ? 'Please renew your subscription to access this tab.'
+                        : 'Harap perbarui langganan Anda untuk mengakses tab ini.',
+                  ),
+                  backgroundColor: Colors.orangeAccent,
+                ),
+              );
+            },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -3073,27 +3104,30 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
           color: isSelected ? tealColor : Colors.transparent,
           borderRadius: BorderRadius.circular(30),
         ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              size: 16,
-              color: isSelected
-                  ? Colors.white
-                  : (isDark ? Colors.grey[400] : const Color(0xFF64748B)),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: GoogleFonts.outfit(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
+        child: Opacity(
+          opacity: isEnabled ? 1.0 : 0.45,
+          child: Row(
+            children: [
+              Icon(
+                isEnabled ? icon : Icons.lock_rounded,
+                size: 16,
                 color: isSelected
                     ? Colors.white
-                    : (isDark ? Colors.grey[400] : const Color(0xFF475569)),
+                    : (isDark ? Colors.grey[400] : const Color(0xFF64748B)),
               ),
-            ),
-          ],
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: GoogleFonts.outfit(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: isSelected
+                      ? Colors.white
+                      : (isDark ? Colors.grey[400] : const Color(0xFF475569)),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -3112,11 +3146,16 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
     Color tealColor,
     Color purpleColor,
   ) {
+    final bool isSubActive = _subStatus == 'ACTIVE' && _subExpiryDate != null && _subExpiryDate!.isAfter(DateTime.now());
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Card: Personal Information
-        Container(
+        AbsorbPointer(
+          absorbing: !isSubActive,
+          child: Opacity(
+            opacity: isSubActive ? 1.0 : 0.6,
+            child: Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
             color: cardBg,
@@ -3301,69 +3340,25 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                 ),
               ),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildDropdownField(
-                      'Provinsi',
-                      _selectedProvinsi,
-                      [
-                        'JAWA TIMUR',
-                        'JAWA TENGAH',
-                        'JAWA BARAT',
-                        'DKI JAKARTA',
-                      ],
-                      (val) => setState(() => _selectedProvinsi = val!),
-                      inputBg,
-                      textColor,
-                      subtitleColor,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildDropdownField(
-                      'Kota/Kabupaten',
-                      _selectedKabupaten,
-                      [
-                        'KABUPATEN BONDOWOSO',
-                        'KABUPATEN JEMBER',
-                        'KABUPATEN BANYUWANGI',
-                      ],
-                      (val) => setState(() => _selectedKabupaten = val!),
-                      inputBg,
-                      textColor,
-                      subtitleColor,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildDropdownField(
-                      'Kecamatan',
-                      _selectedKecamatan,
-                      ['PUJER', 'TENGGARANG', 'KLOJEN'],
-                      (val) => setState(() => _selectedKecamatan = val!),
-                      inputBg,
-                      textColor,
-                      subtitleColor,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildDropdownField(
-                      'Kelurahan/Desa',
-                      _selectedKelurahan,
-                      ['KEJAYAN', 'PANGGUNGAN', 'SUMBERSARI'],
-                      (val) => setState(() => _selectedKelurahan = val!),
-                      inputBg,
-                      textColor,
-                      subtitleColor,
-                    ),
-                  ),
-                ],
+              LocationSelectorWidget(
+                initialProvince: _selectedProvinsi,
+                initialDistrict: _selectedKabupaten,
+                initialSubDistrict: _selectedKecamatan,
+                initialVillage: _selectedKelurahan,
+                fieldBg: inputBg,
+                textColor: textColor,
+                subtitleColor: subtitleColor,
+                borderColor: borderColor,
+                dropdownColor: inputBg,
+                fontSize: 12,
+                onChanged: (province, district, subDistrict, village) {
+                  setState(() {
+                    _selectedProvinsi = province;
+                    _selectedKabupaten = district;
+                    _selectedKecamatan = subDistrict;
+                    _selectedKelurahan = village;
+                  });
+                },
               ),
               const SizedBox(height: 12),
               Column(
@@ -3962,6 +3957,8 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
             ],
           ),
         ),
+      ),
+    ),
 
         const SizedBox(height: 20),
 
@@ -5006,6 +5003,10 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                 textColor,
                 subtitleColor,
                 tealColor,
+                enabled: _subStatus == 'ACTIVE' && _subExpiryDate != null && _subExpiryDate!.isAfter(DateTime.now()),
+                warningText: (_subStatus == 'ACTIVE' && _subExpiryDate != null && _subExpiryDate!.isAfter(DateTime.now()))
+                    ? null
+                    : 'Active subscription is required to enable public search visibility.',
               ),
 
               const Divider(height: 32),
@@ -5107,11 +5108,13 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
     String title,
     String desc,
     bool val,
-    Function(bool) onChanged,
+    Function(bool)? onChanged,
     Color textColor,
     Color subtitleColor,
-    Color activeColor,
-  ) {
+    Color activeColor, {
+    bool enabled = true,
+    String? warningText,
+  }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -5124,7 +5127,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                 style: GoogleFonts.outfit(
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
-                  color: textColor,
+                  color: enabled ? textColor : textColor.withOpacity(0.5),
                 ),
               ),
               const SizedBox(height: 4),
@@ -5132,15 +5135,30 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                 desc,
                 style: GoogleFonts.outfit(
                   fontSize: 10.5,
-                  color: subtitleColor,
+                  color: enabled ? subtitleColor : subtitleColor.withOpacity(0.5),
                   height: 1.4,
                 ),
               ),
+              if (warningText != null) ...[
+                const SizedBox(height: 6),
+                Text(
+                  warningText,
+                  style: GoogleFonts.outfit(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.redAccent,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
         const SizedBox(width: 16),
-        Switch(value: val, onChanged: onChanged, activeThumbColor: activeColor),
+        Switch(
+          value: enabled ? val : false,
+          onChanged: enabled ? onChanged : null,
+          activeThumbColor: enabled ? activeColor : Colors.grey,
+        ),
       ],
     );
   }

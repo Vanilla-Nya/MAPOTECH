@@ -6,6 +6,8 @@ import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/widgets/ui.dart';
 
 import 'package:mapotech/shared/supabase_service.dart';
+import 'package:mapotech/shared/widgets/location_selector_widget.dart';
+import 'package:mapotech/shared/location_service.dart';
 import 'dart:math';
 
 // ─── UUID Generation Helper ──────────────────────────────────────────────────
@@ -1870,197 +1872,27 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                       ),
                       const SizedBox(height: 12),
 
-                      // Full Address
-                      _buildInputLabel('PROVINSI', subColor),
-                      Container(
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: inputBg,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: prov,
-                            dropdownColor: dialogBg,
-                            isExpanded: true,
-                            style: GoogleFonts.outfit(
-                              fontSize: 12,
-                              color: txtColor,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            items: provinces
-                                .map(
-                                  (p) => DropdownMenuItem(
-                                    value: p,
-                                    child: Text(p),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (val) {
-                              if (val != null) {
-                                setModalState(() {
-                                  prov = val;
-                                  kota = 'Pilih Kota/Kabupaten';
-                                  kec = 'Pilih Kecamatan';
-                                  kel = 'Pilih Kelurahan/Desa';
-                                });
-                              }
-                            },
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildInputLabel('KOTA / KABUPATEN', subColor),
-                                Container(
-                                  height: 44,
-                                  decoration: BoxDecoration(
-                                    color: inputBg,
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                  ),
-                                  child: DropdownButtonHideUnderline(
-                                    child: DropdownButton<String>(
-                                      value: cities.contains(kota)
-                                          ? kota
-                                          : 'Pilih Kota/Kabupaten',
-                                      dropdownColor: dialogBg,
-                                      isExpanded: true,
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 12,
-                                        color: txtColor,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                      items: cities
-                                          .map(
-                                            (c) => DropdownMenuItem(
-                                              value: c,
-                                              child: Text(c),
-                                            ),
-                                          )
-                                          .toList(),
-                                      onChanged: (val) {
-                                        if (val != null) {
-                                          setModalState(() {
-                                            kota = val;
-                                            kec = 'Pilih Kecamatan';
-                                            kel = 'Pilih Kelurahan/Desa';
-                                          });
-                                        }
-                                      },
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildInputLabel('KECAMATAN', subColor),
-                                Container(
-                                  height: 44,
-                                  decoration: BoxDecoration(
-                                    color: inputBg,
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                  ),
-                                  child: DropdownButtonHideUnderline(
-                                    child: DropdownButton<String>(
-                                      value: districts.contains(kec)
-                                          ? kec
-                                          : 'Pilih Kecamatan',
-                                      dropdownColor: dialogBg,
-                                      isExpanded: true,
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 12,
-                                        color: txtColor,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                      items: districts
-                                          .map(
-                                            (d) => DropdownMenuItem(
-                                              value: d,
-                                              child: Text(d),
-                                            ),
-                                          )
-                                          .toList(),
-                                      onChanged: (val) {
-                                        if (val != null) {
-                                          setModalState(() {
-                                            kec = val;
-                                            kel = 'Pilih Kelurahan/Desa';
-                                          });
-                                        }
-                                      },
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildInputLabel('KELURAHAN / DESA', subColor),
-                                Container(
-                                  height: 44,
-                                  decoration: BoxDecoration(
-                                    color: inputBg,
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                  ),
-                                  child: DropdownButtonHideUnderline(
-                                    child: DropdownButton<String>(
-                                      value: villages.contains(kel)
-                                          ? kel
-                                          : 'Pilih Kelurahan/Desa',
-                                      dropdownColor: dialogBg,
-                                      isExpanded: true,
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 12,
-                                        color: txtColor,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                      items: villages
-                                          .map(
-                                            (v) => DropdownMenuItem(
-                                              value: v,
-                                              child: Text(v),
-                                            ),
-                                          )
-                                          .toList(),
-                                      onChanged: (val) {
-                                        if (val != null) {
-                                          setModalState(() {
-                                            kel = val;
-                                          });
-                                        }
-                                      },
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                      LocationSelectorWidget(
+                        initialProvince: prov == 'Pilih Provinsi' ? '' : prov,
+                        initialDistrict: kota == 'Pilih Kota/Kabupaten' ? '' : kota,
+                        initialSubDistrict: kec == 'Pilih Kecamatan' ? '' : kec,
+                        initialVillage: kel == 'Pilih Kelurahan/Desa' ? '' : kel,
+                        fieldBg: inputBg,
+                        textColor: txtColor,
+                        subtitleColor: subColor,
+                        borderColor: isDark
+                            ? const Color(0xFF2C2C2C)
+                            : Colors.grey[200]!,
+                        dropdownColor: dialogBg,
+                        fontSize: 12,
+                        onChanged: (province, district, subDistrict, village) {
+                          setModalState(() {
+                            prov = province.isEmpty ? 'Pilih Provinsi' : province;
+                            kota = district.isEmpty ? 'Pilih Kota/Kabupaten' : district;
+                            kec = subDistrict.isEmpty ? 'Pilih Kecamatan' : subDistrict;
+                            kel = village.isEmpty ? 'Pilih Kelurahan/Desa' : village;
+                          });
+                        },
                       ),
                       const SizedBox(height: 12),
 
@@ -2882,237 +2714,25 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                                   ),
                                   const SizedBox(height: 12),
 
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            _buildInputLabel(
-                                              'Provinsi',
-                                              subColor,
-                                            ),
-                                            Container(
-                                              height: 44,
-                                              decoration: BoxDecoration(
-                                                color: inputBg,
-                                                borderRadius:
-                                                    BorderRadius.circular(10),
-                                              ),
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 12,
-                                                  ),
-                                              child: DropdownButtonHideUnderline(
-                                                child: DropdownButton<String>(
-                                                  value: prov,
-                                                  dropdownColor: dialogBg,
-                                                  isExpanded: true,
-                                                  style: GoogleFonts.outfit(
-                                                    fontSize: 12,
-                                                    color: txtColor,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                  items: provinces
-                                                      .map(
-                                                        (p) => DropdownMenuItem(
-                                                          value: p,
-                                                          child: Text(p),
-                                                        ),
-                                                      )
-                                                      .toList(),
-                                                  onChanged: (val) {
-                                                    if (val != null) {
-                                                      setModalState(() {
-                                                        prov = val;
-                                                        kota =
-                                                            'Pilih Kota/Kabupaten';
-                                                        kec = 'Pilih Kecamatan';
-                                                        kel =
-                                                            'Pilih Kelurahan/Desa';
-                                                      });
-                                                    }
-                                                  },
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      const SizedBox(width: 14),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            _buildInputLabel(
-                                              'Kota/Kabupaten',
-                                              subColor,
-                                            ),
-                                            Container(
-                                              height: 44,
-                                              decoration: BoxDecoration(
-                                                color: inputBg,
-                                                borderRadius:
-                                                    BorderRadius.circular(10),
-                                              ),
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 12,
-                                                  ),
-                                              child: DropdownButtonHideUnderline(
-                                                child: DropdownButton<String>(
-                                                  value: cities.contains(kota)
-                                                      ? kota
-                                                      : 'Pilih Kota/Kabupaten',
-                                                  dropdownColor: dialogBg,
-                                                  isExpanded: true,
-                                                  style: GoogleFonts.outfit(
-                                                    fontSize: 12,
-                                                    color: txtColor,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                  items: cities
-                                                      .map(
-                                                        (c) => DropdownMenuItem(
-                                                          value: c,
-                                                          child: Text(c),
-                                                        ),
-                                                      )
-                                                      .toList(),
-                                                  onChanged: (val) {
-                                                    if (val != null) {
-                                                      setModalState(() {
-                                                        kota = val;
-                                                        kec = 'Pilih Kecamatan';
-                                                        kel =
-                                                            'Pilih Kelurahan/Desa';
-                                                      });
-                                                    }
-                                                  },
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 12),
-
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            _buildInputLabel(
-                                              'Kecamatan',
-                                              subColor,
-                                            ),
-                                            Container(
-                                              height: 44,
-                                              decoration: BoxDecoration(
-                                                color: inputBg,
-                                                borderRadius:
-                                                    BorderRadius.circular(10),
-                                              ),
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 12,
-                                                  ),
-                                              child: DropdownButtonHideUnderline(
-                                                child: DropdownButton<String>(
-                                                  value: districts.contains(kec)
-                                                      ? kec
-                                                      : 'Pilih Kecamatan',
-                                                  dropdownColor: dialogBg,
-                                                  isExpanded: true,
-                                                  style: GoogleFonts.outfit(
-                                                    fontSize: 12,
-                                                    color: txtColor,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                  items: districts
-                                                      .map(
-                                                        (d) => DropdownMenuItem(
-                                                          value: d,
-                                                          child: Text(d),
-                                                        ),
-                                                      )
-                                                      .toList(),
-                                                  onChanged: (val) {
-                                                    if (val != null) {
-                                                      setModalState(() {
-                                                        kec = val;
-                                                        kel =
-                                                            'Pilih Kelurahan/Desa';
-                                                      });
-                                                    }
-                                                  },
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      const SizedBox(width: 14),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            _buildInputLabel(
-                                              'Kelurahan/Desa',
-                                              subColor,
-                                            ),
-                                            Container(
-                                              height: 44,
-                                              decoration: BoxDecoration(
-                                                color: inputBg,
-                                                borderRadius:
-                                                    BorderRadius.circular(10),
-                                              ),
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 12,
-                                                  ),
-                                              child: DropdownButtonHideUnderline(
-                                                child: DropdownButton<String>(
-                                                  value: villages.contains(kel)
-                                                      ? kel
-                                                      : 'Pilih Kelurahan/Desa',
-                                                  dropdownColor: dialogBg,
-                                                  isExpanded: true,
-                                                  style: GoogleFonts.outfit(
-                                                    fontSize: 12,
-                                                    color: txtColor,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                  items: villages
-                                                      .map(
-                                                        (v) => DropdownMenuItem(
-                                                          value: v,
-                                                          child: Text(v),
-                                                        ),
-                                                      )
-                                                      .toList(),
-                                                  onChanged: (val) {
-                                                    if (val != null) {
-                                                      setModalState(() {
-                                                        kel = val;
-                                                      });
-                                                    }
-                                                  },
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
+                                  LocationSelectorWidget(
+                                    initialProvince: prov == 'Pilih Provinsi' ? '' : prov,
+                                    initialDistrict: kota == 'Pilih Kota/Kabupaten' ? '' : kota,
+                                    initialSubDistrict: kec == 'Pilih Kecamatan' ? '' : kec,
+                                    initialVillage: kel == 'Pilih Kelurahan/Desa' ? '' : kel,
+                                    fieldBg: inputBg,
+                                    textColor: txtColor,
+                                    subtitleColor: subColor,
+                                    borderColor: borderColor,
+                                    dropdownColor: dialogBg,
+                                    fontSize: 12,
+                                    onChanged: (province, district, subDistrict, village) {
+                                      setModalState(() {
+                                        prov = province.isEmpty ? 'Pilih Provinsi' : province;
+                                        kota = district.isEmpty ? 'Pilih Kota/Kabupaten' : district;
+                                        kec = subDistrict.isEmpty ? 'Pilih Kecamatan' : subDistrict;
+                                        kel = village.isEmpty ? 'Pilih Kelurahan/Desa' : village;
+                                      });
+                                    },
                                   ),
                                   const SizedBox(height: 12),
 

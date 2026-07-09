@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
+import 'package:mapotech/shared/supabase_service.dart';
 import 'dart:ui' as ui;
 import 'package:mapotech/shared/widgets/page_tutorial_data.dart';
 import 'package:mapotech/shared/widgets/page_tutorial_dialog.dart';
@@ -52,10 +53,219 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   PageTutorialData? _activeGuideTutorial;
   int _activeGuideStepIndex = 0;
 
+  String? _lastCheckedUserId;
+  bool _hasShownSubNotice = false;
+
+  void _showSubscriptionNotice(bool active, DateTime? expiry, String role) {
+    if (_hasShownSubNotice) return;
+    _hasShownSubNotice = true;
+
+    final state = ref.read(landingPageProvider);
+    final isEn = state.language == 'en';
+    final now = DateTime.now();
+
+    if (!active) {
+      // EXPIRED OR INACTIVE
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: [
+                const Icon(Icons.warning_amber_rounded, color: Colors.redAccent),
+                const SizedBox(width: 10),
+                Text(
+                  isEn ? 'Subscription Expired' : 'Langganan Kedaluwarsa',
+                  style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            content: Text(
+              isEn
+                  ? 'Your subscription for the ${role == 'dokter' ? 'Private Practice' : 'Pharmacy'} has expired. Please renew it in the Profile settings to unlock all menus.'
+                  : 'Langganan ${role == 'dokter' ? 'Praktik Mandiri' : 'Apotek'} Anda telah kedaluwarsa. Silakan perbarui di menu Profil untuk membuka kembali semua akses.',
+              style: GoogleFonts.outfit(fontSize: 14),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  setState(() {
+                    _activeMenu = 'profile';
+                  });
+                },
+                child: Text(
+                  isEn ? 'Go to Profile' : 'Ke Profil',
+                  style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.purple),
+                ),
+              ),
+            ],
+          ),
+        );
+      });
+    } else if (expiry != null) {
+      // ACTIVE BUT EXPIRING SOON (<= 5 DAYS)
+      final diff = expiry.difference(now);
+      final daysLeft = diff.inDays;
+
+      if (daysLeft <= 5) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Row(
+                children: [
+                  const Icon(Icons.info_outline, color: Colors.orangeAccent),
+                  const SizedBox(width: 10),
+                  Text(
+                    isEn ? 'Subscription Expiring Soon' : 'Langganan Segera Habis',
+                    style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              content: Text(
+                isEn
+                    ? 'Your subscription for the ${role == 'dokter' ? 'Private Practice' : 'Pharmacy'} will expire in $daysLeft days. Renew now to prevent service disruptions.'
+                    : 'Langganan ${role == 'dokter' ? 'Praktik Mandiri' : 'Apotek'} Anda akan habis dalam $daysLeft hari. Perbarui sekarang untuk mencegah gangguan layanan.',
+                style: GoogleFonts.outfit(fontSize: 14),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text(
+                    isEn ? 'Dismiss' : 'Tutup',
+                    style: GoogleFonts.outfit(color: Colors.grey),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    setState(() {
+                      _activeMenu = 'profile';
+                    });
+                  },
+                  child: Text(
+                    isEn ? 'Renew Now' : 'Perbarui Sekarang',
+                    style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.purple),
+                  ),
+                ),
+              ],
+            ),
+          );
+        });
+      }
+    }
+  }
+
+  Future<void> _checkSubscription() async {
+    final state = ref.read(landingPageProvider);
+    if (!state.isLoggedIn) return;
+    final userId = state.loggedInUser?['id'];
+    if (userId == _lastCheckedUserId) return;
+    _lastCheckedUserId = userId;
+    _hasShownSubNotice = false; // reset for new user session
+
+    final role = state.loggedInRole;
+    if (role != 'dokter' && role != 'apotek') {
+      ref.read(landingPageProvider.notifier).setSubscribed(true);
+      return;
+    }
+
+    try {
+      final client = SupabaseService.client;
+      if (role == 'dokter') {
+        final doctorId = state.activeDoctorId ?? userId;
+        if (doctorId != null) {
+          final res = await client
+              .from('user_detail_doctor')
+              .select('subscription_status, subscription_expired_at, profession')
+              .eq('id', doctorId)
+              .maybeSingle();
+          if (res != null) {
+            final status = (res['subscription_status'] ?? 'INACTIVE')
+                .toString()
+                .toUpperCase();
+            final expiredAt = res['subscription_expired_at'];
+            final profession = res['profession']?.toString() ?? 'Doctor';
+            bool active = false;
+            DateTime? expiry;
+            if (status == 'ACTIVE' && expiredAt != null) {
+              try {
+                expiry = DateTime.parse(expiredAt.toString());
+                active = expiry.isAfter(DateTime.now());
+              } catch (_) {}
+            }
+            ref.read(landingPageProvider.notifier).updateUser({
+              'profession': profession,
+            });
+            ref.read(landingPageProvider.notifier).setSubscribed(active);
+            _showSubscriptionNotice(active, expiry, role!);
+            return;
+          }
+        }
+      } else if (role == 'apotek') {
+        final apotekId = state.activeApotekId;
+        if (apotekId != null) {
+          final res = await client
+              .from('user_detail_pharmacist')
+              .select('subscription_status, subscription_expired_at')
+              .eq('id', apotekId)
+              .maybeSingle();
+          if (res != null) {
+            final status = (res['subscription_status'] ?? 'INACTIVE')
+                .toString()
+                .toUpperCase();
+            final expiredAt = res['subscription_expired_at'];
+            bool active = false;
+            DateTime? expiry;
+            if (status == 'ACTIVE' && expiredAt != null) {
+              try {
+                expiry = DateTime.parse(expiredAt.toString());
+                active = expiry.isAfter(DateTime.now());
+              } catch (_) {}
+            }
+            ref.read(landingPageProvider.notifier).setSubscribed(active);
+            _showSubscriptionNotice(active, expiry, role!);
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error checking subscription: $e');
+    }
+    ref.read(landingPageProvider.notifier).setSubscribed(false);
+    _showSubscriptionNotice(false, null, role ?? 'dokter');
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(landingPageProvider);
     final notifier = ref.read(landingPageProvider.notifier);
+
+    // Check subscription status if user changes
+    if (state.isLoggedIn && state.loggedInUser?['id'] != _lastCheckedUserId) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _checkSubscription();
+      });
+    }
+
+    // Safety redirect: If the logged-in user is a doctor or apotek and has no active subscription, force profile menu.
+    if (state.isLoggedIn &&
+        (state.loggedInRole == 'dokter' || state.loggedInRole == 'apotek') &&
+        !state.isSubscribed) {
+      if (_activeMenu != 'profile') {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            setState(() {
+              _activeMenu = 'profile';
+            });
+          }
+        });
+      }
+    }
 
     // Safety redirect: If the logged-in user is an assistant, they should only see permitted menus.
     if (state.isLoggedIn && state.isAssistant) {
@@ -522,7 +732,9 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   // ==================== 3. INTERACTIVE GUIDE OVERLAY WIDGETS ====================
 
   Widget _buildGuideFocusTarget(LandingPageState state) {
-    final themeAccent = ref.read(landingPageProvider.notifier).getPrimaryColor();
+    final themeAccent = ref
+        .read(landingPageProvider.notifier)
+        .getPrimaryColor();
 
     final alignment = _getGuideTargetAlignment(
       _activeGuideTutorial!.title,
@@ -564,7 +776,10 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
         constraints: const BoxConstraints(maxWidth: 400),
         child: Container(
           decoration: BoxDecoration(
-            color: ref.read(landingPageProvider.notifier).getCardColor().withOpacity(0.95),
+            color: ref
+                .read(landingPageProvider.notifier)
+                .getCardColor()
+                .withOpacity(0.95),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: themeAccent.withOpacity(0.5), width: 1.5),
             boxShadow: [
@@ -582,7 +797,9 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
             children: [
               LinearProgressIndicator(
                 value: stepProgress,
-                backgroundColor: ref.read(landingPageProvider.notifier).getBorderColor(),
+                backgroundColor: ref
+                    .read(landingPageProvider.notifier)
+                    .getBorderColor(),
                 valueColor: AlwaysStoppedAnimation<Color>(themeAccent),
                 minHeight: 4,
               ),

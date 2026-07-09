@@ -240,15 +240,21 @@ class ApotekPortal extends ConsumerWidget {
                     children: [
                       Row(
                         children: [
-                          Container(
+                          Image.asset(
+                            'assets/images/logo.png',
                             width: 28,
                             height: 28,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: activeColor,
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) => Container(
+                              width: 28,
+                              height: 28,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: activeColor,
+                              ),
+                              child: const Icon(Icons.healing_rounded,
+                                  size: 14, color: Colors.white),
                             ),
-                            child: const Icon(Icons.healing_rounded,
-                                size: 14, color: Colors.white),
                           ),
                           const SizedBox(width: 8),
                           Text(

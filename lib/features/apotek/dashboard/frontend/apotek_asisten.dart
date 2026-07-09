@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/widgets/ui.dart';
+import 'package:mapotech/shared/supabase_service.dart';
+import 'package:uuid/uuid.dart';
 
 // ─── Data Models ─────────────────────────────────────────────────────────────
 
@@ -65,70 +67,115 @@ class ApotekStaffModel {
 // ─── Riverpod State Provider ──────────────────────────────────────────────────
 
 class ApotekAsistenListNotifier extends StateNotifier<List<ApotekStaffModel>> {
-  ApotekAsistenListNotifier() : super(_initialStaff);
+  final String apotekId;
+  final SupabaseService _db = SupabaseService();
+  bool _isLoading = false;
+  bool get isLoading => _isLoading;
 
-  static final List<ApotekStaffModel> _initialStaff = [
-    const ApotekStaffModel(
-      id: 'STF-20260526-0001',
-      nama: 'Fatimah Az-Zahra, A.Md.Farm.',
-      email: 'fatimah.az@gmail.com',
-      nik: '3511084610990001',
-      strttk: '1999/STRTTK/35.11/2024',
-      peran: 'Asisten Apoteker',
-      telepon: '081234432211',
-      shift: 'Pagi',
-      isStandby: true,
-      permissions: ['POS Kasir', 'Kelola Resep', 'Stok Opname'],
-      avatarBg: Color(0xFF48C9B0), // Mint accent
-    ),
-    const ApotekStaffModel(
-      id: 'STF-20260520-0002',
-      nama: 'Rian Hidayat',
-      email: 'rian.h@gmail.com',
-      nik: '3511082205970002',
-      strttk: '-',
-      peran: 'Kasir',
-      telepon: '082355667788',
-      shift: 'Sore',
-      isStandby: true,
-      permissions: ['POS Kasir', 'Transaksi Tunai / QRIS'],
-      avatarBg: Color(0xFFB577F2), // Purple accent
-    ),
-    const ApotekStaffModel(
-      id: 'STF-20260512-0003',
-      nama: 'Hendra Wijaya',
-      email: 'hendra.w@gmail.com',
-      nik: '3511081408950003',
-      strttk: '-',
-      peran: 'Gudang',
-      telepon: '087855443322',
-      shift: 'Pagi',
-      isStandby: false,
-      permissions: ['Stok Opname', 'Inventaris Gudang'],
-      avatarBg: Color(0xFFF39C12), // Orange accent
-    ),
-  ];
-
-  void addStaff(ApotekStaffModel staff) {
-    state = [...state, staff];
+  ApotekAsistenListNotifier(this.apotekId) : super([]) {
+    loadStaff();
   }
 
-  void toggleStandby(String id) {
-    state = [
-      for (final s in state)
-        if (s.id == id) s.copyWith(isStandby: !s.isStandby) else s,
-    ];
+  Future<void> loadStaff() async {
+    _isLoading = true;
+    try {
+      final dbStaff = await _db.fetchPharmacistStaff(apotekId);
+      state = dbStaff.map((ds) {
+        return ApotekStaffModel(
+          id: ds['id'] as String,
+          nama: ds['nama'] as String,
+          email: ds['email'] as String? ?? '-',
+          nik: ds['nik'] as String,
+          strttk: ds['strttk'] as String? ?? '-',
+          peran: ds['peran'] as String? ?? 'Asisten Apoteker',
+          telepon: ds['telepon'] as String? ?? '-',
+          shift: ds['shift'] as String? ?? 'Pagi',
+          isStandby: ds['isStandby'] as bool? ?? true,
+          permissions: List<String>.from(ds['permissions'] ?? ['POS Kasir']),
+          avatarBg: ds['peran'] == 'Asisten Apoteker'
+              ? const Color(0xFF48C9B0)
+              : (ds['peran'] == 'Kasir'
+                    ? const Color(0xFFB577F2)
+                    : const Color(0xFFF39C12)),
+        );
+      }).toList();
+    } catch (e) {
+      debugPrint('Error loading pharmacist staff: $e');
+    } finally {
+      _isLoading = false;
+      if (mounted) {
+        state = List.from(state);
+      }
+    }
   }
 
-  void removeStaff(String id) {
-    state = state.where((s) => s.id != id).toList();
+  Future<void> addStaff(
+    ApotekStaffModel staff, {
+    required String username,
+    required String password,
+  }) async {
+    try {
+      await _db.addPharmacistStaff(
+        apotekId: apotekId,
+        staffId: staff.id,
+        name: staff.nama,
+        email: staff.email,
+        nik: staff.nik,
+        phone: staff.telepon,
+        strttk: staff.strttk,
+        peran: staff.peran,
+        shift: staff.shift,
+        username: username,
+        password: password,
+      );
+      await loadStaff();
+    } catch (e) {
+      debugPrint('Error adding staff: $e');
+      rethrow;
+    }
   }
 
-  void updateShift(String id, String newShift) {
-    state = [
-      for (final s in state)
-        if (s.id == id) s.copyWith(shift: newShift) else s,
-    ];
+  Future<void> removeStaff(String id) async {
+    try {
+      await _db.deletePharmacistStaff(id);
+      await loadStaff();
+    } catch (e) {
+      debugPrint('Error removing staff: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> toggleStandby(String id) async {
+    try {
+      final staff = state.firstWhere((s) => s.id == id);
+      final nextStandby = !staff.isStandby;
+
+      // Optimistic UI response
+      state = [
+        for (final s in state)
+          if (s.id == id) s.copyWith(isStandby: nextStandby) else s,
+      ];
+
+      await _db.updatePharmacistStaffDuty(id, nextStandby);
+    } catch (e) {
+      debugPrint('Error toggling duty: $e');
+      await loadStaff();
+    }
+  }
+
+  Future<void> updateShift(String id, String newShift) async {
+    try {
+      // Optimistic UI response
+      state = [
+        for (final s in state)
+          if (s.id == id) s.copyWith(shift: newShift) else s,
+      ];
+
+      await _db.updatePharmacistStaffShift(id, newShift);
+    } catch (e) {
+      debugPrint('Error updating shift: $e');
+      await loadStaff();
+    }
   }
 }
 
@@ -136,7 +183,10 @@ final apotekAsistenListProvider =
     StateNotifierProvider<ApotekAsistenListNotifier, List<ApotekStaffModel>>((
       ref,
     ) {
-      return ApotekAsistenListNotifier();
+      final userState = ref.watch(landingPageProvider);
+      final apotekId =
+          userState.activeApotekId ?? '10b247b2-94ec-4eb4-829b-e53f9164e313';
+      return ApotekAsistenListNotifier(apotekId);
     });
 
 // ─── Apotek Staff View ────────────────────────────────────────────────────────
@@ -155,6 +205,7 @@ class _ApotekAsistenState extends ConsumerState<ApotekAsisten> {
   Widget build(BuildContext context) {
     final state = ref.watch(landingPageProvider);
     final allStaff = ref.watch(apotekAsistenListProvider);
+    final isLoading = ref.watch(apotekAsistenListProvider.notifier).isLoading;
 
     final isDark = state.appearance == 'dark';
     final isRev = state.appearance == 'rev';
@@ -295,7 +346,14 @@ class _ApotekAsistenState extends ConsumerState<ApotekAsisten> {
         const SizedBox(height: 24),
 
         // ── Staff Cards Grid ──────────────────────────────────────────────
-        if (filteredStaff.isEmpty)
+        if (isLoading)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 60),
+              child: CircularProgressIndicator(),
+            ),
+          )
+        else if (filteredStaff.isEmpty)
           Container(
             padding: const EdgeInsets.symmetric(vertical: 60),
             alignment: Alignment.center,
@@ -797,6 +855,8 @@ class _ApotekAsistenState extends ConsumerState<ApotekAsisten> {
     final strttkController = TextEditingController();
     final phoneController = TextEditingController();
     final emailController = TextEditingController();
+    final usernameController = TextEditingController();
+    final passwordController = TextEditingController();
     String selectedRole = 'Asisten Apoteker';
     String selectedShift = 'Pagi';
     List<String> selectedPerms = ['POS Kasir'];
@@ -1054,6 +1114,45 @@ class _ApotekAsistenState extends ConsumerState<ApotekAsisten> {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 12),
+
+                      // Username & Password
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildInputLabel('USERNAME LOGIN', subColor),
+                                _buildInputField(
+                                  usernameController,
+                                  'staff_username',
+                                  inputBg,
+                                  txtColor,
+                                  subColor,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildInputLabel('PASSWORD LOGIN', subColor),
+                                _buildInputField(
+                                  passwordController,
+                                  '••••••••',
+                                  inputBg,
+                                  txtColor,
+                                  subColor,
+                                  obscureText: true,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 16),
 
                       // Permissions
@@ -1111,20 +1210,24 @@ class _ApotekAsistenState extends ConsumerState<ApotekAsisten> {
                           const SizedBox(width: 14),
                           CustomButton(
                             text: 'Simpan Staff',
-                            onPressed: () {
+                            onPressed: () async {
                               final name = nameController.text.trim();
                               final nik = nikController.text.trim();
                               final phone = phoneController.text.trim();
                               final email = emailController.text.trim();
                               final strttk = strttkController.text.trim();
+                              final username = usernameController.text.trim();
+                              final password = passwordController.text.trim();
 
                               if (name.isEmpty ||
                                   nik.isEmpty ||
-                                  phone.isEmpty) {
+                                  phone.isEmpty ||
+                                  username.isEmpty ||
+                                  password.isEmpty) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text(
-                                      'Nama, NIK, dan Telepon wajib diisi!',
+                                      'Semua field wajib diisi!',
                                       style: GoogleFonts.outfit(fontSize: 12),
                                     ),
                                     backgroundColor: Colors.redAccent,
@@ -1146,11 +1249,9 @@ class _ApotekAsistenState extends ConsumerState<ApotekAsisten> {
                                 return;
                               }
 
-                              final currentCount = ref
-                                  .read(apotekAsistenListProvider)
-                                  .length;
+                              final String staffUuid = const Uuid().v4();
                               final newStaff = ApotekStaffModel(
-                                id: 'STF-20260526-${(currentCount + 1).toString().padLeft(4, '0')}',
+                                id: staffUuid,
                                 nama: name,
                                 email: email.isEmpty ? '-' : email,
                                 nik: nik,
@@ -1171,20 +1272,47 @@ class _ApotekAsistenState extends ConsumerState<ApotekAsisten> {
                                           : const Color(0xFFF39C12)),
                               );
 
-                              ref
-                                  .read(apotekAsistenListProvider.notifier)
-                                  .addStaff(newStaff);
-                              Navigator.pop(context);
-
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'Staff $name berhasil didaftarkan!',
-                                    style: GoogleFonts.outfit(fontSize: 12),
+                              try {
+                                showDialog(
+                                  context: context,
+                                  barrierDismissible: false,
+                                  builder: (context) => const Center(
+                                    child: CircularProgressIndicator(),
                                   ),
-                                  backgroundColor: const Color(0xFF48C9B0),
-                                ),
-                              );
+                                );
+
+                                await ref
+                                    .read(apotekAsistenListProvider.notifier)
+                                    .addStaff(
+                                      newStaff,
+                                      username: username,
+                                      password: password,
+                                    );
+
+                                Navigator.pop(context); // Pop loading dialog
+                                Navigator.pop(context); // Pop form dialog
+
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Staff $name berhasil didaftarkan!',
+                                      style: GoogleFonts.outfit(fontSize: 12),
+                                    ),
+                                    backgroundColor: const Color(0xFF48C9B0),
+                                  ),
+                                );
+                              } catch (e) {
+                                Navigator.pop(context); // Pop loading dialog
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Gagal mendaftarkan staff: $e',
+                                      style: GoogleFonts.outfit(fontSize: 12),
+                                    ),
+                                    backgroundColor: Colors.redAccent,
+                                  ),
+                                );
+                              }
                             },
                             primaryColor: themeAccent,
                             textColor: Colors.white,
@@ -1225,6 +1353,7 @@ class _ApotekAsistenState extends ConsumerState<ApotekAsisten> {
     Color subtitle, {
     TextInputType keyboardType = TextInputType.text,
     bool enabled = true,
+    bool obscureText = false,
   }) {
     return Container(
       height: 44,
@@ -1237,6 +1366,7 @@ class _ApotekAsistenState extends ConsumerState<ApotekAsisten> {
         controller: controller,
         keyboardType: keyboardType,
         enabled: enabled,
+        obscureText: obscureText,
         style: GoogleFonts.outfit(
           fontSize: 12,
           color: enabled ? text : text.withOpacity(0.4),

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -5,6 +6,7 @@ import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/layouts/responsive_layout.dart';
 import 'package:mapotech/shared/widgets/custom_button.dart';
 import 'package:mapotech/shared/widgets/floating_settings.dart';
+import 'package:mapotech/shared/widgets/ui.dart';
 
 // Import standalone portals
 import 'package:mapotech/features/landing/portals/mapotech_home_portal.dart';
@@ -30,11 +32,37 @@ class LandingPageLayout extends ConsumerStatefulWidget {
 class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
   final ScrollController _scrollController = ScrollController();
   bool _isScrolled = false;
+  bool _isFirstTimeLoading = true;
+  final ValueNotifier<double> _loadingProgressNotifier = ValueNotifier<double>(0.0);
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_scrollListener);
+    _startFirstTimeLoad();
+  }
+
+  void _startFirstTimeLoad() {
+    _loadingProgressNotifier.value = 0.0;
+    Timer.periodic(const Duration(milliseconds: 20), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      final current = _loadingProgressNotifier.value;
+      if (current >= 1.0) {
+        timer.cancel();
+        Future.delayed(const Duration(milliseconds: 250), () {
+          if (mounted) {
+            setState(() {
+              _isFirstTimeLoading = false;
+            });
+          }
+        });
+      } else {
+        _loadingProgressNotifier.value = current + 0.015;
+      }
+    });
   }
 
   void _scrollListener() {
@@ -49,6 +77,7 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
   void dispose() {
     _scrollController.removeListener(_scrollListener);
     _scrollController.dispose();
+    _loadingProgressNotifier.dispose();
     super.dispose();
   }
 
@@ -56,6 +85,12 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
   Widget build(BuildContext context) {
     final state = ref.watch(landingPageProvider);
     final notifier = ref.read(landingPageProvider.notifier);
+
+    if (_isFirstTimeLoading) {
+      return MapotechLoadingScreen(
+        progressNotifier: _loadingProgressNotifier,
+      );
+    }
 
     if (state.isLoggedIn) {
       return const DashboardShell();
@@ -78,39 +113,47 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
       }
     });
 
-    return Scaffold(
-      backgroundColor: backgroundColor,
-      drawer: _buildMobileDrawer(state, notifier),
-      body: Stack(
-        children: [
-          // Background subtle gradients
-          Positioned(
-            top: -150,
-            right: -150,
-            child: Container(
-              width: 500,
-              height: 500,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: activeColor.withOpacity(0.08),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeInOut,
+      color: backgroundColor,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        drawer: _buildMobileDrawer(state, notifier),
+        body: Stack(
+          children: [
+            // Background subtle gradients
+            Positioned(
+              top: -150,
+              right: -150,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 400),
+                width: 500,
+                height: 500,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: activeColor.withOpacity(0.08),
+                ),
               ),
             ),
-          ),
-          Positioned(
-            top: 400,
-            left: -200,
-            child: Container(
-              width: 600,
-              height: 600,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: darkGreenColor.withOpacity(0.04),
+            Positioned(
+              top: 400,
+              left: -200,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 400),
+                width: 600,
+                height: 600,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: darkGreenColor.withOpacity(0.04),
+                ),
               ),
             ),
-          ),
 
-          // Main Content
-          SafeArea(
+            // Main Content
+            FadeTransitionOnChange(
+              animationKey: '${state.appearance}_${state.language}',
+              child: SafeArea(
             top: false,
             child: CustomScrollView(
               controller: _scrollController,
@@ -148,13 +191,13 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
                 ),
               ],
             ),
-          ),
+          ),),
 
           // Floating settings panel
           const FloatingSettings(),
         ],
       ),
-    );
+    ),);
   }
 
   // --- ACTIVE PORTALS ROUTER ---
@@ -687,21 +730,27 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
+            Image.asset(
+              'assets/images/logo.png',
               width: 38,
               height: 38,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: [activeColor, darkGreenColor],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) => Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [activeColor, darkGreenColor],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
                 ),
-              ),
-              child: const Icon(
-                Icons.healing_rounded,
-                color: Colors.white,
-                size: 20,
+                child: const Icon(
+                  Icons.healing_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
               ),
             ),
             const SizedBox(width: 12),
@@ -1264,21 +1313,27 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
+            Image.asset(
+              'assets/images/logo.png',
               width: 32,
               height: 32,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: [activeColor, notifier.getSecondaryColor()],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) => Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [activeColor, notifier.getSecondaryColor()],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
                 ),
-              ),
-              child: const Icon(
-                Icons.healing_rounded,
-                color: Colors.white,
-                size: 16,
+                child: const Icon(
+                  Icons.healing_rounded,
+                  color: Colors.white,
+                  size: 16,
+                ),
               ),
             ),
             const SizedBox(width: 10),
@@ -1522,6 +1577,67 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
           color: isDark ? Colors.white70 : Colors.grey[600],
         ),
       ),
+    );
+  }
+}
+
+class FadeTransitionOnChange extends StatefulWidget {
+  final Widget child;
+  final String animationKey;
+
+  const FadeTransitionOnChange({
+    super.key,
+    required this.child,
+    required this.animationKey,
+  });
+
+  @override
+  State<FadeTransitionOnChange> createState() => _FadeTransitionOnChangeState();
+}
+
+class _FadeTransitionOnChangeState extends State<FadeTransitionOnChange>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _opacityAnimation;
+  late String _currentKey;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentKey = widget.animationKey;
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+    _opacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeInOut,
+      ),
+    );
+    _controller.forward(from: 1.0);
+  }
+
+  @override
+  void didUpdateWidget(covariant FadeTransitionOnChange oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.animationKey != _currentKey) {
+      _currentKey = widget.animationKey;
+      _controller.forward(from: 0.0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _opacityAnimation,
+      child: widget.child,
     );
   }
 }

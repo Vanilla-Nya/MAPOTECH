@@ -641,6 +641,8 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
     String genderSelection = 'Laki-laki';
     String? uploadedAvatarUrl;
     bool isUploadingPhoto = false;
+    bool isSubmitting = false;
+    bool isPasswordObscured = true;
 
     final isMobile = MediaQuery.of(context).size.width < 600;
 
@@ -734,9 +736,11 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
 
                     // --- Scrollable Form Fields ---
                     Flexible(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
+                      child: AbsorbPointer(
+                        absorbing: isSubmitting,
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             // Photo upload placeholder
@@ -959,6 +963,15 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                                         subtitleColor,
                                         keyboardType:
                                             TextInputType.emailAddress,
+                                        validator: (v) {
+                                          if (v == null || v.trim().isEmpty) {
+                                            return 'Email wajib diisi';
+                                          }
+                                          if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(v.trim())) {
+                                            return 'Format email tidak valid';
+                                          }
+                                          return null;
+                                        },
                                       ),
                                     ],
                                   ),
@@ -981,7 +994,30 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                                         borderColor,
                                         textColor,
                                         subtitleColor,
-                                        obscureText: true,
+                                        obscureText: isPasswordObscured,
+                                        validator: (v) {
+                                          if (v == null || v.isEmpty) {
+                                            return 'Kata sandi wajib diisi';
+                                          }
+                                          if (v.length < 6) {
+                                            return 'Minimal 6 karakter';
+                                          }
+                                          return null;
+                                        },
+                                        suffixIcon: IconButton(
+                                          icon: Icon(
+                                            isPasswordObscured
+                                                ? Icons.visibility_off_outlined
+                                                : Icons.visibility_outlined,
+                                            size: 16,
+                                            color: subtitleColor,
+                                          ),
+                                          onPressed: () {
+                                            setDialogState(() {
+                                              isPasswordObscured = !isPasswordObscured;
+                                            });
+                                          },
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -1153,6 +1189,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                         ),
                       ),
                     ),
+                    ),
 
                     // --- Bottom Actions ---
                     Container(
@@ -1164,7 +1201,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
                           OutlinedButton(
-                            onPressed: () => Navigator.of(ctx).pop(),
+                            onPressed: isSubmitting ? null : () => Navigator.of(ctx).pop(),
                             style: OutlinedButton.styleFrom(
                               side: BorderSide(color: borderColor),
                               shape: RoundedRectangleBorder(
@@ -1186,52 +1223,68 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                           ),
                           const SizedBox(width: 12),
                           ElevatedButton(
-                            onPressed: () {
-                              if (formKey.currentState!.validate()) {
-                                // Add patient to riverpod state
-                                final randomId =
-                                    'PAS-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
-                                final newPatient = PasienModel(
-                                  id: randomId,
-                                  nama: nameController.text,
-                                  email: emailController.text.isEmpty
-                                      ? '${nameController.text.toLowerCase().replaceAll(' ', '')}@gmail.com'
-                                      : emailController.text,
-                                  nik: nikController.text,
-                                  tempatLahir: birthplaceController.text.isEmpty
-                                      ? 'Bondowoso'
-                                      : birthplaceController.text,
-                                  tanggalLahir: dobController.text.isEmpty
-                                      ? '26 Mei 2026'
-                                      : dobController.text,
-                                  jenisKelamin: genderSelection,
-                                  telepon: phoneController.text.isEmpty
-                                      ? '081234567890'
-                                      : phoneController.text,
-                                  alamat: addressController.text.isEmpty
-                                      ? 'KABUPATEN BONDOWOSO'
-                                      : addressController.text,
-                                  umur: '24 th',
-                                  avatarBg: genderSelection == 'Laki-laki'
-                                      ? const Color(0xFF48C9B0)
-                                      : const Color(0xFFEAB7EE),
-                                  history: const [],
-                                  avatarUrl: uploadedAvatarUrl,
-                                );
+                            onPressed: isSubmitting
+                                ? null
+                                : () async {
+                                    if (formKey.currentState!.validate()) {
+                                      setDialogState(() {
+                                        isSubmitting = true;
+                                      });
 
-                                ref
-                                    .read(dokterPasienListProvider.notifier)
-                                    .addPasien(newPatient);
+                                      try {
+                                        final birthDateIso = _parseIndoDateToIso(dobController.text);
+                                        
+                                        // Call database signup via SupabaseService
+                                        final result = await SupabaseService().registerPatientByDoctor(
+                                          email: emailController.text.trim(),
+                                          password: passwordController.text,
+                                          name: nameController.text.trim(),
+                                          nik: nikController.text.trim(),
+                                          gender: genderSelection,
+                                          birthPlace: birthplaceController.text.trim().isEmpty
+                                              ? 'Bondowoso'
+                                              : birthplaceController.text.trim(),
+                                          birthDate: birthDateIso,
+                                          address: addressController.text.trim().isEmpty
+                                              ? 'KABUPATEN BONDOWOSO'
+                                              : addressController.text.trim(),
+                                          phone: phoneController.text.trim().isEmpty
+                                              ? '081234567890'
+                                              : phoneController.text.trim(),
+                                        );
 
-                                Navigator.of(ctx).pop();
+                                        if (result['success'] == true) {
+                                          // Refresh the patient list from database
+                                          await ref.read(dokterPasienListProvider.notifier).loadPatients();
 
-                                // Show success confirmation
-                                _showSuccessSnackBar(
-                                  context,
-                                  'Pasien baru berhasil didaftarkan!',
-                                );
-                              }
-                            },
+                                          if (ctx.mounted) {
+                                            Navigator.of(ctx).pop();
+                                            // Show success confirmation
+                                            _showSuccessSnackBar(
+                                              context,
+                                              'Pasien baru berhasil didaftarkan!',
+                                            );
+                                          }
+                                        }
+                                      } catch (e) {
+                                        if (ctx.mounted) {
+                                          setDialogState(() {
+                                            isSubmitting = false;
+                                          });
+                                          // Show error snackbar or dialog
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                e.toString().replaceAll('Exception: ', ''),
+                                                style: GoogleFonts.outfit(color: Colors.white),
+                                              ),
+                                              backgroundColor: Colors.redAccent,
+                                            ),
+                                          );
+                                        }
+                                      }
+                                    }
+                                  },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: purple,
                               foregroundColor: Colors.white,
@@ -1244,13 +1297,22 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                                 vertical: 14,
                               ),
                             ),
-                            child: Text(
-                              'Daftarkan Pasien'.tr(state),
-                              style: GoogleFonts.outfit(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
+                            child: isSubmitting
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : Text(
+                                    'Daftarkan Pasien'.tr(state),
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
                           ),
                         ],
                       ),
@@ -1292,6 +1354,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
     TextInputType keyboardType = TextInputType.text,
     int maxLines = 1,
     String? Function(String?)? validator,
+    Widget? suffixIcon,
   }) {
     return TextFormField(
       controller: controller,
@@ -1311,6 +1374,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
           color: subtitle.withOpacity(0.4),
         ),
         prefixIcon: Icon(icon, size: 16, color: subtitle),
+        suffixIcon: suffixIcon,
         filled: true,
         fillColor: bg,
         isDense: true,
@@ -1399,6 +1463,39 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
         ),
       ),
     );
+  }
+
+  String _parseIndoDateToIso(String indoDate) {
+    try {
+      final parts = indoDate.split(' ');
+      if (parts.length == 3) {
+        final day = int.parse(parts[0]);
+        final monthStr = parts[1].toLowerCase();
+        final year = int.parse(parts[2]);
+
+        final months = [
+          'januari',
+          'februari',
+          'maret',
+          'april',
+          'mei',
+          'juni',
+          'juli',
+          'agustus',
+          'september',
+          'oktober',
+          'november',
+          'desember',
+        ];
+        final monthIndex = months.indexOf(monthStr);
+        if (monthIndex != -1) {
+          final m = (monthIndex + 1).toString().padLeft(2, '0');
+          final d = day.toString().padLeft(2, '0');
+          return '$year-$m-$d';
+        }
+      }
+    } catch (_) {}
+    return '2000-01-01'; // Fallback
   }
 
   void _showSuccessSnackBar(BuildContext context, String message) {
@@ -1740,37 +1837,8 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                         border: Border(top: BorderSide(color: border)),
                       ),
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        mainAxisAlignment: MainAxisAlignment.end,
                         children: [
-                          TextButton.icon(
-                            onPressed: () {
-                              _showDeleteConfirmDialog(
-                                context,
-                                patient,
-                                dialogCtx,
-                              );
-                            },
-                            icon: const Icon(
-                              Icons.delete_outline_rounded,
-                              color: Colors.redAccent,
-                              size: 16,
-                            ),
-                            label: Text(
-                              'Hapus Rekam Medis',
-                              style: GoogleFonts.outfit(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.redAccent,
-                              ),
-                            ),
-                            style: TextButton.styleFrom(
-                              foregroundColor: Colors.redAccent,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 12,
-                              ),
-                            ),
-                          ),
                           OutlinedButton(
                             onPressed: () => Navigator.of(dialogCtx).pop(),
                             style: OutlinedButton.styleFrom(

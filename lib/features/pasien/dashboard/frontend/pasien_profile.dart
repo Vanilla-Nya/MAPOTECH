@@ -5,6 +5,8 @@ import 'package:mapotech/shared/widgets/skeleton_loading.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/widgets/profile_widgets.dart';
 import 'package:mapotech/shared/supabase_service.dart';
+import 'package:mapotech/shared/widgets/location_selector_widget.dart';
+import 'package:mapotech/shared/location_service.dart';
 
 /// Profil Pasien — dedicated profile page for the masyarakat/pasien role.
 class PasienProfile extends ConsumerStatefulWidget {
@@ -432,56 +434,25 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildEditableField(
-                            'Provinsi',
-                            _provinceController,
-                            inputBg,
-                            textColor,
-                            subtitleColor,
-                            Icons.map_outlined,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildEditableField(
-                            'Kota/Kabupaten',
-                            _districtController,
-                            inputBg,
-                            textColor,
-                            subtitleColor,
-                            Icons.location_city_rounded,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildEditableField(
-                            'Kecamatan',
-                            _subDistrictController,
-                            inputBg,
-                            textColor,
-                            subtitleColor,
-                            Icons.landscape_outlined,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildEditableField(
-                            'Kelurahan/Desa',
-                            _villageController,
-                            inputBg,
-                            textColor,
-                            subtitleColor,
-                            Icons.home_work_outlined,
-                          ),
-                        ),
-                      ],
+                    LocationSelectorWidget(
+                      initialProvince: _provinceController.text,
+                      initialDistrict: _districtController.text,
+                      initialSubDistrict: _subDistrictController.text,
+                      initialVillage: _villageController.text,
+                      fieldBg: inputBg,
+                      textColor: textColor,
+                      subtitleColor: subtitleColor,
+                      borderColor: borderColor,
+                      dropdownColor: cardBg,
+                      fontSize: 12,
+                      onChanged: (province, district, subDistrict, village) {
+                        setState(() {
+                          _provinceController.text = province;
+                          _districtController.text = district;
+                          _subDistrictController.text = subDistrict;
+                          _villageController.text = village;
+                        });
+                      },
                     ),
                     const SizedBox(height: 12),
                     Text(

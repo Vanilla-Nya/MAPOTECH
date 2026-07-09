@@ -98,12 +98,22 @@ class LandingPageState {
   final Set<String> syncedTransactions;
   final double defaultServiceFee;
   final String receiptPaperSize; // 'A4', 'A5', 'Thermal 58mm', 'Thermal 80mm'
+  final bool isSubscribed;
 
-  bool get isAssistant => loggedInUser?['role'] == 'asisten_dokter';
+  bool get isAssistant =>
+      loggedInUser?['role'] == 'asisten_dokter' ||
+      loggedInUser?['role'] == 'asisten_apotek';
 
   String? get activeDoctorId {
-    if (isAssistant) {
+    if (loggedInUser?['role'] == 'asisten_dokter') {
       return loggedInUser?['doctor_id'] as String?;
+    }
+    return loggedInUser?['id'] as String?;
+  }
+
+  String? get activeApotekId {
+    if (loggedInUser?['role'] == 'asisten_apotek') {
+      return loggedInUser?['apotek_id'] as String?;
     }
     return loggedInUser?['id'] as String?;
   }
@@ -122,6 +132,7 @@ class LandingPageState {
     this.syncedTransactions = const {},
     this.defaultServiceFee = 0.0,
     this.receiptPaperSize = 'A4',
+    this.isSubscribed = true,
   });
 
   LandingPageState copyWith({
@@ -138,6 +149,7 @@ class LandingPageState {
     Set<String>? syncedTransactions,
     double? defaultServiceFee,
     String? receiptPaperSize,
+    bool? isSubscribed,
   }) {
     return LandingPageState(
       activeTab: activeTab ?? this.activeTab,
@@ -153,6 +165,7 @@ class LandingPageState {
       syncedTransactions: syncedTransactions ?? this.syncedTransactions,
       defaultServiceFee: defaultServiceFee ?? this.defaultServiceFee,
       receiptPaperSize: receiptPaperSize ?? this.receiptPaperSize,
+      isSubscribed: isSubscribed ?? this.isSubscribed,
     );
   }
 }
@@ -203,7 +216,11 @@ class LandingPageNotifier extends StateNotifier<LandingPageState> {
   }
 
   void logout() {
-    state = state.copyWith(isLoggedIn: false, loggedInRole: null, loggedInName: null, loggedInUser: null, drawerSize: 1);
+    state = state.copyWith(isLoggedIn: false, loggedInRole: null, loggedInName: null, loggedInUser: null, drawerSize: 1, isSubscribed: true);
+  }
+
+  void setSubscribed(bool val) {
+    state = state.copyWith(isSubscribed: val);
   }
 
   void updateUser(Map<String, dynamic> updatedFields) {
@@ -712,7 +729,7 @@ class LandingPageNotifier extends StateNotifier<LandingPageState> {
           {'label': isId ? 'Puskesmas' : 'Health Center', 'tab': 'puskesmas'},
           {'label': isId ? 'Rumah Sakit' : 'Hospital', 'tab': 'rumahsakit'},
           {'label': isId ? 'PONKESDES' : 'Village Clinic', 'tab': 'ponkesdes'},
-          {'label': isId ? 'Pasyandu' : 'Family Health', 'tab': 'posyandu'},
+          {'label': isId ? 'Posyandu' : 'Family Health', 'tab': 'posyandu'},
         ]
       },
       {
@@ -761,7 +778,7 @@ const _translations = {
     'hero_tagline': 'PORTAL KESEHATAN DIGITAL INTEGRATIF',
     'hero_title': 'MAPOTECH',
     'hero_desc':
-        'Medical Application Platform for Operation Technology and Connected Health Care. Ekosistem kesehatan digital modern yang menghubungkan Dokter, Pasien, Apotek, dan Fasilitas Kesehatan dalam satu platform terintegrasi SatuSehat Kemenkes.',
+        'Medical Application Platform for Operational Technology and Connected Healthcare. Ekosistem kesehatan digital modern yang menghubungkan Dokter, Pasien, Apotek, dan Fasilitas Kesehatan dalam satu platform terintegrasi SatuSehat Kemenkes.',
     'selection_public': 'Masyarakat',
     'selection_dokter': 'Praktik Mandiri',
     'selection_apotek': 'Apotek',
@@ -809,7 +826,7 @@ const _translations = {
     'hero_tagline': 'INTEGRATIVE DIGITAL HEALTH PORTAL',
     'hero_title': 'MAPOTECH',
     'hero_desc':
-        'Medical Application Platform for Operation Technology and Connected Health Care. A modern digital health ecosystem connecting Doctors, Patients, Pharmacies, and Healthcare Facilities into a single SatuSehat Kemenkes integrated platform.',
+        'Medical Application Platform for Operational Technology and Connected Healthcare. A modern digital health ecosystem connecting Doctors, Patients, Pharmacies, and Healthcare Facilities into a single SatuSehat Kemenkes integrated platform.',
     'selection_public': 'Community',
     'selection_dokter': 'Private Practice',
     'selection_apotek': 'Pharmacy',
@@ -1098,7 +1115,7 @@ const _updatesDataId = {
       id: '1',
       title: 'Lahirnya MAPOTECH Baru',
       description:
-          'Transformasi besar MAPOTEK dengan reposisi makna nama menjadi Medical Application Platform for Operation Technology and Connected Health Care. Disertai integrasi Manajemen Apotek, fitur E-Resep lintas entitas, dan pengiriman RME manual ke SatuSehat.',
+          'Transformasi besar MAPOTEK dengan reposisi makna nama menjadi Medical Application Platform for Operational Technology and Connected Healthcare. Disertai integrasi Manajemen Apotek, fitur E-Resep lintas entitas, dan pengiriman RME manual ke SatuSehat.',
       date: 'Februari 2026',
       type: 'feature',
     ),
@@ -1262,7 +1279,7 @@ const _updatesDataEn = {
       id: '1',
       title: 'Birth of New MAPOTECH',
       description:
-          'Major transformation of MAPOTEK with repositioning of the name meaning to Medical Application Platform for Operation Technology and Connected Health Care. Includes Pharmacy Management integration, cross-entity E-Prescription, and manual EMR submission to SatuSehat.',
+          'Major transformation of MAPOTEK with repositioning of the name meaning to Medical Application Platform for Operational Technology and Connected Healthcare. Includes Pharmacy Management integration, cross-entity E-Prescription, and manual EMR submission to SatuSehat.',
       date: 'February 2026',
       type: 'feature',
     ),

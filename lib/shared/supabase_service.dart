@@ -68,11 +68,21 @@ class SupabaseService {
         throw Exception('Pendaftaran gagal. Coba lagi.');
       }
 
+      // Send onboarding welcome email via Resend API asynchronously
+      sendWelcomeEmail(
+        email: email,
+        name: name,
+        role: role,
+      ).catchError((e) {
+        print('Failed to send welcome email: $e');
+        return false;
+      });
+
       return {
         'success': true,
         'user': response.user,
         'message':
-            'Pendaftaran berhasil! Silakan cek email Anda untuk verifikasi.',
+            'Pendaftaran berhasil! Akun Anda telah aktif dan siap digunakan.',
       };
     } on AuthException catch (e) {
       throw Exception(e.message);
@@ -81,31 +91,178 @@ class SupabaseService {
     }
   }
 
+  /// Checks if an email is already registered in the public.user table.
+  /// Returns true if it exists, false otherwise.
+  Future<bool> checkEmailExists(String email) async {
+    try {
+      final rows = await _get('user?email=eq.${Uri.encodeComponent(email)}&limit=1');
+      return rows.isNotEmpty;
+    } catch (e) {
+      print('Error checking email: $e');
+      return false;
+    }
+  }
+
+  /// Checks if a NIK is already registered with the same role in the public.user table.
+  /// Returns true if a duplicate NIK with the same role exists, false otherwise.
+  Future<bool> checkNikExists(String nik, String role) async {
+    try {
+      String roleQuery;
+      if (role == 'pasien' || role == 'patient') {
+        roleQuery = 'role=in.(pasien,patient)';
+      } else if (role == 'dokter' || role == 'praktikmandiri') {
+        roleQuery = 'role=in.(dokter,praktikmandiri)';
+      } else {
+        roleQuery = 'role=eq.${Uri.encodeComponent(role)}';
+      }
+      final rows = await _get(
+        'user?nik=eq.${Uri.encodeComponent(nik)}&$roleQuery&limit=1',
+      );
+      return rows.isNotEmpty;
+    } catch (e) {
+      print('Error checking NIK: $e');
+      return false;
+    }
+  }
+
+  /// Sends a welcome email using the Resend API.
+  Future<bool> sendWelcomeEmail({
+    required String email,
+    required String name,
+    required String role,
+  }) async {
+    try {
+      final apiKey = dotenv.env['RESEND_API_KEY'];
+      if (apiKey == null || apiKey.isEmpty) {
+        print('Resend API Key is not configured in env file');
+        return false;
+      }
+
+      final response = await http.post(
+        Uri.parse('https://api.resend.com/emails'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $apiKey',
+        },
+        body: jsonEncode({
+          'from': 'MAPOTECH <no-reply@Relvastudio.com>',
+          'to': email,
+          'subject': 'Welcome to MAPOTECH!',
+          'html': '''
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Welcome to MAPOTECH</title>
+    <style type="text/css">
+        body { width:100% !important; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; margin:0; padding:0; background-color: #f0faf8; font-family: 'Segoe UI', Helvetica, Arial, sans-serif; }
+        h1, h2, h3 { color: #1B4F42 !important; }
+        a { color: #48C9B0; }
+    </style>
+</head>
+<body style="background-color: #f0faf8; margin: 0; padding: 40px 0;">
+    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+            <td align="center" style="padding: 0 16px;">
+                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 520px; background-color: #ffffff; border-radius: 24px; overflow: hidden; box-shadow: 0 8px 40px rgba(27, 79, 66, 0.12);">
+                    <tr>
+                        <td align="center" style="background: linear-gradient(135deg, #1B4F42 0%, #2d7a66 100%); padding: 40px 40px 32px;">
+                            <table border="0" cellpadding="0" cellspacing="0">
+                                <tr>
+                                    <td valign="middle" style="padding-right: 12px;"><div style="width: 10px; height: 10px; border-radius: 50%; background: #48C9B0;"></div></td>
+                                    <td valign="middle"><h1 style="color: #ffffff; font-size: 28px; font-weight: 900; letter-spacing: -1px; margin: 0; padding: 0; line-height: 1;">MAPOTECH</h1></td>
+                                    <td valign="middle" style="padding-left: 12px;"><div style="width: 10px; height: 10px; border-radius: 50%; background: #48C9B0;"></div></td>
+                                </tr>
+                            </table>
+                            <p style="color: rgba(255,255,255,0.6); font-size: 11px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; margin: 12px 0 0 0; line-height: 1;">Digital Health System</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td align="center" style="padding: 44px 40px 36px;">
+                            <h2 style="font-size: 22px; font-weight: 700; color: #1B4F42; margin: 0 0 8px 0; line-height: 1.2;">Registration Complete!</h2>
+                            <p style="font-size: 14px; color: #6b7280; font-weight: 500; margin: 0 0 20px 0; line-height: 1.6; text-align: left;">
+                                Hello <strong>$name</strong>,<br/><br/>
+                                You have successfully registered on MAPOTECH! Your account is active and verified, so there is no need for further confirmation.
+                            </p>
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #E8F8F5; border-radius: 12px; margin-bottom: 24px;">
+                                <tr>
+                                    <td style="padding: 16px; font-size: 13px; color: #1B4F42; line-height: 1.5;">
+                                        <strong>Account Info:</strong><br/>
+                                        • Email: $email<br/>
+                                        • Registered As: ${role == 'patient' ? 'Patient (Masyarakat)' : role == 'praktikmandiri' ? 'Private Practice (Doctor)' : 'Pharmacy (Apotek)'}
+                                    </td>
+                                </tr>
+                            </table>
+                            <p style="font-size: 13px; color: #6b7280; line-height: 1.6; margin-bottom: 24px; text-align: left;">
+                                You can log in now to the portal or launch the application via the link below:
+                            </p>
+                            <table border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
+                                <tr>
+                                    <td align="center" bgcolor="#1B4F42" style="border-radius: 8px;">
+                                        <a href="https://mapotech.app" target="_blank" style="font-size: 14px; font-weight: 700; color: #ffffff; text-decoration: none; padding: 12px 24px; display: inline-block;">Login to MAPOTECH</a>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td align="center" style="background: #f8fffe; border-top: 1px solid #e0f5f0; padding: 24px 40px;">
+                            <p style="color: #9ca3af; font-size: 12px; font-weight: 500; line-height: 1.8; margin: 0;">
+                                © 2026 <span style="color: #48C9B0; font-weight: 800;">MAPOTECH</span> Digital Health System. All rights reserved.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+''',
+        }),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return true;
+      } else {
+        print('Failed to send welcome email: ${response.body}');
+        return false;
+      }
+    } catch (e) {
+      print('Error sending welcome email: $e');
+      return false;
+    }
+  }
+
   // ─────────────────────────────────────────────────────────────────
   // AUTH — OTP (send & verify via otp_verifications table)
   // ─────────────────────────────────────────────────────────────────
 
-  /// Generates a 6-digit OTP, stores it in otp_verifications, and returns
-  /// the code so the caller can display/send it (in a real app, use an
-  /// email service; here we return it for demo/development use).
   Future<String> sendOtp(String email) async {
-    // Generate 6-digit OTP
-    final otp = (100000 + Random().nextInt(900000)).toString();
-    final expiresAt = DateTime.now()
-        .add(const Duration(minutes: 10))
-        .toUtc()
-        .toIso8601String();
-
     try {
-      // Delete old OTPs for this email first
-      await _delete('otp_verifications?email=eq.${Uri.encodeComponent(email)}');
-      // Insert new OTP
-      await _post('otp_verifications', {
-        'email': email,
-        'otp_code': otp,
-        'expires_at': expiresAt,
-      });
-      return otp;
+      // Invoke Supabase Edge Function to send email without CORS errors
+      final response = await client.functions.invoke(
+        'otp-handler',
+        body: {
+          'action': 'send',
+          'email': email,
+        },
+      );
+
+      if (response.status != 200) {
+        throw Exception('Server error status ${response.status}');
+      }
+
+      // Query the database to retrieve the generated OTP code for dev mode/debug display
+      final rows = await _get(
+        'otp_verifications?email=eq.${Uri.encodeComponent(email)}&order=created_at.desc&limit=1',
+      );
+      if (rows.isNotEmpty) {
+        final row = rows.first as Map<String, dynamic>;
+        return row['otp_code'] as String;
+      }
+      return '';
     } catch (e) {
       throw Exception('Gagal mengirim OTP: $e');
     }
@@ -421,7 +578,7 @@ class SupabaseService {
   Future<List<Map<String, dynamic>>> fetchAllPatients() async {
     try {
       final users = await _get(
-        'user?select=*&role=eq.pasien',
+        'user?select=*&role=in.(pasien,patient)',
         schema: 'public',
       );
       final details = await _get(
@@ -713,6 +870,155 @@ class SupabaseService {
       }, schema: 'public');
     } catch (e) {
       throw Exception('Gagal memperbarui izin akses: $e');
+    }
+  }
+
+  // Fetch pharmacist staff
+  Future<List<Map<String, dynamic>>> fetchPharmacistStaff(String apotekId) async {
+    try {
+      final rows = await _get(
+        'user_detail_pharmacist_staff?select=*,user:id(name,email,nik,phone_number,username,gender,birth_place,birth_date,address,province,district,sub_district,village,created_at)&apotek_id=eq.$apotekId',
+        schema: 'public',
+      );
+
+      final List<Map<String, dynamic>> staffList = [];
+      for (final row in rows) {
+        final rowMap = Map<String, dynamic>.from(row as Map);
+        final userMap = rowMap['user'] != null
+            ? Map<String, dynamic>.from(rowMap['user'] as Map)
+            : null;
+        if (userMap != null) {
+          staffList.add({
+            'id': rowMap['id'],
+            'apotek_id': rowMap['apotek_id'],
+            'nama': userMap['name'] ?? '',
+            'email': userMap['email'] ?? '-',
+            'nik': userMap['nik'] ?? '',
+            'telepon': userMap['phone_number'] ?? '',
+            'username': userMap['username'] ?? '',
+            'created_at': userMap['created_at'] ?? '',
+            'strttk': rowMap['sipa_number'] ?? '-',
+            'peran': rowMap['job_title'] ?? 'Asisten Apoteker',
+            'shift': rowMap['shift'] ?? 'Pagi',
+            'isStandby': rowMap['status'] == 'Active',
+            'permissions': ['POS Kasir'], // default mock permissions
+          });
+        }
+      }
+      return staffList;
+    } catch (e) {
+      throw Exception('Gagal mengambil daftar staff apotek: $e');
+    }
+  }
+
+  // Create pharmacist staff
+  Future<void> addPharmacistStaff({
+    required String apotekId,
+    required String staffId,
+    required String name,
+    required String email,
+    required String nik,
+    required String phone,
+    required String strttk,
+    required String peran,
+    required String shift,
+    required String username,
+    required String password,
+  }) async {
+    try {
+      // 1. Fetch pharmacist's instance_id from user_role
+      String? instanceId;
+      final pharmacistRoles = await _get(
+        'user_role?select=id_instance&id_user=eq.$apotekId',
+        schema: 'public',
+      );
+      if (pharmacistRoles.isNotEmpty) {
+        instanceId =
+            (pharmacistRoles.first as Map<String, dynamic>)['id_instance']
+                as String?;
+      }
+
+      // Hash password using Bcrypt
+      final hashedPassword = BCrypt.hashpw(password, BCrypt.gensalt());
+
+      // 2. Insert into public.user
+      final userData = {
+        'id': staffId,
+        'name': name,
+        'email': email.isEmpty || email == '-' ? null : email,
+        'nik': nik,
+        'phone_number': phone,
+        'role': 'asisten_apotek',
+        'username': username,
+        'password': hashedPassword,
+      };
+      await _post('user', userData, schema: 'public');
+
+      // 3. Insert into public.user_role
+      final roleData = {
+        'id_user': staffId,
+        'id_role': 12, // 12 is 'pharmacist_staff'
+        'type': 'pharmacist',
+        'id_instance': instanceId,
+      };
+      await _post('user_role', roleData, schema: 'public');
+
+      // 4. Insert into public.user_detail_pharmacist_staff
+      final staffData = {
+        'id': staffId,
+        'apotek_id': apotekId,
+        'job_title': peran,
+        'sipa_number': strttk,
+        'shift': shift,
+        'status': 'Active',
+      };
+      await _post(
+        'user_detail_pharmacist_staff',
+        staffData,
+        schema: 'public',
+      );
+    } catch (e) {
+      throw Exception('Gagal mendaftarkan staff apotek: $e');
+    }
+  }
+
+  // Delete pharmacist staff
+  Future<void> deletePharmacistStaff(String staffId) async {
+    try {
+      await _delete(
+        'user_detail_pharmacist_staff?id=eq.$staffId',
+        schema: 'public',
+      );
+      await _delete('user_role?id_user=eq.$staffId', schema: 'public');
+      await _delete('user?id=eq.$staffId', schema: 'public');
+    } catch (e) {
+      throw Exception('Gagal menghapus staff apotek: $e');
+    }
+  }
+
+  // Update duty status
+  Future<void> updatePharmacistStaffDuty(String staffId, bool isActive) async {
+    try {
+      await _patch(
+        'user_detail_pharmacist_staff?id=eq.$staffId',
+        {'status': isActive ? 'Active' : 'Inactive'},
+        schema: 'public',
+      );
+    } catch (e) {
+      throw Exception('Gagal memperbarui status staff apotek: $e');
+    }
+  }
+
+  // Update shift
+  Future<void> updatePharmacistStaffShift(String staffId, String shift) async {
+    try {
+      await _patch(
+        'user_detail_pharmacist_staff?id=eq.$staffId',
+        {'shift': shift},
+        schema: 'public',
+      );
+    } catch (e) {
+      throw Exception('Gagal memperbarui shift staff apotek: $e');
     }
   }
 
@@ -1520,6 +1826,19 @@ class SupabaseService {
           final doctorId = docMap['id'] as String;
           final queueInfo = queuesMap[doctorId];
 
+          // Enforce subscription check: must be active and not expired
+          final subStatus = (docMap['subscription_status'] ?? 'INACTIVE').toString().toUpperCase();
+          final subExpiredAt = docMap['subscription_expired_at'];
+          bool isSubActive = false;
+          if (subStatus == 'ACTIVE' && subExpiredAt != null) {
+            try {
+              final expiry = DateTime.parse(subExpiredAt.toString());
+              isSubActive = expiry.isAfter(DateTime.now());
+            } catch (_) {}
+          }
+
+          final isVisible = isSubActive && (docMap['is_visible'] ?? true);
+
           doctorsList.add({
             'id': doctorId,
             'name': userMap['name'] ?? '',
@@ -1527,7 +1846,7 @@ class SupabaseService {
             'avatar_url': userMap['avatar_url'] ?? docMap['satusehat_photo_url'],
             'nama_faskes': docMap['nama_faskes'] ?? 'Praktek Mandiri',
             'profession': docMap['profession'] ?? 'Dokter',
-            'is_visible': docMap['is_visible'] ?? true,
+            'is_visible': isVisible,
             'is_bpjs': docMap['is_bpjs'] ?? false,
             'about': docMap['about'] ?? '',
             'whatsapp_number': docMap['whatsapp_number'] ?? userMap['phone_number'] ?? '',
@@ -1588,5 +1907,113 @@ class SupabaseService {
     } catch (e) {
       throw Exception('Gagal mengambil jadwal dokter: $e');
     }
+  }
+
+  /// Registers a patient account by a doctor without changing the doctor's active session.
+  Future<Map<String, dynamic>> registerPatientByDoctor({
+    required String email,
+    required String password,
+    required String name,
+    required String nik,
+    required String gender,
+    required String birthPlace,
+    required String birthDate, // e.g. "yyyy-MM-dd"
+    required String address,
+    required String phone,
+  }) async {
+    try {
+      // 1. Check if email already exists
+      final emailExists = await checkEmailExists(email);
+      if (emailExists) {
+        throw Exception('Email sudah terdaftar di sistem MAPOTECH');
+      }
+
+      // 2. Check if NIK already exists
+      final nikExists = await checkNikExists(nik, 'pasien');
+      if (nikExists) {
+        throw Exception('NIK sudah terdaftar di sistem MAPOTECH');
+      }
+
+      final supabaseUrl = dotenv.env['SUPABASE_URL'] ?? 'https://abdburxhqqwsobmzuwmz.supabase.co';
+      final supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'] ??
+          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFiZGJ1cnhocXF3c29ibXp1d216Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0OTMyNjYsImV4cCI6MjA5MjA2OTI2Nn0.mB3qIJAHjtWe5UKxE9Oj-RNLQCbQKFYHUZBLaF4nQwk';
+
+      // Create a temporary client instance to register the patient.
+      // This prevents the doctor (currently logged in user) from being signed out.
+      final tempClient = SupabaseClient(
+        supabaseUrl,
+        supabaseAnonKey,
+        authOptions: AuthClientOptions(
+          pkceAsyncStorage: InMemoryStorageAdapter(),
+        ),
+      );
+
+      final response = await tempClient.auth.signUp(
+        email: email,
+        password: password,
+        data: {
+          'name': name,
+          'nik': nik,
+          'gender': gender,
+          'birth_place': birthPlace,
+          'birth_date': birthDate,
+          'province': '',
+          'regency': '',
+          'district': '',
+          'village': '',
+          'address': address,
+          'phone_number': phone,
+          'role': 'pasien',
+        },
+      );
+
+      if (response.user == null) {
+        throw Exception('Pendaftaran gagal. Coba lagi.');
+      }
+
+      // Send welcome email asynchronously
+      sendWelcomeEmail(
+        email: email,
+        name: name,
+        role: 'patient',
+      ).catchError((e) {
+        print('Failed to send welcome email: $e');
+        return false;
+      });
+
+      return {
+        'success': true,
+        'user': response.user,
+        'message': 'Pasien berhasil didaftarkan ke sistem MAPOTECH!',
+      };
+    } on AuthException catch (e) {
+      throw Exception(e.message);
+    } catch (e) {
+      if (e.toString().startsWith('Exception: ')) {
+        rethrow;
+      }
+      throw Exception('Gagal mendaftarkan pasien: $e');
+    }
+  }
+}
+
+/// A lightweight, in-memory implementation of GotrueAsyncStorage
+/// to satisfy Supabase PKCE flow requirements on secondary clients.
+class InMemoryStorageAdapter extends GotrueAsyncStorage {
+  final Map<String, String> _storage = {};
+
+  @override
+  Future<String?> getItem({required String key}) async {
+    return _storage[key];
+  }
+
+  @override
+  Future<void> removeItem({required String key}) async {
+    _storage.remove(key);
+  }
+
+  @override
+  Future<void> setItem({required String key, required String value}) async {
+    _storage[key] = value;
   }
 }
