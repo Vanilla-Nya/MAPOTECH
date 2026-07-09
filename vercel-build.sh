@@ -1,0 +1,11 @@
+#!/bin/bash
+flutter build web --release \
+  --dart-define=SUPABASE_URL=$SUPABASE_URL \
+  --dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY \
+  --dart-define=RESEND_API_KEY=$RESEND_API_KEY \
+  --dart-define=DUITKU_MERCHANT_CODE=$DUITKU_MERCHANT_CODE \
+  --dart-define=DUITKU_MERCHANT_KEY=$DUITKU_MERCHANT_KEY \
+  --dart-define=DUITKU_INQUIRY_URL=$DUITKU_INQUIRY_URL \
+  --dart-define=DUITKU_CALLBACK_URL=$DUITKU_CALLBACK_URL \
+  --dart-define=DUITKU_RETURN_URL=$DUITKU_RETURN_URL \
+  --dart-define=DUITKU_PAYMENT_METHOD=$DUITKU_PAYMENT_METHOD
