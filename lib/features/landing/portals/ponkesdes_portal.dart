@@ -175,7 +175,17 @@ class PonkesdesPortal extends ConsumerWidget {
                   children: [
                     Row(
                       children: [
-                        Container(width: 22, height: 22, decoration: BoxDecoration(shape: BoxShape.circle, color: accentGreen), child: const Icon(Icons.home_work_rounded, size: 11, color: Colors.white)),
+                        Image.asset(
+                          'assets/images/logo.png',
+                          width: 22,
+                          height: 22,
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) => Container(
+                            width: 22, height: 22,
+                            decoration: BoxDecoration(shape: BoxShape.circle, color: accentGreen),
+                            child: const Icon(Icons.home_work_rounded, size: 11, color: Colors.white),
+                          ),
+                        ),
                         const SizedBox(width: 6),
                         Text('PONKESDES', style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: textColor)),
                       ],

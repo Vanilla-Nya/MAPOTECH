@@ -7,6 +7,8 @@ import 'package:mapotech/shared/widgets/custom_button.dart';
 import 'package:bcrypt/bcrypt.dart';
 import 'package:mapotech/shared/supabase_service.dart';
 import 'package:mapotech/shared/widgets/animated_transitions.dart';
+import 'package:mapotech/shared/widgets/ui.dart';
+import 'dart:async';
 
 /// Shows the premium login modal dialog.
 void showLoginModal(BuildContext context, WidgetRef ref) {
@@ -433,12 +435,29 @@ class _LoginModalContentState extends State<_LoginModalContent> {
                       return;
                     }
 
-                    // Show a full overlay loading dialog for real DB login
-                    showDialog(
+                    // Show the premium full-screen loading page with progress and FAQ
+                    final progressNotifier = ValueNotifier<double>(0.0);
+                    Timer? loadingTimer;
+
+                    loadingTimer = Timer.periodic(const Duration(milliseconds: 20), (timer) {
+                      final current = progressNotifier.value;
+                      if (current < 0.90) {
+                        progressNotifier.value = current + 0.015;
+                      } else {
+                        timer.cancel();
+                      }
+                    });
+
+                    showGeneralDialog(
                       context: context,
                       barrierDismissible: false,
-                      builder: (context) => Center(
-                        child: CircularProgressIndicator(color: accentPurple),
+                      barrierColor: Colors.black.withOpacity(0.5),
+                      transitionDuration: const Duration(milliseconds: 250),
+                      pageBuilder: (context, anim1, anim2) => FadeTransition(
+                        opacity: anim1,
+                        child: MapotechLoadingScreen(
+                          progressNotifier: progressNotifier,
+                        ),
                       ),
                     );
 
@@ -484,10 +503,20 @@ class _LoginModalContentState extends State<_LoginModalContent> {
                         }
                       }
 
-                      // Close the circular loading overlay
+                      // Fast-forward progress to 100% and close the loading page
+                      loadingTimer?.cancel();
+                      double currentVal = progressNotifier.value;
+                      while (currentVal < 1.0) {
+                        currentVal = (currentVal + 0.05).clamp(0.0, 1.0);
+                        progressNotifier.value = currentVal;
+                        await Future.delayed(const Duration(milliseconds: 15));
+                      }
+                      await Future.delayed(const Duration(milliseconds: 150));
+
                       if (Navigator.canPop(context)) {
                         Navigator.pop(context);
                       }
+                      progressNotifier.dispose();
 
                       if (dbSuccess) {
                         final blurProfile =
@@ -579,9 +608,11 @@ class _LoginModalContentState extends State<_LoginModalContent> {
                     }
 
                     // Try to close loading dialog if it's still open
+                    loadingTimer?.cancel();
                     if (Navigator.canPop(context)) {
                       Navigator.pop(context);
                     }
+                    progressNotifier.dispose();
 
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
@@ -2512,6 +2543,32 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
                           return;
                         }
 
+                        // Show the premium full-screen loading page with progress and FAQ
+                        final progressNotifier = ValueNotifier<double>(0.0);
+                        Timer? loadingTimer;
+
+                        loadingTimer = Timer.periodic(const Duration(milliseconds: 20), (timer) {
+                          final current = progressNotifier.value;
+                          if (current < 0.90) {
+                            progressNotifier.value = current + 0.015;
+                          } else {
+                            timer.cancel();
+                          }
+                        });
+
+                        showGeneralDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          barrierColor: Colors.black.withOpacity(0.5),
+                          transitionDuration: const Duration(milliseconds: 250),
+                          pageBuilder: (context, anim1, anim2) => FadeTransition(
+                            opacity: anim1,
+                            child: MapotechLoadingScreen(
+                              progressNotifier: progressNotifier,
+                            ),
+                          ),
+                        );
+
                         setState(() => _isLoading = true);
 
                         try {
@@ -2560,6 +2617,20 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
                             role: dbRole,
                           );
 
+                          // Fast-forward progress to 100% and close the loading page
+                          loadingTimer?.cancel();
+                          double currentVal = progressNotifier.value;
+                          while (currentVal < 1.0) {
+                            currentVal = (currentVal + 0.05).clamp(0.0, 1.0);
+                            progressNotifier.value = currentVal;
+                            await Future.delayed(const Duration(milliseconds: 15));
+                          }
+                          await Future.delayed(const Duration(milliseconds: 150));
+
+                          if (context.mounted && Navigator.canPop(context)) {
+                            Navigator.pop(context);
+                          }
+                          progressNotifier.dispose();
                           setState(() => _isLoading = false);
 
                           if (context.mounted) {
@@ -2581,6 +2652,11 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
                             );
                           }
                         } catch (e) {
+                          loadingTimer?.cancel();
+                          if (context.mounted && Navigator.canPop(context)) {
+                            Navigator.pop(context);
+                          }
+                          progressNotifier.dispose();
                           setState(() => _isLoading = false);
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(

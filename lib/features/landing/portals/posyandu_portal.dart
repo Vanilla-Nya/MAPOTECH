@@ -159,7 +159,17 @@ class PosyanduPortal extends ConsumerWidget {
                             // Header
                             Row(
                               children: [
-                                Container(width: 22, height: 22, decoration: const BoxDecoration(shape: BoxShape.circle, color: accentPink), child: const Icon(Icons.favorite_rounded, size: 11, color: Colors.white)),
+                                Image.asset(
+                                  'assets/images/logo.png',
+                                  width: 22,
+                                  height: 22,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (context, error, stackTrace) => Container(
+                                    width: 22, height: 22,
+                                    decoration: const BoxDecoration(shape: BoxShape.circle, color: accentPink),
+                                    child: const Icon(Icons.favorite_rounded, size: 11, color: Colors.white),
+                                  ),
+                                ),
                                 const SizedBox(width: 6),
                                 Text('POSYANDU', style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: textColor)),
                               ],
