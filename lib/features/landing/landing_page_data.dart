@@ -98,12 +98,22 @@ class LandingPageState {
   final Set<String> syncedTransactions;
   final double defaultServiceFee;
   final String receiptPaperSize; // 'A4', 'A5', 'Thermal 58mm', 'Thermal 80mm'
+  final bool isSubscribed;
 
-  bool get isAssistant => loggedInUser?['role'] == 'asisten_dokter';
+  bool get isAssistant =>
+      loggedInUser?['role'] == 'asisten_dokter' ||
+      loggedInUser?['role'] == 'asisten_apotek';
 
   String? get activeDoctorId {
-    if (isAssistant) {
+    if (loggedInUser?['role'] == 'asisten_dokter') {
       return loggedInUser?['doctor_id'] as String?;
+    }
+    return loggedInUser?['id'] as String?;
+  }
+
+  String? get activeApotekId {
+    if (loggedInUser?['role'] == 'asisten_apotek') {
+      return loggedInUser?['apotek_id'] as String?;
     }
     return loggedInUser?['id'] as String?;
   }
@@ -122,6 +132,7 @@ class LandingPageState {
     this.syncedTransactions = const {},
     this.defaultServiceFee = 0.0,
     this.receiptPaperSize = 'A4',
+    this.isSubscribed = true,
   });
 
   LandingPageState copyWith({
@@ -138,6 +149,7 @@ class LandingPageState {
     Set<String>? syncedTransactions,
     double? defaultServiceFee,
     String? receiptPaperSize,
+    bool? isSubscribed,
   }) {
     return LandingPageState(
       activeTab: activeTab ?? this.activeTab,
@@ -153,6 +165,7 @@ class LandingPageState {
       syncedTransactions: syncedTransactions ?? this.syncedTransactions,
       defaultServiceFee: defaultServiceFee ?? this.defaultServiceFee,
       receiptPaperSize: receiptPaperSize ?? this.receiptPaperSize,
+      isSubscribed: isSubscribed ?? this.isSubscribed,
     );
   }
 }
@@ -203,7 +216,11 @@ class LandingPageNotifier extends StateNotifier<LandingPageState> {
   }
 
   void logout() {
-    state = state.copyWith(isLoggedIn: false, loggedInRole: null, loggedInName: null, loggedInUser: null, drawerSize: 1);
+    state = state.copyWith(isLoggedIn: false, loggedInRole: null, loggedInName: null, loggedInUser: null, drawerSize: 1, isSubscribed: true);
+  }
+
+  void setSubscribed(bool val) {
+    state = state.copyWith(isSubscribed: val);
   }
 
   void updateUser(Map<String, dynamic> updatedFields) {
@@ -712,7 +729,7 @@ class LandingPageNotifier extends StateNotifier<LandingPageState> {
           {'label': isId ? 'Puskesmas' : 'Health Center', 'tab': 'puskesmas'},
           {'label': isId ? 'Rumah Sakit' : 'Hospital', 'tab': 'rumahsakit'},
           {'label': isId ? 'PONKESDES' : 'Village Clinic', 'tab': 'ponkesdes'},
-          {'label': isId ? 'Pasyandu' : 'Family Health', 'tab': 'posyandu'},
+          {'label': isId ? 'Posyandu' : 'Family Health', 'tab': 'posyandu'},
         ]
       },
       {

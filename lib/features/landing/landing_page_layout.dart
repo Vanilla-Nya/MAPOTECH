@@ -113,39 +113,47 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
       }
     });
 
-    return Scaffold(
-      backgroundColor: backgroundColor,
-      drawer: _buildMobileDrawer(state, notifier),
-      body: Stack(
-        children: [
-          // Background subtle gradients
-          Positioned(
-            top: -150,
-            right: -150,
-            child: Container(
-              width: 500,
-              height: 500,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: activeColor.withOpacity(0.08),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeInOut,
+      color: backgroundColor,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        drawer: _buildMobileDrawer(state, notifier),
+        body: Stack(
+          children: [
+            // Background subtle gradients
+            Positioned(
+              top: -150,
+              right: -150,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 400),
+                width: 500,
+                height: 500,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: activeColor.withOpacity(0.08),
+                ),
               ),
             ),
-          ),
-          Positioned(
-            top: 400,
-            left: -200,
-            child: Container(
-              width: 600,
-              height: 600,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: darkGreenColor.withOpacity(0.04),
+            Positioned(
+              top: 400,
+              left: -200,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 400),
+                width: 600,
+                height: 600,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: darkGreenColor.withOpacity(0.04),
+                ),
               ),
             ),
-          ),
 
-          // Main Content
-          SafeArea(
+            // Main Content
+            FadeTransitionOnChange(
+              animationKey: '${state.appearance}_${state.language}',
+              child: SafeArea(
             top: false,
             child: CustomScrollView(
               controller: _scrollController,
@@ -183,13 +191,13 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
                 ),
               ],
             ),
-          ),
+          ),),
 
           // Floating settings panel
           const FloatingSettings(),
         ],
       ),
-    );
+    ),);
   }
 
   // --- ACTIVE PORTALS ROUTER ---
@@ -1569,6 +1577,67 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
           color: isDark ? Colors.white70 : Colors.grey[600],
         ),
       ),
+    );
+  }
+}
+
+class FadeTransitionOnChange extends StatefulWidget {
+  final Widget child;
+  final String animationKey;
+
+  const FadeTransitionOnChange({
+    super.key,
+    required this.child,
+    required this.animationKey,
+  });
+
+  @override
+  State<FadeTransitionOnChange> createState() => _FadeTransitionOnChangeState();
+}
+
+class _FadeTransitionOnChangeState extends State<FadeTransitionOnChange>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _opacityAnimation;
+  late String _currentKey;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentKey = widget.animationKey;
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+    _opacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeInOut,
+      ),
+    );
+    _controller.forward(from: 1.0);
+  }
+
+  @override
+  void didUpdateWidget(covariant FadeTransitionOnChange oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.animationKey != _currentKey) {
+      _currentKey = widget.animationKey;
+      _controller.forward(from: 0.0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _opacityAnimation,
+      child: widget.child,
     );
   }
 }

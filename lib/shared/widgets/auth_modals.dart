@@ -8,6 +8,8 @@ import 'package:bcrypt/bcrypt.dart';
 import 'package:mapotech/shared/supabase_service.dart';
 import 'package:mapotech/shared/widgets/animated_transitions.dart';
 import 'package:mapotech/shared/widgets/ui.dart';
+import 'package:mapotech/shared/widgets/location_selector_widget.dart';
+import 'package:mapotech/shared/location_service.dart';
 import 'dart:async';
 
 /// Shows the premium login modal dialog.
@@ -84,7 +86,7 @@ class _LoginModalContentState extends State<_LoginModalContent> {
     final isSoonActive = soonPortals.contains(state.activeTab);
 
     final activeTab = state.activeTab;
-    final isRev = activeTab == 'pasien';
+    final isRev = state.appearance == 'rev';
 
     final isDark = state.appearance == 'dark';
     final bgColor = notifier.getCardColor();
@@ -487,9 +489,10 @@ class _LoginModalContentState extends State<_LoginModalContent> {
                               displayName = user['name'];
 
                               final String dbRole = user['role'] ?? 'pasien';
-                              if (dbRole == 'pasien') {
+                              if (dbRole == 'pasien' || dbRole == 'patient') {
                                 mappedRole = 'pasien';
                               } else if (dbRole == 'dokter' ||
+                                  dbRole == 'praktikmandiri' ||
                                   dbRole == 'asisten_dokter') {
                                 mappedRole = 'dokter';
                               } else if (dbRole == 'apotek' ||
@@ -540,6 +543,22 @@ class _LoginModalContentState extends State<_LoginModalContent> {
                             }
                           } catch (e) {
                             debugPrint('Error fetching assistant details: $e');
+                          }
+                        }
+
+                        // Fetch assistant details if role is asisten_apotek
+                        if (user != null && user['role'] == 'asisten_apotek') {
+                          try {
+                            final asisData = await SupabaseService.client
+                                .from('user_detail_pharmacist_staff')
+                                .select('apotek_id')
+                                .eq('id', user['id'])
+                                .maybeSingle();
+                            if (asisData != null) {
+                              user['apotek_id'] = asisData['apotek_id'];
+                            }
+                          } catch (e) {
+                            debugPrint('Error fetching pharmacist assistant details: $e');
                           }
                         }
 
@@ -763,7 +782,7 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
     final state = widget.ref.watch(landingPageProvider);
     final notifier = widget.ref.read(landingPageProvider.notifier);
 
-    final isRev = _selectedRoleId == 'pasien';
+    final isRev = state.appearance == 'rev';
 
     final isDark = state.appearance == 'dark';
     final bgColor = notifier.getCardColor();
@@ -1516,61 +1535,114 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
                 borderColor: isDark
                     ? const Color(0xFF2C2C2C)
                     : Colors.grey[200]!,
-                onPressed: () {
-                  setState(() {
-                    _currentStep = 0;
-                  });
-                },
+                onPressed: _isLoading
+                    ? () {}
+                    : () {
+                        setState(() {
+                          _currentStep = 0;
+                        });
+                      },
               ),
             ),
             const SizedBox(width: 14),
             Expanded(
-              child: CustomButton(
-                text: state.language == 'id' ? 'LANJUT' : 'NEXT',
-                isGradient: true,
-                gradientColors: btnGradient,
-                height: 48,
-                onPressed: () {
-                  // Validate step 1 fields
-                  if (_namaController.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        backgroundColor: Colors.redAccent,
-                        content: Text(
-                          state.language == 'id'
-                              ? 'Nama lengkap wajib diisi!'
-                              : 'Full name is required!',
-                          style: GoogleFonts.outfit(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
+              child: _isLoading
+                  ? Container(
+                      height: 48,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(colors: btnGradient),
+                        borderRadius: BorderRadius.circular(100),
+                      ),
+                      alignment: Alignment.center,
+                      child: const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: Colors.white,
                         ),
                       ),
-                    );
-                    return;
-                  }
-                  if (_nikController.text.trim().length != 16) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        backgroundColor: Colors.redAccent,
-                        content: Text(
-                          state.language == 'id'
-                              ? 'NIK harus 16 digit!'
-                              : 'NIK must be 16 digits!',
-                          style: GoogleFonts.outfit(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    );
-                    return;
-                  }
-                  setState(() {
-                    _currentStep = 2;
-                  });
-                },
-              ),
+                    )
+                  : CustomButton(
+                      text: state.language == 'id' ? 'LANJUT' : 'NEXT',
+                      isGradient: true,
+                      gradientColors: btnGradient,
+                      height: 48,
+                      onPressed: () async {
+                        // Validate step 1 fields
+                        if (_namaController.text.trim().isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              backgroundColor: Colors.redAccent,
+                              content: Text(
+                                state.language == 'id'
+                                    ? 'Nama lengkap wajib diisi!'
+                                    : 'Full name is required!',
+                                style: GoogleFonts.outfit(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          );
+                          return;
+                        }
+                        if (_nikController.text.trim().length != 16) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              backgroundColor: Colors.redAccent,
+                              content: Text(
+                                state.language == 'id'
+                                    ? 'NIK harus 16 digit!'
+                                    : 'NIK must be 16 digits!',
+                                style: GoogleFonts.outfit(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          );
+                          return;
+                        }
+
+                        setState(() => _isLoading = true);
+                        try {
+                          final db = SupabaseService();
+                          String dbRole = 'patient';
+                          if (_selectedRoleId == 'dokter') dbRole = 'praktikmandiri';
+                          if (_selectedRoleId == 'apotek') dbRole = 'apotek';
+
+                          final exists = await db.checkNikExists(_nikController.text.trim(), dbRole);
+                          setState(() => _isLoading = false);
+
+                          if (exists) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  backgroundColor: Colors.redAccent,
+                                  content: Text(
+                                    state.language == 'id'
+                                        ? 'NIK sudah terdaftar!'
+                                        : 'NIK already registered!',
+                                    style: GoogleFonts.outfit(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }
+                            return;
+                          }
+                        } catch (e) {
+                          setState(() => _isLoading = false);
+                        }
+
+                        setState(() {
+                          _currentStep = 2;
+                        });
+                      },
+                    ),
             ),
           ],
         ),
@@ -1622,274 +1694,26 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
               ),
               const SizedBox(height: 16),
 
-              // Provinsi & Kota
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Provinsi',
-                          style: GoogleFonts.outfit(
-                            fontSize: 9,
-                            color: subtitleColor,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: fieldBg,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: isDark
-                                  ? const Color(0xFF2C2C2C)
-                                  : Colors.grey[200]!,
-                            ),
-                          ),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              value: _provinsi,
-                              isExpanded: true,
-                              dropdownColor: fieldBg,
-                              icon: Icon(
-                                Icons.keyboard_arrow_down_rounded,
-                                size: 16,
-                                color: subtitleColor,
-                              ),
-                              style: GoogleFonts.outfit(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: textColor,
-                              ),
-                              onChanged: (String? val) {
-                                if (val != null)
-                                  setState(() => _provinsi = val);
-                              },
-                              items: const [
-                                DropdownMenuItem(
-                                  value: 'Pilih Provinsi',
-                                  child: Text('Pilih Provinsi'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'Jawa Timur',
-                                  child: Text('Jawa Timur'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'DKI Jakarta',
-                                  child: Text('DKI Jakarta'),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Kota/Kabupaten',
-                          style: GoogleFonts.outfit(
-                            fontSize: 9,
-                            color: subtitleColor,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: fieldBg,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: isDark
-                                  ? const Color(0xFF2C2C2C)
-                                  : Colors.grey[200]!,
-                            ),
-                          ),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              value: _kota,
-                              isExpanded: true,
-                              dropdownColor: fieldBg,
-                              icon: Icon(
-                                Icons.keyboard_arrow_down_rounded,
-                                size: 16,
-                                color: subtitleColor,
-                              ),
-                              style: GoogleFonts.outfit(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: textColor,
-                              ),
-                              onChanged: (String? val) {
-                                if (val != null) setState(() => _kota = val);
-                              },
-                              items: const [
-                                DropdownMenuItem(
-                                  value: 'Pilih Kota/Kabupaten',
-                                  child: Text('Pilih Kota/Kabupaten'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'Surabaya',
-                                  child: Text('Surabaya'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'Jakarta Selatan',
-                                  child: Text('Jakarta Selatan'),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-
-              // Kecamatan & Kelurahan
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Kecamatan',
-                          style: GoogleFonts.outfit(
-                            fontSize: 9,
-                            color: subtitleColor,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: fieldBg,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: isDark
-                                  ? const Color(0xFF2C2C2C)
-                                  : Colors.grey[200]!,
-                            ),
-                          ),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              value: _kecamatan,
-                              isExpanded: true,
-                              dropdownColor: fieldBg,
-                              icon: Icon(
-                                Icons.keyboard_arrow_down_rounded,
-                                size: 16,
-                                color: subtitleColor,
-                              ),
-                              style: GoogleFonts.outfit(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: textColor,
-                              ),
-                              onChanged: (String? val) {
-                                if (val != null)
-                                  setState(() => _kecamatan = val);
-                              },
-                              items: const [
-                                DropdownMenuItem(
-                                  value: 'Pilih Kecamatan',
-                                  child: Text('Pilih Kecamatan'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'Gubeng',
-                                  child: Text('Gubeng'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'Tebet',
-                                  child: Text('Tebet'),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Kelurahan/Desa',
-                          style: GoogleFonts.outfit(
-                            fontSize: 9,
-                            color: subtitleColor,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: fieldBg,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: isDark
-                                  ? const Color(0xFF2C2C2C)
-                                  : Colors.grey[200]!,
-                            ),
-                          ),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              value: _kelurahan,
-                              isExpanded: true,
-                              dropdownColor: fieldBg,
-                              icon: Icon(
-                                Icons.keyboard_arrow_down_rounded,
-                                size: 16,
-                                color: subtitleColor,
-                              ),
-                              style: GoogleFonts.outfit(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: textColor,
-                              ),
-                              onChanged: (String? val) {
-                                if (val != null)
-                                  setState(() => _kelurahan = val);
-                              },
-                              items: const [
-                                DropdownMenuItem(
-                                  value: 'Pilih Kelurahan/Desa',
-                                  child: Text('Pilih Kelurahan/Desa'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'Mojo',
-                                  child: Text('Mojo'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'Menteng Dalam',
-                                  child: Text('Menteng Dalam'),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+              LocationSelectorWidget(
+                initialProvince: _provinsi == 'Pilih Provinsi' ? '' : _provinsi,
+                initialDistrict: _kota == 'Pilih Kota/Kabupaten' ? '' : _kota,
+                initialSubDistrict: _kecamatan == 'Pilih Kecamatan' ? '' : _kecamatan,
+                initialVillage: _kelurahan == 'Pilih Kelurahan/Desa' ? '' : _kelurahan,
+                fieldBg: fieldBg,
+                textColor: textColor,
+                subtitleColor: subtitleColor,
+                borderColor: isDark
+                    ? const Color(0xFF2C2C2C)
+                    : Colors.grey[200]!,
+                dropdownColor: fieldBg,
+                onChanged: (province, district, subDistrict, village) {
+                  setState(() {
+                    _provinsi = province.isEmpty ? 'Pilih Provinsi' : province;
+                    _kota = district.isEmpty ? 'Pilih Kota/Kabupaten' : district;
+                    _kecamatan = subDistrict.isEmpty ? 'Pilih Kecamatan' : subDistrict;
+                    _kelurahan = village.isEmpty ? 'Pilih Kelurahan/Desa' : village;
+                  });
+                },
               ),
               const SizedBox(height: 14),
 
@@ -2106,6 +1930,30 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
                             setState(() => _isLoading = true);
                             try {
                               final db = SupabaseService();
+
+                              // Check if email already registered
+                              final emailExists = await db.checkEmailExists(email);
+                              if (emailExists) {
+                                setState(() => _isLoading = false);
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      backgroundColor: Colors.redAccent,
+                                      content: Text(
+                                        state.language == 'id'
+                                            ? 'Email sudah terdaftar!'
+                                            : 'Email already registered!',
+                                        style: GoogleFonts.outfit(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }
+                                return;
+                              }
+
                               final otp = await db.sendOtp(email);
                               setState(() {
                                 _otpSent = true;
@@ -2543,6 +2391,36 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
                           return;
                         }
 
+                        // Double check email duplicate first
+                        setState(() => _isLoading = true);
+                        try {
+                          final db = SupabaseService();
+                          final emailExists = await db.checkEmailExists(email);
+                          if (emailExists) {
+                            setState(() => _isLoading = false);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  backgroundColor: Colors.redAccent,
+                                  content: Text(
+                                    state.language == 'id'
+                                        ? 'Email sudah terdaftar!'
+                                        : 'Email already registered!',
+                                    style: GoogleFonts.outfit(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }
+                            return;
+                          }
+                        } catch (e) {
+                          print('Email double-check failed: $e');
+                        }
+                        setState(() => _isLoading = false);
+
                         // Show the premium full-screen loading page with progress and FAQ
                         final progressNotifier = ValueNotifier<double>(0.0);
                         Timer? loadingTimer;
@@ -2580,8 +2458,8 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
                               : 'female';
 
                           // Map role to DB role string
-                          String dbRole = 'pasien';
-                          if (_selectedRoleId == 'dokter') dbRole = 'dokter';
+                          String dbRole = 'patient';
+                          if (_selectedRoleId == 'dokter') dbRole = 'praktikmandiri';
                           if (_selectedRoleId == 'apotek') dbRole = 'apotek';
 
                           // Build ISO birth date
@@ -2640,8 +2518,8 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
                                 backgroundColor: accentPurple,
                                 content: Text(
                                   state.language == 'id'
-                                      ? 'Pendaftaran berhasil! Silakan cek email Anda untuk verifikasi akun.'
-                                      : 'Registration successful! Please check your email to verify your account.',
+                                      ? 'Pendaftaran berhasil! Akun Anda telah aktif dan siap digunakan.'
+                                      : 'Registration successful! Your account is active and ready to use.',
                                   style: GoogleFonts.outfit(
                                     fontWeight: FontWeight.bold,
                                     color: Colors.white,
