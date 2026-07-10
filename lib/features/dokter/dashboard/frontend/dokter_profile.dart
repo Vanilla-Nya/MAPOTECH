@@ -14,6 +14,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/supabase_service.dart';
+import 'package:mapotech/features/pasien/dashboard/frontend/pasien_dokter_search.dart';
 import 'package:mapotech/shared/widgets/skeleton_loading.dart';
 import 'package:mapotech/shared/widgets/location_selector_widget.dart';
 import 'package:mapotech/shared/location_service.dart';
@@ -46,6 +47,13 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
   int _subMinutesRemaining = 0;
   int _subTotalDays = 30; // default plan length
   DateTime? _subExpiryDate;
+
+  // Premium Design Details
+  bool _isPremiumActive = false;
+  String _premiumExpiry = '-';
+  int _premiumDaysRemaining = 0;
+  DateTime? _premiumExpiryDate;
+  bool _isPremiumLifetime = false;
 
   // Tab index: 0 = Profile & Status, 1 = Practice & Service, 2 = API & Integration
   int _activeTab = 0;
@@ -590,9 +598,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
           _selectedProfession = 'Doctor';
         }
 
-        ref.read(landingPageProvider.notifier).updateUser({
-          'profession': prof,
-        });
+        ref.read(landingPageProvider.notifier).updateUser({'profession': prof});
 
         // Parse JSONB API credentials
         final ssApiRaw = detailRes['satu_sehat_api'];
@@ -696,6 +702,102 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
           _subExpiryDate = null;
         }
 
+        // Parse Premium Design details
+        final bgSettings = detailRes['header_bg_settings'];
+        final Map<String, dynamic> settings = bgSettings is Map
+            ? Map<String, dynamic>.from(bgSettings)
+            : <String, dynamic>{};
+
+        _isPremiumActive = settings['is_premium'] == true;
+        _isPremiumLifetime = false;
+        _premiumExpiry = '-';
+        _premiumDaysRemaining = 0;
+        _premiumExpiryDate = null;
+
+        final now = DateTime.now();
+        final bool isSubActive =
+            _subStatus == 'ACTIVE' &&
+            _subExpiryDate != null &&
+            _subExpiryDate!.isAfter(now);
+
+        if (_isPremiumActive) {
+          final expAt = settings['premium_expired_at'];
+
+          if (!isSubActive) {
+            _isPremiumActive = false;
+            _premiumExpiry = 'Expired (Subs Expired)';
+            _premiumDaysRemaining = 0;
+            _isPremiumLifetime = expAt == 'lifetime';
+
+            // Clean up in the database so it is gone next time (ONLY if NOT lifetime)
+            if (expAt != 'lifetime') {
+              settings['is_premium'] = false;
+              settings['premium_expired_at'] = null;
+              final userIdVal = _effectiveUserId;
+              SupabaseService.client
+                  .from('user_detail_doctor')
+                  .update({'header_bg_settings': settings})
+                  .eq('id', userIdVal)
+                  .then(
+                    (_) => debugPrint('Cleaned expired premium status in DB'),
+                  );
+            }
+          } else {
+            if (expAt == 'lifetime') {
+              _isPremiumLifetime = true;
+              _premiumExpiry = 'Lifetime (Subs Tied)';
+              _premiumDaysRemaining = _subDaysRemaining;
+            } else if (expAt != null) {
+              try {
+                final expDate = DateTime.parse(expAt.toString());
+                _premiumExpiryDate = expDate;
+                if (expDate.isBefore(now)) {
+                  _isPremiumActive = false;
+                  _premiumExpiry = 'Expired';
+
+                  // Clean up in database
+                  settings['is_premium'] = false;
+                  settings['premium_expired_at'] = null;
+                  final userIdVal = _effectiveUserId;
+                  SupabaseService.client
+                      .from('user_detail_doctor')
+                      .update({'header_bg_settings': settings})
+                      .eq('id', userIdVal)
+                      .then(
+                        (_) =>
+                            debugPrint('Cleaned expired premium status in DB'),
+                      );
+                } else {
+                  const months = [
+                    'Jan',
+                    'Feb',
+                    'Mar',
+                    'Apr',
+                    'May',
+                    'Jun',
+                    'Jul',
+                    'Aug',
+                    'Sep',
+                    'Oct',
+                    'Nov',
+                    'Dec',
+                  ];
+                  _premiumExpiry =
+                      '${expDate.day.toString().padLeft(2, '0')} '
+                      '${months[expDate.month - 1]} ${expDate.year}';
+                  _premiumDaysRemaining = expDate.difference(now).inDays;
+                }
+              } catch (_) {
+                _isPremiumActive = false;
+              }
+            } else {
+              _isPremiumLifetime = true;
+              _premiumExpiry = 'Lifetime (Subs Tied)';
+              _premiumDaysRemaining = _subDaysRemaining;
+            }
+          }
+        }
+
         // Parse Queue QR Code token
         _qrToken = detailRes['qr_token']?.toString() ?? '';
 
@@ -745,7 +847,6 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
         }
 
         // Force _showProfileInSearch to false if subscription is inactive or expired
-        final bool isSubActive = _subStatus == 'ACTIVE' && _subExpiryDate != null && _subExpiryDate!.isAfter(DateTime.now());
         if (!isSubActive) {
           _showProfileInSearch = false;
         }
@@ -863,7 +964,9 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
     if (_isAssistant) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Hanya Dokter (Pemilik) yang dapat mengubah pengaturan praktik.'),
+          content: Text(
+            'Hanya Dokter (Pemilik) yang dapat mengubah pengaturan praktik.',
+          ),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -920,7 +1023,10 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
 
       final maxVal = int.tryParse(_maxQueueController.text) ?? 20;
 
-      final bool isSubActive = _subStatus == 'ACTIVE' && _subExpiryDate != null && _subExpiryDate!.isAfter(DateTime.now());
+      final bool isSubActive =
+          _subStatus == 'ACTIVE' &&
+          _subExpiryDate != null &&
+          _subExpiryDate!.isAfter(DateTime.now());
       final isVisibleToSave = isSubActive && _showProfileInSearch;
 
       await client
@@ -961,7 +1067,9 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
     if (_isAssistant) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Hanya Dokter (Pemilik) yang dapat mengubah API Integrasi.'),
+          content: Text(
+            'Hanya Dokter (Pemilik) yang dapat mengubah API Integrasi.',
+          ),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -1044,7 +1152,9 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
     if (_isAssistant) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Hanya Dokter (Pemilik) yang dapat memperpanjang langganan.'),
+          content: Text(
+            'Hanya Dokter (Pemilik) yang dapat memperpanjang langganan.',
+          ),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -1095,7 +1205,10 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
           'category': 'Operasional',
           'status': 'active',
         };
-        await client.schema('private_doctor').from('financial_transactions').insert(txData);
+        await client
+            .schema('private_doctor')
+            .from('financial_transactions')
+            .insert(txData);
       } catch (dbErr) {
         debugPrint('Failed to auto-record subscription expense: $dbErr');
       }
@@ -1122,11 +1235,530 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
     }
   }
 
+  Future<void> _renewPackageProfile(String packageType, int amount) async {
+    Navigator.of(context).pop(); // Close bottom sheet first
+
+    if (_isAssistant) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Hanya Dokter (Pemilik) yang dapat melakukan pembelian.',
+          ),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+    final userId = _effectiveUserId;
+
+    setState(() => _isSaving = true);
+
+    try {
+      final client = SupabaseService.client;
+
+      // 1. Fetch current database record
+      final res = await client
+          .from('user_detail_doctor')
+          .select(
+            'subscription_expired_at, subscription_status, header_bg_settings',
+          )
+          .eq('id', userId)
+          .maybeSingle();
+
+      DateTime currentSubExpiry = DateTime.now();
+      if (res != null && res['subscription_expired_at'] != null) {
+        try {
+          final parsed = DateTime.parse(
+            res['subscription_expired_at'].toString(),
+          );
+          if (parsed.isAfter(DateTime.now())) {
+            currentSubExpiry = parsed;
+          }
+        } catch (_) {}
+      }
+
+      final bgSettings = res?['header_bg_settings'];
+      final Map<String, dynamic> settings = bgSettings is Map
+          ? Map<String, dynamic>.from(bgSettings)
+          : <String, dynamic>{};
+
+      DateTime currentPremExpiry = DateTime.now();
+      if (settings['is_premium'] == true &&
+          settings['premium_expired_at'] != 'lifetime' &&
+          settings['premium_expired_at'] != null) {
+        try {
+          final parsed = DateTime.parse(
+            settings['premium_expired_at'].toString(),
+          );
+          if (parsed.isAfter(DateTime.now())) {
+            currentPremExpiry = parsed;
+          }
+        } catch (_) {}
+      }
+
+      String newSubExpiryStr =
+          res?['subscription_expired_at']?.toString() ?? '';
+      String newSubStatus =
+          res?['subscription_status']?.toString() ?? 'inactive';
+
+      // 2. Determine changes based on packageType
+      if (packageType == 'subscription_30') {
+        final newExpiry = currentSubExpiry.add(const Duration(days: 30));
+        newSubExpiryStr = newExpiry.toIso8601String();
+        newSubStatus = 'active';
+      } else if (packageType == 'premium_30') {
+        settings['is_premium'] = true;
+        if (settings['premium_expired_at'] == 'lifetime') {
+          // If already lifetime, keep it lifetime
+        } else {
+          final newExpiry = currentPremExpiry.add(const Duration(days: 30));
+          settings['premium_expired_at'] = newExpiry.toIso8601String();
+        }
+      } else if (packageType == 'premium_sync') {
+        settings['is_premium'] = true;
+        settings['premium_expired_at'] =
+            newSubExpiryStr; // Sync with subscription expiry date string!
+      } else if (packageType == 'premium_lifetime') {
+        settings['is_premium'] = true;
+        settings['premium_expired_at'] = 'lifetime';
+      } else if (packageType == 'bundle_30') {
+        // Subs 30
+        final newSubExpiry = currentSubExpiry.add(const Duration(days: 30));
+        newSubExpiryStr = newSubExpiry.toIso8601String();
+        newSubStatus = 'active';
+        // Premium 30
+        settings['is_premium'] = true;
+        if (settings['premium_expired_at'] == 'lifetime') {
+          // Keep lifetime
+        } else {
+          final newPremExpiry = currentPremExpiry.add(const Duration(days: 30));
+          settings['premium_expired_at'] = newPremExpiry.toIso8601String();
+        }
+      }
+
+      // 3. Perform database update
+      await client
+          .from('user_detail_doctor')
+          .update({
+            'subscription_status': newSubStatus,
+            'subscription_expired_at': newSubExpiryStr,
+            'header_bg_settings': settings,
+          })
+          .eq('id', userId);
+
+      // 4. Record expense
+      String packageDesc = 'Pembelian Paket Layanan';
+      if (packageType == 'subscription_30')
+        packageDesc = 'Perpanjangan Langganan Praktik Mandiri 30 Hari';
+      if (packageType == 'premium_30')
+        packageDesc = 'Pembelian Kustomisasi Profil Premium 30 Hari';
+      if (packageType == 'premium_sync')
+        packageDesc = 'Pembelian Premium Customizer (Sinkronisasi Durasi)';
+      if (packageType == 'premium_lifetime')
+        packageDesc = 'Pembelian Kustomisasi Profil Premium Lifetime';
+      if (packageType == 'bundle_30')
+        packageDesc = 'Pembelian Paket Mega Bundle 30 Hari';
+
+      try {
+        final txData = {
+          'id_user': userId,
+          'transaction_type': 'expense',
+          'source_type': 'manual',
+          'amount': amount.toDouble(),
+          'description': packageDesc,
+          'category': 'Operasional',
+          'status': 'active',
+        };
+        await client
+            .schema('private_doctor')
+            .from('financial_transactions')
+            .insert(txData);
+      } catch (dbErr) {
+        debugPrint('Failed to auto-record package expense: $dbErr');
+      }
+
+      await _fetchDbData();
+      _showPurchaseSuccessDialogProfile(packageType);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.redAccent),
+      );
+    } finally {
+      setState(() => _isSaving = false);
+    }
+  }
+
+  void _showUpgradePlansModalProfile() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        final isDarkTheme = ref.read(landingPageProvider).appearance == 'dark';
+        final bg = isDarkTheme ? const Color(0xFF1E1E22) : Colors.white;
+        final text = isDarkTheme ? Colors.white : const Color(0xFF1E1E22);
+        final subText = isDarkTheme ? Colors.white60 : Colors.black54;
+        final border = isDarkTheme ? Colors.white12 : Colors.black12;
+
+        return DraggableScrollableSheet(
+          initialChildSize: 0.85,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          builder: (_, controller) {
+            return Container(
+              decoration: BoxDecoration(
+                color: bg,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(24),
+                  topRight: Radius.circular(24),
+                ),
+              ),
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+              child: ListView(
+                controller: controller,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: border,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Pilih Paket Layanan',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.outfit(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: text,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Pilih paket yang sesuai untuk menunjang praktik Anda',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.outfit(fontSize: 12, color: subText),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Section header: Layanan Praktik
+                  Text(
+                    '1. Layanan Praktik (Subscription)',
+                    style: GoogleFonts.outfit(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                      color: text,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildPlanCardProfile(
+                    title: 'Standard Subscription (30 Days)',
+                    description:
+                        'Akses penuh ke semua fitur dashboard praktik mandiri & booking pasien selama 30 hari.',
+                    price: 'Rp 1.000',
+                    isPopular: false,
+                    accentColor: const Color(0xFF00BFA6),
+                    textColor: text,
+                    subTextColor: subText,
+                    borderColor: border,
+                    onTap: () => _buySubscriptionWithDuitku('subscription_30'),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Section header: Kustomisasi Profil
+                  Text(
+                    '2. Desain Profil Premium',
+                    style: GoogleFonts.outfit(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                      color: text,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildPlanCardProfile(
+                    title: 'Premium Customizer (30 Days)',
+                    description:
+                        'Buka kustomisasi desain profil lengkap (font nama, tagline, blur level, vignette, custom gradients) selama 30 hari.',
+                    price: 'Rp 1.000',
+                    isPopular: false,
+                    accentColor: const Color(0xFFFFB300),
+                    textColor: text,
+                    subTextColor: subText,
+                    borderColor: border,
+                    onTap: () => _renewPackageProfile('premium_30', 1000),
+                  ),
+                  if (_subDaysRemaining > 0) ...[
+                    const SizedBox(height: 8),
+                    _buildPlanCardProfile(
+                      title:
+                          'Premium Customizer (Sync $_subDaysRemaining Days)',
+                      description:
+                          'Sesuaikan durasi Premium Customizer Anda dengan sisa durasi Langganan Praktik Anda saat ini.',
+                      price: 'Rp 1.000',
+                      isPopular: false,
+                      accentColor: const Color(0xFFFFB300),
+                      textColor: text,
+                      subTextColor: subText,
+                      borderColor: border,
+                      onTap: () => _renewPackageProfile('premium_sync', 1000),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  _buildPlanCardProfile(
+                    title: 'Premium Customizer (Lifetime)',
+                    description:
+                        'Buka kustomisasi desain profil premium. Aktif selama langganan Anda aktif. (Kehilangan status jika langganan dibiarkan kedaluwarsa).',
+                    price: 'Rp 1.000',
+                    isPopular: true,
+                    accentColor: const Color(0xFFFFB300),
+                    textColor: text,
+                    subTextColor: subText,
+                    borderColor: border,
+                    onTap: () => _renewPackageProfile('premium_lifetime', 1000),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Section header: Mega Bundle
+                  Text(
+                    '3. Mega Bundle (Subscription + Premium)',
+                    style: GoogleFonts.outfit(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                      color: text,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildPlanCardProfile(
+                    title: 'Mega Bundle (30 Days)',
+                    description:
+                        'Gabungan akses Layanan Praktik & Kustomisasi Profil Premium selama 30 hari.',
+                    price: 'Rp 1.000',
+                    isPopular: false,
+                    accentColor: const Color(0xFFCB8FFF),
+                    textColor: text,
+                    subTextColor: subText,
+                    borderColor: border,
+                    onTap: () => _buySubscriptionWithDuitku('bundle_30'),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildPlanCardProfile({
+    required String title,
+    required String description,
+    required String price,
+    required bool isPopular,
+    required Color accentColor,
+    required Color textColor,
+    required Color subTextColor,
+    required Color borderColor,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isPopular ? accentColor : borderColor,
+          width: isPopular ? 2 : 1,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: GoogleFonts.outfit(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: textColor,
+                      ),
+                    ),
+                  ),
+                  if (isPopular)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: accentColor,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        'POPULER',
+                        style: GoogleFonts.outfit(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                description,
+                style: GoogleFonts.outfit(
+                  fontSize: 11,
+                  color: subTextColor,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Text(
+                    price,
+                    style: GoogleFonts.outfit(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                      color: accentColor,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: accentColor,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      'Pilih Paket',
+                      style: GoogleFonts.outfit(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showPurchaseSuccessDialogProfile(String packageType) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        final isDarkTheme = ref.read(landingPageProvider).appearance == 'dark';
+        final bg = isDarkTheme ? const Color(0xFF1E1E22) : Colors.white;
+        final text = isDarkTheme ? Colors.white : const Color(0xFF1E1E22);
+        final subText = isDarkTheme ? Colors.white60 : Colors.black54;
+
+        String packageName = '';
+        if (packageType == 'subscription')
+          packageName = 'Standard Subscription';
+        if (packageType == 'premium') packageName = 'Premium Customizer';
+        if (packageType == 'bundle')
+          packageName = 'Mega Bundle (Subs + Premium)';
+
+        return Dialog(
+          backgroundColor: bg,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF00BFA6),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.check_rounded,
+                    size: 40,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Pembelian Sukses!',
+                  style: GoogleFonts.outfit(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: text,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Paket $packageName Anda telah berhasil diaktifkan. Terima kasih telah menggunakan MAPOTECH!',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.outfit(
+                    fontSize: 12,
+                    color: subText,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF00BFA6),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: Text(
+                      'Selesai',
+                      style: GoogleFonts.outfit(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _regenerateQrToken() async {
     if (_isAssistant) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Hanya Dokter (Pemilik) yang dapat meregenerasi QR Code.'),
+          content: Text(
+            'Hanya Dokter (Pemilik) yang dapat meregenerasi QR Code.',
+          ),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -2027,11 +2659,20 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
   // --- DUITKU INTEGRATION ---
 
   // Keys for localStorage persistence of pending QRIS payment
-  static const String _kPendingOrderId   = 'duitku_pending_order_id';
+  static const String _kPendingOrderId = 'duitku_pending_order_id';
   static const String _kPendingPaymentUrl = 'duitku_pending_payment_url';
-  static const String _kPendingQrString  = 'duitku_pending_qr_string';
-  static const String _kPendingAmount    = 'duitku_pending_amount';
-  static const String _kPendingUserId    = 'duitku_pending_user_id';
+  static const String _kPendingQrString = 'duitku_pending_qr_string';
+  static const String _kPendingAmount = 'duitku_pending_amount';
+  static const String _kPendingUserId = 'duitku_pending_user_id';
+  static const String _kPendingPackageType = 'duitku_pending_package_type';
+
+  /// Returns true when there is an incomplete pending QRIS payment saved for this user.
+  bool get _hasPendingPayment {
+    if (!kIsWeb) return false;
+    final userId = _effectiveUserId;
+    final pending = _loadPendingPayment(userId);
+    return pending != null;
+  }
 
   /// Save pending payment info to localStorage (including raw QRIS string)
   void _savePendingPayment({
@@ -2040,24 +2681,28 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
     required String qrString,
     required int amount,
     required String userId,
+    required String packageType,
   }) {
     if (kIsWeb) {
-      html.window.localStorage[_kPendingOrderId]    = orderId;
+      html.window.localStorage[_kPendingOrderId] = orderId;
       html.window.localStorage[_kPendingPaymentUrl] = paymentUrl;
-      html.window.localStorage[_kPendingQrString]   = qrString;
-      html.window.localStorage[_kPendingAmount]     = amount.toString();
-      html.window.localStorage[_kPendingUserId]     = userId;
+      html.window.localStorage[_kPendingQrString] = qrString;
+      html.window.localStorage[_kPendingAmount] = amount.toString();
+      html.window.localStorage[_kPendingUserId] = userId;
+      html.window.localStorage[_kPendingPackageType] = packageType;
     }
   }
 
   /// Load pending payment from localStorage (returns null if none for this user)
   Map<String, String>? _loadPendingPayment(String userId) {
     if (!kIsWeb) return null;
-    final orderId    = html.window.localStorage[_kPendingOrderId];
+    final orderId = html.window.localStorage[_kPendingOrderId];
     final paymentUrl = html.window.localStorage[_kPendingPaymentUrl];
-    final qrString   = html.window.localStorage[_kPendingQrString] ?? '';
-    final amount     = html.window.localStorage[_kPendingAmount];
+    final qrString = html.window.localStorage[_kPendingQrString] ?? '';
+    final amount = html.window.localStorage[_kPendingAmount];
     final savedUserId = html.window.localStorage[_kPendingUserId];
+    final packageType =
+        html.window.localStorage[_kPendingPackageType] ?? 'subscription_30';
     if (orderId == null || paymentUrl == null || amount == null) return null;
     if (savedUserId != null && savedUserId != userId) return null;
     return {
@@ -2065,6 +2710,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
       'paymentUrl': paymentUrl,
       'qrString': qrString,
       'amount': amount,
+      'packageType': packageType,
     };
   }
 
@@ -2076,14 +2722,106 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
       html.window.localStorage.remove(_kPendingQrString);
       html.window.localStorage.remove(_kPendingAmount);
       html.window.localStorage.remove(_kPendingUserId);
+      html.window.localStorage.remove(_kPendingPackageType);
     }
   }
 
-  Future<void> _buySubscriptionWithDuitku() async {
+  /// Apply the correct package benefits after a successful Duitku QRIS payment.
+  Future<void> _applyDuitkuPackage(String packageType, int amount) async {
+    final userId = _effectiveUserId;
+    final client = SupabaseService.client;
+
+    final res = await client
+        .from('user_detail_doctor')
+        .select('subscription_expired_at, header_bg_settings')
+        .eq('id', userId)
+        .maybeSingle();
+
+    DateTime currentSubExpiry = DateTime.now();
+    if (res != null && res['subscription_expired_at'] != null) {
+      try {
+        final parsed = DateTime.parse(
+          res['subscription_expired_at'].toString(),
+        );
+        if (parsed.isAfter(DateTime.now())) currentSubExpiry = parsed;
+      } catch (_) {}
+    }
+
+    final bgSettings = res?['header_bg_settings'];
+    final Map<String, dynamic> settings = bgSettings is Map
+        ? Map<String, dynamic>.from(bgSettings)
+        : <String, dynamic>{};
+
+    final newSubExpiry = currentSubExpiry.add(const Duration(days: 30));
+    final newSubExpiryStr = newSubExpiry.toIso8601String();
+
+    String packageDesc = 'Perpanjangan Langganan Praktik Mandiri 30 Hari';
+
+    if (packageType == 'bundle_30') {
+      // Apply both subscription +30 days AND premium +30 days
+      DateTime currentPremExpiry = DateTime.now();
+      if (settings['is_premium'] == true &&
+          settings['premium_expired_at'] != 'lifetime' &&
+          settings['premium_expired_at'] != null) {
+        try {
+          final parsed = DateTime.parse(
+            settings['premium_expired_at'].toString(),
+          );
+          if (parsed.isAfter(DateTime.now())) currentPremExpiry = parsed;
+        } catch (_) {}
+      }
+      settings['is_premium'] = true;
+      if (settings['premium_expired_at'] != 'lifetime') {
+        settings['premium_expired_at'] = currentPremExpiry
+            .add(const Duration(days: 30))
+            .toIso8601String();
+      }
+      packageDesc =
+          'Pembelian Paket Mega Bundle 30 Hari (Subscription + Premium)';
+    }
+
+    // Always extend subscription for both subscription_30 and bundle_30
+    await client
+        .from('user_detail_doctor')
+        .update({
+          'subscription_status': 'active',
+          'subscription_expired_at': newSubExpiryStr,
+          if (packageType == 'bundle_30') 'header_bg_settings': settings,
+        })
+        .eq('id', userId);
+
+    // Record the expense
+    try {
+      final txData = {
+        'id_user': userId,
+        'transaction_type': 'expense',
+        'source_type': 'manual',
+        'amount': amount.toDouble(),
+        'description': packageDesc,
+        'category': 'Operasional',
+        'status': 'active',
+      };
+      await client
+          .schema('private_doctor')
+          .from('financial_transactions')
+          .insert(txData);
+    } catch (dbErr) {
+      debugPrint('Failed to auto-record package expense: $dbErr');
+    }
+
+    await _fetchDbData();
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _buySubscriptionWithDuitku([
+    String packageType = 'subscription_30',
+  ]) async {
     if (_isAssistant) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Hanya Dokter (Pemilik) yang dapat memperpanjang langganan.'),
+          content: Text(
+            'Hanya Dokter (Pemilik) yang dapat memperpanjang langganan.',
+          ),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -2096,10 +2834,11 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
     // ── Check if there is already a saved pending payment for this user ──
     final pending = _loadPendingPayment(userId);
     if (pending != null) {
-      final savedOrderId    = pending['orderId']!;
+      final savedOrderId = pending['orderId']!;
       final savedPaymentUrl = pending['paymentUrl']!;
-      final savedQrString   = pending['qrString'] ?? '';
-      final savedAmount     = int.tryParse(pending['amount'] ?? '1000') ?? 1000;
+      final savedQrString = pending['qrString'] ?? '';
+      final savedAmount = int.tryParse(pending['amount'] ?? '1000') ?? 1000;
+      final savedPkg = pending['packageType'] ?? packageType;
       // Re-open QRIS dialog with the saved order (no new API call)
       _showQrisPaymentDialog(
         orderId: savedOrderId,
@@ -2108,70 +2847,54 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
         amount: savedAmount,
         userId: userId,
         isResume: true,
+        packageType: savedPkg,
       );
       return;
     }
 
     setState(() => _isSaving = true);
 
-    final String orderId =
-        'SUBS_${userId.toString().substring(0, 8)}_${DateTime.now().millisecondsSinceEpoch ~/ 1000}';
-    final int amount = 1000; // Rp 1.000
-
-    // Credentials from environment (Production by default)
-    final String merchantCode = dotenv.env['DUITKU_MERCHANT_CODE'] ?? 'DS24853';
-    final String merchantKey = dotenv.env['DUITKU_MERCHANT_KEY'] ?? '';
-    final String inquiryUrl = dotenv.env['DUITKU_INQUIRY_URL'] ??
-        'https://passport.duitku.com/webapi/api/merchant/v2/inquiry';
-    final String callbackUrl = dotenv.env['DUITKU_CALLBACK_URL'] ??
-        'https://abdburxhqqwsobmzuwmz.supabase.co/functions/v1/duitku-callback';
-    final String returnUrl =
-        dotenv.env['DUITKU_RETURN_URL'] ?? 'https://mapotech.app/payment-success';
-    final String paymentMethod = dotenv.env['DUITKU_PAYMENT_METHOD'] ?? 'NQ'; // QRIS by Nobu
-
-    // Signature formula: md5(merchantCode + merchantOrderId + paymentAmount + merchantKey)
-    final signatureStr = '$merchantCode$orderId$amount$merchantKey';
-    final signatureBytes = utf8.encode(signatureStr);
-    final signature = md5.convert(signatureBytes).toString();
-
     try {
-      final response = await http.post(
-        Uri.parse(inquiryUrl),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
+      // ── Call Supabase Edge Function via client.functions.invoke (auto JWT) ──
+      final userState = ref.read(landingPageProvider).loggedInUser;
+      final email = userState?['email'] ?? '';
+      final name = userState?['name'] ?? userState?['full_name'] ?? 'Dokter';
+      final merchantCode = dotenv.env['DUITKU_MERCHANT_CODE'] ?? '';
+      final merchantKey = dotenv.env['DUITKU_MERCHANT_KEY'] ?? '';
+      final paymentMethod = dotenv.env['DUITKU_PAYMENT_METHOD'] ?? 'NQ';
+
+      final fnResponse = await SupabaseService.client.functions.invoke(
+        'create-duitku-payment',
+        body: {
+          'packageType': packageType,
+          'customerEmail': email,
+          'customerName': name,
           'merchantCode': merchantCode,
-          'paymentAmount': amount,
+          'merchantKey': merchantKey,
           'paymentMethod': paymentMethod,
-          'merchantOrderId': orderId,
-          'productDetails': 'Perpanjang Layanan Mandiri 30 Hari',
-          'email': email,
-          'callbackUrl': callbackUrl,
-          'returnUrl': returnUrl,
-          'signature': signature,
-          'expiryPeriod': 60, // 60 minutes expiry
-        }),
+        },
       );
 
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      debugPrint('Duitku response: ${response.body}');
+      final data = fnResponse.data as Map<String, dynamic>? ?? {};
+      debugPrint(
+        'create-duitku-payment response: $data  status=${fnResponse.status}',
+      );
 
-      final statusCode    = data['statusCode']?.toString();
-      final paymentUrl    = data['paymentUrl']?.toString() ?? '';
-      final statusMessage = data['statusMessage']?.toString() ?? 'Error';
-      // vaNumber holds the raw QRIS string for NQ (Nobu QRIS) payment method
-      final qrString = data['vaNumber']?.toString() ??
-          data['qrString']?.toString() ??
-          data['qrCode']?.toString() ?? '';
+      if (fnResponse.status == 200 && data['statusCode']?.toString() == '00') {
+        final orderId = data['orderId']?.toString() ?? '';
+        final paymentUrl = data['paymentUrl']?.toString() ?? '';
+        final qrString = data['qrString']?.toString() ?? '';
+        final amount = (data['amount'] as num?)?.toInt() ?? 1000;
 
-      if (statusCode == '00') {
-        // Save everything to localStorage so it survives dialog close
         _savePendingPayment(
           orderId: orderId,
           paymentUrl: paymentUrl,
           qrString: qrString,
           amount: amount,
           userId: userId,
+          packageType: packageType,
         );
+        if (mounted) setState(() {}); // refresh UI to show "Continue" button
 
         if (mounted) {
           _showQrisPaymentDialog(
@@ -2181,10 +2904,15 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
             amount: amount,
             userId: userId,
             isResume: false,
+            packageType: packageType,
           );
         }
       } else {
-        throw Exception('$statusCode: $statusMessage');
+        final errMsg =
+            data['error']?.toString() ??
+            data['statusMessage']?.toString() ??
+            'Terjadi kesalahan pada server.';
+        throw Exception(errMsg);
       }
     } catch (e) {
       debugPrint('Duitku API error: $e');
@@ -2204,31 +2932,24 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
     }
   }
 
-  /// Check Duitku transaction status (dynamic environment resolution)
+  /// Check Duitku transaction status via Supabase Edge Function (avoids CORS, auto JWT)
   Future<bool> _checkDuitkuPaymentStatus(String orderId, int amount) async {
-    final String merchantCode = dotenv.env['DUITKU_MERCHANT_CODE'] ?? 'DS24853';
-    final String merchantKey = dotenv.env['DUITKU_MERCHANT_KEY'] ?? '';
-    final String inquiryUrl = dotenv.env['DUITKU_INQUIRY_URL'] ?? 'https://passport.duitku.com/webapi/api/merchant/v2/inquiry';
-    final String statusUrl = inquiryUrl.contains('sandbox.duitku.com')
-        ? 'https://sandbox.duitku.com/webapi/api/merchant/transactionStatus'
-        : 'https://passport.duitku.com/webapi/api/merchant/transactionStatus';
+    final merchantCode = dotenv.env['DUITKU_MERCHANT_CODE'] ?? '';
+    final merchantKey = dotenv.env['DUITKU_MERCHANT_KEY'] ?? '';
 
-    // Signature: md5(merchantCode + merchantOrderId + merchantKey)
-    final signatureStr = '$merchantCode$orderId$merchantKey';
-    final signatureBytes = utf8.encode(signatureStr);
-    final signature = md5.convert(signatureBytes).toString();
-
-    final response = await http.post(
-      Uri.parse(statusUrl),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'merchantCode': merchantCode,
+    final fnResponse = await SupabaseService.client.functions.invoke(
+      'check-duitku-status',
+      body: {
         'merchantOrderId': orderId,
-        'signature': signature,
-      }),
+        'merchantCode': merchantCode,
+        'merchantKey': merchantKey,
+      },
     );
 
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final data = fnResponse.data as Map<String, dynamic>? ?? {};
+    debugPrint(
+      'check-duitku-status response: $data  status=${fnResponse.status}',
+    );
     // statusCode '00' means success / paid
     return data['statusCode']?.toString() == '00';
   }
@@ -2240,6 +2961,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
     required int amount,
     required String userId,
     required bool isResume,
+    String packageType = 'subscription_30',
   }) {
     final formattedAmount =
         'Rp ${amount.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}';
@@ -2255,36 +2977,61 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
           builder: (sbContext, setStateDialog) {
             Future<void> onCheckPayment() async {
               if (checkButtonUsed) return;
-              setStateDialog(() { isCheckingPayment = true; checkButtonUsed = true; });
+              setStateDialog(() {
+                isCheckingPayment = true;
+                checkButtonUsed = true;
+              });
               try {
                 final isPaid = await _checkDuitkuPaymentStatus(orderId, amount);
                 if (!mounted) return;
                 if (isPaid) {
                   _clearPendingPayment();
                   if (dialogContext.mounted) Navigator.of(dialogContext).pop();
-                  await _renewSubscription(amount);
+                  if (mounted) setState(() {}); // hide "Continue" button
+                  await _applyDuitkuPackage(packageType, amount);
                   if (mounted) {
+                    final successMsg = packageType == 'bundle_30'
+                        ? 'Pembayaran berhasil! Mega Bundle aktif: Langganan + Premium diperpanjang 30 hari.'
+                        : 'Pembayaran QRIS berhasil! Langganan diperpanjang 30 hari.';
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Pembayaran QRIS berhasil! Langganan diperpanjang.'),
-                        backgroundColor: Colors.green, duration: Duration(seconds: 4)),
+                      SnackBar(
+                        content: Text(successMsg),
+                        backgroundColor: Colors.green,
+                        duration: const Duration(seconds: 5),
+                      ),
                     );
                   }
                 } else {
+                  // Payment not confirmed — re-enable button so user can try again after scanning
+                  setStateDialog(() {
+                    isCheckingPayment = false;
+                    checkButtonUsed = false;
+                  });
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Pembayaran belum diterima. Silakan selesaikan scan QRIS.'),
-                        backgroundColor: Colors.orangeAccent, duration: Duration(seconds: 4)),
+                      const SnackBar(
+                        content: Text(
+                          'Pembayaran belum diterima. Silakan selesaikan scan QRIS lalu cek kembali.',
+                        ),
+                        backgroundColor: Colors.orangeAccent,
+                        duration: Duration(seconds: 4),
+                      ),
                     );
                   }
-                  setStateDialog(() { isCheckingPayment = false; });
                 }
               } catch (e) {
                 debugPrint('Payment status check error: $e');
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Gagal cek status: $e'), backgroundColor: Colors.redAccent));
+                    SnackBar(
+                      content: Text('Gagal cek status: $e'),
+                      backgroundColor: Colors.redAccent,
+                    ),
+                  );
                 }
-                setStateDialog(() { isCheckingPayment = false; });
+                setStateDialog(() {
+                  isCheckingPayment = false;
+                });
               }
             }
 
@@ -2293,28 +3040,58 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                 context: sbContext,
                 builder: (warnCtx) => AlertDialog(
                   backgroundColor: const Color(0xFF1E1E22),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  title: Row(children: [
-                    const Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 22),
-                    const SizedBox(width: 8),
-                    Text('Tutup Pembayaran?',
-                      style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
-                  ]),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  title: Row(
+                    children: [
+                      const Icon(
+                        Icons.warning_amber_rounded,
+                        color: Colors.amber,
+                        size: 22,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Tutup Pembayaran?',
+                        style: GoogleFonts.outfit(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ],
+                  ),
                   content: Text(
                     'Pembayaran QRIS belum selesai.\n\nQR code tersimpan — tekan "Renew" kembali untuk melanjutkan.',
-                    style: GoogleFonts.outfit(color: Colors.grey[300], fontSize: 13, height: 1.5)),
+                    style: GoogleFonts.outfit(
+                      color: Colors.grey[300],
+                      fontSize: 13,
+                      height: 1.5,
+                    ),
+                  ),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.of(warnCtx).pop(false),
-                      child: Text('Lanjutkan Bayar',
-                        style: GoogleFonts.outfit(color: const Color(0xFF00A67E), fontWeight: FontWeight.bold))),
+                      child: Text(
+                        'Lanjutkan Bayar',
+                        style: GoogleFonts.outfit(
+                          color: const Color(0xFF00A67E),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
                     TextButton(
                       onPressed: () => Navigator.of(warnCtx).pop(true),
-                      child: Text('Tutup', style: GoogleFonts.outfit(color: Colors.grey))),
+                      child: Text(
+                        'Tutup',
+                        style: GoogleFonts.outfit(color: Colors.grey),
+                      ),
+                    ),
                   ],
                 ),
               );
-              if (shouldClose == true && dialogContext.mounted) Navigator.of(dialogContext).pop();
+              if (shouldClose == true && dialogContext.mounted)
+                Navigator.of(dialogContext).pop();
             }
 
             Future<void> onResetPayment() async {
@@ -2322,24 +3099,53 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                 context: sbContext,
                 builder: (confirmCtx) => AlertDialog(
                   backgroundColor: const Color(0xFF1E1E22),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  title: Row(children: [
-                    const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 22),
-                    const SizedBox(width: 8),
-                    Text('Reset Pembayaran?',
-                      style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
-                  ]),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  title: Row(
+                    children: [
+                      const Icon(
+                        Icons.delete_outline_rounded,
+                        color: Colors.redAccent,
+                        size: 22,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Reset Pembayaran?',
+                        style: GoogleFonts.outfit(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ],
+                  ),
                   content: Text(
                     'Apakah Anda yakin ingin membatalkan tagihan QRIS yang sekarang dan membuat tagihan baru?',
-                    style: GoogleFonts.outfit(color: Colors.grey[300], fontSize: 13, height: 1.5)),
+                    style: GoogleFonts.outfit(
+                      color: Colors.grey[300],
+                      fontSize: 13,
+                      height: 1.5,
+                    ),
+                  ),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.of(confirmCtx).pop(false),
-                      child: Text('Batal', style: GoogleFonts.outfit(color: Colors.grey))),
+                      child: Text(
+                        'Batal',
+                        style: GoogleFonts.outfit(color: Colors.grey),
+                      ),
+                    ),
                     TextButton(
                       onPressed: () => Navigator.of(confirmCtx).pop(true),
-                      child: Text('Ya, Reset',
-                        style: GoogleFonts.outfit(color: Colors.redAccent, fontWeight: FontWeight.bold))),
+                      child: Text(
+                        'Ya, Reset',
+                        style: GoogleFonts.outfit(
+                          color: Colors.redAccent,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               );
@@ -2349,7 +3155,9 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                 if (dialogContext.mounted) Navigator.of(dialogContext).pop();
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('Pembayaran berhasil direset. Silakan tekan tombol "Renew" kembali.'),
+                    content: Text(
+                      'Pembayaran berhasil direset. Silakan tekan tombol "Renew" kembali.',
+                    ),
                     backgroundColor: Colors.green,
                   ),
                 );
@@ -2360,7 +3168,9 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
 
             return Dialog(
               backgroundColor: const Color(0xFF1E1E22),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 380),
                 child: SingleChildScrollView(
@@ -2368,43 +3178,83 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Row(children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF00A67E).withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(8),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(
+                                0xFF00A67E,
+                              ).withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.qr_code_2_rounded,
+                              color: Color(0xFF00A67E),
+                              size: 22,
+                            ),
                           ),
-                          child: const Icon(Icons.qr_code_2_rounded, color: Color(0xFF00A67E), size: 22),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              isResume ? 'Lanjutkan Pembayaran QRIS' : 'Scan & Bayar via QRIS',
-                              style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14)),
-                            Text('Berlaku 60 menit · $formattedAmount',
-                              style: GoogleFonts.outfit(color: Colors.grey[400], fontSize: 11)),
-                          ],
-                        )),
-                      ]),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  isResume
+                                      ? 'Lanjutkan Pembayaran QRIS'
+                                      : 'Scan & Bayar via QRIS',
+                                  style: GoogleFonts.outfit(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                Text(
+                                  'Berlaku 60 menit · $formattedAmount',
+                                  style: GoogleFonts.outfit(
+                                    color: Colors.grey[400],
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 14),
                       if (isResume)
                         Container(
                           margin: const EdgeInsets.only(bottom: 10),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.amber.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+                            border: Border.all(
+                              color: Colors.amber.withValues(alpha: 0.4),
+                            ),
                           ),
-                          child: Row(children: [
-                            const Icon(Icons.history_rounded, color: Colors.amber, size: 16),
-                            const SizedBox(width: 8),
-                            Expanded(child: Text('QR sebelumnya masih bisa digunakan.',
-                              style: GoogleFonts.outfit(color: Colors.amber, fontSize: 11))),
-                          ]),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.history_rounded,
+                                color: Colors.amber,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'QR sebelumnya masih bisa digunakan.',
+                                  style: GoogleFonts.outfit(
+                                    color: Colors.amber,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       if (hasQr)
                         Container(
@@ -2412,9 +3262,15 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(16),
-                            boxShadow: [BoxShadow(
-                              color: const Color(0xFF00A67E).withValues(alpha: 0.25),
-                              blurRadius: 24, spreadRadius: 2)],
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(
+                                  0xFF00A67E,
+                                ).withValues(alpha: 0.25),
+                                blurRadius: 24,
+                                spreadRadius: 2,
+                              ),
+                            ],
                           ),
                           child: QrImageView(
                             data: qrString,
@@ -2423,116 +3279,253 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                             backgroundColor: Colors.white,
                             errorCorrectionLevel: QrErrorCorrectLevel.M,
                           ),
-                        )
-                      else
-                        Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF2A2A2E),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
-                          ),
-                          child: Column(children: [
-                            const Icon(Icons.qr_code_outlined, color: Colors.grey, size: 48),
-                            const SizedBox(height: 8),
-                            Text('QR code tidak tersedia.\nGunakan tombol di bawah untuk membuka halaman pembayaran.',
-                              textAlign: TextAlign.center,
-                              style: GoogleFonts.outfit(color: Colors.grey[400], fontSize: 12, height: 1.5)),
-                          ]),
                         ),
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2A2A2E),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: const Color(0xFF00A67E).withValues(alpha: 0.25)),
-                        ),
-                        child: Column(children: [
-                          _buildQrisInfoRow(Icons.receipt_long, 'Order ID', orderId),
-                          const Divider(color: Color(0xFF3A3A3E), height: 14),
-                          _buildQrisInfoRow(Icons.payments_rounded, 'Total', formattedAmount),
-                        ]),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(children: [
-                        const Icon(Icons.info_outline, size: 13, color: Colors.amber),
-                        const SizedBox(width: 6),
-                        Expanded(child: Text(
-                          hasQr ? 'Scan QR di atas, lalu tekan "Cek Pembayaran".'
-                                : 'Buka halaman pembayaran, lalu scan & bayar.',
-                          style: GoogleFonts.outfit(color: Colors.amber, fontSize: 11, height: 1.4))),
-                      ]),
-                      if (!hasQr && paymentUrl.isNotEmpty) ...[
+                      // Always show the payment URL button when available (useful when QR is missing)
+                      if (paymentUrl.isNotEmpty) ...[
                         const SizedBox(height: 10),
                         SizedBox(
                           width: double.infinity,
-                          child: OutlinedButton.icon(
+                          child: ElevatedButton.icon(
                             onPressed: () async {
                               final uri = Uri.parse(paymentUrl);
-                              if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+                              if (await canLaunchUrl(uri))
+                                await launchUrl(
+                                  uri,
+                                  mode: LaunchMode.externalApplication,
+                                );
                             },
-                            icon: const Icon(Icons.open_in_new_rounded, size: 15),
-                            label: Text('Buka Halaman Pembayaran', style: GoogleFonts.outfit(fontSize: 12)),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: const Color(0xFF00A67E),
-                              side: BorderSide(color: const Color(0xFF00A67E).withValues(alpha: 0.5)),
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            icon: const Icon(
+                              Icons.open_in_new_rounded,
+                              size: 16,
                             ),
+                            label: Text(
+                              hasQr
+                                  ? 'Buka Halaman Pembayaran'
+                                  : 'Bayar Sekarang → Buka Halaman Pembayaran',
+                              style: GoogleFonts.outfit(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: hasQr
+                                  ? const Color(0xFF2A2A2E)
+                                  : const Color(0xFF00A67E),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: EdgeInsets.symmetric(
+                                vertical: hasQr ? 10 : 14,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                side: hasQr
+                                    ? BorderSide(
+                                        color: const Color(
+                                          0xFF00A67E,
+                                        ).withValues(alpha: 0.4),
+                                      )
+                                    : BorderSide.none,
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (!hasQr) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            'Anda akan diarahkan ke halaman pembayaran ShopeePay/QRIS.',
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.outfit(
+                              color: Colors.grey[500],
+                              fontSize: 10,
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+                      ] else if (!hasQr) ...[
+                        // No QR and no paymentUrl — show placeholder
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2A2A2E),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.grey.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              const Icon(
+                                Icons.error_outline_rounded,
+                                color: Colors.redAccent,
+                                size: 36,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Tautan pembayaran tidak tersedia.\nSilakan tutup dan coba lagi.',
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.outfit(
+                                  color: Colors.grey[400],
+                                  fontSize: 12,
+                                  height: 1.5,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2A2A2E),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: const Color(
+                              0xFF00A67E,
+                            ).withValues(alpha: 0.25),
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            _buildQrisInfoRow(
+                              Icons.receipt_long,
+                              'Order ID',
+                              orderId,
+                            ),
+                            const Divider(color: Color(0xFF3A3A3E), height: 14),
+                            _buildQrisInfoRow(
+                              Icons.payments_rounded,
+                              'Total',
+                              formattedAmount,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.info_outline,
+                            size: 13,
+                            color: Colors.amber,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              hasQr
+                                  ? 'Scan QR di atas, lalu tekan "Cek Pembayaran".'
+                                  : 'Buka halaman pembayaran, lalu scan & bayar.',
+                              style: GoogleFonts.outfit(
+                                color: Colors.amber,
+                                fontSize: 11,
+                                height: 1.4,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 16),
-                      Row(children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: onCloseDialog,
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.grey,
-                              side: const BorderSide(color: Color(0xFF3A3A3E)),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            ),
-                            child: Text('Tutup', style: GoogleFonts.outfit(fontWeight: FontWeight.w500)),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          flex: 2,
-                          child: ElevatedButton.icon(
-                            onPressed: (checkButtonUsed || isCheckingPayment) ? null : onCheckPayment,
-                            icon: isCheckingPayment
-                                ? const SizedBox(width: 14, height: 14,
-                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                : const Icon(Icons.verified_rounded, size: 16),
-                            label: Text(
-                              isCheckingPayment ? 'Memeriksa...' : checkButtonUsed ? 'Sudah Dicek' : 'Cek Pembayaran',
-                              style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: checkButtonUsed ? Colors.grey[700] : const Color(0xFF00A67E),
-                              foregroundColor: Colors.white,
-                              disabledBackgroundColor: Colors.grey[800],
-                              disabledForegroundColor: Colors.grey[500],
-                              elevation: 0,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: onCloseDialog,
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.grey,
+                                side: const BorderSide(
+                                  color: Color(0xFF3A3A3E),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              child: Text(
+                                'Tutup',
+                                style: GoogleFonts.outfit(
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      ]),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            flex: 2,
+                            child: ElevatedButton.icon(
+                              onPressed: (checkButtonUsed || isCheckingPayment)
+                                  ? null
+                                  : onCheckPayment,
+                              icon: isCheckingPayment
+                                  ? const SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Icon(
+                                      Icons.verified_rounded,
+                                      size: 16,
+                                    ),
+                              label: Text(
+                                isCheckingPayment
+                                    ? 'Memeriksa...'
+                                    : checkButtonUsed
+                                    ? 'Sudah Dicek'
+                                    : 'Cek Pembayaran',
+                                style: GoogleFonts.outfit(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: checkButtonUsed
+                                    ? Colors.grey[700]
+                                    : const Color(0xFF00A67E),
+                                foregroundColor: Colors.white,
+                                disabledBackgroundColor: Colors.grey[800],
+                                disabledForegroundColor: Colors.grey[500],
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 10),
                       TextButton.icon(
                         onPressed: onResetPayment,
-                        icon: const Icon(Icons.refresh_rounded, size: 14, color: Colors.redAccent),
+                        icon: const Icon(
+                          Icons.refresh_rounded,
+                          size: 14,
+                          color: Colors.redAccent,
+                        ),
                         label: Text(
                           'Batalkan & Buat Pembayaran Baru',
-                          style: GoogleFonts.outfit(color: Colors.redAccent, fontSize: 11, fontWeight: FontWeight.w500),
+                          style: GoogleFonts.outfit(
+                            color: Colors.redAccent,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                         style: TextButton.styleFrom(
                           minimumSize: Size.zero,
-                          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 6,
+                            horizontal: 12,
+                          ),
                         ),
                       ),
                     ],
@@ -2547,13 +3540,25 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
   }
 
   Widget _buildQrisInfoRow(IconData icon, String label, String value) {
-    return Row(children: [
-      Icon(icon, size: 14, color: Colors.grey[500]),
-      const SizedBox(width: 8),
-      Text(label, style: GoogleFonts.outfit(color: Colors.grey[500], fontSize: 12)),
-      const Spacer(),
-      Text(value, style: GoogleFonts.outfit(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-    ]);
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: Colors.grey[500]),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: GoogleFonts.outfit(color: Colors.grey[500], fontSize: 12),
+        ),
+        const Spacer(),
+        Text(
+          value,
+          style: GoogleFonts.outfit(
+            color: Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -2661,6 +3666,133 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
     }
 
     super.dispose();
+  }
+
+  void _viewPatientPerspective() async {
+    bool loaderDismissed = false;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final db = SupabaseService();
+      final allDocs = await db.fetchAllDoctors();
+
+      if (mounted) {
+        Navigator.of(context).pop();
+        loaderDismissed = true;
+      }
+
+      // Find our doctor
+      final docId = _effectiveDoctorId;
+      Map<String, dynamic>? baseDoc;
+      for (final doc in allDocs) {
+        if (doc['id'] == docId) {
+          baseDoc = doc;
+          break;
+        }
+      }
+
+      // Build live preview map
+      final Map<String, dynamic> dokterMap = baseDoc != null
+          ? Map<String, dynamic>.from(baseDoc)
+          : <String, dynamic>{};
+
+      // Override with live edits from text controllers & dropdown states
+      dokterMap['id'] = docId;
+      dokterMap['name'] = _nameController.text.isNotEmpty
+          ? _nameController.text
+          : 'dr. Agoes Soetanto';
+      dokterMap['email'] = _emailController.text.isNotEmpty
+          ? _emailController.text
+          : 'agoes.soetanto@gmail.com';
+      dokterMap['avatar_url'] = _avatarUrl.isNotEmpty ? _avatarUrl : null;
+      dokterMap['nama_faskes'] = _faskesController.text.isNotEmpty
+          ? _faskesController.text
+          : 'Dokter Praktek Mandiri Dokter Agoes Soetanto, dr';
+      dokterMap['profession'] = _selectedProfession;
+      dokterMap['is_visible'] = _showProfileInSearch;
+      dokterMap['is_bpjs'] = _serveBPJSPatients;
+      dokterMap['about'] = _aboutController.text;
+      dokterMap['whatsapp_number'] = _phoneController.text.isNotEmpty
+          ? _phoneController.text
+          : '085259930755';
+      dokterMap['address'] = _addressDetailController.text;
+      dokterMap['province'] = _selectedProvinsi;
+      dokterMap['district'] = _selectedKabupaten;
+      dokterMap['sub_district'] = _selectedKecamatan;
+      dokterMap['village'] = _selectedKelurahan;
+      dokterMap['practice_licenses'] = _certificationControllers
+          .map((c) => c.text)
+          .toList();
+      dokterMap['google_maps_link'] = _mapsLinkController.text;
+
+      // Now show the DoctorDetailDialog
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        barrierColor: Colors.black.withOpacity(0.45),
+        builder: (ctx) => DoctorDetailDialog(
+          dokter: dokterMap,
+          isDark: ref.read(landingPageProvider).appearance == 'dark',
+          isPreview: true,
+        ),
+      );
+    } catch (e) {
+      if (mounted && !loaderDismissed) {
+        Navigator.of(context).pop();
+      }
+
+      // Fallback: build purely from local states if DB fetch fails
+      final Map<String, dynamic> fallbackMap = {
+        'id': _effectiveDoctorId,
+        'name': _nameController.text.isNotEmpty
+            ? _nameController.text
+            : 'dr. Agoes Soetanto',
+        'email': _emailController.text.isNotEmpty
+            ? _emailController.text
+            : 'agoes.soetanto@gmail.com',
+        'avatar_url': _avatarUrl.isNotEmpty ? _avatarUrl : null,
+        'nama_faskes': _faskesController.text.isNotEmpty
+            ? _faskesController.text
+            : 'Dokter Praktek Mandiri Dokter Agoes Soetanto, dr',
+        'profession': _selectedProfession,
+        'is_visible': _showProfileInSearch,
+        'is_bpjs': _serveBPJSPatients,
+        'about': _aboutController.text,
+        'whatsapp_number': _phoneController.text.isNotEmpty
+            ? _phoneController.text
+            : '085259930755',
+        'address': _addressDetailController.text,
+        'province': _selectedProvinsi,
+        'district': _selectedKabupaten,
+        'sub_district': _selectedKecamatan,
+        'village': _selectedKelurahan,
+        'latitude': null,
+        'longitude': null,
+        'default_service_fee': 0.0,
+        'active_today': 0,
+        'finished_total': 15,
+        'practice_licenses': _certificationControllers
+            .map((c) => c.text)
+            .toList(),
+        'google_maps_link': _mapsLinkController.text,
+      };
+
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierColor: Colors.black.withOpacity(0.45),
+          builder: (ctx) => DoctorDetailDialog(
+            dokter: fallbackMap,
+            isDark: ref.read(landingPageProvider).appearance == 'dark',
+            isPreview: true,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -2982,13 +4114,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
               children: [
                 // View Patient Perspective Button
                 ElevatedButton.icon(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Switching to patient perspective...'),
-                      ),
-                    );
-                  },
+                  onPressed: _viewPatientPerspective,
                   icon: const Icon(Icons.visibility_outlined, size: 16),
                   label: const Text('View Patient Perspective'),
                   style: ElevatedButton.styleFrom(
@@ -3075,7 +4201,10 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
     bool isDark,
   ) {
     final isSelected = _activeTab == index;
-    final isSubActive = _subStatus == 'ACTIVE' && _subExpiryDate != null && _subExpiryDate!.isAfter(DateTime.now());
+    final isSubActive =
+        _subStatus == 'ACTIVE' &&
+        _subExpiryDate != null &&
+        _subExpiryDate!.isAfter(DateTime.now());
     final isEnabled = isSubActive || index == 0;
 
     return GestureDetector(
@@ -3146,7 +4275,10 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
     Color tealColor,
     Color purpleColor,
   ) {
-    final bool isSubActive = _subStatus == 'ACTIVE' && _subExpiryDate != null && _subExpiryDate!.isAfter(DateTime.now());
+    final bool isSubActive =
+        _subStatus == 'ACTIVE' &&
+        _subExpiryDate != null &&
+        _subExpiryDate!.isAfter(DateTime.now());
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -3156,809 +4288,838 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
           child: Opacity(
             opacity: isSubActive ? 1.0 : 0.6,
             child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: cardBg,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: borderColor),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Header
-              Row(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: cardBg,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: borderColor),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Icon(
-                    Icons.person_outline_rounded,
-                    color: tealColor,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Edit Profile',
-                      style: GoogleFonts.outfit(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                        color: textColor,
+                  // Header
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.person_outline_rounded,
+                        color: tealColor,
+                        size: 20,
                       ),
-                    ),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Password reset link sent to your email!',
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Edit Profile',
+                          style: GoogleFonts.outfit(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                            color: textColor,
                           ),
                         ),
-                      );
-                    },
-                    icon: const Icon(Icons.lock_outline, size: 12),
-                    label: const Text('Reset Password'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: tealColor,
-                      side: BorderSide(color: tealColor),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      textStyle: GoogleFonts.outfit(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              const Divider(),
-              const SizedBox(height: 20),
-
-              // ── Row 1: Name & Phone ──────────────────────────────────────
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildInputLabelAndField(
-                      'Full Name',
-                      _nameController,
-                      inputBg,
-                      textColor,
-                      subtitleColor,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildInputLabelAndField(
-                      'Phone Number',
-                      _phoneController,
-                      inputBg,
-                      textColor,
-                      subtitleColor,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // ── Row 2: Email & Gender ────────────────────────────────────
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildInputLabelAndField(
-                      'Email Address',
-                      _emailController,
-                      inputBg,
-                      textColor,
-                      subtitleColor,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildDropdownField(
-                      'GENDER',
-                      _selectedGender,
-                      ['Male', 'Female'],
-                      (val) => setState(() => _selectedGender = val!),
-                      inputBg,
-                      textColor,
-                      subtitleColor,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // ── Faskes Name ──────────────────────────────────────────────
-              _buildInputLabelAndField(
-                'Faskes / Clinic Name',
-                _faskesController,
-                inputBg,
-                textColor,
-                subtitleColor,
-              ),
-              const SizedBox(height: 16),
-
-              // ── About ────────────────────────────────────────────────────
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'ABOUT',
-                    style: GoogleFonts.outfit(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: subtitleColor,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: inputBg,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: borderColor),
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
-                    ),
-                    child: TextField(
-                      controller: _aboutController,
-                      maxLines: 3,
-                      style: GoogleFonts.outfit(fontSize: 12, color: textColor),
-                      decoration: InputDecoration(
-                        hintText:
-                            'Tell us about your profile, expertise, and experience...',
-                        hintStyle: GoogleFonts.outfit(
-                          fontSize: 12,
-                          color: subtitleColor.withOpacity(0.6),
+                      OutlinedButton.icon(
+                        onPressed: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Password reset link sent to your email!',
+                              ),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.lock_outline, size: 12),
+                        label: const Text('Reset Password'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: tealColor,
+                          side: BorderSide(color: tealColor),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          textStyle: GoogleFonts.outfit(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                        border: InputBorder.none,
-                        isDense: true,
                       ),
-                    ),
+                    ],
                   ),
-                ],
-              ),
+                  const SizedBox(height: 16),
+                  const Divider(),
+                  const SizedBox(height: 20),
 
-              const SizedBox(height: 24),
-              const Divider(),
-              const SizedBox(height: 20),
-
-              // ── ADDRESS ──────────────────────────────────────────────────
-              Text(
-                'ADDRESS',
-                style: GoogleFonts.outfit(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w900,
-                  color: textColor,
-                  letterSpacing: 1.0,
-                ),
-              ),
-              const SizedBox(height: 12),
-              LocationSelectorWidget(
-                initialProvince: _selectedProvinsi,
-                initialDistrict: _selectedKabupaten,
-                initialSubDistrict: _selectedKecamatan,
-                initialVillage: _selectedKelurahan,
-                fieldBg: inputBg,
-                textColor: textColor,
-                subtitleColor: subtitleColor,
-                borderColor: borderColor,
-                dropdownColor: inputBg,
-                fontSize: 12,
-                onChanged: (province, district, subDistrict, village) {
-                  setState(() {
-                    _selectedProvinsi = province;
-                    _selectedKabupaten = district;
-                    _selectedKecamatan = subDistrict;
-                    _selectedKelurahan = village;
-                  });
-                },
-              ),
-              const SizedBox(height: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'DETAIL ALAMAT',
-                    style: GoogleFonts.outfit(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: subtitleColor,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: inputBg,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: borderColor),
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
-                    ),
-                    child: TextField(
-                      controller: _addressDetailController,
-                      maxLines: 2,
-                      style: GoogleFonts.outfit(fontSize: 12, color: textColor),
-                      decoration: InputDecoration(
-                        hintText: 'Nama jalan, RT/RW, Kelurahan, Kecamatan...',
-                        hintStyle: GoogleFonts.outfit(
-                          fontSize: 12,
-                          color: subtitleColor.withOpacity(0.6),
-                        ),
-                        border: InputBorder.none,
-                        isDense: true,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 24),
-              const Divider(),
-              const SizedBox(height: 20),
-
-              // ── PROFESSIONAL IDs ─────────────────────────────────────────
-              Text(
-                'PROFESSIONAL IDs',
-                style: GoogleFonts.outfit(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w900,
-                  color: textColor,
-                  letterSpacing: 1.0,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildInputLabelAndField(
-                          'NIK',
-                          _nikController,
+                  // ── Row 1: Name & Phone ──────────────────────────────────────
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildInputLabelAndField(
+                          'Full Name',
+                          _nameController,
                           inputBg,
                           textColor,
                           subtitleColor,
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Used for identity verification',
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _buildInputLabelAndField(
+                          'Phone Number',
+                          _phoneController,
+                          inputBg,
+                          textColor,
+                          subtitleColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ── Row 2: Email & Gender ────────────────────────────────────
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildInputLabelAndField(
+                          'Email Address',
+                          _emailController,
+                          inputBg,
+                          textColor,
+                          subtitleColor,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _buildDropdownField(
+                          'GENDER',
+                          _selectedGender,
+                          ['Male', 'Female'],
+                          (val) => setState(() => _selectedGender = val!),
+                          inputBg,
+                          textColor,
+                          subtitleColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ── Faskes Name ──────────────────────────────────────────────
+                  _buildInputLabelAndField(
+                    'Faskes / Clinic Name',
+                    _faskesController,
+                    inputBg,
+                    textColor,
+                    subtitleColor,
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ── About ────────────────────────────────────────────────────
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'ABOUT',
+                        style: GoogleFonts.outfit(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: subtitleColor,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: inputBg,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: borderColor),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        child: TextField(
+                          controller: _aboutController,
+                          maxLines: 3,
                           style: GoogleFonts.outfit(
-                            fontSize: 10,
-                            color: subtitleColor.withOpacity(0.8),
+                            fontSize: 12,
+                            color: textColor,
+                          ),
+                          decoration: InputDecoration(
+                            hintText:
+                                'Tell us about your profile, expertise, and experience...',
+                            hintStyle: GoogleFonts.outfit(
+                              fontSize: 12,
+                              color: subtitleColor.withOpacity(0.6),
+                            ),
+                            border: InputBorder.none,
+                            isDense: true,
                           ),
                         ),
-                      ],
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 24),
+                  const Divider(),
+                  const SizedBox(height: 20),
+
+                  // ── ADDRESS ──────────────────────────────────────────────────
+                  Text(
+                    'ADDRESS',
+                    style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      color: textColor,
+                      letterSpacing: 1.0,
                     ),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'ID SATUSEHAT',
+                  const SizedBox(height: 12),
+                  LocationSelectorWidget(
+                    initialProvince: _selectedProvinsi,
+                    initialDistrict: _selectedKabupaten,
+                    initialSubDistrict: _selectedKecamatan,
+                    initialVillage: _selectedKelurahan,
+                    fieldBg: inputBg,
+                    textColor: textColor,
+                    subtitleColor: subtitleColor,
+                    borderColor: borderColor,
+                    dropdownColor: inputBg,
+                    fontSize: 12,
+                    onChanged: (province, district, subDistrict, village) {
+                      setState(() {
+                        _selectedProvinsi = province;
+                        _selectedKabupaten = district;
+                        _selectedKecamatan = subDistrict;
+                        _selectedKelurahan = village;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'DETAIL ALAMAT',
+                        style: GoogleFonts.outfit(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: subtitleColor,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: inputBg,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: borderColor),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        child: TextField(
+                          controller: _addressDetailController,
+                          maxLines: 2,
                           style: GoogleFonts.outfit(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: subtitleColor,
-                            letterSpacing: 0.5,
+                            fontSize: 12,
+                            color: textColor,
+                          ),
+                          decoration: InputDecoration(
+                            hintText:
+                                'Nama jalan, RT/RW, Kelurahan, Kecamatan...',
+                            hintStyle: GoogleFonts.outfit(
+                              fontSize: 12,
+                              color: subtitleColor.withOpacity(0.6),
+                            ),
+                            border: InputBorder.none,
+                            isDense: true,
                           ),
                         ),
-                        const SizedBox(height: 6),
-                        Row(
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 24),
+                  const Divider(),
+                  const SizedBox(height: 20),
+
+                  // ── PROFESSIONAL IDs ─────────────────────────────────────────
+                  Text(
+                    'PROFESSIONAL IDs',
+                    style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      color: textColor,
+                      letterSpacing: 1.0,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 10,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: inputBg,
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: borderColor),
-                                ),
-                                child: TextField(
-                                  controller: _satuSehatIdController,
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: textColor,
-                                  ),
-                                  decoration: const InputDecoration(
-                                    border: InputBorder.none,
-                                    isDense: true,
-                                  ),
-                                ),
-                              ),
+                            _buildInputLabelAndField(
+                              'NIK',
+                              _nikController,
+                              inputBg,
+                              textColor,
+                              subtitleColor,
                             ),
-                            const SizedBox(width: 8),
-                            GestureDetector(
-                              onTap: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'ID Verified against SatuSehat Hub!',
-                                    ),
-                                  ),
-                                );
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: tealColor,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Icon(
-                                  Icons.search,
-                                  color: Colors.white,
-                                  size: 16,
-                                ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Used for identity verification',
+                              style: GoogleFonts.outfit(
+                                fontSize: 10,
+                                color: subtitleColor.withOpacity(0.8),
                               ),
                             ),
                           ],
                         ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 24),
-              const Divider(),
-              const SizedBox(height: 20),
-
-              // ── CERTIFICATIONS ───────────────────────────────────────────
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Sertifikasi & Lisensi Praktik',
-                      style: GoogleFonts.outfit(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w900,
-                        color: textColor,
                       ),
-                    ),
-                  ),
-                  Text(
-                    '${_certificationControllers.length}/3',
-                    style: GoogleFonts.outfit(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: subtitleColor,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Link URL atau nama file sertifikat / lisensi praktek Anda.',
-                style: GoogleFonts.outfit(
-                  fontSize: 10.5,
-                  color: subtitleColor,
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 12),
-              ...List.generate(_certificationControllers.length, (index) {
-                final controller = _certificationControllers[index];
-                while (_certificationTypes.length <= index) {
-                  _certificationTypes.add('LINK');
-                }
-                while (_certificationUploading.length <= index) {
-                  _certificationUploading.add(false);
-                }
-                final isLinkType = _certificationTypes[index] == 'LINK';
-
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: inputBg,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: borderColor),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.description_outlined,
-                            size: 16,
-                            color: controller.text.isNotEmpty
-                                ? tealColor
-                                : subtitleColor.withOpacity(0.5),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Sertifikasi #${index + 1}',
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'ID SATUSEHAT',
                               style: GoogleFonts.outfit(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: textColor,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: subtitleColor,
+                                letterSpacing: 0.5,
                               ),
                             ),
-                          ),
-                          // Link / Upload Toggle
-                          Container(
-                            padding: const EdgeInsets.all(2),
-                            decoration: BoxDecoration(
-                              color: isDark
-                                  ? const Color(0xFF1E1E22)
-                                  : const Color(0xFFFAFAFB),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: borderColor),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
+                            const SizedBox(height: 6),
+                            Row(
                               children: [
-                                _buildCertTypeSegment(
-                                  index,
-                                  'LINK',
-                                  'Link URL',
-                                  Icons.link,
-                                  tealColor,
-                                  isDark,
-                                  controller,
-                                ),
-                                _buildCertTypeSegment(
-                                  index,
-                                  'UPLOAD',
-                                  'Upload File',
-                                  Icons.upload_file,
-                                  tealColor,
-                                  isDark,
-                                  controller,
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                final c = _certificationControllers.removeAt(
-                                  index,
-                                );
-                                c.dispose();
-                                if (index < _certificationTypes.length) {
-                                  _certificationTypes.removeAt(index);
-                                }
-                                if (index < _certificationUploading.length) {
-                                  _certificationUploading.removeAt(index);
-                                }
-                              });
-                            },
-                            child: Icon(
-                              Icons.close_rounded,
-                              size: 16,
-                              color: Colors.redAccent.withOpacity(0.8),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      if (isLinkType)
-                        Builder(builder: (ctx) {
-                          final isStorageUrl = controller.text.contains(
-                                '.supabase.co/storage/v1/object/public/',
-                              ) ||
-                              controller.text.startsWith('mock_uploads/');
-                          if (isStorageUrl && controller.text.isNotEmpty) {
-                            // The value is a hidden storage URL — show a
-                            // friendly filename chip instead of the raw URL.
-                            return Container(
-                              height: 38,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                              ),
-                              decoration: BoxDecoration(
-                                color: isDark
-                                    ? const Color(0xFF1A1A1E)
-                                    : Colors.white,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: borderColor),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.link_rounded,
-                                    size: 13,
-                                    color: tealColor,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      _getFileName(controller.text),
+                                Expanded(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 10,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: inputBg,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: borderColor),
+                                    ),
+                                    child: TextField(
+                                      controller: _satuSehatIdController,
                                       style: GoogleFonts.outfit(
-                                        fontSize: 11,
+                                        fontSize: 12,
                                         fontWeight: FontWeight.bold,
                                         color: textColor,
                                       ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  GestureDetector(
-                                    onTap: () => _previewCertificate(
-                                      context,
-                                      controller.text,
-                                      isDark,
-                                      tealColor,
-                                    ),
-                                    child: Container(
-                                      padding: const EdgeInsets.all(4),
-                                      decoration: BoxDecoration(
-                                        color: tealColor.withOpacity(0.12),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: Icon(
-                                        Icons.visibility_outlined,
-                                        size: 13,
-                                        color: tealColor,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }
-                          // Normal user-entered URL — show editable text field
-                          // with an optional preview button when a URL is present.
-                          return Container(
-                            padding: const EdgeInsets.only(left: 10),
-                            decoration: BoxDecoration(
-                              color: isDark
-                                  ? const Color(0xFF1A1A1E)
-                                  : Colors.white,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: borderColor),
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: TextField(
-                                    controller: controller,
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 12,
-                                      color: textColor,
-                                    ),
-                                    decoration: InputDecoration(
-                                      hintText:
-                                          'https://example.com/sertifikat.pdf',
-                                      hintStyle: GoogleFonts.outfit(
-                                        fontSize: 12,
-                                        color: subtitleColor.withOpacity(0.4),
-                                      ),
-                                      border: InputBorder.none,
-                                      isDense: true,
-                                      contentPadding:
-                                          const EdgeInsets.symmetric(
-                                        vertical: 10,
+                                      decoration: const InputDecoration(
+                                        border: InputBorder.none,
+                                        isDense: true,
                                       ),
                                     ),
                                   ),
                                 ),
-                                if (controller.text.isNotEmpty) ...[
-                                  const SizedBox(width: 4),
-                                  GestureDetector(
-                                    onTap: () => _previewCertificate(
-                                      context,
-                                      controller.text,
-                                      isDark,
-                                      tealColor,
-                                    ),
-                                    child: Padding(
-                                      padding: const EdgeInsets.only(right: 8),
-                                      child: Container(
-                                        padding: const EdgeInsets.all(4),
-                                        decoration: BoxDecoration(
-                                          color: tealColor.withOpacity(0.12),
-                                          borderRadius: BorderRadius.circular(6),
+                                const SizedBox(width: 8),
+                                GestureDetector(
+                                  onTap: () {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'ID Verified against SatuSehat Hub!',
                                         ),
-                                        child: Icon(
-                                          Icons.visibility_outlined,
+                                      ),
+                                    );
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: tealColor,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Icon(
+                                      Icons.search,
+                                      color: Colors.white,
+                                      size: 16,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 24),
+                  const Divider(),
+                  const SizedBox(height: 20),
+
+                  // ── CERTIFICATIONS ───────────────────────────────────────────
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Sertifikasi & Lisensi Praktik',
+                          style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                            color: textColor,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        '${_certificationControllers.length}/3',
+                        style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: subtitleColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Link URL atau nama file sertifikat / lisensi praktek Anda.',
+                    style: GoogleFonts.outfit(
+                      fontSize: 10.5,
+                      color: subtitleColor,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ...List.generate(_certificationControllers.length, (index) {
+                    final controller = _certificationControllers[index];
+                    while (_certificationTypes.length <= index) {
+                      _certificationTypes.add('LINK');
+                    }
+                    while (_certificationUploading.length <= index) {
+                      _certificationUploading.add(false);
+                    }
+                    final isLinkType = _certificationTypes[index] == 'LINK';
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: inputBg,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: borderColor),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.description_outlined,
+                                size: 16,
+                                color: controller.text.isNotEmpty
+                                    ? tealColor
+                                    : subtitleColor.withOpacity(0.5),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Sertifikasi #${index + 1}',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: textColor,
+                                  ),
+                                ),
+                              ),
+                              // Link / Upload Toggle
+                              Container(
+                                padding: const EdgeInsets.all(2),
+                                decoration: BoxDecoration(
+                                  color: isDark
+                                      ? const Color(0xFF1E1E22)
+                                      : const Color(0xFFFAFAFB),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: borderColor),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    _buildCertTypeSegment(
+                                      index,
+                                      'LINK',
+                                      'Link URL',
+                                      Icons.link,
+                                      tealColor,
+                                      isDark,
+                                      controller,
+                                    ),
+                                    _buildCertTypeSegment(
+                                      index,
+                                      'UPLOAD',
+                                      'Upload File',
+                                      Icons.upload_file,
+                                      tealColor,
+                                      isDark,
+                                      controller,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    final c = _certificationControllers
+                                        .removeAt(index);
+                                    c.dispose();
+                                    if (index < _certificationTypes.length) {
+                                      _certificationTypes.removeAt(index);
+                                    }
+                                    if (index <
+                                        _certificationUploading.length) {
+                                      _certificationUploading.removeAt(index);
+                                    }
+                                  });
+                                },
+                                child: Icon(
+                                  Icons.close_rounded,
+                                  size: 16,
+                                  color: Colors.redAccent.withOpacity(0.8),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          if (isLinkType)
+                            Builder(
+                              builder: (ctx) {
+                                final isStorageUrl =
+                                    controller.text.contains(
+                                      '.supabase.co/storage/v1/object/public/',
+                                    ) ||
+                                    controller.text.startsWith('mock_uploads/');
+                                if (isStorageUrl &&
+                                    controller.text.isNotEmpty) {
+                                  // The value is a hidden storage URL — show a
+                                  // friendly filename chip instead of the raw URL.
+                                  return Container(
+                                    height: 38,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: isDark
+                                          ? const Color(0xFF1A1A1E)
+                                          : Colors.white,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: borderColor),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.link_rounded,
                                           size: 13,
                                           color: tealColor,
                                         ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            _getFileName(controller.text),
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: textColor,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        GestureDetector(
+                                          onTap: () => _previewCertificate(
+                                            context,
+                                            controller.text,
+                                            isDark,
+                                            tealColor,
+                                          ),
+                                          child: Container(
+                                            padding: const EdgeInsets.all(4),
+                                            decoration: BoxDecoration(
+                                              color: tealColor.withOpacity(
+                                                0.12,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                            ),
+                                            child: Icon(
+                                              Icons.visibility_outlined,
+                                              size: 13,
+                                              color: tealColor,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }
+                                // Normal user-entered URL — show editable text field
+                                // with an optional preview button when a URL is present.
+                                return Container(
+                                  padding: const EdgeInsets.only(left: 10),
+                                  decoration: BoxDecoration(
+                                    color: isDark
+                                        ? const Color(0xFF1A1A1E)
+                                        : Colors.white,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: borderColor),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: TextField(
+                                          controller: controller,
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 12,
+                                            color: textColor,
+                                          ),
+                                          decoration: InputDecoration(
+                                            hintText:
+                                                'https://example.com/sertifikat.pdf',
+                                            hintStyle: GoogleFonts.outfit(
+                                              fontSize: 12,
+                                              color: subtitleColor.withOpacity(
+                                                0.4,
+                                              ),
+                                            ),
+                                            border: InputBorder.none,
+                                            isDense: true,
+                                            contentPadding:
+                                                const EdgeInsets.symmetric(
+                                                  vertical: 10,
+                                                ),
+                                          ),
+                                        ),
+                                      ),
+                                      if (controller.text.isNotEmpty) ...[
+                                        const SizedBox(width: 4),
+                                        GestureDetector(
+                                          onTap: () => _previewCertificate(
+                                            context,
+                                            controller.text,
+                                            isDark,
+                                            tealColor,
+                                          ),
+                                          child: Padding(
+                                            padding: const EdgeInsets.only(
+                                              right: 8,
+                                            ),
+                                            child: Container(
+                                              padding: const EdgeInsets.all(4),
+                                              decoration: BoxDecoration(
+                                                color: tealColor.withOpacity(
+                                                  0.12,
+                                                ),
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
+                                              ),
+                                              child: Icon(
+                                                Icons.visibility_outlined,
+                                                size: 13,
+                                                color: tealColor,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                );
+                              },
+                            )
+                          else
+                            GestureDetector(
+                              onTap: _certificationUploading[index]
+                                  ? null
+                                  : () => _pickAndUploadCertificate(
+                                      index,
+                                      controller,
+                                    ),
+                              child: Container(
+                                height: 38,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isDark
+                                      ? const Color(0xFF1A1A1E)
+                                      : Colors.white,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: tealColor.withOpacity(0.4),
+                                    style: BorderStyle.solid,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    _certificationUploading[index]
+                                        ? SizedBox(
+                                            width: 14,
+                                            height: 14,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: tealColor,
+                                            ),
+                                          )
+                                        : Icon(
+                                            Icons.cloud_upload_outlined,
+                                            size: 14,
+                                            color: tealColor,
+                                          ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        _certificationUploading[index]
+                                            ? 'Mengunggah file...'
+                                            : (controller.text.isNotEmpty
+                                                  ? _getFileName(
+                                                      controller.text,
+                                                    )
+                                                  : 'Upload file sertifikat...'),
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 11,
+                                          fontWeight: controller.text.isNotEmpty
+                                              ? FontWeight.bold
+                                              : FontWeight.normal,
+                                          color: controller.text.isNotEmpty
+                                              ? textColor
+                                              : subtitleColor.withOpacity(0.5),
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          );
-                        })
-                      else
-                        GestureDetector(
-                          onTap: _certificationUploading[index]
-                              ? null
-                              : () => _pickAndUploadCertificate(
-                                  index,
-                                  controller,
-                                ),
-                          child: Container(
-                            height: 38,
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            decoration: BoxDecoration(
-                              color: isDark
-                                  ? const Color(0xFF1A1A1E)
-                                  : Colors.white,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: tealColor.withOpacity(0.4),
-                                style: BorderStyle.solid,
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                _certificationUploading[index]
-                                    ? SizedBox(
-                                        width: 14,
-                                        height: 14,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: tealColor,
-                                        ),
-                                      )
-                                    : Icon(
-                                        Icons.cloud_upload_outlined,
+                                    if (!_certificationUploading[index] &&
+                                        controller.text.isNotEmpty) ...[
+                                      const SizedBox(width: 8),
+                                      Icon(
+                                        Icons.check_circle_rounded,
                                         size: 14,
                                         color: tealColor,
                                       ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    _certificationUploading[index]
-                                        ? 'Mengunggah file...'
-                                        : (controller.text.isNotEmpty
-                                              ? _getFileName(controller.text)
-                                              : 'Upload file sertifikat...'),
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 11,
-                                      fontWeight: controller.text.isNotEmpty
-                                          ? FontWeight.bold
-                                          : FontWeight.normal,
-                                      color: controller.text.isNotEmpty
-                                          ? textColor
-                                          : subtitleColor.withOpacity(0.5),
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
+                                      const SizedBox(width: 4),
+                                      GestureDetector(
+                                        onTap: () => _previewCertificate(
+                                          context,
+                                          controller.text,
+                                          isDark,
+                                          tealColor,
+                                        ),
+                                        child: Container(
+                                          padding: const EdgeInsets.all(4),
+                                          decoration: BoxDecoration(
+                                            color: tealColor.withOpacity(0.12),
+                                            borderRadius: BorderRadius.circular(
+                                              6,
+                                            ),
+                                          ),
+                                          child: Icon(
+                                            Icons.visibility_outlined,
+                                            size: 13,
+                                            color: tealColor,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
                                 ),
-                                if (!_certificationUploading[index] &&
-                                    controller.text.isNotEmpty) ...[
-                                  const SizedBox(width: 8),
-                                  Icon(
-                                    Icons.check_circle_rounded,
-                                    size: 14,
-                                    color: tealColor,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  GestureDetector(
-                                    onTap: () => _previewCertificate(
-                                      context,
-                                      controller.text,
-                                      isDark,
-                                      tealColor,
-                                    ),
-                                    child: Container(
-                                      padding: const EdgeInsets.all(4),
-                                      decoration: BoxDecoration(
-                                        color: tealColor.withOpacity(0.12),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: Icon(
-                                        Icons.visibility_outlined,
-                                        size: 13,
-                                        color: tealColor,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ],
+                              ),
                             ),
-                          ),
-                        ),
-                        // ── FILE PREVIEW (below upload row) ─────────────────
-                        if (!_certificationUploading[index] &&
-                            controller.text.isNotEmpty &&
-                            !controller.text.startsWith('mock_uploads/')) ...[
-                          const SizedBox(height: 8),
-                          _buildCertPreview(
-                            controller.text,
-                            isDark,
-                            tealColor,
-                            subtitleColor,
-                            borderColor,
-                          ),
+                          // ── FILE PREVIEW (below upload row) ─────────────────
+                          if (!_certificationUploading[index] &&
+                              controller.text.isNotEmpty &&
+                              !controller.text.startsWith('mock_uploads/')) ...[
+                            const SizedBox(height: 8),
+                            _buildCertPreview(
+                              controller.text,
+                              isDark,
+                              tealColor,
+                              subtitleColor,
+                              borderColor,
+                            ),
+                          ],
                         ],
-                    ],
-                  ),
-                );
-              }),
-              if (_certificationControllers.length < 3) ...[
-                const SizedBox(height: 4),
-                InkWell(
-                  onTap: () {
-                    setState(() {
-                      _certificationControllers.add(
-                        TextEditingController(text: ''),
-                      );
-                      _certificationTypes.add('LINK');
-                      _certificationUploading.add(false);
-                    });
-                  },
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    height: 44,
-                    decoration: BoxDecoration(
+                      ),
+                    );
+                  }),
+                  if (_certificationControllers.length < 3) ...[
+                    const SizedBox(height: 4),
+                    InkWell(
+                      onTap: () {
+                        setState(() {
+                          _certificationControllers.add(
+                            TextEditingController(text: ''),
+                          );
+                          _certificationTypes.add('LINK');
+                          _certificationUploading.add(false);
+                        });
+                      },
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: tealColor.withOpacity(0.5)),
-                    ),
-                    alignment: Alignment.center,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.add, size: 16, color: tealColor),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Tambah Sertifikasi',
-                          style: GoogleFonts.outfit(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: tealColor,
-                          ),
+                      child: Container(
+                        height: 44,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: tealColor.withOpacity(0.5)),
                         ),
-                      ],
+                        alignment: Alignment.center,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.add, size: 16, color: tealColor),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Tambah Sertifikasi',
+                              style: GoogleFonts.outfit(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: tealColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(height: 28),
+
+                  // ── SAVE BUTTON ──────────────────────────────────────────────
+                  ElevatedButton.icon(
+                    onPressed: _isSaving ? null : _saveProfileAndStatus,
+                    icon: Icon(
+                      _isSaving
+                          ? Icons.hourglass_top_rounded
+                          : Icons.save_rounded,
+                      size: 16,
+                    ),
+                    label: Text(_isSaving ? 'Saving...' : 'Save Profile'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: tealColor,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      textStyle: GoogleFonts.outfit(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
                     ),
                   ),
-                ),
-              ],
-
-              const SizedBox(height: 28),
-
-              // ── SAVE BUTTON ──────────────────────────────────────────────
-              ElevatedButton.icon(
-                onPressed: _isSaving ? null : _saveProfileAndStatus,
-                icon: Icon(
-                  _isSaving ? Icons.hourglass_top_rounded : Icons.save_rounded,
-                  size: 16,
-                ),
-                label: Text(_isSaving ? 'Saving...' : 'Save Profile'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: tealColor,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  textStyle: GoogleFonts.outfit(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
-      ),
-    ),
 
         const SizedBox(height: 20),
 
@@ -4188,18 +5349,93 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                       border: Border.all(color: borderColor),
                     ),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        // Header for standard subscription
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(
+                              isDark ? 0.2 : 0.02,
+                            ),
+                            borderRadius: const BorderRadius.only(
+                              topLeft: Radius.circular(11),
+                              topRight: Radius.circular(11),
+                            ),
+                          ),
+                          child: Text(
+                            'LAYANAN PRAKTIK (STANDARD SUBSCRIPTION)',
+                            style: GoogleFonts.outfit(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.teal,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
                         _buildSubStatusRow(
                           'Expiry Date:',
-                          _subExpiry,
+                          _subExpiry.contains('2099') ? 'Lifetime' : _subExpiry,
                           textColor,
                           isDark,
                         ),
                         const Divider(height: 1),
                         _buildSubStatusRow(
                           'Days Left:',
-                          isActive ? '$_subDaysRemaining days' : 'N/A',
+                          isActive
+                              ? (_subExpiry.contains('2099')
+                                    ? 'Lifetime'
+                                    : '$_subDaysRemaining days')
+                              : 'N/A',
                           isActive ? tealColor : Colors.orangeAccent,
+                          isDark,
+                          showBold: true,
+                        ),
+                        const Divider(height: 1),
+
+                        // Header for premium design
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          color: Colors.black.withOpacity(isDark ? 0.2 : 0.02),
+                          child: Text(
+                            'KUSTOMISASI DESAIN PROFILE (PREMIUM)',
+                            style: GoogleFonts.outfit(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w900,
+                              color: const Color(0xFFFFB300),
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                        _buildSubStatusRow(
+                          'Premium Status:',
+                          _isPremiumActive ? 'Aktif' : 'Belum Aktif',
+                          _isPremiumActive ? tealColor : Colors.orangeAccent,
+                          isDark,
+                          showBold: true,
+                        ),
+                        const Divider(height: 1),
+                        _buildSubStatusRow(
+                          'Premium Expiry:',
+                          _premiumExpiry,
+                          textColor,
+                          isDark,
+                        ),
+                        const Divider(height: 1),
+                        _buildSubStatusRow(
+                          'Premium Days Left:',
+                          _isPremiumActive
+                              ? (_isPremiumLifetime
+                                    ? 'Lifetime'
+                                    : '$_premiumDaysRemaining days')
+                              : 'N/A',
+                          _isPremiumActive ? tealColor : Colors.orangeAccent,
                           isDark,
                           showBold: true,
                         ),
@@ -4209,29 +5445,72 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
 
                   const SizedBox(height: 16),
 
-                  // Renew Button
-                  ElevatedButton.icon(
-                    onPressed: _isSaving ? null : _buySubscriptionWithDuitku,
-                    icon: Icon(
-                      _isSaving ? Icons.hourglass_top_rounded : Icons.sync,
-                      size: 16,
-                    ),
-                    label: Text(
-                      _isSaving ? 'Connecting Duitku...' : 'Renew 30 Days',
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: tealColor,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                  // Renew & Continue buttons
+                  Row(
+                    children: [
+                      // "Continue Payment" button — only visible when there is an incomplete payment
+                      if (_hasPendingPayment) ...[
+                        Expanded(
+                          flex: 1,
+                          child: OutlinedButton.icon(
+                            onPressed: _isSaving
+                                ? null
+                                : () => _buySubscriptionWithDuitku(),
+                            icon: const Icon(
+                              Icons.hourglass_bottom_rounded,
+                              size: 15,
+                            ),
+                            label: const Text('Lanjutkan'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.amber,
+                              side: const BorderSide(color: Colors.amber),
+                              padding: const EdgeInsets.symmetric(vertical: 15),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              textStyle: GoogleFonts.outfit(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      // Main Renew / Upgrade Plan button
+                      Expanded(
+                        flex: _hasPendingPayment ? 2 : 1,
+                        child: ElevatedButton.icon(
+                          onPressed: _isSaving
+                              ? null
+                              : _showUpgradePlansModalProfile,
+                          icon: Icon(
+                            _isSaving
+                                ? Icons.hourglass_top_rounded
+                                : Icons.sync,
+                            size: 16,
+                          ),
+                          label: Text(
+                            _isSaving
+                                ? 'Processing...'
+                                : 'Renew / Upgrade Plan',
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: tealColor,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            textStyle: GoogleFonts.outfit(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
                       ),
-                      textStyle: GoogleFonts.outfit(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                      ),
-                    ),
+                    ],
                   ),
                 ],
               ),
@@ -5003,8 +6282,14 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                 textColor,
                 subtitleColor,
                 tealColor,
-                enabled: _subStatus == 'ACTIVE' && _subExpiryDate != null && _subExpiryDate!.isAfter(DateTime.now()),
-                warningText: (_subStatus == 'ACTIVE' && _subExpiryDate != null && _subExpiryDate!.isAfter(DateTime.now()))
+                enabled:
+                    _subStatus == 'ACTIVE' &&
+                    _subExpiryDate != null &&
+                    _subExpiryDate!.isAfter(DateTime.now()),
+                warningText:
+                    (_subStatus == 'ACTIVE' &&
+                        _subExpiryDate != null &&
+                        _subExpiryDate!.isAfter(DateTime.now()))
                     ? null
                     : 'Active subscription is required to enable public search visibility.',
               ),
@@ -5135,7 +6420,9 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                 desc,
                 style: GoogleFonts.outfit(
                   fontSize: 10.5,
-                  color: enabled ? subtitleColor : subtitleColor.withOpacity(0.5),
+                  color: enabled
+                      ? subtitleColor
+                      : subtitleColor.withOpacity(0.5),
                   height: 1.4,
                 ),
               ),
@@ -6791,10 +8078,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
           child: GestureDetector(
             onTap: () => Navigator.of(context).pop(),
             child: Container(
-              constraints: const BoxConstraints(
-                maxWidth: 700,
-                maxHeight: 600,
-              ),
+              constraints: const BoxConstraints(maxWidth: 700, maxHeight: 600),
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF1E1E2A) : Colors.white,
                 borderRadius: BorderRadius.circular(16),
@@ -6807,11 +8091,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                     padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.image_outlined,
-                          size: 16,
-                          color: tealColor,
-                        ),
+                        Icon(Icons.image_outlined, size: 16, color: tealColor),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -6819,7 +8099,9 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                             style: GoogleFonts.outfit(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
-                              color: isDark ? Colors.white : const Color(0xFF1E293B),
+                              color: isDark
+                                  ? Colors.white
+                                  : const Color(0xFF1E293B),
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -6855,7 +8137,9 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                                 'Gambar tidak dapat dimuat',
                                 style: GoogleFonts.outfit(
                                   fontSize: 12,
-                                  color: isDark ? Colors.white54 : Colors.black45,
+                                  color: isDark
+                                      ? Colors.white54
+                                      : Colors.black45,
                                 ),
                               ),
                             ],
@@ -6937,12 +8221,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
     final isImage = _isImageFile(url);
     if (isImage) {
       return GestureDetector(
-        onTap: () => _previewCertificate(
-          context,
-          url,
-          isDark,
-          tealColor,
-        ),
+        onTap: () => _previewCertificate(context, url, isDark, tealColor),
         child: Container(
           height: 100,
           width: double.infinity,
@@ -7009,12 +8288,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
     } else {
       // PDF / other non-image file
       return GestureDetector(
-        onTap: () => _previewCertificate(
-          context,
-          url,
-          isDark,
-          tealColor,
-        ),
+        onTap: () => _previewCertificate(context, url, isDark, tealColor),
         child: Container(
           height: 52,
           padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -7041,7 +8315,9 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                       style: GoogleFonts.outfit(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white70 : const Color(0xFF334155),
+                        color: isDark
+                            ? Colors.white70
+                            : const Color(0xFF334155),
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -7055,11 +8331,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                   ],
                 ),
               ),
-              Icon(
-                Icons.open_in_new,
-                size: 14,
-                color: tealColor,
-              ),
+              Icon(Icons.open_in_new, size: 14, color: tealColor),
             ],
           ),
         ),

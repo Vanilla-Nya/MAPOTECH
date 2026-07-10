@@ -207,10 +207,19 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
         final dateRaw = q['date_queue'] ?? '';
         final dateFormatted = _formatDate(dateRaw);
 
+        final dateQueueTsRaw = q['date_queue_ts'];
+        String timeStr = '09:00';
+        if (dateQueueTsRaw != null) {
+          final dt = DateTime.tryParse(dateQueueTsRaw.toString());
+          if (dt != null) {
+            timeStr = '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+          }
+        }
+
         loadedDokter.add(RiwayatDokterEntry(
           id: qId,
           date: dateFormatted,
-          time: '09:00',
+          time: timeStr,
           doctorName: doctorName,
           clinic: 'Praktek Mandiri Dokter $doctorName',
           keluhan: encounter['rujukan_catatan'] ?? 'Pemeriksaan Rutin',

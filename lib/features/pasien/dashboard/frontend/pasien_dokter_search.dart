@@ -1,3 +1,8 @@
+import 'dart:ui' show ImageFilter;
+import 'dart:io' as io;
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -80,7 +85,7 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
     showDialog(
       context: context,
       barrierColor: Colors.black.withOpacity(0.45),
-      builder: (ctx) => _DoctorDetailDialog(
+      builder: (ctx) => DoctorDetailDialog(
         dokter: dokter,
         isDark: isDark,
       ),
@@ -601,25 +606,50 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
 }
 
 /// Detailed profile modal dialog for Doctors
-class _DoctorDetailDialog extends ConsumerStatefulWidget {
+class DoctorDetailDialog extends ConsumerStatefulWidget {
   final Map<String, dynamic> dokter;
   final bool isDark;
+  final bool isPreview;
 
-  const _DoctorDetailDialog({
+  const DoctorDetailDialog({
     required this.dokter,
     required this.isDark,
+    this.isPreview = false,
   });
 
   @override
-  ConsumerState<_DoctorDetailDialog> createState() => _DoctorDetailDialogState();
+  ConsumerState<DoctorDetailDialog> createState() => _DoctorDetailDialogState();
 }
 
-class _DoctorDetailDialogState extends ConsumerState<_DoctorDetailDialog>
+class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
     with SingleTickerProviderStateMixin {
   final SupabaseService _db = SupabaseService();
   List<Map<String, dynamic>> _schedules = [];
   bool _loadingSchedules = true;
   String? _scheduleError;
+
+  // Background Customization State
+  String _bgType = 'gradient';
+  late TextEditingController _customBgUrlController;
+  bool _isSavingBg = false;
+  bool _isUploadingBgImage = false;
+
+  // Font & Tagline Promotion Customization State
+  String _nameFontFamily = 'Outfit';
+  late TextEditingController _promoTaglineController;
+  String _taglineFontFamily = 'Outfit';
+  String _taglineColor = 'white';
+
+  // Advanced Background Style Customization State
+  String _gradientTheme = 'theme';
+  double _blurAmount = 15.0;
+  double _overlayOpacity = 0.35;
+  String _blurStyle = 'full';
+
+  // Plan/Subscription States
+  bool _isSubscribed = false;
+  bool _isPremium = false;
+  String? _subscriptionExpiredAt;
 
   // Booking state
   DateTime? _selectedDate;
@@ -633,18 +663,75 @@ class _DoctorDetailDialogState extends ConsumerState<_DoctorDetailDialog>
   int _clockMinute = -1;  // -1 = not yet selected
   bool _pickingHour = true;        // true = picking hour, false = picking minute
   List<String> _clockOpenSlots = []; // valid "HH:mm" slots from schedule
+  late TextEditingController _hourController;
+  late TextEditingController _minuteController;
+  late FocusNode _hourFocus;
+  late FocusNode _minuteFocus;
 
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _hourController = TextEditingController();
+    _minuteController = TextEditingController();
+    _hourFocus = FocusNode();
+    _minuteFocus = FocusNode();
+
+    // Initialize background settings
+    final bgSettings = widget.dokter['header_bg_settings'];
+    final Map<String, dynamic> settings = bgSettings is Map
+        ? Map<String, dynamic>.from(bgSettings)
+        : <String, dynamic>{};
+    _bgType = settings['bg_type']?.toString() ?? 'gradient';
+    _customBgUrlController = TextEditingController(
+      text: settings['image_url']?.toString() ?? '',
+    );
+    _nameFontFamily = settings['name_font_family']?.toString() ?? 'Outfit';
+    _promoTaglineController = TextEditingController(
+      text: settings['promo_tagline']?.toString() ?? '',
+    );
+    _taglineFontFamily = settings['tagline_font_family']?.toString() ?? 'Outfit';
+    _taglineColor = settings['tagline_color']?.toString() ?? 'white';
+    _gradientTheme = settings['gradient_theme']?.toString() ?? 'theme';
+    _blurAmount = double.tryParse(settings['blur_amount']?.toString() ?? '') ?? 15.0;
+    _overlayOpacity = double.tryParse(settings['overlay_opacity']?.toString() ?? '') ?? 0.35;
+    _blurStyle = settings['blur_style']?.toString() ?? 'full';
+
+    // Initialize plan/subscription states
+    _isSubscribed = widget.dokter['subscription_status']?.toString().toUpperCase() == 'ACTIVE';
+    _subscriptionExpiredAt = widget.dokter['subscription_expired_at']?.toString();
+    final isPremiumField = settings['is_premium'] == true;
+    final expAt = settings['premium_expired_at'];
+    if (isPremiumField) {
+      if (expAt == 'lifetime') {
+        _isPremium = true;
+      } else if (expAt != null) {
+        try {
+          final expDate = DateTime.parse(expAt.toString());
+          _isPremium = expDate.isAfter(DateTime.now());
+        } catch (_) {
+          _isPremium = false;
+        }
+      } else {
+        _isPremium = true;
+      }
+    } else {
+      _isPremium = false;
+    }
+
     _loadSchedules();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _hourController.dispose();
+    _minuteController.dispose();
+    _hourFocus.dispose();
+    _minuteFocus.dispose();
+    _customBgUrlController.dispose();
+    _promoTaglineController.dispose();
     super.dispose();
   }
 
@@ -875,6 +962,45 @@ class _DoctorDetailDialogState extends ConsumerState<_DoctorDetailDialog>
   }
 
   // ── CLOCK PICKER ─────────────────────────────────────────────────
+  bool _isTimeValid(int hour, int minute) {
+    if (_selectedDate == null) return false;
+    final sched = _scheduleForDate(_selectedDate!);
+    if (sched == null) return false;
+    final open = (sched['open_time']?.toString() ?? '').substring(0, 5).split(':');
+    final close = (sched['close_time']?.toString() ?? '').substring(0, 5).split(':');
+    if (open.length < 2 || close.length < 2) return false;
+
+    int openMin = int.parse(open[0]) * 60 + int.parse(open[1]);
+    int closeMin = int.parse(close[0]) * 60 + int.parse(close[1]);
+    if (closeMin <= openMin) closeMin += 24 * 60; // overnight
+
+    int selectedMin = hour * 60 + minute;
+    if (selectedMin < openMin && (selectedMin + 24 * 60) < closeMin) {
+      selectedMin += 24 * 60;
+    }
+
+    return selectedMin >= openMin && selectedMin <= closeMin;
+  }
+
+  void _updateSelectedTime() {
+    if (_clockHour >= 0 && _clockMinute >= 0) {
+      if (_isTimeValid(_clockHour, _clockMinute)) {
+        final slot = '${_clockHour.toString().padLeft(2, '0')}:${_clockMinute.toString().padLeft(2, '0')}';
+        setState(() {
+          _selectedTimeSlot = slot;
+        });
+      } else {
+        setState(() {
+          _selectedTimeSlot = null;
+        });
+      }
+    } else {
+      setState(() {
+        _selectedTimeSlot = null;
+      });
+    }
+  }
+
   void _onClockHourTap(int h) {
     final hasSlot = _clockOpenSlots.any((s) {
       final parts = s.split(':');
@@ -886,14 +1012,17 @@ class _DoctorDetailDialogState extends ConsumerState<_DoctorDetailDialog>
       _clockMinute = -1;
       _pickingHour = false;
       _selectedTimeSlot = null;
+      _hourController.text = h.toString().padLeft(2, '0');
+      _minuteController.text = '';
     });
+    _minuteFocus.requestFocus();
   }
 
   void _onClockMinuteTap(int m) {
-    final slot = '${_clockHour.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
     setState(() {
       _clockMinute = m;
-      _selectedTimeSlot = slot;
+      _minuteController.text = m.toString().padLeft(2, '0');
+      _updateSelectedTime();
     });
   }
 
@@ -920,11 +1049,7 @@ class _DoctorDetailDialogState extends ConsumerState<_DoctorDetailDialog>
         .toSet()
         .toList()
       ..sort();
-    final availableMinutes = _clockOpenSlots
-        .where((s) => int.tryParse(s.split(':')[0]) == _clockHour)
-        .map((s) => int.tryParse(s.split(':')[1]) ?? -1)
-        .toList()
-      ..sort();
+    final availableMinutes = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
 
     const double clockSize = 220;
     const double outerR = 86.0;
@@ -936,52 +1061,154 @@ class _DoctorDetailDialogState extends ConsumerState<_DoctorDetailDialog>
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            GestureDetector(
-              onTap: () => setState(() => _pickingHour = true),
+            Focus(
+              onFocusChange: (hasFocus) {
+                if (hasFocus) {
+                  setState(() => _pickingHour = true);
+                } else {
+                  if (_clockHour >= 0) {
+                    _hourController.text = _clockHour.toString().padLeft(2, '0');
+                  }
+                }
+              },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                width: 76,
+                height: 58,
                 decoration: BoxDecoration(
                   color: isHourMode ? themeAccent : sectionBg,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: isHourMode ? themeAccent : borderColor, width: 2),
                 ),
-                child: Text(
-                  _clockHour == -1 ? '--' : _clockHour.toString().padLeft(2, '0'),
-                  style: GoogleFonts.outfit(fontSize: 30, fontWeight: FontWeight.w900,
-                      color: isHourMode ? Colors.white : textColor),
+                alignment: Alignment.center,
+                child: TextField(
+                  controller: _hourController,
+                  focusNode: _hourFocus,
+                  keyboardType: TextInputType.number,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.outfit(
+                    fontSize: 30,
+                    fontWeight: FontWeight.w900,
+                    color: isHourMode ? Colors.white : textColor,
+                  ),
+                  decoration: InputDecoration(
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.zero,
+                    isDense: true,
+                    counterText: "",
+                    hintText: '--',
+                    hintStyle: GoogleFonts.outfit(
+                      fontSize: 30,
+                      fontWeight: FontWeight.w900,
+                      color: isHourMode ? Colors.white.withOpacity(0.5) : subtitleColor,
+                    ),
+                  ),
+                  maxLength: 2,
+                  onChanged: (val) {
+                    final h = int.tryParse(val);
+                    if (h != null && h >= 0 && h <= 23) {
+                      setState(() {
+                        _clockHour = h;
+                        _updateSelectedTime();
+                      });
+                      if (val.length == 2) {
+                        _minuteFocus.requestFocus();
+                      }
+                    } else if (val.isEmpty) {
+                      setState(() {
+                        _clockHour = -1;
+                        _selectedTimeSlot = null;
+                      });
+                    }
+                  },
                 ),
               ),
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Text(':',
-                  style: GoogleFonts.outfit(fontSize: 30, fontWeight: FontWeight.w900, color: textColor)),
+              child: Text(
+                ':',
+                style: GoogleFonts.outfit(
+                  fontSize: 30,
+                  fontWeight: FontWeight.w900,
+                  color: textColor,
+                ),
+              ),
             ),
-            GestureDetector(
-              onTap: _clockHour == -1 ? null : () => setState(() => _pickingHour = false),
+            Focus(
+              onFocusChange: (hasFocus) {
+                if (hasFocus) {
+                  setState(() => _pickingHour = false);
+                } else {
+                  if (_clockMinute >= 0) {
+                    _minuteController.text = _clockMinute.toString().padLeft(2, '0');
+                  }
+                }
+              },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                width: 76,
+                height: 58,
                 decoration: BoxDecoration(
                   color: !isHourMode ? themeAccent : sectionBg,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: !isHourMode ? themeAccent : borderColor, width: 2),
                 ),
-                child: Text(
-                  _clockMinute == -1 ? '--' : _clockMinute.toString().padLeft(2, '0'),
-                  style: GoogleFonts.outfit(fontSize: 30, fontWeight: FontWeight.w900,
-                      color: !isHourMode ? Colors.white : textColor),
+                alignment: Alignment.center,
+                child: TextField(
+                  controller: _minuteController,
+                  focusNode: _minuteFocus,
+                  keyboardType: TextInputType.number,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.outfit(
+                    fontSize: 30,
+                    fontWeight: FontWeight.w900,
+                    color: !isHourMode ? Colors.white : textColor,
+                  ),
+                  decoration: InputDecoration(
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.zero,
+                    isDense: true,
+                    counterText: "",
+                    hintText: '--',
+                    hintStyle: GoogleFonts.outfit(
+                      fontSize: 30,
+                      fontWeight: FontWeight.w900,
+                      color: !isHourMode ? Colors.white.withOpacity(0.5) : subtitleColor,
+                    ),
+                  ),
+                  maxLength: 2,
+                  enabled: _clockHour != -1,
+                  onChanged: (val) {
+                    final m = int.tryParse(val);
+                    if (m != null && m >= 0 && m <= 59) {
+                      setState(() {
+                        _clockMinute = m;
+                        _updateSelectedTime();
+                      });
+                    } else if (val.isEmpty) {
+                      setState(() {
+                        _clockMinute = -1;
+                        _selectedTimeSlot = null;
+                      });
+                    }
+                  },
                 ),
               ),
             ),
           ],
         ),
         const SizedBox(height: 6),
-        Text(
-          isHourMode ? 'Ketuk untuk memilih jam' : 'Ketuk untuk memilih menit',
-          style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor, fontWeight: FontWeight.w600),
-        ),
+        if (_clockHour >= 0 && _clockMinute >= 0 && !_isTimeValid(_clockHour, _clockMinute))
+          Text(
+            'Waktu booking di luar jam kerja dokter.',
+            style: GoogleFonts.outfit(fontSize: 10, color: Colors.redAccent, fontWeight: FontWeight.bold),
+          )
+        else
+          Text(
+            isHourMode ? 'Ketuk/ketik untuk memilih jam' : 'Ketuk/ketik untuk memilih menit',
+            style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor, fontWeight: FontWeight.w600),
+          ),
         const SizedBox(height: 16),
         SizedBox(
           width: clockSize,
@@ -1163,6 +1390,10 @@ class _DoctorDetailDialogState extends ConsumerState<_DoctorDetailDialog>
     final todayDate = DateTime(today.year, today.month, today.day);
     final openWeekdays = _getOpenWeekdays();
 
+    final user = ref.read(landingPageProvider).loggedInUser;
+    final isSelfPreview = widget.isPreview || (user != null && user['id'] == widget.dokter['id']);
+    final isDark = ref.read(landingPageProvider).appearance == 'dark';
+
     if (_bookingSuccess) {
       return Center(
         child: Padding(
@@ -1277,6 +1508,8 @@ class _DoctorDetailDialogState extends ConsumerState<_DoctorDetailDialog>
                 _clockMinute = -1;
                 _pickingHour = true;
                 _selectedTimeSlot = null;
+                _hourController.text = '';
+                _minuteController.text = '';
               });
             });
           }
@@ -1293,6 +1526,34 @@ class _DoctorDetailDialogState extends ConsumerState<_DoctorDetailDialog>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (isSelfPreview) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF2C94C).withOpacity(0.12),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFF2C94C).withOpacity(0.3)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline_rounded, color: Color(0xFFF2C94C), size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Pratinjau Perspektif Pasien: Anda tidak dapat membuat janji temu dengan diri sendiri.',
+                    style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? const Color(0xFFF2C94C) : const Color(0xFFD3A106),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         // Date picker
         _buildSectionHeader('Pilih Tanggal', Icons.calendar_today_rounded, themeAccent, textColor),
         const SizedBox(height: 10),
@@ -1322,6 +1583,8 @@ class _DoctorDetailDialogState extends ConsumerState<_DoctorDetailDialog>
                     _clockMinute = -1;
                     _pickingHour = true;
                     _clockOpenSlots = [];
+                    _hourController.text = '';
+                    _minuteController.text = '';
                   });
                 },
                 child: AnimatedContainer(
@@ -1384,7 +1647,27 @@ class _DoctorDetailDialogState extends ConsumerState<_DoctorDetailDialog>
         if (_selectedDate != null) ...[
           const SizedBox(height: 20),
           _buildSectionHeader('Pilih Jam', Icons.schedule_rounded, themeAccent, textColor),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
+          (() {
+            final sched = _scheduleForDate(_selectedDate!);
+            if (sched != null && sched['open_time'] != null && sched['close_time'] != null) {
+              final openPart = sched['open_time'].toString().substring(0, 5);
+              final closePart = sched['close_time'].toString().substring(0, 5);
+              return Padding(
+                padding: const EdgeInsets.only(left: 24, bottom: 8),
+                child: Text(
+                  'Jam Kerja Dokter: $openPart - $closePart',
+                  style: GoogleFonts.outfit(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: themeAccent,
+                  ),
+                ),
+              );
+            }
+            return const SizedBox.shrink();
+          })(),
+          const SizedBox(height: 4),
           if (timeSlots.isEmpty)
             Center(
               child: Text(
@@ -1448,24 +1731,29 @@ class _DoctorDetailDialogState extends ConsumerState<_DoctorDetailDialog>
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: _isBooking ? null : _submitBooking,
+              onPressed: isSelfPreview ? null : (_isBooking ? null : _submitBooking),
               icon: _isBooking
                   ? const SizedBox(
                       width: 14,
                       height: 14,
                       child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                     )
-                  : const Icon(Icons.check_circle_rounded, size: 16, color: Colors.white),
+                  : (isSelfPreview
+                      ? const Icon(Icons.block_rounded, size: 16, color: Colors.white70)
+                      : const Icon(Icons.check_circle_rounded, size: 16, color: Colors.white)),
               label: Text(
-                _isBooking ? 'Memproses...' : 'Konfirmasi Booking',
+                isSelfPreview
+                    ? 'Tidak Dapat Booking Diri Sendiri'
+                    : (_isBooking ? 'Memproses...' : 'Konfirmasi Booking'),
                 style: GoogleFonts.outfit(
                   fontWeight: FontWeight.w700,
                   fontSize: 13,
-                  color: Colors.white,
+                  color: isSelfPreview ? Colors.white70 : Colors.white,
                 ),
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: themeAccent,
+                disabledBackgroundColor: isDark ? Colors.grey[800] : Colors.grey[300],
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 elevation: 0,
@@ -1479,6 +1767,9 @@ class _DoctorDetailDialogState extends ConsumerState<_DoctorDetailDialog>
 
   Future<void> _submitBooking() async {
     final user = ref.read(landingPageProvider).loggedInUser;
+    final isSelfPreview = widget.isPreview || (user != null && user['id'] == widget.dokter['id']);
+    if (isSelfPreview) return;
+
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -1494,10 +1785,25 @@ class _DoctorDetailDialogState extends ConsumerState<_DoctorDetailDialog>
 
     setState(() => _isBooking = true);
     try {
+      DateTime bookingDateTime = _selectedDate!;
+      if (_selectedTimeSlot != null) {
+        final parts = _selectedTimeSlot!.split(':');
+        if (parts.length == 2) {
+          final hour = int.tryParse(parts[0]) ?? 0;
+          final minute = int.tryParse(parts[1]) ?? 0;
+          bookingDateTime = DateTime(
+            _selectedDate!.year,
+            _selectedDate!.month,
+            _selectedDate!.day,
+            hour,
+            minute,
+          );
+        }
+      }
       await _db.createBooking(
         doctorId: widget.dokter['id'] as String,
         patientId: user['id'] as String,
-        date: _selectedDate!,
+        date: bookingDateTime,
       );
       if (mounted) {
         setState(() {
@@ -1849,6 +2155,1497 @@ class _DoctorDetailDialogState extends ConsumerState<_DoctorDetailDialog>
     }
   }
 
+  Widget _buildHeaderBackground(
+    String appearance,
+    bool isDark,
+    Color themeAccent,
+  ) {
+    if (_bgType == 'blurred_pp' && widget.dokter['avatar_url'] != null && widget.dokter['avatar_url'].toString().isNotEmpty) {
+      return _buildImageBackground(widget.dokter['avatar_url']!);
+    } else if (_bgType == 'custom_image' && _customBgUrlController.text.trim().isNotEmpty) {
+      return _buildImageBackground(_customBgUrlController.text.trim());
+    }
+
+    // Default gradient background
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: _getGradientColors(appearance, isDark, themeAccent),
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+    );
+  }
+
+  List<Color> _getGradientColors(String appearance, bool isDark, Color themeAccent) {
+    final selectedTheme = _isPremium ? _gradientTheme : 'theme';
+    switch (selectedTheme.toLowerCase()) {
+      case 'teal':
+        return [Colors.teal, const Color(0xFF004D40)];
+      case 'violet':
+        return [const Color(0xFF8E2DE2), const Color(0xFF4A00E0)];
+      case 'coral':
+        return [const Color(0xFFF857A6), const Color(0xFFFF5858)];
+      case 'sunset':
+        return [const Color(0xFFF9D423), const Color(0xFFFF4E50)];
+      case 'emerald':
+        return [const Color(0xFF11998E), const Color(0xFF38EF7D)];
+      case 'slate':
+        return [const Color(0xFF434343), const Color(0xFF000000)];
+      case 'theme':
+      default:
+        return appearance == 'rev'
+            ? const [Color(0xFFCB8FFF), Color(0xFFB577F2)]
+            : (isDark
+                ? const [Color(0xFF3A3A40), Color(0xFF252528)]
+                : [themeAccent, themeAccent.withOpacity(0.8)]);
+    }
+  }
+
+  Widget _buildImageBackground(String imageUrl) {
+    final effectiveBlurAmount = _isPremium ? _blurAmount : 15.0;
+    final effectiveBlurStyle = _isPremium ? _blurStyle : 'full';
+    final effectiveOverlayOpacity = _isPremium ? _overlayOpacity : 0.35;
+
+    final imageWidget = Image.network(
+      imageUrl,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => Container(
+        color: Colors.red[300],
+      ),
+    );
+
+    Widget blurredLayer = ImageFiltered(
+      imageFilter: ImageFilter.blur(sigmaX: effectiveBlurAmount, sigmaY: effectiveBlurAmount),
+      child: Image.network(
+        imageUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => Container(
+          color: Colors.red[300],
+        ),
+      ),
+    );
+
+    // Apply Mask based on effectiveBlurStyle
+    if (effectiveBlurAmount > 0 && effectiveBlurStyle != 'none') {
+      if (effectiveBlurStyle == 'radial') {
+        blurredLayer = ShaderMask(
+          shaderCallback: (rect) {
+            return const RadialGradient(
+              center: Alignment.center,     // Center the gradient globally
+              radius: 1.5,                  // Expand radius significantly to blend over the wide header
+              colors: [
+                Colors.transparent, // Center is clear (shows sharp image)
+                Colors.black,       // Borders are blurred
+              ],
+              stops: [0.0, 1.0],            // Smooth linear transition from center to border
+            ).createShader(rect);
+          },
+          blendMode: BlendMode.dstIn,
+          child: blurredLayer,
+        );
+      } else if (effectiveBlurStyle == 'bottom') {
+        blurredLayer = ShaderMask(
+          shaderCallback: (rect) {
+            return const LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.transparent, // Top is clear
+                Colors.black,       // Bottom is blurred
+              ],
+              stops: [0.0, 1.0],
+            ).createShader(rect);
+          },
+          blendMode: BlendMode.dstIn,
+          child: blurredLayer,
+        );
+      }
+    }
+
+    return ClipRect(
+      child: Transform.scale(
+        scale: 1.15, // Scale slightly up to push the blurry edge pixels outside the clip bounds
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Base sharp image
+            imageWidget,
+            // Blurred overlay (either full, radial, or bottom)
+            if (effectiveBlurAmount > 0 && effectiveBlurStyle != 'none') blurredLayer,
+            // Dimming overlay for readability
+            Container(
+              color: Colors.black.withOpacity(effectiveOverlayOpacity),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPreviewSettingsPanel(
+    bool isDark,
+    Color textColor,
+    Color subtitleColor,
+    Color themeAccent,
+    Color borderColor,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Header
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: borderColor)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.palette_outlined, size: 20, color: themeAccent),
+              const SizedBox(width: 10),
+              Text(
+                'Customize Design',
+                style: GoogleFonts.outfit(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                  color: textColor,
+                ),
+              ),
+            ],
+          ),
+        ),
+        
+        // Scrollable Options
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Header Background Style',
+                  style: GoogleFonts.outfit(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: textColor,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                
+                // Radio Option: Gradient
+                _buildBgTypeRadio(
+                  value: 'gradient',
+                  title: 'Default Gradient',
+                  icon: Icons.gradient_rounded,
+                  textColor: textColor,
+                  themeAccent: themeAccent,
+                ),
+                const SizedBox(height: 8),
+                
+                // Radio Option: Blurred Profile Photo
+                _buildBgTypeRadio(
+                  value: 'blurred_pp',
+                  title: 'Blurred Profile Photo',
+                  icon: Icons.blur_on_rounded,
+                  textColor: textColor,
+                  themeAccent: themeAccent,
+                ),
+                const SizedBox(height: 8),
+                
+                // Radio Option: Custom Image
+                _buildBgTypeRadio(
+                  value: 'custom_image',
+                  title: 'Custom Image / GIF',
+                  icon: Icons.image_outlined,
+                  textColor: textColor,
+                  themeAccent: themeAccent,
+                ),
+                
+                if (_bgType == 'custom_image') ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    'Background Image URL / GIF',
+                    style: GoogleFonts.outfit(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: subtitleColor,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: _customBgUrlController,
+                    style: GoogleFonts.outfit(fontSize: 12, color: textColor),
+                    decoration: InputDecoration(
+                      hintText: 'https://example.com/image.gif',
+                      hintStyle: GoogleFonts.outfit(fontSize: 11, color: subtitleColor),
+                      filled: true,
+                      fillColor: isDark ? const Color(0xFF161619) : Colors.white,
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: borderColor),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: borderColor),
+                      ),
+                    ),
+                    onChanged: (val) {
+                      setState(() {});
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _isUploadingBgImage ? null : _pickAndUploadHeaderBg,
+                      icon: const Icon(Icons.upload_file_rounded, size: 14),
+                      label: Text(
+                        _isUploadingBgImage ? 'Uploading...' : 'Upload Image / GIF',
+                        style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: themeAccent,
+                        side: BorderSide(color: themeAccent),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                    ),
+                  ),
+                ],
+                if (_isPremium) ...[
+                  if (_bgType == 'gradient') ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      'Gradient Palette',
+                      style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: textColor,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _buildGradientOption('theme', const [Colors.blue, Colors.blueAccent], isDark),
+                        _buildGradientOption('teal', const [Colors.teal, Color(0xFF004D40)], isDark),
+                        _buildGradientOption('violet', const [Color(0xFF8E2DE2), Color(0xFF4A00E0)], isDark),
+                        _buildGradientOption('coral', const [Color(0xFFF857A6), Color(0xFFFF5858)], isDark),
+                        _buildGradientOption('sunset', const [Color(0xFFF9D423), Color(0xFFFF4E50)], isDark),
+                        _buildGradientOption('emerald', const [Color(0xFF11998E), Color(0xFF38EF7D)], isDark),
+                        _buildGradientOption('slate', const [Color(0xFF434343), Color(0xFF000000)], isDark),
+                      ],
+                    ),
+                  ],
+                  if (_bgType == 'blurred_pp' || _bgType == 'custom_image') ...[
+                    const SizedBox(height: 20),
+                    Text(
+                      'Image Blur Level: ${_blurAmount.toStringAsFixed(0)}',
+                      style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: textColor,
+                      ),
+                    ),
+                    SliderTheme(
+                      data: SliderThemeData(
+                        activeTrackColor: themeAccent,
+                        inactiveTrackColor: themeAccent.withOpacity(0.2),
+                        thumbColor: themeAccent,
+                        overlayColor: themeAccent.withOpacity(0.1),
+                        valueIndicatorColor: themeAccent,
+                        valueIndicatorTextStyle: const TextStyle(color: Colors.white),
+                      ),
+                      child: Slider(
+                        value: _blurAmount,
+                        min: 0.0,
+                        max: 30.0,
+                        divisions: 30,
+                        label: _blurAmount.toStringAsFixed(0),
+                        onChanged: (val) {
+                          setState(() {
+                            _blurAmount = val;
+                          });
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Dark Overlay Opacity: ${(_overlayOpacity * 100).toStringAsFixed(0)}%',
+                      style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: textColor,
+                      ),
+                    ),
+                    SliderTheme(
+                      data: SliderThemeData(
+                        activeTrackColor: themeAccent,
+                        inactiveTrackColor: themeAccent.withOpacity(0.2),
+                        thumbColor: themeAccent,
+                        overlayColor: themeAccent.withOpacity(0.1),
+                        valueIndicatorColor: themeAccent,
+                        valueIndicatorTextStyle: const TextStyle(color: Colors.white),
+                      ),
+                      child: Slider(
+                        value: _overlayOpacity,
+                        min: 0.0,
+                        max: 0.8,
+                        divisions: 16,
+                        label: '${(_overlayOpacity * 100).toStringAsFixed(0)}%',
+                        onChanged: (val) {
+                          setState(() {
+                            _overlayOpacity = val;
+                          });
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Blur Style & Vignette',
+                      style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: textColor,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF161619) : Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: borderColor),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _blurStyle,
+                          dropdownColor: isDark ? const Color(0xFF1E1E22) : Colors.white,
+                          style: GoogleFonts.outfit(fontSize: 12, color: textColor),
+                          isExpanded: true,
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'none',
+                              child: Text('No Blur (Original Image)'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'full',
+                              child: Text('All Blurred'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'radial',
+                              child: Text('Sharp Center, Blurred Borders (Vignette)'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'bottom',
+                              child: Text('Sharp Top, Blurred Bottom'),
+                            ),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) {
+                              setState(() {
+                                _blurStyle = val;
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 24),
+                  const Divider(),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Name Font Family',
+                    style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: textColor,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF161619) : Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: borderColor),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _nameFontFamily,
+                        dropdownColor: isDark ? const Color(0xFF1E1E22) : Colors.white,
+                        style: GoogleFonts.outfit(fontSize: 12, color: textColor),
+                        isExpanded: true,
+                        items: ['Outfit', 'Playfair Display', 'Montserrat', 'Caveat', 'Cinzel', 'Inter']
+                            .map((font) => DropdownMenuItem(
+                                  value: font,
+                                  child: Text(font, style: GoogleFonts.getFont(font, fontSize: 13, color: textColor)),
+                                ))
+                            .toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() {
+                              _nameFontFamily = val;
+                            });
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Promotional Tagline',
+                    style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: textColor,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _promoTaglineController,
+                    style: GoogleFonts.outfit(fontSize: 12, color: textColor),
+                    decoration: InputDecoration(
+                      hintText: 'e.g., 🩺 Spesialis Bedah 10+ Thn',
+                      hintStyle: GoogleFonts.outfit(fontSize: 11, color: subtitleColor),
+                      filled: true,
+                      fillColor: isDark ? const Color(0xFF161619) : Colors.white,
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: borderColor),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: borderColor),
+                      ),
+                    ),
+                    onChanged: (val) {
+                      setState(() {});
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Tagline Font Family',
+                    style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: textColor,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF161619) : Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: borderColor),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _taglineFontFamily,
+                        dropdownColor: isDark ? const Color(0xFF1E1E22) : Colors.white,
+                        style: GoogleFonts.outfit(fontSize: 12, color: textColor),
+                        isExpanded: true,
+                        items: ['Outfit', 'Playfair Display', 'Montserrat', 'Caveat', 'Cinzel', 'Inter']
+                            .map((font) => DropdownMenuItem(
+                                  value: font,
+                                  child: Text(font, style: GoogleFonts.getFont(font, fontSize: 13, color: textColor)),
+                                ))
+                            .toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() {
+                              _taglineFontFamily = val;
+                            });
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Tagline Theme Style',
+                    style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: textColor,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _buildTaglineColorOption('white', Colors.white, isDark),
+                      _buildTaglineColorOption('amber', Colors.amber, isDark),
+                      _buildTaglineColorOption('cyan', Colors.cyanAccent, isDark),
+                      _buildTaglineColorOption('green', Colors.green, isDark),
+                      _buildTaglineColorOption('rose', Colors.pink, isDark),
+                    ],
+                  ),
+                ] else ...[
+                  const SizedBox(height: 24),
+                  const Divider(),
+                  const SizedBox(height: 24),
+                  _buildPremiumLockCard(themeAccent, textColor, subtitleColor, borderColor),
+                ],
+              ],
+            ),
+          ),
+        ),
+        
+        // Footer: Save Button
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            border: Border(top: BorderSide(color: borderColor)),
+          ),
+          child: ElevatedButton.icon(
+            onPressed: _isSavingBg ? null : _saveHeaderBgSettings,
+            icon: _isSavingBg
+                ? const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  )
+                : const Icon(Icons.save_rounded, size: 16, color: Colors.white),
+            label: Text(
+              _isSavingBg ? 'Saving...' : 'Save Settings',
+              style: GoogleFonts.outfit(
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+                color: Colors.white,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: themeAccent,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              elevation: 0,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPremiumLockCard(Color themeAccent, Color textColor, Color subtitleColor, Color borderColor) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: widget.isDark ? const Color(0xFF1E1E22) : Colors.grey[50],
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: themeAccent.withOpacity(0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.lock_rounded, size: 28, color: themeAccent),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Fitur Desain Profil Premium',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.outfit(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: textColor,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Upgrade ke Premium untuk membuka font nama, tagline promosi, kustomisasi blur level, vignette & gradient palette.',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.outfit(
+              fontSize: 11,
+              color: subtitleColor,
+              height: 1.45,
+            ),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _showUpgradePlansModal,
+              icon: const Icon(Icons.flash_on_rounded, size: 14, color: Colors.white),
+              label: Text(
+                'Unlock Premium (Rp 1.000)',
+                style: GoogleFonts.outfit(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: themeAccent,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                elevation: 0,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showUpgradePlansModal() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        final isDarkTheme = widget.isDark;
+        final bg = isDarkTheme ? const Color(0xFF1E1E22) : Colors.white;
+        final text = isDarkTheme ? Colors.white : const Color(0xFF1E1E22);
+        final subText = isDarkTheme ? Colors.white60 : Colors.black54;
+        final border = isDarkTheme ? Colors.white12 : Colors.black12;
+
+        int subDaysRemaining = 0;
+        if (_subscriptionExpiredAt != null) {
+          try {
+            final parsed = DateTime.parse(_subscriptionExpiredAt!);
+            final diff = parsed.difference(DateTime.now());
+            if (!diff.isNegative) {
+              subDaysRemaining = diff.inDays;
+            }
+          } catch (_) {}
+        }
+
+        return DraggableScrollableSheet(
+          initialChildSize: 0.85,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          builder: (_, controller) {
+            return Container(
+              decoration: BoxDecoration(
+                color: bg,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(24),
+                  topRight: Radius.circular(24),
+                ),
+              ),
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+              child: ListView(
+                controller: controller,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: border,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Pilih Paket Layanan',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.outfit(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: text,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Pilih paket yang sesuai untuk menunjang praktik Anda',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      color: subText,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Section header: Layanan Praktik
+                  Text(
+                    '1. Layanan Praktik (Subscription)',
+                    style: GoogleFonts.outfit(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                      color: text,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildPlanCard(
+                    title: 'Standard Subscription (30 Days)',
+                    description: 'Akses penuh ke semua fitur dashboard praktik mandiri & booking pasien selama 30 hari.',
+                    price: 'Rp 1.000',
+                    isPopular: false,
+                    accentColor: const Color(0xFF00BFA6),
+                    textColor: text,
+                    subTextColor: subText,
+                    borderColor: border,
+                    onTap: () => _renewPackage('subscription_30', 1000),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Section header: Kustomisasi Profil
+                  Text(
+                    '2. Desain Profil Premium',
+                    style: GoogleFonts.outfit(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                      color: text,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildPlanCard(
+                    title: 'Premium Customizer (30 Days)',
+                    description: 'Buka kustomisasi desain profil lengkap (font nama, tagline, blur level, vignette, custom gradients) selama 30 hari.',
+                    price: 'Rp 1.000',
+                    isPopular: false,
+                    accentColor: const Color(0xFFFFB300),
+                    textColor: text,
+                    subTextColor: subText,
+                    borderColor: border,
+                    onTap: () => _renewPackage('premium_30', 1000),
+                  ),
+                  if (subDaysRemaining > 0) ...[
+                    const SizedBox(height: 8),
+                    _buildPlanCard(
+                      title: 'Premium Customizer (Sync $subDaysRemaining Days)',
+                      description: 'Sesuaikan durasi Premium Customizer Anda dengan sisa durasi Langganan Praktik Anda saat ini.',
+                      price: 'Rp 1.000',
+                      isPopular: false,
+                      accentColor: const Color(0xFFFFB300),
+                      textColor: text,
+                      subTextColor: subText,
+                      borderColor: border,
+                      onTap: () => _renewPackage('premium_sync', 1000),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  _buildPlanCard(
+                    title: 'Premium Customizer (Lifetime)',
+                    description: 'Buka kustomisasi desain profil premium. Aktif selama langganan Anda aktif. (Kehilangan status jika langganan dibiarkan kedaluwarsa).',
+                    price: 'Rp 1.000',
+                    isPopular: true,
+                    accentColor: const Color(0xFFFFB300),
+                    textColor: text,
+                    subTextColor: subText,
+                    borderColor: border,
+                    onTap: () => _renewPackage('premium_lifetime', 1000),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Section header: Mega Bundle
+                  Text(
+                    '3. Mega Bundle (Subscription + Premium)',
+                    style: GoogleFonts.outfit(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                      color: text,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildPlanCard(
+                    title: 'Mega Bundle (30 Days)',
+                    description: 'Gabungan akses Layanan Praktik & Kustomisasi Profil Premium selama 30 hari.',
+                    price: 'Rp 1.000',
+                    isPopular: false,
+                    accentColor: const Color(0xFFCB8FFF),
+                    textColor: text,
+                    subTextColor: subText,
+                    borderColor: border,
+                    onTap: () => _renewPackage('bundle_30', 1000),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildPlanCard({
+    required String title,
+    required String description,
+    required String price,
+    required bool isPopular,
+    required Color accentColor,
+    required Color textColor,
+    required Color subTextColor,
+    required Color borderColor,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isPopular ? accentColor : borderColor,
+          width: isPopular ? 2 : 1,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: GoogleFonts.outfit(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: textColor,
+                      ),
+                    ),
+                  ),
+                  if (isPopular)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: accentColor,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        'POPULER',
+                        style: GoogleFonts.outfit(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                description,
+                style: GoogleFonts.outfit(
+                  fontSize: 11,
+                  color: subTextColor,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Text(
+                    price,
+                    style: GoogleFonts.outfit(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                      color: accentColor,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: accentColor,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      'Pilih Paket',
+                      style: GoogleFonts.outfit(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _renewPackage(String packageType, int amount) async {
+    Navigator.of(context).pop(); // Close bottom sheet first
+    
+    // Show Loading Dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(
+        child: CircularProgressIndicator(color: Color(0xFF00BFA6)),
+      ),
+    );
+
+    try {
+      final client = SupabaseService.client;
+      final userId = widget.dokter['id'] as String;
+
+      // 1. Fetch current database record
+      final res = await client
+          .from('user_detail_doctor')
+          .select('subscription_expired_at, subscription_status, header_bg_settings')
+          .eq('id', userId)
+          .maybeSingle();
+
+      DateTime currentSubExpiry = DateTime.now();
+      if (res != null && res['subscription_expired_at'] != null) {
+        try {
+          final parsed = DateTime.parse(res['subscription_expired_at'].toString());
+          if (parsed.isAfter(DateTime.now())) {
+            currentSubExpiry = parsed;
+          }
+        } catch (_) {}
+      }
+
+      final bgSettings = res?['header_bg_settings'];
+      final Map<String, dynamic> settings = bgSettings is Map
+          ? Map<String, dynamic>.from(bgSettings)
+          : <String, dynamic>{};
+
+      DateTime currentPremExpiry = DateTime.now();
+      if (settings['is_premium'] == true && settings['premium_expired_at'] != 'lifetime' && settings['premium_expired_at'] != null) {
+        try {
+          final parsed = DateTime.parse(settings['premium_expired_at'].toString());
+          if (parsed.isAfter(DateTime.now())) {
+            currentPremExpiry = parsed;
+          }
+        } catch (_) {}
+      }
+
+      String newSubExpiryStr = res?['subscription_expired_at']?.toString() ?? '';
+      String newSubStatus = res?['subscription_status']?.toString() ?? 'inactive';
+
+      // 2. Determine changes based on packageType
+      if (packageType == 'subscription_30') {
+        final newExpiry = currentSubExpiry.add(const Duration(days: 30));
+        newSubExpiryStr = newExpiry.toIso8601String();
+        newSubStatus = 'active';
+      } else if (packageType == 'subscription_lifetime') {
+        newSubExpiryStr = DateTime(2099, 12, 31, 23, 59, 59).toIso8601String();
+        newSubStatus = 'active';
+      } else if (packageType == 'premium_30') {
+        settings['is_premium'] = true;
+        if (settings['premium_expired_at'] == 'lifetime') {
+          // If already lifetime, keep it lifetime
+        } else {
+          final newExpiry = currentPremExpiry.add(const Duration(days: 30));
+          settings['premium_expired_at'] = newExpiry.toIso8601String();
+        }
+      } else if (packageType == 'premium_lifetime') {
+        settings['is_premium'] = true;
+        settings['premium_expired_at'] = 'lifetime';
+      } else if (packageType == 'bundle_30') {
+        // Subs 30
+        final newSubExpiry = currentSubExpiry.add(const Duration(days: 30));
+        newSubExpiryStr = newSubExpiry.toIso8601String();
+        newSubStatus = 'active';
+        // Premium 30
+        settings['is_premium'] = true;
+        if (settings['premium_expired_at'] == 'lifetime') {
+          // Keep lifetime
+        } else {
+          final newPremExpiry = currentPremExpiry.add(const Duration(days: 30));
+          settings['premium_expired_at'] = newPremExpiry.toIso8601String();
+        }
+      } else if (packageType == 'bundle_lifetime') {
+        // Subs lifetime
+        newSubExpiryStr = DateTime(2099, 12, 31, 23, 59, 59).toIso8601String();
+        newSubStatus = 'active';
+        // Premium lifetime
+        settings['is_premium'] = true;
+        settings['premium_expired_at'] = 'lifetime';
+      }
+
+      // 3. Perform database update
+      await client
+          .from('user_detail_doctor')
+          .update({
+            'subscription_status': newSubStatus,
+            'subscription_expired_at': newSubExpiryStr,
+            'header_bg_settings': settings,
+          })
+          .eq('id', userId);
+
+      // 4. Update local state
+      setState(() {
+        _isSubscribed = newSubStatus == 'active';
+        _subscriptionExpiredAt = newSubExpiryStr;
+
+        final isPremiumField = settings['is_premium'] == true;
+        final expAt = settings['premium_expired_at'];
+        if (isPremiumField) {
+          if (expAt == 'lifetime') {
+            _isPremium = true;
+          } else if (expAt != null) {
+            try {
+              final expDate = DateTime.parse(expAt.toString());
+              _isPremium = expDate.isAfter(DateTime.now());
+            } catch (_) {
+              _isPremium = false;
+            }
+          } else {
+            _isPremium = true;
+          }
+        } else {
+          _isPremium = false;
+        }
+      });
+
+      // Close loading dialog
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+
+      // Show Success Dialog
+      _showPurchaseSuccessDialog(packageType);
+
+    } catch (e) {
+      // Close loading dialog
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+
+      // Show Error Snackbar
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Pembelian gagal: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showPurchaseSuccessDialog(String packageType) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        final isDarkTheme = widget.isDark;
+        final bg = isDarkTheme ? const Color(0xFF1E1E22) : Colors.white;
+        final text = isDarkTheme ? Colors.white : const Color(0xFF1E1E22);
+        final subText = isDarkTheme ? Colors.white60 : Colors.black54;
+
+        String packageName = '';
+        if (packageType == 'subscription_30') packageName = 'Standard Subscription (30 Hari)';
+        if (packageType == 'subscription_lifetime') packageName = 'Standard Subscription (Lifetime)';
+        if (packageType == 'premium_30') packageName = 'Premium Customizer (30 Hari)';
+        if (packageType == 'premium_lifetime') packageName = 'Premium Customizer (Lifetime)';
+        if (packageType == 'bundle_30') packageName = 'Mega Bundle (30 Hari)';
+        if (packageType == 'bundle_lifetime') packageName = 'Mega Bundle (Lifetime)';
+
+        return Dialog(
+          backgroundColor: bg,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF00BFA6),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.check_rounded,
+                    size: 40,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Pembelian Sukses!',
+                  style: GoogleFonts.outfit(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: text,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Paket $packageName Anda telah berhasil diaktifkan. Terima kasih telah menggunakan MAPOTECH!',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.outfit(
+                    fontSize: 12,
+                    color: subText,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF00BFA6),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      elevation: 0,
+                    ),
+                    child: Text(
+                      'Selesai',
+                      style: GoogleFonts.outfit(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildBgTypeRadio({
+    required String value,
+    required String title,
+    required IconData icon,
+    required Color textColor,
+    required Color themeAccent,
+  }) {
+    final isSelected = _bgType == value;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _bgType = value;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? themeAccent.withOpacity(0.08) : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? themeAccent : Colors.transparent,
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: isSelected ? themeAccent : textColor.withOpacity(0.6),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                title,
+                style: GoogleFonts.outfit(
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                  color: textColor,
+                ),
+              ),
+            ),
+            if (isSelected)
+              Icon(Icons.check_circle_rounded, size: 16, color: themeAccent),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTaglineColorOption(String colorName, Color color, bool isDark) {
+    final isSelected = _taglineColor.toLowerCase() == colorName.toLowerCase();
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _taglineColor = colorName;
+        });
+      },
+      child: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.2),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: isSelected
+                ? (isDark ? Colors.white : Colors.black)
+                : color.withOpacity(0.6),
+            width: isSelected ? 2.5 : 1,
+          ),
+        ),
+        alignment: Alignment.center,
+        child: Container(
+          width: 16,
+          height: 16,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGradientOption(String name, List<Color> colors, bool isDark) {
+    final isSelected = _gradientTheme.toLowerCase() == name.toLowerCase();
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _gradientTheme = name;
+        });
+      },
+      child: Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: isSelected
+                ? (isDark ? Colors.white : Colors.black)
+                : Colors.transparent,
+            width: isSelected ? 2.5 : 0,
+          ),
+          boxShadow: [
+            if (isSelected)
+              BoxShadow(
+                color: Colors.black.withOpacity(0.2),
+                blurRadius: 4,
+                spreadRadius: 1,
+              ),
+          ],
+        ),
+        padding: const EdgeInsets.all(2),
+        child: Container(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              colors: colors,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickAndUploadHeaderBg() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        withData: true,
+      );
+
+      if (result == null || result.files.isEmpty) return;
+
+      setState(() => _isUploadingBgImage = true);
+
+      final file = result.files.first;
+      Uint8List? bytes = file.bytes;
+      if (bytes == null && !kIsWeb && file.path != null) {
+        bytes = io.File(file.path!).readAsBytesSync();
+      }
+
+      if (bytes == null) {
+        throw Exception('Could not read file bytes.');
+      }
+
+      final fileName = file.name;
+      final userId = widget.dokter['id'] as String;
+      final storagePath = 'practice_backgrounds/$userId/${DateTime.now().millisecondsSinceEpoch}_$fileName';
+
+      // Upload to Supabase Storage
+      await SupabaseService.client.storage
+          .from('profiles')
+          .uploadBinary(storagePath, bytes);
+
+      // Get public URL
+      final publicUrl = SupabaseService.client.storage
+          .from('profiles')
+          .getPublicUrl(storagePath);
+
+      if (mounted) {
+        setState(() {
+          _customBgUrlController.text = publicUrl;
+          _isUploadingBgImage = false;
+        });
+      }
+    } catch (e) {
+      print('Upload bg failed: $e');
+      if (mounted) {
+        setState(() => _isUploadingBgImage = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal upload gambar: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+  }
+
+  TextStyle _getNameStyle(Color color) {
+    final font = _isPremium ? _nameFontFamily : 'Outfit';
+    try {
+      return GoogleFonts.getFont(
+        font,
+        fontSize: 20,
+        fontWeight: FontWeight.w900,
+        color: color,
+      );
+    } catch (_) {
+      return GoogleFonts.outfit(
+        fontSize: 20,
+        fontWeight: FontWeight.w900,
+        color: color,
+      );
+    }
+  }
+
+  TextStyle _getTaglineStyle(Color color) {
+    final font = _isPremium ? _taglineFontFamily : 'Outfit';
+    try {
+      return GoogleFonts.getFont(
+        font,
+        fontSize: 10,
+        fontWeight: FontWeight.bold,
+        color: color,
+      );
+    } catch (_) {
+      return GoogleFonts.outfit(
+        fontSize: 10,
+        fontWeight: FontWeight.bold,
+        color: color,
+      );
+    }
+  }
+
+  Color _getTaglineBgColor() {
+    switch (_taglineColor.toLowerCase()) {
+      case 'amber':
+        return Colors.amber.withOpacity(0.15);
+      case 'cyan':
+        return Colors.cyan.withOpacity(0.15);
+      case 'green':
+        return Colors.green.withOpacity(0.15);
+      case 'rose':
+        return Colors.pink.withOpacity(0.15);
+      case 'white':
+      default:
+        return Colors.white.withOpacity(0.15);
+    }
+  }
+
+  Color _getTaglineBorderColor() {
+    switch (_taglineColor.toLowerCase()) {
+      case 'amber':
+        return Colors.amber.withOpacity(0.3);
+      case 'cyan':
+        return Colors.cyan.withOpacity(0.3);
+      case 'green':
+        return Colors.green.withOpacity(0.3);
+      case 'rose':
+        return Colors.pink.withOpacity(0.3);
+      case 'white':
+      default:
+        return Colors.white.withOpacity(0.3);
+    }
+  }
+
+  Color _getTaglineIconColor() {
+    switch (_taglineColor.toLowerCase()) {
+      case 'amber':
+        return Colors.amberAccent;
+      case 'cyan':
+        return Colors.cyanAccent;
+      case 'green':
+        return Colors.greenAccent;
+      case 'rose':
+        return Colors.pinkAccent;
+      case 'white':
+      default:
+        return Colors.amber;
+    }
+  }
+
+  Color _getTaglineTextColor() {
+    switch (_taglineColor.toLowerCase()) {
+      case 'amber':
+        return Colors.amberAccent;
+      case 'cyan':
+        return Colors.cyanAccent;
+      case 'green':
+        return Colors.greenAccent;
+      case 'rose':
+        return Colors.pinkAccent;
+      case 'white':
+      default:
+        return Colors.white;
+    }
+  }
+
+  Future<void> _saveHeaderBgSettings() async {
+    setState(() => _isSavingBg = true);
+    try {
+      final client = SupabaseService.client;
+      final settings = {
+        'bg_type': _bgType,
+        'image_url': _customBgUrlController.text.trim(),
+        'name_font_family': _nameFontFamily,
+        'promo_tagline': _promoTaglineController.text.trim(),
+        'tagline_font_family': _taglineFontFamily,
+        'tagline_color': _taglineColor,
+        'gradient_theme': _gradientTheme,
+        'blur_amount': _blurAmount,
+        'overlay_opacity': _overlayOpacity,
+        'blur_style': _blurStyle,
+        'is_premium': _isPremium,
+      };
+      await client
+          .from('user_detail_doctor')
+          .update({'header_bg_settings': settings})
+          .eq('id', widget.dokter['id']);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Header background settings saved successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving background settings: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSavingBg = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(landingPageProvider);
@@ -1865,385 +3662,290 @@ class _DoctorDetailDialogState extends ConsumerState<_DoctorDetailDialog>
 
     final isMobile = MediaQuery.of(context).size.width < 600;
     final dialogWidth = isMobile ? double.infinity : 520.0;
+    final showSettings = widget.isPreview && !isMobile;
 
     return Dialog(
       insetPadding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 16 : (MediaQuery.of(context).size.width - dialogWidth) / 2,
+        horizontal: isMobile ? 16 : (MediaQuery.of(context).size.width - (dialogWidth + (showSettings ? 320 : 0))) / 2,
         vertical: 40,
       ),
       backgroundColor: Colors.transparent,
-      child: Container(
-        width: dialogWidth,
-        decoration: BoxDecoration(
-          color: cardBg,
-          borderRadius: BorderRadius.circular(28),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.2),
-              blurRadius: 40,
-              offset: const Offset(0, 16),
-            ),
-          ],
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Ã¢â€â‚¬Ã¢â€â‚¬ Header Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-            Container(
-              padding: const EdgeInsets.fromLTRB(24, 24, 16, 0),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: appearance == 'rev'
-                      ? const [Color(0xFFCB8FFF), Color(0xFFB577F2)]
-                      : (isDark
-                          ? const [Color(0xFF3A3A40), Color(0xFF252528)]
-                          : [themeAccent, themeAccent.withOpacity(0.8)]),
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Main Dialog Card
+          Container(
+            width: dialogWidth,
+            decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: showSettings
+                  ? const BorderRadius.only(
+                      topLeft: Radius.circular(28),
+                      bottomLeft: Radius.circular(28),
+                    )
+                  : BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 40,
+                  offset: const Offset(0, 16),
                 ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              ],
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // ── Header ──────────────────────────────────────────────────
+                ClipRect(
+                  child: Stack(
                     children: [
+                      Positioned.fill(
+                        child: _buildHeaderBackground(appearance, isDark, themeAccent),
+                      ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(100),
-                        ),
-                        child: Text(
-                          widget.dokter['profession']?.toString().toUpperCase() ?? 'DOKTER',
-                          style: GoogleFonts.outfit(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close_rounded, color: Colors.white),
-                        onPressed: () => Navigator.of(context).pop(),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Container(
-                        width: 72,
-                        height: 72,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.25),
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white.withOpacity(0.6), width: 2),
-                        ),
-                        alignment: Alignment.center,
-                        child: ClipOval(
-                          child: widget.dokter['avatar_url'] != null
-                              ? Image.network(
-                                  widget.dokter['avatar_url']!,
-                                  width: 72,
-                                  height: 72,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => _buildInitialsAvatar(themeAccent),
-                                )
-                              : _buildInitialsAvatar(themeAccent),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
+                        padding: const EdgeInsets.fromLTRB(24, 24, 16, 0),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              widget.dokter['name'],
-                              style: GoogleFonts.outfit(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.white,
-                              ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(100),
+                                  ),
+                                  child: Text(
+                                    widget.dokter['profession']?.toString().toUpperCase() ?? 'DOKTER',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.close_rounded, color: Colors.white),
+                                  onPressed: () => Navigator.of(context).pop(),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              widget.dokter['nama_faskes'] ?? 'Praktek Mandiri',
-                              style: GoogleFonts.outfit(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white.withOpacity(0.9),
-                              ),
+                            const SizedBox(height: 16),
+                            Row(
+                              children: [
+                                Container(
+                                  width: 72,
+                                  height: 72,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.25),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.white.withOpacity(0.6), width: 2),
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: ClipOval(
+                                    child: widget.dokter['avatar_url'] != null
+                                        ? Image.network(
+                                            widget.dokter['avatar_url']!,
+                                            width: 72,
+                                            height: 72,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) => _buildInitialsAvatar(themeAccent),
+                                          )
+                                        : _buildInitialsAvatar(themeAccent),
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        widget.dokter['name'],
+                                        style: _getNameStyle(Colors.white),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        widget.dokter['nama_faskes'] ?? 'Praktek Mandiri',
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.white.withOpacity(0.9),
+                                        ),
+                                      ),
+                                      if (_isPremium && _promoTaglineController.text.trim().isNotEmpty) ...[
+                                        const SizedBox(height: 6),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                          decoration: BoxDecoration(
+                                            color: _getTaglineBgColor(),
+                                            borderRadius: BorderRadius.circular(12),
+                                            border: Border.all(
+                                              color: _getTaglineBorderColor(),
+                                              width: 1,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                Icons.stars_rounded,
+                                                size: 11,
+                                                color: _getTaglineIconColor(),
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Flexible(
+                                                child: Text(
+                                                  _promoTaglineController.text.trim(),
+                                                  style: _getTaglineStyle(_getTaglineTextColor()),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            TabBar(
+                              controller: _tabController,
+                              indicatorColor: Colors.white,
+                              indicatorWeight: 3,
+                              labelColor: Colors.white,
+                              unselectedLabelColor: Colors.white.withOpacity(0.55),
+                              labelStyle: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w800),
+                              unselectedLabelStyle: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600),
+                              tabs: const [
+                                Tab(text: 'Detail'),
+                                Tab(text: 'Booking'),
+                                Tab(text: 'Dokumen'),
+                              ],
                             ),
                           ],
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                ),
 
-                  // Ã¢â€â‚¬Ã¢â€â‚¬ Tab Bar Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-                  TabBar(
+                // ── Tab Content ──────────────────────────────────────────────
+                Flexible(
+                  child: TabBarView(
                     controller: _tabController,
-                    indicatorColor: Colors.white,
-                    indicatorWeight: 3,
-                    labelColor: Colors.white,
-                    unselectedLabelColor: Colors.white.withOpacity(0.55),
-                    labelStyle: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w800),
-                    unselectedLabelStyle: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600),
-                    tabs: const [
-                      Tab(text: 'Detail'),
-                      Tab(text: 'Booking'),
-                      Tab(text: 'Dokumen'),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            // Ã¢â€â‚¬Ã¢â€â‚¬ Tab Content Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-            Flexible(
-              child: TabBarView(
-                controller: _tabController,
-                physics: const NeverScrollableScrollPhysics(),
-                children: [
-                  // TAB 1 Ã¢â‚¬â€ Detail
-                  SingleChildScrollView(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Action buttons
-                        Row(
+                    physics: const NeverScrollableScrollPhysics(),
+                    children: [
+                      // TAB 1 — Detail
+                      SingleChildScrollView(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            if (widget.dokter['whatsapp_number'] != null &&
-                                widget.dokter['whatsapp_number'].toString().isNotEmpty)
-                              Expanded(
-                                child: ElevatedButton.icon(
-                                  onPressed: _launchWhatsApp,
-                                  icon: const Icon(Icons.chat_bubble_outline_rounded,
-                                      size: 16, color: Colors.white),
-                                  label: Text(
-                                    'Chat WhatsApp',
-                                    style: GoogleFonts.outfit(
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 12,
-                                        color: Colors.white),
+                            // Action buttons
+                            Row(
+                              children: [
+                                if (widget.dokter['whatsapp_number'] != null &&
+                                    widget.dokter['whatsapp_number'].toString().isNotEmpty)
+                                  Expanded(
+                                    child: ElevatedButton.icon(
+                                      onPressed: _launchWhatsApp,
+                                      icon: const Icon(Icons.chat_bubble_outline_rounded,
+                                          size: 16, color: Colors.white),
+                                      label: Text(
+                                        'Chat WhatsApp',
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w800,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF27AE60),
+                                        padding: const EdgeInsets.symmetric(vertical: 16),
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(14)),
+                                        elevation: 0,
+                                      ),
+                                    ),
                                   ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF27AE60),
-                                    padding: const EdgeInsets.symmetric(vertical: 14),
-                                    shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12)),
-                                    elevation: 0,
+                                if (widget.dokter['whatsapp_number'] != null &&
+                                    widget.dokter['whatsapp_number'].toString().isNotEmpty &&
+                                    widget.dokter['google_maps_link'] != null &&
+                                    widget.dokter['google_maps_link'].toString().isNotEmpty)
+                                  const SizedBox(width: 12),
+                                if (widget.dokter['google_maps_link'] != null &&
+                                    widget.dokter['google_maps_link'].toString().isNotEmpty)
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      onPressed: _launchMaps,
+                                      icon: Icon(Icons.map_outlined, size: 16, color: themeAccent),
+                                      label: Text(
+                                        'Buka Peta',
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w800,
+                                          color: themeAccent,
+                                        ),
+                                      ),
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: themeAccent,
+                                        side: BorderSide(color: themeAccent, width: 1.5),
+                                        padding: const EdgeInsets.symmetric(vertical: 16),
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(14)),
+                                      ),
+                                    ),
                                   ),
-                                ),
-                              ),
-                            if (widget.dokter['whatsapp_number'] != null &&
-                                widget.dokter['whatsapp_number'].toString().isNotEmpty &&
-                                _hasMapsLink())
-                              const SizedBox(width: 12),
-                            if (_hasMapsLink())
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  onPressed: _launchMaps,
-                                  icon: Icon(Icons.map_outlined, size: 16, color: themeAccent),
-                                  label: Text(
-                                    'Buka Peta',
-                                    style: GoogleFonts.outfit(
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 12,
-                                        color: themeAccent),
-                                  ),
-                                  style: OutlinedButton.styleFrom(
-                                    side: BorderSide(color: themeAccent, width: 1.5),
-                                    padding: const EdgeInsets.symmetric(vertical: 14),
-                                    shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12)),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        if ((widget.dokter['whatsapp_number'] != null &&
-                                widget.dokter['whatsapp_number'].toString().isNotEmpty) ||
-                            _hasMapsLink())
-                          const SizedBox(height: 24),
+                              ],
+                            ),
+                            if ((widget.dokter['whatsapp_number'] != null &&
+                                    widget.dokter['whatsapp_number'].toString().isNotEmpty) ||
+                                (widget.dokter['google_maps_link'] != null &&
+                                    widget.dokter['google_maps_link'].toString().isNotEmpty))
+                              const SizedBox(height: 24),
 
-                        // Tentang Praktik
-                        _buildSectionHeader(
-                            'Tentang Praktik', Icons.info_outline_rounded, themeAccent, textColor),
-                        const SizedBox(height: 8),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: sectionBg,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: borderColor),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                widget.dokter['about'] != null &&
-                                        widget.dokter['about'].toString().trim().isNotEmpty
-                                    ? widget.dokter['about']
-                                    : 'Praktik Mandiri ${widget.dokter['name']} siap melayani konsultasi dan pemeriksaan medis umum.',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 12,
-                                  color: subtitleColor,
-                                  height: 1.5,
-                                ),
+                            // Tentang Praktik
+                            _buildSectionHeader(
+                                'Tentang Praktik',
+                                Icons.info_outline_rounded,
+                                themeAccent,
+                                textColor),
+                            const SizedBox(height: 8),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: sectionBg,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: borderColor),
                               ),
-                              const SizedBox(height: 12),
-                              Row(
+                              child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Icon(Icons.location_on_outlined, size: 16, color: themeAccent),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      _formatFullAddress(),
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 11,
-                                        color: subtitleColor,
-                                        fontWeight: FontWeight.w600,
-                                      ),
+                                  Text(
+                                    _formatFullAddress().isNotEmpty
+                                        ? _formatFullAddress()
+                                        : 'Alamat praktik tidak tersedia.',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                      color: textColor,
+                                      height: 1.5,
                                     ),
                                   ),
                                 ],
                               ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-
-                        // Informasi Layanan (BPJS only, no tarif)
-                        _buildSectionHeader(
-                            'Informasi Layanan',
-                            Icons.medical_services_outlined,
-                            themeAccent,
-                            textColor),
-                        const SizedBox(height: 8),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: sectionBg,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: borderColor),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                widget.dokter['is_bpjs'] == true
-                                    ? Icons.verified_rounded
-                                    : Icons.info_outline_rounded,
-                                size: 18,
-                                color: widget.dokter['is_bpjs'] == true
-                                    ? const Color(0xFF27AE60)
-                                    : subtitleColor,
-                              ),
-                              const SizedBox(width: 10),
-                              Text(
-                                widget.dokter['is_bpjs'] == true
-                                    ? 'Melayani BPJS'
-                                    : 'Pasien Umum',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 13,
-                                  color: widget.dokter['is_bpjs'] == true
-                                      ? const Color(0xFF27AE60)
-                                      : textColor,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-
-                        // Statistik Pasien
-                        _buildSectionHeader(
-                            'Statistik Pasien',
-                            Icons.people_alt_outlined,
-                            themeAccent,
-                            textColor),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Container(
-                                padding: const EdgeInsets.all(14),
-                                decoration: BoxDecoration(
-                                  color: sectionBg,
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(color: borderColor),
-                                ),
-                                child: Column(
-                                  children: [
-                                    Icon(Icons.how_to_reg_rounded, size: 22, color: themeAccent),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      '${widget.dokter['finished_total'] ?? 0}',
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.w900,
-                                        color: textColor,
-                                      ),
-                                    ),
-                                    Text(
-                                      'Total Diperiksa',
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w600,
-                                        color: subtitleColor,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Container(
-                                padding: const EdgeInsets.all(14),
-                                decoration: BoxDecoration(
-                                  color: sectionBg,
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(color: borderColor),
-                                ),
-                                child: Column(
-                                  children: [
-                                    Icon(Icons.today_rounded, size: 22, color: const Color(0xFF27AE60)),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      '${widget.dokter['active_today'] ?? 0}',
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.w900,
-                                        color: textColor,
-                                      ),
-                                    ),
-                                    Text(
-                                      'Pasien Hari Ini',
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w600,
-                                        color: subtitleColor,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
+                            const SizedBox(height: 24),
 
                         // Jadwal Praktik
                         _buildSectionHeader(
@@ -2308,6 +4010,31 @@ class _DoctorDetailDialogState extends ConsumerState<_DoctorDetailDialog>
             ),
           ],
         ),
+      ),
+      
+      // Settings Card on the Right (Customization Panel)
+      if (showSettings)
+        Container(
+          width: 320,
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E1E22) : const Color(0xFFF3F4F6),
+            borderRadius: const BorderRadius.only(
+              topRight: Radius.circular(28),
+              bottomRight: Radius.circular(28),
+            ),
+            border: Border(
+              left: BorderSide(color: borderColor),
+            ),
+          ),
+          child: _buildPreviewSettingsPanel(
+            isDark,
+            textColor,
+            subtitleColor,
+            themeAccent,
+            borderColor,
+          ),
+        ),
+        ],
       ),
     );
   }

@@ -1204,6 +1204,100 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
         ? (bpjsCount / totalPatientsWithRecords) * 100
         : 22.0;
 
+    // Month-over-Month (MoM) Percentage Calculations
+    DateTime latestMonthDate = DateTime.now();
+    if (_ledger.isNotEmpty) {
+      DateTime latest = _ledger
+          .map((e) => e.rawDate)
+          .whereType<DateTime>()
+          .fold(DateTime(1970), (prev, el) => el.isAfter(prev) ? el : prev);
+      if (latest.year > 1970) {
+        latestMonthDate = latest;
+      }
+    } else if (_patientSyncList.isNotEmpty) {
+      DateTime latest = _patientSyncList
+          .map((e) => e['raw_date'] as DateTime?)
+          .whereType<DateTime>()
+          .fold(DateTime(1970), (prev, el) => el.isAfter(prev) ? el : prev);
+      if (latest.year > 1970) {
+        latestMonthDate = latest;
+      }
+    }
+
+    final int currentYear = latestMonthDate.year;
+    final int currentMonth = latestMonthDate.month;
+
+    // Previous month details
+    final int prevYear = currentMonth == 1 ? currentYear - 1 : currentYear;
+    final int prevMonth = currentMonth == 1 ? 12 : currentMonth - 1;
+
+    // Total Income & Expense for Current Month
+    final double currentMonthIncome = _ledger
+        .where((e) => e.tipe == 'Pemasukan' && e.rawDate != null && e.rawDate!.year == currentYear && e.rawDate!.month == currentMonth)
+        .map((e) => e.jumlah)
+        .fold(0.0, (prev, element) => prev + element);
+
+    final double prevMonthIncome = _ledger
+        .where((e) => e.tipe == 'Pemasukan' && e.rawDate != null && e.rawDate!.year == prevYear && e.rawDate!.month == prevMonth)
+        .map((e) => e.jumlah)
+        .fold(0.0, (prev, element) => prev + element);
+
+    // Total Expenses for Current Month
+    final double currentMonthExpense = _ledger
+        .where((e) => e.tipe == 'Pengeluaran' && e.rawDate != null && e.rawDate!.year == currentYear && e.rawDate!.month == currentMonth)
+        .map((e) => e.jumlah)
+        .fold(0.0, (prev, element) => prev + element);
+
+    final double prevMonthExpense = _ledger
+        .where((e) => e.tipe == 'Pengeluaran' && e.rawDate != null && e.rawDate!.year == prevYear && e.rawDate!.month == prevMonth)
+        .map((e) => e.jumlah)
+        .fold(0.0, (prev, element) => prev + element);
+
+    // Net Profit
+    final double currentMonthNetProfit = currentMonthIncome - currentMonthExpense;
+    final double prevMonthNetProfit = prevMonthIncome - prevMonthExpense;
+
+    // Patients
+    final int currentMonthPatients = _patientSyncList
+        .where((e) => e['raw_date'] != null && (e['raw_date'] as DateTime).year == currentYear && (e['raw_date'] as DateTime).month == currentMonth && e['patient_id'] != null)
+        .map((e) => e['patient_id'] as String)
+        .toSet()
+        .length;
+
+    final int prevMonthPatients = _patientSyncList
+        .where((e) => e['raw_date'] != null && (e['raw_date'] as DateTime).year == prevYear && (e['raw_date'] as DateTime).month == prevMonth && e['patient_id'] != null)
+        .map((e) => e['patient_id'] as String)
+        .toSet()
+        .length;
+
+    // Helper for formatting percentage change
+    String calculatePercentChange(double current, double previous) {
+      if (previous == 0) {
+        if (current > 0) return '+100%';
+        if (current < 0) return '-100%';
+        return '0%';
+      }
+      final double change = ((current - previous) / previous.abs()) * 100;
+      if (change == 0) return '0%';
+      final String sign = change > 0 ? '+' : '';
+      if (change.toStringAsFixed(1).endsWith('.0')) {
+        return '$sign${change.toStringAsFixed(0)}%';
+      }
+      return '$sign${change.toStringAsFixed(1)}%';
+    }
+
+    final String incomePercentStr = calculatePercentChange(currentMonthIncome, prevMonthIncome);
+    final bool isIncomePercentRed = !incomePercentStr.startsWith('+') && incomePercentStr != '0%';
+
+    final String expensePercentStr = calculatePercentChange(currentMonthExpense, prevMonthExpense);
+    final bool isExpensePercentRed = expensePercentStr.startsWith('+');
+
+    final String profitPercentStr = calculatePercentChange(currentMonthNetProfit, prevMonthNetProfit);
+    final bool isProfitPercentRed = !profitPercentStr.startsWith('+') && profitPercentStr != '0%';
+
+    final String patientsPercentStr = calculatePercentChange(currentMonthPatients.toDouble(), prevMonthPatients.toDouble());
+    final bool isPatientsPercentRed = !patientsPercentStr.startsWith('+') && patientsPercentStr != '0%';
+
     if (_isLoading) {
       return const SkeletonScope(child: SkeletonPembukuan());
     }
@@ -1400,7 +1494,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
               crossAxisCount: isMobile ? 2 : 4,
               crossAxisSpacing: 16,
               mainAxisSpacing: 16,
-              childAspectRatio: 1.6,
+              childAspectRatio: isMobile ? 1.4 : 1.6,
               children: [
                 _buildMetricCard(
                   Icons.trending_up_rounded,
@@ -1411,8 +1505,8 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                   cardBg,
                   borderColor,
                   'Gross Month Revenue',
-                  badgeText: '-96%',
-                  isBadgeRed: true,
+                  badgeText: incomePercentStr,
+                  isBadgeRed: isIncomePercentRed,
                 ),
                 _buildMetricCard(
                   Icons.trending_down_rounded,
@@ -1423,8 +1517,8 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                   cardBg,
                   borderColor,
                   'Clinic operational cost',
-                  badgeText: '+100%',
-                  isBadgeRed: false,
+                  badgeText: expensePercentStr,
+                  isBadgeRed: isExpensePercentRed,
                 ),
                 _buildMetricCard(
                   Icons.account_balance_wallet_rounded,
@@ -1435,8 +1529,8 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                   cardBg,
                   borderColor,
                   'Gross - Operational Costs',
-                  badgeText: '+1.63%',
-                  isBadgeRed: false,
+                  badgeText: profitPercentStr,
+                  isBadgeRed: isProfitPercentRed,
                 ),
                 _buildMetricCard(
                   Icons.people_alt_rounded,
@@ -1447,6 +1541,8 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                   cardBg,
                   borderColor,
                   'BPJS vs General Split',
+                  badgeText: patientsPercentStr,
+                  isBadgeRed: isPatientsPercentRed,
                   patientsBadges: ['BPJS $bpjsCount', 'General $generalCount'],
                 ),
               ],
@@ -3834,97 +3930,153 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
     bool isBadgeRed = false,
     List<String>? patientsBadges,
   }) {
+    // Elegant theme-based dynamic color scheme for background glow and icon tint
+    final Color primaryColor = valueCol;
+    final Color iconBg = primaryColor.withOpacity(0.08);
+
+    // Dynamic badge coloring
+    final Color badgeBg = isBadgeRed 
+        ? Colors.redAccent.withOpacity(0.08) 
+        : const Color(0xFF48C9B0).withOpacity(0.08);
+    final Color badgeBorder = isBadgeRed 
+        ? Colors.redAccent.withOpacity(0.2) 
+        : const Color(0xFF48C9B0).withOpacity(0.2);
+    final Color badgeTextCol = isBadgeRed 
+        ? Colors.redAccent 
+        : const Color(0xFF48C9B0);
+
     return Container(
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: border),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: border, width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          // Top Row: Icon + Label (left), Badge (right)
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                label,
-                style: GoogleFonts.outfit(
-                  fontSize: 8,
-                  fontWeight: FontWeight.w900,
-                  color: subCol,
-                  letterSpacing: 0.5,
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(5),
+                      decoration: BoxDecoration(
+                        color: iconBg,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        icon,
+                        size: 13,
+                        color: primaryColor,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: GoogleFonts.outfit(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w900,
+                          color: subCol,
+                          letterSpacing: 0.5,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
               ),
+              const SizedBox(width: 4),
               if (badgeText != null)
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color:
-                        (isBadgeRed
-                                ? Colors.redAccent
-                                : const Color(0xFF48C9B0))
-                            .withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    badgeText,
-                    style: GoogleFonts.outfit(
-                      fontSize: 7,
-                      fontWeight: FontWeight.w900,
-                      color: isBadgeRed
-                          ? Colors.redAccent
-                          : const Color(0xFF48C9B0),
-                    ),
-                  ),
-                )
-              else
-                Icon(icon, size: 14, color: subCol.withOpacity(0.5)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: GoogleFonts.outfit(
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
-              color: valueCol,
-            ),
-          ),
-          const SizedBox(height: 2),
-          if (patientsBadges != null)
-            Row(
-              children: patientsBadges.map((b) {
-                final isBpjs = b.startsWith('BPJS');
-                return Container(
-                  margin: const EdgeInsets.only(right: 6),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 5,
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color:
-                        (isBpjs ? Colors.blueAccent : const Color(0xFF48C9B0))
-                            .withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(4),
+                    color: badgeBg,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: badgeBorder, width: 1),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        badgeText == '0%' 
+                            ? Icons.trending_flat_rounded
+                            : (isBadgeRed ? Icons.trending_down_rounded : Icons.trending_up_rounded),
+                        size: 9,
+                        color: badgeText == '0%' ? subCol : badgeTextCol,
+                      ),
+                      const SizedBox(width: 1.5),
+                      Text(
+                        badgeText,
+                        style: GoogleFonts.outfit(
+                          fontSize: 8,
+                          fontWeight: FontWeight.w900,
+                          color: badgeText == '0%' ? subCol : badgeTextCol,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          
+          const SizedBox(height: 10),
+          
+          // Value Row
+          Text(
+            value,
+            style: GoogleFonts.outfit(
+              fontSize: 19,
+              fontWeight: FontWeight.w900,
+              color: valueCol,
+              letterSpacing: -0.5,
+            ),
+          ),
+          
+          const SizedBox(height: 4),
+
+          // Bottom Row: Patient Badges or Subtitle Description
+          if (patientsBadges != null)
+            Row(
+              children: patientsBadges.map((b) {
+                final isBpjs = b.startsWith('BPJS');
+                final badgeColor = isBpjs ? Colors.blueAccent : const Color(0xFF48C9B0);
+                return Container(
+                  margin: const EdgeInsets.only(right: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 1.5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: badgeColor.withOpacity(0.06),
+                    borderRadius: BorderRadius.circular(5),
                     border: Border.all(
-                      color:
-                          (isBpjs ? Colors.blueAccent : const Color(0xFF48C9B0))
-                              .withOpacity(0.2),
+                      color: badgeColor.withOpacity(0.18),
+                      width: 1,
                     ),
                   ),
                   child: Text(
                     b,
                     style: GoogleFonts.outfit(
-                      fontSize: 6.5,
+                      fontSize: 7.5,
                       fontWeight: FontWeight.w900,
-                      color: isBpjs
-                          ? Colors.blueAccent
-                          : const Color(0xFF48C9B0),
+                      color: badgeColor,
                     ),
                   ),
                 );
@@ -3934,8 +4086,8 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
             Text(
               subtitleDesc,
               style: GoogleFonts.outfit(
-                fontSize: 7.5,
-                color: subCol,
+                fontSize: 8.5,
+                color: subCol.withOpacity(0.8),
                 fontWeight: FontWeight.bold,
               ),
             ),

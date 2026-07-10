@@ -1862,6 +1862,7 @@ class SupabaseService {
             'finished_total': queueInfo?['finished_total'] ?? 0,
             'practice_licenses': docMap['practice_licenses'],
             'google_maps_link': docMap['google_maps_link'] ?? '',
+            'header_bg_settings': docMap['header_bg_settings'],
           });
         }
       }
@@ -1885,13 +1886,15 @@ class SupabaseService {
         schema: 'private_doctor',
       );
       final noQueue = (existing.length + 1).toString().padLeft(3, '0');
+      final hourStr = date.hour.toString().padLeft(2, '0');
+      final minuteStr = date.minute.toString().padLeft(2, '0');
       await _post('queue', {
         'id_doctor': doctorId,
         'id_patient': patientId,
         'no_queue': noQueue,
         'patient_type': 'umum',
         'date_queue': dateStr,
-        'date_queue_ts': '${dateStr}T00:00:00',
+        'date_queue_ts': '${dateStr}T$hourStr:$minuteStr:00',
       }, schema: 'private_doctor');
     } catch (e) {
       throw Exception('Gagal membuat booking: $e');
