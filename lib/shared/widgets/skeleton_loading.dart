@@ -95,6 +95,28 @@ class SkeletonBox extends StatelessWidget {
   }
 }
 
+class SkeletonLoading extends StatelessWidget {
+  final double? width;
+  final double? height;
+  final double? borderRadius;
+
+  const SkeletonLoading({
+    super.key,
+    this.width,
+    this.height,
+    this.borderRadius,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SkeletonBox(
+      width: width,
+      height: height,
+      borderRadius: borderRadius != null ? BorderRadius.circular(borderRadius!) : null,
+    );
+  }
+}
+
 // 1. SkeletonQueueList - Doctor Queue List
 class SkeletonQueueList extends StatelessWidget {
   const SkeletonQueueList({super.key});

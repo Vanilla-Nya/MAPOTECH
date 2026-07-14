@@ -15,6 +15,10 @@ class ResepObat {
   final String time;
   final bool sudahDiambil;
   final List<ObatItem> obatList;
+  final String? certificateDescription;
+  final SuratRujukan? suratRujukan;
+  final SuratSakitEntry? suratSakit;
+  final SuratSehatEntry? suratSehat;
 
   const ResepObat({
     required this.id,
@@ -23,6 +27,40 @@ class ResepObat {
     required this.time,
     required this.sudahDiambil,
     required this.obatList,
+    this.certificateDescription,
+    this.suratRujukan,
+    this.suratSakit,
+    this.suratSehat,
+  });
+}
+
+class SuratRujukan {
+  final String namaRs;
+  final String poli;
+  final String noSurat;
+
+  const SuratRujukan({required this.namaRs, required this.poli, required this.noSurat});
+}
+
+class SuratSakitEntry {
+  final int jumlahHari;
+  final String mulaiTanggal;
+  final String selesaiTanggal;
+  final String riwayatPenyakit;
+
+  const SuratSakitEntry({
+    required this.jumlahHari,
+    required this.mulaiTanggal,
+    required this.selesaiTanggal,
+    required this.riwayatPenyakit,
+  });
+}
+
+class SuratSehatEntry {
+  final String keperluan;
+
+  const SuratSehatEntry({
+    required this.keperluan,
   });
 }
 
@@ -85,6 +123,8 @@ class _PasienPrescriptionState extends ConsumerState<PasienPrescription> {
     setState(() => _isLoading = true);
     try {
       final String patientName = user['name'] ?? '';
+      
+      // 1. Fetch External Prescriptions from apotek DB
       final rawRx = await _db.fetchAllPrescriptions();
       final List<ResepObat> loaded = [];
 
@@ -92,11 +132,23 @@ class _PasienPrescriptionState extends ConsumerState<PasienPrescription> {
         final notes = rx['notes'] ?? '';
         String pName = 'Umum / Walk-in';
         String dName = 'Resep Manual';
+        List<ObatItem> obatList = [];
         try {
           if (notes.startsWith('{')) {
             final decoded = jsonDecode(notes);
             pName = decoded['patientName'] ?? pName;
             dName = decoded['doctorName'] ?? dName;
+            final items = decoded['items'] as List<dynamic>?;
+            if (items != null) {
+              obatList = items.map((item) {
+                return ObatItem(
+                  nama: item['name'] ?? item['medicine_name'] ?? 'Obat',
+                  aturan: item['dosage'] ?? item['rules'] ?? item['aturan'] ?? '3 x 1',
+                  jumlah: int.tryParse(item['qty']?.toString() ?? item['quantity']?.toString() ?? '10') ?? 10,
+                  badge: 'E-RESEP',
+                );
+              }).toList();
+            }
           } else if (notes.contains('|')) {
             pName = notes.split('|').first.trim();
           } else {
@@ -109,18 +161,93 @@ class _PasienPrescriptionState extends ConsumerState<PasienPrescription> {
           final String dateRaw = rx['prescription_date'] ?? '';
           final bool statusDiambil = rx['status'] == 'checked_out';
           
+          if (obatList.isEmpty) {
+            obatList = const [
+              ObatItem(nama: 'Paracetamol 500mg', aturan: '3 x 1', jumlah: 10, badge: 'E-RESEP'),
+              ObatItem(nama: 'Amoxicillin 500mg', aturan: '3 x 1', jumlah: 10, badge: 'E-RESEP'),
+            ];
+          }
+
           loaded.add(ResepObat(
             id: id,
             doctorName: dName,
             date: _formatDate(dateRaw),
             time: '08:00',
             sudahDiambil: statusDiambil,
-            obatList: const [
-              ObatItem(nama: 'Paracetamol 500mg', aturan: '3 x 1', jumlah: 10, badge: 'E-RESEP'),
-              ObatItem(nama: 'Amoxicillin 500mg', aturan: '3 x 1', jumlah: 10, badge: 'E-RESEP'),
-            ],
+            obatList: obatList,
           ));
         }
+      }
+
+      // 2. Fetch Doctor Checkup E-Prescriptions and Certificates
+      final rawQueues = await _db.fetchPatientQueues(user['id']);
+      final queueIds = rawQueues.map((q) => q['id'] as String).toList();
+      final privateEncounters = await _db.fetchPrivateClinicalEncounters(queueIds);
+
+      for (final ce in privateEncounters) {
+        final encounterId = ce['id'] as String?;
+        if (encounterId == null) continue;
+
+        final qItem = rawQueues.firstWhere((q) => q['id'] == ce['id_queue'], orElse: () => <String, dynamic>{});
+        final doctorId = qItem['id_doctor'] ?? '';
+        String doctorName = 'dr. Agoes Soetanto';
+        if (doctorId.isNotEmpty) {
+          final docUser = await _db.fetchUserById(doctorId);
+          if (docUser != null) {
+            doctorName = docUser['name'] ?? doctorName;
+          }
+        }
+
+        final dateRaw = qItem['date_queue'] ?? '';
+        final dateFormatted = _formatDate(dateRaw);
+        
+        final dbMedicines = await _db.fetchClinicalEncounterMedicines(encounterId);
+        final certType = ce['surat_keterangan_type']?.toString();
+        final hasRujukan = ce['is_rujukan'] == true;
+
+        if (dbMedicines.isEmpty && certType == null && !hasRujukan) {
+          continue; // Nothing to show here
+        }
+
+        final List<ObatItem> obatList = dbMedicines.map((m) => ObatItem(
+          nama: m['name'] ?? 'Obat',
+          aturan: m['rules'] ?? '3 x 1',
+          jumlah: m['quantity'] ?? 10,
+          badge: 'E-RESEP',
+        )).toList();
+
+        String? certDesc;
+        if (certType == 'sakit') {
+          certDesc = 'Surat Sakit (${ce['surat_sakit_hari']} Hari)';
+        } else if (certType == 'sehat') {
+          certDesc = 'Surat Sehat (${ce['surat_keperluan']})';
+        } else if (hasRujukan) {
+          certDesc = 'Surat Rujukan (${ce['rujukan_rumah_sakit']})';
+        }
+
+        loaded.add(ResepObat(
+          id: encounterId,
+          doctorName: doctorName,
+          date: dateFormatted,
+          time: '09:00',
+          sudahDiambil: true, 
+          obatList: obatList,
+          certificateDescription: certDesc,
+          suratRujukan: hasRujukan ? SuratRujukan(
+            namaRs: ce['rujukan_rumah_sakit'] ?? 'RSUD dr. H. Koesnadi',
+            poli: ce['rujukan_poli'] ?? 'Spesialis',
+            noSurat: ce['rujukan_nomor'] ?? 'REF-MOCK',
+          ) : null,
+          suratSakit: certType == 'sakit' ? SuratSakitEntry(
+            jumlahHari: int.tryParse(ce['surat_sakit_hari']?.toString() ?? '3') ?? 3,
+            mulaiTanggal: ce['surat_sakit_mulai'] != null ? _formatDate(ce['surat_sakit_mulai'].toString().split('T').first) : dateFormatted,
+            selesaiTanggal: ce['surat_sakit_selesai'] != null ? _formatDate(ce['surat_sakit_selesai'].toString().split('T').first) : dateFormatted,
+            riwayatPenyakit: ce['surat_riwayat_penyakit'] ?? '',
+          ) : null,
+          suratSehat: certType == 'sehat' ? SuratSehatEntry(
+            keperluan: ce['surat_keperluan'] ?? '',
+          ) : null,
+        ));
       }
 
       setState(() {
@@ -596,6 +723,132 @@ class _ResepDetailDialog extends ConsumerWidget {
                           greenColor,
                         ),
                       )),
+
+                  // Certificates section if present
+                  if (resep.certificateDescription != null) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(100),
+                        border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.verified_user_rounded, size: 12, color: Colors.blue),
+                          const SizedBox(width: 6),
+                          Text(
+                            resep.certificateDescription!.toUpperCase(),
+                            style: GoogleFonts.outfit(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.blue,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  if (resep.suratRujukan != null) ...[
+                    const SizedBox(height: 14),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF3498DB).withOpacity(0.06),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF3498DB).withOpacity(0.15)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'SURAT RUJUKAN ELEKTRONIK',
+                            style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.w900, color: const Color(0xFF3498DB), letterSpacing: 0.5),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Dirujuk Ke: ${resep.suratRujukan!.namaRs}',
+                            style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: textColor),
+                          ),
+                          Text(
+                            'Spesialis / Poli: ${resep.suratRujukan!.poli} • No: ${resep.suratRujukan!.noSurat}',
+                            style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  if (resep.suratSakit != null) ...[
+                    const SizedBox(height: 14),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.06),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.orange.withOpacity(0.15)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'SURAT KETERANGAN SAKIT DIGITAL',
+                            style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.w900, color: Colors.orange, letterSpacing: 0.5),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Diberikan istirahat selama ${resep.suratSakit!.jumlahHari} hari',
+                            style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: textColor),
+                          ),
+                          Text(
+                            'Mulai: ${resep.suratSakit!.mulaiTanggal} s/d ${resep.suratSakit!.selesaiTanggal}',
+                            style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
+                          ),
+                          if (resep.suratSakit!.riwayatPenyakit.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4.0),
+                              child: Text(
+                                'Diagnosis/Riwayat: ${resep.suratSakit!.riwayatPenyakit}',
+                                style: GoogleFonts.outfit(fontSize: 9, color: subtitleColor, fontStyle: FontStyle.italic),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  if (resep.suratSehat != null) ...[
+                    const SizedBox(height: 14),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withOpacity(0.06),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.green.withOpacity(0.15)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'SURAT KETERANGAN SEHAT DIGITAL',
+                            style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.w900, color: Colors.green, letterSpacing: 0.5),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Kondisi: Sehat Walafiat',
+                            style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: textColor),
+                          ),
+                          Text(
+                            'Keperluan: ${resep.suratSehat!.keperluan}',
+                            style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
 
                   const SizedBox(height: 8),
 

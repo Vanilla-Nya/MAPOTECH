@@ -1,0 +1,12 @@
+- [x] Unlocked Puskesmas & Ponkesdes Dashboards and registration
+- [x] Standardized dashboard layouts and removed duplicate settings buttons from drawer
+- [x] Migrated database schemas for public health center details and village clinic details
+- [x] Implemented premium tabbed profiles for both Puskesmas and Ponkesdes
+  - [x] Hero Profile header card with banner, info labels, and button
+  - [x] "View Patient Perspective" feature linked to DoctorDetailDialog
+  - [x] Profile picture upload dialog with "Upload File" and "Input Link URL" tabs
+  - [x] Weekly Practice/Operational Schedule day row builders and database persistence (using `doctor_schedules` table)
+  - [x] Interactive Location Practice Google Maps preview & integration (using WebMapWidget)
+  - [x] Search & Registration switches (Show Profile in Search, Serve BPJS Patients, Profession selection)
+  - [x] Tabbed API Linkage Settings (SatuSehat, BPJS, Mobile JKN inputs)
+- [x] Expanded Patient search (Masyarakat) to allow searching and filtering for Puskesmas and Ponkesdes facilities

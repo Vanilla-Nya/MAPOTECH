@@ -523,6 +523,44 @@ class SupabaseService {
     return null;
   }
 
+  // Fetch public health center (puskesmas) details by user ID
+  Future<Map<String, dynamic>?> fetchPuskesmasDetail(String id) async {
+    try {
+      final details = await _get(
+        'user_detail_public_health_center?select=*&id=eq.$id',
+        schema: 'public',
+      );
+      if (details.isNotEmpty) {
+        return details.first as Map<String, dynamic>;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  // Save public health center (puskesmas) details
+  Future<void> savePuskesmasDetail(String id, Map<String, dynamic> data) async {
+    await _patch('user_detail_public_health_center?id=eq.$id', data, schema: 'public');
+  }
+
+  // Fetch village clinic (ponkesdes) details by user ID
+  Future<Map<String, dynamic>?> fetchPonkesdesDetail(String id) async {
+    try {
+      final details = await _get(
+        'user_detail_village_clinic?select=*&id=eq.$id',
+        schema: 'public',
+      );
+      if (details.isNotEmpty) {
+        return details.first as Map<String, dynamic>;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  // Save village clinic (ponkesdes) details
+  Future<void> savePonkesdesDetail(String id, Map<String, dynamic> data) async {
+    await _patch('user_detail_village_clinic?id=eq.$id', data, schema: 'public');
+  }
+
   // Update patient profile data in the database
   Future<void> updatePatientProfile(
     String userId,
@@ -562,6 +600,177 @@ class SupabaseService {
       return [];
     }
   }
+
+  // Fetch private clinical encounters directly from the private_doctor schema (for detailed columns)
+  Future<List<Map<String, dynamic>>> fetchPrivateClinicalEncounters(
+    List<String> queueIds,
+  ) async {
+    if (queueIds.isEmpty) return [];
+    try {
+      final res = await client
+          .schema('private_doctor')
+          .from('clinical_encounters')
+          .select('*')
+          .inFilter('id_queue', queueIds);
+      return List<Map<String, dynamic>>.from(res as List);
+    } catch (e) {
+      print('Error fetching private clinical encounters: $e');
+      return [];
+    }
+  }
+
+  // Fetch diagnoses associated with a clinical encounter
+  Future<List<Map<String, dynamic>>> fetchClinicalEncounterDiagnoses(
+    String encounterId,
+  ) async {
+    try {
+      final res = await client
+          .schema('private_doctor')
+          .from('icdx_ecounter')
+          .select('*')
+          .eq('id_clinical_ecounters', encounterId);
+      return List<Map<String, dynamic>>.from(res as List);
+    } catch (e) {
+      print('Error fetching encounter diagnoses: $e');
+      return [];
+    }
+  }
+
+  // Fetch vital signs associated with a clinical encounter
+  Future<Map<String, dynamic>?> fetchEncounterVitals(String encounterId) async {
+    try {
+      final res = await client
+          .schema('private_doctor')
+          .from('vital_signs')
+          .select('*')
+          .eq('id_clinical_ecounter', encounterId)
+          .maybeSingle();
+      return res as Map<String, dynamic>?;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // Fetch anamnesis associated with a clinical encounter
+  Future<Map<String, dynamic>?> fetchEncounterAnamnesis(String encounterId) async {
+    try {
+      final res = await client
+          .schema('private_doctor')
+          .from('anamnesis_ecounter')
+          .select('*')
+          .eq('id_clinical_ecounter', encounterId)
+          .maybeSingle();
+      return res as Map<String, dynamic>?;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // Fetch medicines and manual prescriptions associated with a clinical encounter
+  Future<List<Map<String, dynamic>>> fetchClinicalEncounterMedicines(
+    String encounterId,
+  ) async {
+    final List<Map<String, dynamic>> medicinesList = [];
+    try {
+      // 1. Catalog medicines from medicine_ecounter
+      final medicinesRes = await client
+          .schema('private_doctor')
+          .from('medicine_ecounter')
+          .select('quantity, id_detail_medicine')
+          .eq('id_clinical_encounters', encounterId);
+
+      for (final medRow in medicinesRes) {
+        final qty = double.tryParse(medRow['quantity']?.toString() ?? '0') ?? 0.0;
+        final detailMedId = medRow['id_detail_medicine'];
+        if (detailMedId != null) {
+          final dmRes = await client
+              .schema('private_doctor')
+              .from('detail_medicine')
+              .select('id_medicine')
+              .eq('id', detailMedId)
+              .maybeSingle();
+
+          if (dmRes != null) {
+            final medId = dmRes['id_medicine'];
+            String medicineName = 'Obat';
+            if (medId != null) {
+              final mRes = await client
+                  .schema('private_doctor')
+                  .from('medicine')
+                  .select('medicine_name')
+                  .eq('id', medId)
+                  .maybeSingle();
+              if (mRes != null) {
+                medicineName = mRes['medicine_name']?.toString() ?? 'Obat';
+              }
+            }
+            medicinesList.add({
+              'name': medicineName,
+              'quantity': qty.toInt(),
+              'rules': 'Sesuai petunjuk',
+            });
+          }
+        }
+      }
+    } catch (e) {
+      print('Error loading catalog medicines: $e');
+    }
+
+    try {
+      // 2. Electronic prescriptions (manual items)
+      final epRes = await client
+          .schema('private_doctor')
+          .from('electronic_prescriptions')
+          .select('*, electronic_prescription_items(*)')
+          .eq('id_clinical_encounter', encounterId)
+          .maybeSingle();
+
+      if (epRes != null) {
+        final items = epRes['electronic_prescription_items'] as List<dynamic>?;
+        if (items != null) {
+          for (final item in items) {
+            final qty = double.tryParse(item['quantity']?.toString() ?? '1') ?? 1.0;
+            medicinesList.add({
+              'name': item['medicine_name']?.toString() ?? 'Obat Resep',
+              'quantity': qty.toInt(),
+              'rules': item['dosage_instructions']?.toString() ?? '3 x 1',
+            });
+          }
+        }
+      }
+    } catch (e) {
+      print('Error loading electronic prescriptions: $e');
+    }
+
+    return medicinesList;
+  }
+
+  // Fetch transaction items for a financial transaction
+  Future<List<Map<String, dynamic>>> fetchTransactionItems(
+    String transactionId,
+  ) async {
+    try {
+      final res = await client
+          .schema('pharmacy')
+          .from('transaction_items')
+          .select('*, medicine_batches(*, medicines(*))')
+          .eq('id_transaction', transactionId);
+      return List<Map<String, dynamic>>.from(res as List);
+    } catch (_) {
+      try {
+        final resFallback = await client
+            .schema('pharmacy')
+            .from('transaction_items')
+            .select('*, medicine_batches(*)')
+            .eq('id_transaction', transactionId);
+        return List<Map<String, dynamic>>.from(resFallback as List);
+      } catch (e) {
+        print('Error fetching transaction items: $e');
+        return [];
+      }
+    }
+  }
+
 
   // Fetch a user record by ID
   Future<Map<String, dynamic>?> fetchUserById(String userId) async {
@@ -1802,6 +2011,20 @@ class SupabaseService {
     try {
       final doctorsRaw = await _get('user_detail_doctor?select=*,user:id(*)', schema: 'public');
       
+      List<dynamic> puskesmasRaw = [];
+      try {
+        puskesmasRaw = await _get('user_detail_public_health_center?select=*,user:id(*)', schema: 'public');
+      } catch (e) {
+        print('Error fetching puskesmas for search: $e');
+      }
+
+      List<dynamic> ponkesdesRaw = [];
+      try {
+        ponkesdesRaw = await _get('user_detail_village_clinic?select=*,user:id(*)', schema: 'public');
+      } catch (e) {
+        print('Error fetching ponkesdes for search: $e');
+      }
+
       List<dynamic> queuesRaw = [];
       try {
         queuesRaw = await _get('doctor_queues?select=*', schema: 'public');
@@ -1816,6 +2039,8 @@ class SupabaseService {
       };
 
       final List<Map<String, dynamic>> doctorsList = [];
+      
+      // 1. Map Doctors
       for (final doc in doctorsRaw) {
         if (doc is! Map) continue;
         final docMap = Map<String, dynamic>.from(doc);
@@ -1826,7 +2051,6 @@ class SupabaseService {
           final doctorId = docMap['id'] as String;
           final queueInfo = queuesMap[doctorId];
 
-          // Enforce subscription check: must be active and not expired
           final subStatus = (docMap['subscription_status'] ?? 'INACTIVE').toString().toUpperCase();
           final subExpiredAt = docMap['subscription_expired_at'];
           bool isSubActive = false;
@@ -1866,6 +2090,89 @@ class SupabaseService {
           });
         }
       }
+
+      // 2. Map Puskesmas (bypassing subscription check)
+      for (final pusk in puskesmasRaw) {
+        if (pusk is! Map) continue;
+        final puskMap = Map<String, dynamic>.from(pusk);
+        final userRaw = puskMap['user'];
+        if (userRaw != null && userRaw is Map) {
+          final userMap = Map<String, dynamic>.from(userRaw);
+          final puskId = puskMap['id'] as String;
+          final isVisible = puskMap['is_visible'] ?? true;
+          
+          final mapsLink = puskMap['google_maps_link'] ?? '';
+          final coords = extractLatLngFromMapsLink(mapsLink);
+
+          doctorsList.add({
+            'id': puskId,
+            'name': puskMap['facility_name'] ?? userMap['name'] ?? '',
+            'email': userMap['email'] ?? '',
+            'avatar_url': userMap['avatar_url'] ?? '',
+            'nama_faskes': puskMap['facility_name'] ?? 'Puskesmas',
+            'profession': puskMap['profession'] ?? 'Puskesmas',
+            'is_visible': isVisible,
+            'is_bpjs': puskMap['is_bpjs'] ?? true,
+            'about': puskMap['about'] ?? '',
+            'whatsapp_number': puskMap['phone'] ?? userMap['phone_number'] ?? '',
+            'latitude': coords['latitude'],
+            'longitude': coords['longitude'],
+            'default_service_fee': 0.0,
+            'address': puskMap['address'] ?? '',
+            'province': puskMap['province'] ?? userMap['province'] ?? '',
+            'district': puskMap['district'] ?? userMap['district'] ?? '',
+            'sub_district': puskMap['sub_district'] ?? userMap['sub_district'] ?? '',
+            'village': puskMap['village'] ?? userMap['village'] ?? '',
+            'active_today': 0,
+            'finished_total': 0,
+            'practice_licenses': [],
+            'google_maps_link': mapsLink,
+            'header_bg_settings': null,
+          });
+        }
+      }
+
+      // 3. Map Ponkesdes (bypassing subscription check)
+      for (final ponk in ponkesdesRaw) {
+        if (ponk is! Map) continue;
+        final ponkMap = Map<String, dynamic>.from(ponk);
+        final userRaw = ponkMap['user'];
+        if (userRaw != null && userRaw is Map) {
+          final userMap = Map<String, dynamic>.from(userRaw);
+          final ponkId = ponkMap['id'] as String;
+          final isVisible = ponkMap['is_visible'] ?? true;
+          
+          final mapsLink = ponkMap['google_maps_link'] ?? '';
+          final coords = extractLatLngFromMapsLink(mapsLink);
+
+          doctorsList.add({
+            'id': ponkId,
+            'name': ponkMap['clinic_name'] ?? userMap['name'] ?? '',
+            'email': userMap['email'] ?? '',
+            'avatar_url': userMap['avatar_url'] ?? '',
+            'nama_faskes': ponkMap['clinic_name'] ?? 'Ponkesdes',
+            'profession': ponkMap['profession'] ?? 'Ponkesdes',
+            'is_visible': isVisible,
+            'is_bpjs': ponkMap['is_bpjs'] ?? false,
+            'about': ponkMap['about'] ?? '',
+            'whatsapp_number': ponkMap['phone'] ?? userMap['phone_number'] ?? '',
+            'latitude': coords['latitude'],
+            'longitude': coords['longitude'],
+            'default_service_fee': 0.0,
+            'address': ponkMap['address'] ?? '',
+            'province': ponkMap['province'] ?? userMap['province'] ?? '',
+            'district': ponkMap['district'] ?? userMap['district'] ?? '',
+            'sub_district': ponkMap['sub_district'] ?? userMap['sub_district'] ?? '',
+            'village': ponkMap['village'] ?? userMap['village'] ?? '',
+            'active_today': 0,
+            'finished_total': 0,
+            'practice_licenses': [],
+            'google_maps_link': mapsLink,
+            'header_bg_settings': null,
+          });
+        }
+      }
+
       return doctorsList;
     } catch (e) {
       throw Exception('Gagal mengambil daftar dokter: $e');

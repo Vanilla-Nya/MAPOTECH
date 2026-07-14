@@ -78,9 +78,7 @@ class _LoginModalContentState extends State<_LoginModalContent> {
     // Identify if active portal is "Segera" (Soon)
     final soonPortals = [
       'klinik',
-      'puskesmas',
       'rumahsakit',
-      'ponkesdes',
       'posyandu',
     ];
     final isSoonActive = soonPortals.contains(state.activeTab);
@@ -375,6 +373,14 @@ class _LoginModalContentState extends State<_LoginModalContent> {
                       isStaticValid = true;
                       staticRole = 'apotek';
                       staticName = 'CyrenElysia~♪';
+                    } else if (username == 'puskesmas' && password == '123') {
+                      isStaticValid = true;
+                      staticRole = 'puskesmas';
+                      staticName = 'Puskesmas Sumbersari';
+                    } else if (username == 'ponkesdes' && password == '123') {
+                      isStaticValid = true;
+                      staticRole = 'ponkesdes';
+                      staticName = 'Ponkesdes Sukowono';
                     }
 
                     if (isStaticValid) {
@@ -387,6 +393,12 @@ class _LoginModalContentState extends State<_LoginModalContent> {
                         staticAvatarUrl =
                             'https://pkm-sumberwringin.bondowosokab.go.id/uploads/pkm-sumberwringin.bondowosokab.go.id/kegiatan/Foto%20Kappus.jpg';
                       } else if (staticRole == 'apotek') {
+                        staticAvatarUrl =
+                            'https://media1.tenor.com/m/vXcb3pS1xs8AAAAd/elysia-honkai-impact-3rd.gif';
+                      } else if (staticRole == 'puskesmas') {
+                        staticAvatarUrl =
+                            'https://pkm-sumberwringin.bondowosokab.go.id/uploads/pkm-sumberwringin.bondowosokab.go.id/kegiatan/Foto%20Kappus.jpg';
+                      } else if (staticRole == 'ponkesdes') {
                         staticAvatarUrl =
                             'https://media1.tenor.com/m/vXcb3pS1xs8AAAAd/elysia-honkai-impact-3rd.gif';
                       }
@@ -498,6 +510,10 @@ class _LoginModalContentState extends State<_LoginModalContent> {
                               } else if (dbRole == 'apotek' ||
                                   dbRole == 'asisten_apotek') {
                                 mappedRole = 'apotek';
+                              } else if (dbRole == 'puskesmas') {
+                                mappedRole = 'puskesmas';
+                              } else if (dbRole == 'ponkesdes') {
+                                mappedRole = 'ponkesdes';
                               } else {
                                 mappedRole = 'pasien'; // default fallback
                               }
@@ -977,9 +993,7 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
 
     final soonPortals = [
       'klinik',
-      'puskesmas',
       'rumahsakit',
-      'ponkesdes',
       'posyandu',
     ];
     final isSelectedSoon = soonPortals.contains(_selectedRoleId);
@@ -1013,7 +1027,7 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
         'id': 'puskesmas',
         'label': 'PUSKESMAS',
         'icon': Icons.domain_rounded,
-        'isSoon': true,
+        'isSoon': false,
       },
       {
         'id': 'rumahsakit',
@@ -1025,7 +1039,7 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
         'id': 'ponkesdes',
         'label': 'PONKESDES',
         'icon': Icons.home_work_rounded,
-        'isSoon': true,
+        'isSoon': false,
       },
       {
         'id': 'posyandu',
@@ -1611,6 +1625,8 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
                           String dbRole = 'patient';
                           if (_selectedRoleId == 'dokter') dbRole = 'praktikmandiri';
                           if (_selectedRoleId == 'apotek') dbRole = 'apotek';
+                          if (_selectedRoleId == 'puskesmas') dbRole = 'puskesmas';
+                          if (_selectedRoleId == 'ponkesdes') dbRole = 'ponkesdes';
 
                           final exists = await db.checkNikExists(_nikController.text.trim(), dbRole);
                           setState(() => _isLoading = false);
@@ -2461,6 +2477,8 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
                           String dbRole = 'patient';
                           if (_selectedRoleId == 'dokter') dbRole = 'praktikmandiri';
                           if (_selectedRoleId == 'apotek') dbRole = 'apotek';
+                          if (_selectedRoleId == 'puskesmas') dbRole = 'puskesmas';
+                          if (_selectedRoleId == 'ponkesdes') dbRole = 'ponkesdes';
 
                           // Build ISO birth date
                           String birthDateIso = '';

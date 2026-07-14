@@ -74,6 +74,12 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
       } else if (_selectedFilter == 'bidan') {
         final prof = d['profession']?.toString().toLowerCase() ?? '';
         filterMatches = prof.contains('bid') || prof.contains('mid') || prof.contains('nurse') || prof.contains('perawat');
+      } else if (_selectedFilter == 'puskesmas') {
+        final prof = d['profession']?.toString().toLowerCase() ?? '';
+        filterMatches = prof.contains('pusk');
+      } else if (_selectedFilter == 'ponkesdes') {
+        final prof = d['profession']?.toString().toLowerCase() ?? '';
+        filterMatches = prof.contains('ponk') || prof.contains('village') || prof.contains('clinic');
       }
 
       return textMatches && filterMatches;
@@ -183,9 +189,27 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  _buildFilterChip(
+                   _buildFilterChip(
                     'Semua',
                     'semua',
+                    subtitleColor,
+                    purpleAccent,
+                    borderColor,
+                    cardBgColor,
+                  ),
+                  const SizedBox(width: 8),
+                  _buildFilterChip(
+                    'Puskesmas',
+                    'puskesmas',
+                    subtitleColor,
+                    purpleAccent,
+                    borderColor,
+                    cardBgColor,
+                  ),
+                  const SizedBox(width: 8),
+                  _buildFilterChip(
+                    'Ponkesdes',
+                    'ponkesdes',
                     subtitleColor,
                     purpleAccent,
                     borderColor,

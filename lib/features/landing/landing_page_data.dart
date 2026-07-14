@@ -118,6 +118,14 @@ class LandingPageState {
     return loggedInUser?['id'] as String?;
   }
 
+  String? get activePuskesmasId {
+    return loggedInUser?['id'] as String?;
+  }
+
+  String? get activePonkesdesId {
+    return loggedInUser?['id'] as String?;
+  }
+
   const LandingPageState({
     required this.activeTab,
     required this.language,

@@ -8,9 +8,10 @@ import 'package:mapotech/shared/widgets/animated_transitions.dart';
 import 'package:mapotech/shared/widgets/custom_button.dart';
 import 'package:mapotech/shared/supabase_service.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong2.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:mapotech/features/pasien/dashboard/frontend/pasien_dokter_search.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class PasienDashboard extends ConsumerStatefulWidget {
   final Function(String menu)? onNavigate;
@@ -39,10 +40,10 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
   Future<void> _loadDashboardData() async {
     if (!mounted) return;
     setState(() => _isLoading = true);
+    _fetchCurrentLocation();
     await Future.wait([
       _loadPrescriptionCount(),
       _loadNextAppointment(),
-      _fetchCurrentLocation(),
       _loadMapMarkers(),
     ]);
     if (mounted) {
@@ -849,37 +850,40 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                                                         },
                                                         child: Container(
                                                           decoration: BoxDecoration(
-                                                            color: Colors
-                                                                .redAccent,
-                                                            shape:
-                                                                BoxShape.circle,
+                                                            color: Colors.redAccent,
+                                                            shape: BoxShape.circle,
                                                             border: Border.all(
-                                                              color:
-                                                                  Colors.white,
+                                                              color: Colors.white,
                                                               width: 2.0,
                                                             ),
                                                             boxShadow: [
                                                               BoxShadow(
-                                                                color: Colors
-                                                                    .black
-                                                                    .withOpacity(
-                                                                      0.2,
-                                                                    ),
+                                                                color: Colors.black.withOpacity(0.2),
                                                                 blurRadius: 6,
-                                                                offset:
-                                                                    const Offset(
-                                                                      0,
-                                                                      3,
-                                                                    ),
+                                                                offset: const Offset(0, 3),
                                                               ),
                                                             ],
                                                           ),
-                                                          child: const Icon(
-                                                            Icons
-                                                                .medical_services_rounded,
-                                                            color: Colors.white,
-                                                            size: 14,
-                                                          ),
+                                                          child: (doc['avatar_url'] != null && doc['avatar_url'].toString().isNotEmpty)
+                                                              ? ClipRRect(
+                                                                  borderRadius: BorderRadius.circular(100),
+                                                                  child: Image.network(
+                                                                    doc['avatar_url'].toString(),
+                                                                    fit: BoxFit.cover,
+                                                                    errorBuilder: (context, error, stackTrace) {
+                                                                      return const Icon(
+                                                                        Icons.medical_services_rounded,
+                                                                        color: Colors.white,
+                                                                        size: 14,
+                                                                      );
+                                                                    },
+                                                                  ),
+                                                                )
+                                                              : const Icon(
+                                                                  Icons.medical_services_rounded,
+                                                                  color: Colors.white,
+                                                                  size: 14,
+                                                                ),
                                                         ),
                                                       ),
                                                     ),
@@ -932,38 +936,40 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                                                         },
                                                         child: Container(
                                                           decoration: BoxDecoration(
-                                                            color: const Color(
-                                                              0xFF2EC4B6,
-                                                            ),
-                                                            shape:
-                                                                BoxShape.circle,
+                                                            color: const Color(0xFF2EC4B6),
+                                                            shape: BoxShape.circle,
                                                             border: Border.all(
-                                                              color:
-                                                                  Colors.white,
+                                                              color: Colors.white,
                                                               width: 2.0,
                                                             ),
                                                             boxShadow: [
                                                               BoxShadow(
-                                                                color: Colors
-                                                                    .black
-                                                                    .withOpacity(
-                                                                      0.2,
-                                                                    ),
+                                                                color: Colors.black.withOpacity(0.2),
                                                                 blurRadius: 6,
-                                                                offset:
-                                                                    const Offset(
-                                                                      0,
-                                                                      3,
-                                                                    ),
+                                                                offset: const Offset(0, 3),
                                                               ),
                                                             ],
                                                           ),
-                                                          child: const Icon(
-                                                            Icons
-                                                                .local_pharmacy_rounded,
-                                                            color: Colors.white,
-                                                            size: 14,
-                                                          ),
+                                                          child: (pharm['avatar_url'] != null && pharm['avatar_url'].toString().isNotEmpty)
+                                                              ? ClipRRect(
+                                                                  borderRadius: BorderRadius.circular(100),
+                                                                  child: Image.network(
+                                                                    pharm['avatar_url'].toString(),
+                                                                    fit: BoxFit.cover,
+                                                                    errorBuilder: (context, error, stackTrace) {
+                                                                      return const Icon(
+                                                                        Icons.local_pharmacy_rounded,
+                                                                        color: Colors.white,
+                                                                        size: 14,
+                                                                    );
+                                                                  },
+                                                                ),
+                                                              )
+                                                              : const Icon(
+                                                                  Icons.local_pharmacy_rounded,
+                                                                  color: Colors.white,
+                                                                  size: 14,
+                                                                ),
                                                         ),
                                                       ),
                                                     ),

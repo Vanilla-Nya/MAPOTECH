@@ -5,7 +5,7 @@ import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/layouts/responsive_layout.dart';
 import 'package:mapotech/shared/widgets/custom_button.dart';
 import 'package:mapotech/shared/widgets/three_dimensional_device_wrapper.dart';
-import 'package:mapotech/shared/widgets/segera_hadir_mockup.dart';
+import 'package:mapotech/shared/widgets/auth_modals.dart';
 
 class PuskesmasPortal extends ConsumerWidget {
   const PuskesmasPortal({super.key});
@@ -18,18 +18,17 @@ class PuskesmasPortal extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _buildHeroSection(context, state, notifier),
+        _buildHeroSection(context, ref, state, notifier),
         const SizedBox(height: 80),
         _buildFeaturesSection(context, state, notifier),
       ],
     );
   }
 
-  Widget _buildHeroSection(BuildContext context, LandingPageState state,
+  Widget _buildHeroSection(BuildContext context, WidgetRef ref, LandingPageState state,
       LandingPageNotifier notifier) {
     final isMobile = ResponsiveLayout.isMobile(context);
     final activeColor = notifier.getPrimaryColor();
-    final darkGreenColor = notifier.getSecondaryColor();
     final textColor = notifier.getTextColor();
     final bodyTextColor = notifier.getBodyTextColor();
     final cardColor = notifier.getCardColor();
@@ -67,6 +66,15 @@ class PuskesmasPortal extends ConsumerWidget {
         Row(
           mainAxisAlignment: isMobile ? MainAxisAlignment.center : MainAxisAlignment.start,
           children: [
+            CustomButton(
+              text: state.language == 'id' ? 'Daftar Sekarang' : 'Register Now',
+              primaryColor: activeColor,
+              textColor: isDark ? Colors.black : Colors.white,
+              onPressed: () {
+                showRegisterModal(context, ref);
+              },
+            ),
+            const SizedBox(width: 12),
             CustomButton(text: notifier.t('learn_more'), isSecondary: true, primaryColor: Colors.transparent, textColor: textColor, borderColor: borderColor, onPressed: () {}),
           ],
         ),
@@ -82,7 +90,15 @@ class PuskesmasPortal extends ConsumerWidget {
       ],
     );
 
-    Widget heroVisual = const SegeraHadirMockup(portalPath: 'PUSKESMAS');
+    Widget heroVisual = _buildPuskesmasMockup(
+      isDark,
+      borderColor,
+      cardColor,
+      activeColor,
+      textColor,
+      bodyTextColor,
+      lang,
+    );
     heroVisual = ThreeDimensionalDeviceWrapper(child: heroVisual);
 
     if (isMobile) {

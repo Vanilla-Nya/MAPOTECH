@@ -116,6 +116,92 @@ List<DrawerMenuItem> getMenuItemsForRole(String role, String lang, {LandingPageS
         icon: Icons.account_circle_rounded,
       ),
     ];
+  } else if (role == 'puskesmas') {
+    items = [
+      DrawerMenuItem(
+        id: 'dashboard',
+        label: 'Dashboard',
+        icon: Icons.dashboard_rounded,
+      ),
+      DrawerMenuItem(
+        id: 'pasien',
+        label: isEn ? 'Patients' : 'Pasien',
+        icon: Icons.people_rounded,
+      ),
+      DrawerMenuItem(
+        id: 'obat',
+        label: isEn ? 'Medicines' : 'Obat',
+        icon: Icons.medication_rounded,
+      ),
+      DrawerMenuItem(
+        id: 'antrian',
+        label: isEn ? 'Queues' : 'Antrian',
+        icon: Icons.hourglass_empty_rounded,
+      ),
+      DrawerMenuItem(
+        id: 'pemeriksaan',
+        label: isEn ? 'Examinations' : 'Pemeriksaan',
+        icon: Icons.assignment_rounded,
+      ),
+      DrawerMenuItem(
+        id: 'pembukuan',
+        label: isEn ? 'Bookkeeping' : 'Pembukuan',
+        icon: Icons.account_balance_wallet_rounded,
+      ),
+      DrawerMenuItem(
+        id: 'asisten_praktik',
+        label: isEn ? 'Practice Assistant' : 'Asisten Praktik',
+        icon: Icons.badge_rounded,
+      ),
+      DrawerMenuItem(
+        id: 'profile',
+        label: isEn ? 'Profile' : 'Profil',
+        icon: Icons.domain_rounded,
+      ),
+    ];
+  } else if (role == 'ponkesdes') {
+    items = [
+      DrawerMenuItem(
+        id: 'dashboard',
+        label: 'Dashboard',
+        icon: Icons.dashboard_rounded,
+      ),
+      DrawerMenuItem(
+        id: 'pasien',
+        label: isEn ? 'Patients' : 'Pasien',
+        icon: Icons.people_rounded,
+      ),
+      DrawerMenuItem(
+        id: 'obat',
+        label: isEn ? 'Medicines' : 'Obat',
+        icon: Icons.medication_rounded,
+      ),
+      DrawerMenuItem(
+        id: 'antrian',
+        label: isEn ? 'Queues' : 'Antrian',
+        icon: Icons.hourglass_empty_rounded,
+      ),
+      DrawerMenuItem(
+        id: 'pemeriksaan',
+        label: isEn ? 'Examinations' : 'Pemeriksaan',
+        icon: Icons.assignment_rounded,
+      ),
+      DrawerMenuItem(
+        id: 'pembukuan',
+        label: isEn ? 'Bookkeeping' : 'Pembukuan',
+        icon: Icons.account_balance_wallet_rounded,
+      ),
+      DrawerMenuItem(
+        id: 'asisten_praktik',
+        label: isEn ? 'Practice Assistant' : 'Asisten Praktik',
+        icon: Icons.badge_rounded,
+      ),
+      DrawerMenuItem(
+        id: 'profile',
+        label: isEn ? 'Profile' : 'Profil',
+        icon: Icons.home_work_rounded,
+      ),
+    ];
   } else {
     items = [
       DrawerMenuItem(
@@ -230,7 +316,11 @@ class DashboardDrawer extends ConsumerWidget {
                     return isEn ? 'DOCTOR' : 'DOKTER';
                   }
                 })()
-              : (isEn ? 'PHARMACY' : 'APOTEK'));
+              : (state.loggedInRole == 'apotek'
+                    ? (isEn ? 'PHARMACY' : 'APOTEK')
+                    : (state.loggedInRole == 'puskesmas'
+                          ? (isEn ? 'HEALTH CENTER' : 'PUSKESMAS')
+                          : (isEn ? 'VILLAGE CLINIC' : 'PONKESDES'))));
 
     final showLabels = state.drawerSize == 1;
 

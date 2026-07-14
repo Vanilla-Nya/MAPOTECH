@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:mapotech/features/apotek/dashboard/frontend/apotek_pesanan.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/supabase_service.dart';
 import 'dart:ui' as ui;
@@ -30,9 +31,10 @@ import 'package:mapotech/features/apotek/dashboard/frontend/apotek_profile.dart'
 import 'package:mapotech/features/apotek/dashboard/frontend/apotek_asisten.dart';
 import 'package:mapotech/features/apotek/dashboard/frontend/apotek_penjualan.dart';
 import 'package:mapotech/features/apotek/dashboard/frontend/apotek_inventori.dart';
-import 'package:mapotech/features/apotek/dashboard/frontend/apotek_pesanan.dart';
 import 'package:mapotech/features/apotek/dashboard/frontend/apotek_laporan.dart';
 import 'package:mapotech/shared/widgets/segera_hadir_mockup.dart';
+import 'package:mapotech/features/puskesmas/dashboard/frontend/puskesmas_profile.dart';
+import 'package:mapotech/features/ponkesdes/dashboard/frontend/ponkesdes_profile.dart';
 
 bool _isCorsafeUrl(String url) {
   if (url.isEmpty) return false;
@@ -56,6 +58,13 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   String? _lastCheckedUserId;
   bool _hasShownSubNotice = false;
 
+  bool _shouldUseShellScroll(String menu) {
+    if (menu == 'doctors' || menu == 'pharmacies' || menu == 'pasien') {
+      return false;
+    }
+    return true;
+  }
+
   void _showSubscriptionNotice(bool active, DateTime? expiry, String role) {
     if (_hasShownSubNotice) return;
     _hasShownSubNotice = true;
@@ -71,10 +80,15 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
           context: context,
           barrierDismissible: false,
           builder: (ctx) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             title: Row(
               children: [
-                const Icon(Icons.warning_amber_rounded, color: Colors.redAccent),
+                const Icon(
+                  Icons.warning_amber_rounded,
+                  color: Colors.redAccent,
+                ),
                 const SizedBox(width: 10),
                 Text(
                   isEn ? 'Subscription Expired' : 'Langganan Kedaluwarsa',
@@ -98,7 +112,10 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                 },
                 child: Text(
                   isEn ? 'Go to Profile' : 'Ke Profil',
-                  style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.purple),
+                  style: GoogleFonts.outfit(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.purple,
+                  ),
                 ),
               ),
             ],
@@ -115,13 +132,17 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
           showDialog(
             context: context,
             builder: (ctx) => AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
               title: Row(
                 children: [
                   const Icon(Icons.info_outline, color: Colors.orangeAccent),
                   const SizedBox(width: 10),
                   Text(
-                    isEn ? 'Subscription Expiring Soon' : 'Langganan Segera Habis',
+                    isEn
+                        ? 'Subscription Expiring Soon'
+                        : 'Langganan Segera Habis',
                     style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
                   ),
                 ],
@@ -149,7 +170,10 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                   },
                   child: Text(
                     isEn ? 'Renew Now' : 'Perbarui Sekarang',
-                    style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.purple),
+                    style: GoogleFonts.outfit(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.purple,
+                    ),
                   ),
                 ),
               ],
@@ -169,7 +193,10 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     _hasShownSubNotice = false; // reset for new user session
 
     final role = state.loggedInRole;
-    if (role != 'dokter' && role != 'apotek') {
+    if (role != 'dokter' &&
+        role != 'apotek' &&
+        role != 'puskesmas' &&
+        role != 'ponkesdes') {
       ref.read(landingPageProvider.notifier).setSubscribed(true);
       return;
     }
@@ -181,7 +208,9 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
         if (doctorId != null) {
           final res = await client
               .from('user_detail_doctor')
-              .select('subscription_status, subscription_expired_at, profession')
+              .select(
+                'subscription_status, subscription_expired_at, profession',
+              )
               .eq('id', doctorId)
               .maybeSingle();
           if (res != null) {
@@ -205,6 +234,29 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
             _showSubscriptionNotice(active, expiry, role!);
             return;
           }
+        }
+      } else if (role == 'puskesmas' || role == 'ponkesdes') {
+        final res = await client
+            .from('user')
+            .select('subscription_status, subscription_expires_at')
+            .eq('id', userId)
+            .maybeSingle();
+        if (res != null) {
+          final status = (res['subscription_status'] ?? 'INACTIVE')
+              .toString()
+              .toUpperCase();
+          final expiredAt = res['subscription_expires_at'];
+          bool active = false;
+          DateTime? expiry;
+          if (status == 'ACTIVE' && expiredAt != null) {
+            try {
+              expiry = DateTime.parse(expiredAt.toString());
+              active = expiry.isAfter(DateTime.now());
+            } catch (_) {}
+          }
+          ref.read(landingPageProvider.notifier).setSubscribed(active);
+          _showSubscriptionNotice(active, expiry, role!);
+          return;
         }
       } else if (role == 'apotek') {
         final apotekId = state.activeApotekId;
@@ -681,6 +733,50 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
           return const DokterDashboard();
         default:
           return SegeraHadirMockup(portalPath: 'DOKTER/$_activeMenu');
+      }
+    } else if (role == 'puskesmas') {
+      switch (_activeMenu) {
+        case 'profile':
+          return const PuskesmasProfile();
+        case 'settings':
+          return const DokterSettings();
+        case 'pasien':
+          return const DokterPasien();
+        case 'obat':
+          return const DokterObat();
+        case 'antrian':
+          return const DokterAntrian();
+        case 'pemeriksaan':
+          return const DokterPemeriksaan();
+        case 'pembukuan':
+          return const DokterPembukuan();
+        case 'asisten_praktik':
+          return const DokterAsisten();
+        case 'dashboard':
+        default:
+          return const DokterDashboard();
+      }
+    } else if (role == 'ponkesdes') {
+      switch (_activeMenu) {
+        case 'profile':
+          return const PonkesdesProfile();
+        case 'settings':
+          return const DokterSettings();
+        case 'pasien':
+          return const DokterPasien();
+        case 'obat':
+          return const DokterObat();
+        case 'antrian':
+          return const DokterAntrian();
+        case 'pemeriksaan':
+          return const DokterPemeriksaan();
+        case 'pembukuan':
+          return const DokterPembukuan();
+        case 'asisten_praktik':
+          return const DokterAsisten();
+        case 'dashboard':
+        default:
+          return const DokterDashboard();
       }
     } else if (role == 'apotek') {
       switch (_activeMenu) {
