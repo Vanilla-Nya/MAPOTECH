@@ -1029,10 +1029,15 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
           _subExpiryDate!.isAfter(DateTime.now());
       final isVisibleToSave = isSubActive && _showProfileInSearch;
 
+      final mapsLink = _mapsLinkController.text.trim();
+      final latLng = SupabaseService.extractLatLngFromMapsLink(mapsLink);
+
       await client
           .from('user_detail_doctor')
           .update({
-            'google_maps_link': _mapsLinkController.text.trim(),
+            'google_maps_link': mapsLink,
+            'latitude': latLng['latitude'],
+            'longitude': latLng['longitude'],
             'max_antrian': maxVal,
             'is_visible': isVisibleToSave,
             'is_bpjs': _serveBPJSPatients,
@@ -1389,165 +1394,231 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
   }
 
   void _showUpgradePlansModalProfile() {
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
       builder: (ctx) {
         final isDarkTheme = ref.read(landingPageProvider).appearance == 'dark';
-        final bg = isDarkTheme ? const Color(0xFF1E1E22) : Colors.white;
+        final bg = isDarkTheme ? const Color(0xFF18181B) : Colors.white;
+        final cardBg = isDarkTheme ? const Color(0xFF242427) : const Color(0xFFF9FAFB);
         final text = isDarkTheme ? Colors.white : const Color(0xFF1E1E22);
-        final subText = isDarkTheme ? Colors.white60 : Colors.black54;
+        final subText = isDarkTheme ? Colors.white70 : Colors.black54;
         final border = isDarkTheme ? Colors.white12 : Colors.black12;
 
-        return DraggableScrollableSheet(
-          initialChildSize: 0.85,
-          minChildSize: 0.5,
-          maxChildSize: 0.95,
-          builder: (_, controller) {
-            return Container(
-              decoration: BoxDecoration(
-                color: bg,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(24),
-                  topRight: Radius.circular(24),
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 1100),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: border, width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(isDarkTheme ? 0.5 : 0.08),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
                 ),
-              ),
-              padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
-              child: ListView(
-                controller: controller,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: border,
-                        borderRadius: BorderRadius.circular(10),
+              ],
+            ),
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Top Header Row
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const SizedBox(width: 32), // spacer to match close button width
+                    Expanded(
+                      child: Text(
+                        'Pilih Paket Layanan',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.outfit(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          color: text,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      hoverColor: Colors.transparent,
+                      splashColor: Colors.transparent,
+                      highlightColor: Colors.transparent,
+                      icon: Icon(Icons.close_rounded, color: text.withOpacity(0.7), size: 24),
+                      onPressed: () => Navigator.of(ctx).pop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Pilih paket yang sesuai untuk menunjang praktik Anda',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.outfit(
+                    fontSize: 14,
+                    color: subText,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+                const SizedBox(height: 28),
+
+                // Subscription Cards
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final List<Widget> cards = [
+                            _buildPlanCardProfile(
+                              title: 'Standard Subscription (30 Days)',
+                              description: 'Akses penuh ke semua fitur dashboard praktik mandiri & booking pasien selama 30 hari.',
+                              price: 'Rp 1.000',
+                              priceSuffix: '/ 30 Hari',
+                              isPopular: false,
+                              accentColor: const Color(0xFF00BFA6),
+                              textColor: text,
+                              subTextColor: subText,
+                              borderColor: border,
+                              cardBg: cardBg,
+                              features: [
+                                'Akses fitur praktik mandiri',
+                                'Sistem booking & antrean pasien',
+                                'Dashboard statistik dokter',
+                                'Durasi aktif 30 hari',
+                              ],
+                              onTap: () {
+                                Navigator.of(ctx).pop();
+                                _buySubscriptionWithDuitku('subscription_30');
+                              },
+                            ),
+                            _buildPlanCardProfile(
+                              title: 'Premium Customizer (30 Days)',
+                              description: 'Buka kustomisasi desain profil lengkap (font nama, tagline, blur level, vignette, custom gradients) selama 30 hari.',
+                              price: 'Rp 1.000',
+                              priceSuffix: '/ 30 Hari',
+                              isPopular: false,
+                              accentColor: const Color(0xFFFFB300),
+                              textColor: text,
+                              subTextColor: subText,
+                              borderColor: border,
+                              cardBg: cardBg,
+                              features: [
+                                'Ubah font nama & tagline profil',
+                                'Kustomisasi background & gradient',
+                                'Efek vignette & blur level',
+                                'Tampilan profil premium',
+                              ],
+                              onTap: () {
+                                Navigator.of(ctx).pop();
+                                _renewPackageProfile('premium_30', 1000);
+                              },
+                            ),
+                            if (_subDaysRemaining > 0)
+                              _buildPlanCardProfile(
+                                title: 'Premium Customizer (Sync $_subDaysRemaining Days)',
+                                description: 'Sesuaikan durasi Premium Customizer Anda dengan sisa durasi Langganan Praktik Anda saat ini.',
+                                price: 'Rp 1.000',
+                                priceSuffix: '/ $_subDaysRemaining Hari',
+                                isPopular: false,
+                                accentColor: const Color(0xFFFFB300),
+                                textColor: text,
+                                subTextColor: subText,
+                                borderColor: border,
+                                cardBg: cardBg,
+                                features: [
+                                  'Durasi sinkron dengan langganan',
+                                  'Semua fitur kustomisasi premium',
+                                  'Lebih hemat & efisien',
+                                ],
+                                onTap: () {
+                                  Navigator.of(ctx).pop();
+                                  _renewPackageProfile('premium_sync', 1000);
+                                },
+                              ),
+                            _buildPlanCardProfile(
+                              title: 'Premium Customizer (Lifetime)',
+                              description: 'Buka kustomisasi desain profil premium. Aktif selama langganan Anda aktif. (Kehilangan status jika langganan dibiarkan kedaluwarsa).',
+                              price: 'Rp 1.000',
+                              priceSuffix: '/ Selamanya',
+                              isPopular: true,
+                              accentColor: const Color(0xFFFFB300),
+                              textColor: text,
+                              subTextColor: subText,
+                              borderColor: border,
+                              cardBg: cardBg,
+                              features: [
+                                'Akses customizer selamanya',
+                                'Bebas perpanjangan bulanan',
+                                'Semua fitur premium terbuka',
+                                'Terikat status langganan',
+                              ],
+                              onTap: () {
+                                Navigator.of(ctx).pop();
+                                _renewPackageProfile('premium_lifetime', 1000);
+                              },
+                            ),
+                            _buildPlanCardProfile(
+                              title: 'Mega Bundle (30 Days)',
+                              description: 'Gabungan akses Layanan Praktik & Kustomisasi Profil Premium selama 30 hari.',
+                              price: 'Rp 1.000',
+                              priceSuffix: '/ 30 Hari',
+                              isPopular: false,
+                              accentColor: const Color(0xFFCB8FFF),
+                              textColor: text,
+                              subTextColor: subText,
+                              borderColor: border,
+                              cardBg: cardBg,
+                              features: [
+                                'Semua fitur Standard Subscription',
+                                'Semua fitur Premium Customizer',
+                                'Lebih hemat dibanding beli terpisah',
+                                'Satu kali pembayaran terpadu',
+                              ],
+                              onTap: () {
+                                Navigator.of(ctx).pop();
+                                _buySubscriptionWithDuitku('bundle_30');
+                              },
+                            ),
+                          ];
+
+                          return Center(
+                            child: ScrollConfiguration(
+                              behavior: ScrollConfiguration.of(context).copyWith(
+                                dragDevices: {
+                                  PointerDeviceKind.touch,
+                                  PointerDeviceKind.mouse,
+                                  PointerDeviceKind.trackpad,
+                                },
+                              ),
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: IntrinsicHeight(
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: cards.map((card) {
+                                      return SizedBox(
+                                        width: 255,
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                                          child: card,
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Pilih Paket Layanan',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.outfit(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                      color: text,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Pilih paket yang sesuai untuk menunjang praktik Anda',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.outfit(fontSize: 12, color: subText),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Section header: Layanan Praktik
-                  Text(
-                    '1. Layanan Praktik (Subscription)',
-                    style: GoogleFonts.outfit(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w900,
-                      color: text,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  _buildPlanCardProfile(
-                    title: 'Standard Subscription (30 Days)',
-                    description:
-                        'Akses penuh ke semua fitur dashboard praktik mandiri & booking pasien selama 30 hari.',
-                    price: 'Rp 1.000',
-                    isPopular: false,
-                    accentColor: const Color(0xFF00BFA6),
-                    textColor: text,
-                    subTextColor: subText,
-                    borderColor: border,
-                    onTap: () => _buySubscriptionWithDuitku('subscription_30'),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Section header: Kustomisasi Profil
-                  Text(
-                    '2. Desain Profil Premium',
-                    style: GoogleFonts.outfit(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w900,
-                      color: text,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  _buildPlanCardProfile(
-                    title: 'Premium Customizer (30 Days)',
-                    description:
-                        'Buka kustomisasi desain profil lengkap (font nama, tagline, blur level, vignette, custom gradients) selama 30 hari.',
-                    price: 'Rp 1.000',
-                    isPopular: false,
-                    accentColor: const Color(0xFFFFB300),
-                    textColor: text,
-                    subTextColor: subText,
-                    borderColor: border,
-                    onTap: () => _renewPackageProfile('premium_30', 1000),
-                  ),
-                  if (_subDaysRemaining > 0) ...[
-                    const SizedBox(height: 8),
-                    _buildPlanCardProfile(
-                      title:
-                          'Premium Customizer (Sync $_subDaysRemaining Days)',
-                      description:
-                          'Sesuaikan durasi Premium Customizer Anda dengan sisa durasi Langganan Praktik Anda saat ini.',
-                      price: 'Rp 1.000',
-                      isPopular: false,
-                      accentColor: const Color(0xFFFFB300),
-                      textColor: text,
-                      subTextColor: subText,
-                      borderColor: border,
-                      onTap: () => _renewPackageProfile('premium_sync', 1000),
-                    ),
-                  ],
-                  const SizedBox(height: 8),
-                  _buildPlanCardProfile(
-                    title: 'Premium Customizer (Lifetime)',
-                    description:
-                        'Buka kustomisasi desain profil premium. Aktif selama langganan Anda aktif. (Kehilangan status jika langganan dibiarkan kedaluwarsa).',
-                    price: 'Rp 1.000',
-                    isPopular: true,
-                    accentColor: const Color(0xFFFFB300),
-                    textColor: text,
-                    subTextColor: subText,
-                    borderColor: border,
-                    onTap: () => _renewPackageProfile('premium_lifetime', 1000),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Section header: Mega Bundle
-                  Text(
-                    '3. Mega Bundle (Subscription + Premium)',
-                    style: GoogleFonts.outfit(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w900,
-                      color: text,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  _buildPlanCardProfile(
-                    title: 'Mega Bundle (30 Days)',
-                    description:
-                        'Gabungan akses Layanan Praktik & Kustomisasi Profil Premium selama 30 hari.',
-                    price: 'Rp 1.000',
-                    isPopular: false,
-                    accentColor: const Color(0xFFCB8FFF),
-                    textColor: text,
-                    subTextColor: subText,
-                    borderColor: border,
-                    onTap: () => _buySubscriptionWithDuitku('bundle_30'),
-                  ),
-                ],
-              ),
-            );
-          },
+                ),
+              ],
+            ),
+          ),
         );
       },
     );
@@ -1557,49 +1628,61 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
     required String title,
     required String description,
     required String price,
+    required String priceSuffix,
     required bool isPopular,
     required Color accentColor,
     required Color textColor,
     required Color subTextColor,
     required Color borderColor,
+    required Color cardBg,
+    required List<String> features,
     required VoidCallback onTap,
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
+        color: cardBg,
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: isPopular ? accentColor : borderColor,
-          width: isPopular ? 2 : 1,
+          width: isPopular ? 2.5 : 1,
         ),
+        boxShadow: isPopular
+            ? [
+                BoxShadow(
+                  color: accentColor.withOpacity(0.15),
+                  blurRadius: 16,
+                  spreadRadius: 2,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : null,
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Expanded(
                     child: Text(
                       title,
                       style: GoogleFonts.outfit(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
                         color: textColor,
                       ),
                     ),
                   ),
-                  if (isPopular)
+                  if (isPopular) ...[
+                    const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2,
-                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
                         color: accentColor,
                         borderRadius: BorderRadius.circular(12),
@@ -1613,49 +1696,94 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                         ),
                       ),
                     ),
+                  ],
                 ],
               ),
-              const SizedBox(height: 6),
-              Text(
-                description,
-                style: GoogleFonts.outfit(
-                  fontSize: 11,
-                  color: subTextColor,
-                  height: 1.4,
-                ),
-              ),
               const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.center,
+              Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 4,
+                runSpacing: 4,
                 children: [
                   Text(
                     price,
                     style: GoogleFonts.outfit(
-                      fontSize: 16,
+                      fontSize: 26,
                       fontWeight: FontWeight.w900,
-                      color: accentColor,
+                      color: textColor,
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: accentColor,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      'Pilih Paket',
-                      style: GoogleFonts.outfit(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
+                  Text(
+                    priceSuffix,
+                    style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: subTextColor,
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                description,
+                style: GoogleFonts.outfit(
+                  fontSize: 12,
+                  color: subTextColor,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: onTap,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: accentColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  elevation: 0,
+                  shadowColor: Colors.transparent,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  'Pilih Paket',
+                  style: GoogleFonts.outfit(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Divider(color: borderColor, height: 1),
+              const SizedBox(height: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: features.map((feat) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.check_circle_rounded,
+                          size: 16,
+                          color: accentColor,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            feat,
+                            style: GoogleFonts.outfit(
+                              fontSize: 11.5,
+                              color: textColor.withOpacity(0.85),
+                              height: 1.3,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
               ),
             ],
           ),

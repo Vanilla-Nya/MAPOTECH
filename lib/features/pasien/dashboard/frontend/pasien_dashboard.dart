@@ -7,6 +7,10 @@ import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/widgets/animated_transitions.dart';
 import 'package:mapotech/shared/widgets/custom_button.dart';
 import 'package:mapotech/shared/supabase_service.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong2.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:mapotech/features/pasien/dashboard/frontend/pasien_dokter_search.dart';
 
 class PasienDashboard extends ConsumerStatefulWidget {
   final Function(String menu)? onNavigate;
@@ -22,6 +26,9 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
   int _activePrescriptionsCount = 0;
   Map<String, dynamic>? _nextAppointment;
   String _doctorName = '';
+  LatLng? _currentLocation;
+  List<Map<String, dynamic>> _doctors = [];
+  List<Map<String, dynamic>> _pharmacies = [];
 
   @override
   void initState() {
@@ -35,9 +42,61 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
     await Future.wait([
       _loadPrescriptionCount(),
       _loadNextAppointment(),
+      _fetchCurrentLocation(),
+      _loadMapMarkers(),
     ]);
     if (mounted) {
       setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _fetchCurrentLocation() async {
+    try {
+      bool serviceEnabled;
+      LocationPermission permission;
+
+      // On web we can check permission or ask directly
+      serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return;
+
+      permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) return;
+      }
+
+      if (permission == LocationPermission.deniedForever) return;
+
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      if (mounted) {
+        setState(() {
+          _currentLocation = LatLng(position.latitude, position.longitude);
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching device location: $e');
+    }
+  }
+
+  Future<void> _loadMapMarkers() async {
+    try {
+      final docs = await _db.fetchAllDoctors();
+      final pharms = await _db.fetchAllPharmacies();
+      if (mounted) {
+        setState(() {
+          _doctors = docs
+              .where((d) => d['latitude'] != null && d['longitude'] != null)
+              .toList();
+          _pharmacies = pharms
+              .where((p) => p['latitude'] != null && p['longitude'] != null)
+              .toList();
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading map markers: $e');
     }
   }
 
@@ -47,7 +106,8 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
       final birthDate = DateTime.parse(birthDateStr);
       final today = DateTime.now();
       int age = today.year - birthDate.year;
-      if (today.month < birthDate.month || (today.month == birthDate.month && today.day < birthDate.day)) {
+      if (today.month < birthDate.month ||
+          (today.month == birthDate.month && today.day < birthDate.day)) {
         age--;
       }
       return '$age tahun';
@@ -61,8 +121,18 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
     try {
       final dt = DateTime.parse(rawDate);
       final months = [
-        'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
-        'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'Mei',
+        'Jun',
+        'Jul',
+        'Agt',
+        'Sep',
+        'Okt',
+        'Nov',
+        'Des',
       ];
       return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
     } catch (_) {
@@ -170,7 +240,12 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
 
     final name = user?['name'] ?? 'Alvin';
     final initials = name.isNotEmpty
-        ? name.split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join().toUpperCase()
+        ? name
+              .split(' ')
+              .map((e) => e.isNotEmpty ? e[0] : '')
+              .take(2)
+              .join()
+              .toUpperCase()
         : 'AL';
     final ageStr = _calculateAge(user?['birth_date']);
     final village = user?['village'] ?? 'KEJAYAN';
@@ -178,9 +253,7 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
     final nik = user?['nik'] ?? '3511081208000003';
 
     return _isLoading
-        ? const SkeletonScope(
-            child: SkeletonDashboard(),
-          )
+        ? const SkeletonScope(child: SkeletonDashboard())
         : Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -233,11 +306,26 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                             const SizedBox(height: 6),
                             Row(
                               children: [
-                                _buildProfileSubInfo('USIA', ageStr, subtitleColor, textColor),
+                                _buildProfileSubInfo(
+                                  'USIA',
+                                  ageStr,
+                                  subtitleColor,
+                                  textColor,
+                                ),
                                 const SizedBox(width: 14),
-                                _buildProfileSubInfo('DOMISILI', domisili, subtitleColor, textColor),
+                                _buildProfileSubInfo(
+                                  'DOMISILI',
+                                  domisili,
+                                  subtitleColor,
+                                  textColor,
+                                ),
                                 const SizedBox(width: 14),
-                                _buildProfileSubInfo('NIK', nik, subtitleColor, textColor),
+                                _buildProfileSubInfo(
+                                  'NIK',
+                                  nik,
+                                  subtitleColor,
+                                  textColor,
+                                ),
                               ],
                             ),
                           ],
@@ -294,26 +382,42 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                                     shape: BoxShape.circle,
                                   ),
                                   alignment: Alignment.center,
-                                  child: Icon(Icons.sync_rounded, color: themeAccent),
+                                  child: Icon(
+                                    Icons.sync_rounded,
+                                    color: themeAccent,
+                                  ),
                                 ),
                                 const SizedBox(width: 16),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Text(
                                         'BOOKING LAGI',
-                                        style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.bold, color: subtitleColor, letterSpacing: 0.5),
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 8,
+                                          fontWeight: FontWeight.bold,
+                                          color: subtitleColor,
+                                          letterSpacing: 0.5,
+                                        ),
                                       ),
                                       Text(
                                         'dr. Agoes Soetanto',
-                                        style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w900, color: textColor),
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w900,
+                                          color: textColor,
+                                        ),
                                       ),
                                     ],
                                   ),
                                 ),
-                                Icon(Icons.chevron_right_rounded, color: themeAccent),
+                                Icon(
+                                  Icons.chevron_right_rounded,
+                                  color: themeAccent,
+                                ),
                               ],
                             ),
                           ),
@@ -352,17 +456,25 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                                     shape: BoxShape.circle,
                                   ),
                                   alignment: Alignment.center,
-                                  child: Icon(Icons.qr_code_rounded, color: themeAccent),
+                                  child: Icon(
+                                    Icons.qr_code_rounded,
+                                    color: themeAccent,
+                                  ),
                                 ),
                                 const SizedBox(width: 16),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Text(
                                         'QR RESEP',
-                                        style: GoogleFonts.outfit(fontSize: 8, color: subtitleColor, fontWeight: FontWeight.bold),
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 8,
+                                          color: subtitleColor,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
                                       Text(
                                         _activePrescriptionsCount > 0
@@ -370,14 +482,21 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                                             : 'Konsultasi dulu untuk mendapatkan resep',
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
-                                        style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 10,
+                                          color: subtitleColor,
+                                        ),
                                       ),
                                       const SizedBox(height: 6),
                                       Text(
                                         _activePrescriptionsCount > 0
                                             ? 'LIHAT RESEP SEKARANG >'
                                             : 'BOOKING SEKARANG >',
-                                        style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: themeAccent),
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w900,
+                                          color: themeAccent,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -409,7 +528,11 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                         children: [
                           Text(
                             '🗓️  Janji Temu',
-                            style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w900, color: textColor),
+                            style: GoogleFonts.outfit(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w900,
+                              color: textColor,
+                            ),
                           ),
                           const SizedBox(height: 12),
                           Container(
@@ -426,7 +549,12 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                               children: [
                                 Text(
                                   'JANJI TEMU BERIKUTNYA',
-                                  style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.w900, color: themeAccent, letterSpacing: 0.5),
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.w900,
+                                    color: themeAccent,
+                                    letterSpacing: 0.5,
+                                  ),
                                 ),
                                 const SizedBox(height: 20),
                                 if (_nextAppointment != null) ...[
@@ -441,25 +569,48 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                                         ),
                                         alignment: Alignment.center,
                                         child: Text(
-                                          _doctorName.isNotEmpty && _doctorName.length > 3
-                                              ? _doctorName.split(' ').where((e) => e != 'dr.').map((e) => e.isNotEmpty ? e[0] : '').take(2).join().toUpperCase()
+                                          _doctorName.isNotEmpty &&
+                                                  _doctorName.length > 3
+                                              ? _doctorName
+                                                    .split(' ')
+                                                    .where((e) => e != 'dr.')
+                                                    .map(
+                                                      (e) => e.isNotEmpty
+                                                          ? e[0]
+                                                          : '',
+                                                    )
+                                                    .take(2)
+                                                    .join()
+                                                    .toUpperCase()
                                               : 'DR',
-                                          style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w900, color: themeAccent),
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w900,
+                                            color: themeAccent,
+                                          ),
                                         ),
                                       ),
                                       const SizedBox(width: 14),
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             Text(
                                               _doctorName,
-                                              style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w900, color: textColor),
+                                              style: GoogleFonts.outfit(
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.w900,
+                                                color: textColor,
+                                              ),
                                             ),
                                             const SizedBox(height: 4),
                                             Text(
                                               'Tanggal: ${_formatDate(_nextAppointment!['date_queue'] ?? '')}',
-                                              style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor),
+                                              style: GoogleFonts.outfit(
+                                                fontSize: 11,
+                                                color: subtitleColor,
+                                              ),
                                             ),
                                           ],
                                         ),
@@ -468,21 +619,38 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                                   ),
                                   const SizedBox(height: 20),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 12,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: isDark ? const Color(0xFF1E1E22) : const Color(0xFFF7F5FC),
+                                      color: isDark
+                                          ? const Color(0xFF1E1E22)
+                                          : const Color(0xFFF7F5FC),
                                       borderRadius: BorderRadius.circular(16),
                                     ),
                                     child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
                                       children: [
                                         Text(
                                           'NOMOR ANTRIAN',
-                                          style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.bold, color: subtitleColor, letterSpacing: 0.5),
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.bold,
+                                            color: subtitleColor,
+                                            letterSpacing: 0.5,
+                                          ),
                                         ),
                                         Text(
-                                          _nextAppointment!['no_queue']?.toString() ?? 'A01',
-                                          style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w900, color: themeAccent),
+                                          _nextAppointment!['no_queue']
+                                                  ?.toString() ??
+                                              'A01',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.w900,
+                                            color: themeAccent,
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -499,11 +667,21 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                                   Center(
                                     child: Column(
                                       children: [
-                                        Icon(Icons.calendar_today_rounded, size: 28, color: subtitleColor.withOpacity(0.5)),
+                                        Icon(
+                                          Icons.calendar_today_rounded,
+                                          size: 28,
+                                          color: subtitleColor.withOpacity(0.5),
+                                        ),
                                         const SizedBox(height: 12),
                                         Text(
-                                          state.language == 'id' ? 'Belum ada janji temu' : 'No upcoming appointments',
-                                          style: GoogleFonts.outfit(fontSize: 12, color: subtitleColor, fontWeight: FontWeight.bold),
+                                          state.language == 'id'
+                                              ? 'Belum ada janji temu'
+                                              : 'No upcoming appointments',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 12,
+                                            color: subtitleColor,
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -537,7 +715,11 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                             children: [
                               Text(
                                 '📍  Lokasi Anda',
-                                style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w900, color: textColor),
+                                style: GoogleFonts.outfit(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w900,
+                                  color: textColor,
+                                ),
                               ),
                               MouseRegion(
                                 cursor: SystemMouseCursors.click,
@@ -547,7 +729,11 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                                   },
                                   child: Text(
                                     'PERBARUI DATA',
-                                    style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: themeAccent),
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w900,
+                                      color: themeAccent,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -563,56 +749,236 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                                 border: Border.all(color: borderColor),
                                 borderRadius: BorderRadius.circular(24),
                               ),
-                              child: Stack(
-                                children: [
-                                  // Map Simulator Background grid/image
-                                  Image.network(
-                                    'https://images.unsplash.com/photo-1524661135-423995f22d0b?q=80&w=800',
-                                    fit: BoxFit.cover,
-                                    width: double.infinity,
-                                    height: double.infinity,
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(24),
+                                child: FlutterMap(
+                                  options: MapOptions(
+                                    initialCenter:
+                                        _currentLocation ??
+                                        const LatLng(
+                                          -7.973,
+                                          113.880,
+                                        ), // Center on Pujer by default
+                                    initialZoom: 14.0,
                                   ),
-                                  // Dark Overlay for map aesthetics
-                                  Container(color: Colors.white.withOpacity(0.65)),
-                                  
-                                  // Pin Icon Mockup
-                                  Center(
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Container(
-                                          width: 32,
-                                          height: 32,
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFF48C9B0),
-                                            shape: BoxShape.circle,
-                                            border: Border.all(color: Colors.white, width: 2.0),
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: Colors.black.withOpacity(0.2),
-                                                blurRadius: 8,
-                                                offset: const Offset(0, 4),
-                                              ),
-                                            ],
-                                          ),
-                                          child: const Icon(Icons.add_rounded, color: Colors.white, size: 16),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                          decoration: BoxDecoration(
-                                            color: Colors.indigo,
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: Text(
-                                            domisili.toUpperCase(),
-                                            style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
-                                          ),
-                                        ),
-                                      ],
+                                  children: [
+                                    TileLayer(
+                                      urlTemplate: isDark
+                                          ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+                                          : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+                                      subdomains: const ['a', 'b', 'c', 'd'],
                                     ),
-                                  ),
-                                ],
+                                    MarkerLayer(
+                                      markers:
+                                          [
+                                                // Current location marker (blue pulse)
+                                                if (_currentLocation != null)
+                                                  Marker(
+                                                    point: _currentLocation!,
+                                                    width: 40,
+                                                    height: 40,
+                                                    child: Container(
+                                                      decoration: BoxDecoration(
+                                                        color: themeAccent
+                                                            .withOpacity(0.2),
+                                                        shape: BoxShape.circle,
+                                                      ),
+                                                      alignment:
+                                                          Alignment.center,
+                                                      child: Container(
+                                                        width: 14,
+                                                        height: 14,
+                                                        decoration:
+                                                            BoxDecoration(
+                                                              color:
+                                                                  themeAccent,
+                                                              shape: BoxShape
+                                                                  .circle,
+                                                              border: Border.all(
+                                                                color: Colors
+                                                                    .white,
+                                                                width: 2.0,
+                                                              ),
+                                                            ),
+                                                      ),
+                                                    ),
+                                                  ),
+
+                                                // Doctor pins
+                                                ..._doctors.map((doc) {
+                                                  final lat = double.tryParse(
+                                                    doc['latitude']
+                                                            ?.toString() ??
+                                                        '',
+                                                  );
+                                                  final lng = double.tryParse(
+                                                    doc['longitude']
+                                                            ?.toString() ??
+                                                        '',
+                                                  );
+                                                  if (lat == null ||
+                                                      lng == null) {
+                                                    return const Marker(
+                                                      point: LatLng(0, 0),
+                                                      child: SizedBox.shrink(),
+                                                    );
+                                                  }
+                                                  return Marker(
+                                                    point: LatLng(lat, lng),
+                                                    width: 40,
+                                                    height: 40,
+                                                    child: MouseRegion(
+                                                      cursor: SystemMouseCursors
+                                                          .click,
+                                                      child: GestureDetector(
+                                                        onTap: () {
+                                                          showDialog(
+                                                            context: context,
+                                                            barrierColor: Colors
+                                                                .black
+                                                                .withOpacity(
+                                                                  0.45,
+                                                                ),
+                                                            builder: (ctx) =>
+                                                                DoctorDetailDialog(
+                                                                  dokter: doc,
+                                                                  isDark:
+                                                                      isDark,
+                                                                ),
+                                                          );
+                                                        },
+                                                        child: Container(
+                                                          decoration: BoxDecoration(
+                                                            color: Colors
+                                                                .redAccent,
+                                                            shape:
+                                                                BoxShape.circle,
+                                                            border: Border.all(
+                                                              color:
+                                                                  Colors.white,
+                                                              width: 2.0,
+                                                            ),
+                                                            boxShadow: [
+                                                              BoxShadow(
+                                                                color: Colors
+                                                                    .black
+                                                                    .withOpacity(
+                                                                      0.2,
+                                                                    ),
+                                                                blurRadius: 6,
+                                                                offset:
+                                                                    const Offset(
+                                                                      0,
+                                                                      3,
+                                                                    ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                          child: const Icon(
+                                                            Icons
+                                                                .medical_services_rounded,
+                                                            color: Colors.white,
+                                                            size: 14,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  );
+                                                }),
+
+                                                // Pharmacy pins
+                                                ..._pharmacies.map((pharm) {
+                                                  final lat = double.tryParse(
+                                                    pharm['latitude']
+                                                            ?.toString() ??
+                                                        '',
+                                                  );
+                                                  final lng = double.tryParse(
+                                                    pharm['longitude']
+                                                            ?.toString() ??
+                                                        '',
+                                                  );
+                                                  if (lat == null ||
+                                                      lng == null) {
+                                                    return const Marker(
+                                                      point: LatLng(0, 0),
+                                                      child: SizedBox.shrink(),
+                                                    );
+                                                  }
+                                                  return Marker(
+                                                    point: LatLng(lat, lng),
+                                                    width: 40,
+                                                    height: 40,
+                                                    child: MouseRegion(
+                                                      cursor: SystemMouseCursors
+                                                          .click,
+                                                      child: GestureDetector(
+                                                        onTap: () {
+                                                          showDialog(
+                                                            context: context,
+                                                            barrierColor: Colors
+                                                                .black
+                                                                .withOpacity(
+                                                                  0.45,
+                                                                ),
+                                                            builder: (ctx) =>
+                                                                PharmacyDetailDialog(
+                                                                  pharmacy:
+                                                                      pharm,
+                                                                  isDark:
+                                                                      isDark,
+                                                                ),
+                                                          );
+                                                        },
+                                                        child: Container(
+                                                          decoration: BoxDecoration(
+                                                            color: const Color(
+                                                              0xFF2EC4B6,
+                                                            ),
+                                                            shape:
+                                                                BoxShape.circle,
+                                                            border: Border.all(
+                                                              color:
+                                                                  Colors.white,
+                                                              width: 2.0,
+                                                            ),
+                                                            boxShadow: [
+                                                              BoxShadow(
+                                                                color: Colors
+                                                                    .black
+                                                                    .withOpacity(
+                                                                      0.2,
+                                                                    ),
+                                                                blurRadius: 6,
+                                                                offset:
+                                                                    const Offset(
+                                                                      0,
+                                                                      3,
+                                                                    ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                          child: const Icon(
+                                                            Icons
+                                                                .local_pharmacy_rounded,
+                                                            color: Colors.white,
+                                                            size: 14,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  );
+                                                }),
+                                              ]
+                                              .where(
+                                                (m) =>
+                                                    m.point.latitude != 0.0 &&
+                                                    m.point.longitude != 0.0,
+                                              )
+                                              .toList(),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
@@ -626,18 +992,318 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
           );
   }
 
-  Widget _buildProfileSubInfo(String title, String val, Color subCol, Color textCol) {
+  Widget _buildProfileSubInfo(
+    String title,
+    String val,
+    Color subCol,
+    Color textCol,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           title,
-          style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.bold, color: subCol, letterSpacing: 0.5),
+          style: GoogleFonts.outfit(
+            fontSize: 8,
+            fontWeight: FontWeight.bold,
+            color: subCol,
+            letterSpacing: 0.5,
+          ),
         ),
         const SizedBox(height: 2),
         Text(
           val,
-          style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w900, color: textCol),
+          style: GoogleFonts.outfit(
+            fontSize: 12,
+            fontWeight: FontWeight.w900,
+            color: textCol,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class PharmacyDetailDialog extends StatelessWidget {
+  final Map<String, dynamic> pharmacy;
+  final bool isDark;
+
+  const PharmacyDetailDialog({
+    super.key,
+    required this.pharmacy,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cardBg = isDark ? const Color(0xFF161619) : Colors.white;
+    final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
+    final subtitleColor = isDark ? Colors.grey[400]! : const Color(0xFF6F6A8A);
+    final borderColor = isDark
+        ? const Color(0xFF252528)
+        : const Color(0xFFECEEF2);
+    final sectionBg = isDark
+        ? const Color(0xFF1E1E22)
+        : const Color(0xFFF8FAFD);
+    final green = const Color(0xFF27AE60);
+    final themeAccent = const Color(0xFF48C9B0);
+
+    final faskes = pharmacy['nama_faskes'] ?? 'Apotek Mandiri';
+    final name = pharmacy['name'] ?? '';
+    final address = pharmacy['address'] ?? '';
+    final about =
+        pharmacy['about'] ??
+        'Selamat datang di apotek kami. Kami berkomitmen untuk menyediakan obat-obatan berkualitas tinggi dan layanan kefarmasian terbaik bagi Anda.';
+    final phone = pharmacy['whatsapp_number'] ?? '';
+    final bool verified = pharmacy['is_visible'] ?? true;
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      backgroundColor: cardBg,
+      child: Container(
+        width: 480,
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Header
+            Row(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: themeAccent.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(
+                    Icons.local_pharmacy_rounded,
+                    color: themeAccent,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        faskes,
+                        style: GoogleFonts.outfit(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          color: textColor,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (name.isNotEmpty && name != faskes)
+                        Text(
+                          'Apoteker: $name',
+                          style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: subtitleColor,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close_rounded),
+                  color: subtitleColor,
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            // Verified Badge
+            if (verified)
+              Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: green.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: green.withOpacity(0.2)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.verified_rounded, size: 14, color: green),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Mapotek Verified Pharmacy',
+                      style: GoogleFonts.outfit(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: green,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            // Details section
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: sectionBg,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: borderColor),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildDetailRow(
+                    Icons.location_on_outlined,
+                    'Alamat',
+                    address,
+                    textColor,
+                    subtitleColor,
+                  ),
+                  const SizedBox(height: 12),
+                  _buildDetailRow(
+                    Icons.access_time_rounded,
+                    'Jam Operasional',
+                    pharmacy['jam_kerja'] ?? '08:00 - 21:00',
+                    textColor,
+                    subtitleColor,
+                  ),
+                  const SizedBox(height: 12),
+                  _buildDetailRow(
+                    Icons.info_outline_rounded,
+                    'Tentang Apotek',
+                    about,
+                    textColor,
+                    subtitleColor,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Action Buttons
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      if (phone.isNotEmpty) {
+                        var clean = phone.replaceAll(RegExp(r'\D'), '');
+                        if (clean.startsWith('0')) {
+                          clean = '62${clean.substring(1)}';
+                        } else if (clean.startsWith('8')) {
+                          clean = '62$clean';
+                        }
+                        final uri = Uri.parse("https://wa.me/$clean");
+                        if (await canLaunchUrl(uri)) {
+                          await launchUrl(
+                            uri,
+                            mode: LaunchMode.externalApplication,
+                          );
+                        }
+                      }
+                    },
+                    icon: const Icon(
+                      Icons.chat_bubble_outline_rounded,
+                      size: 16,
+                    ),
+                    label: const Text('Hubungi Apotek'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: green,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      textStyle: GoogleFonts.outfit(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                if (pharmacy['google_maps_link'] != null &&
+                    pharmacy['google_maps_link'].toString().isNotEmpty)
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        final uri = Uri.parse(pharmacy['google_maps_link']);
+                        if (await canLaunchUrl(uri)) {
+                          await launchUrl(
+                            uri,
+                            mode: LaunchMode.externalApplication,
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.map_outlined, size: 16),
+                      label: const Text('Petunjuk Arah'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: themeAccent,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        textStyle: GoogleFonts.outfit(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(
+    IconData icon,
+    String label,
+    String value,
+    Color textColor,
+    Color subtitleColor,
+  ) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 16, color: subtitleColor),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: GoogleFonts.outfit(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: subtitleColor,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: GoogleFonts.outfit(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: textColor,
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );

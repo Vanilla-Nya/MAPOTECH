@@ -1872,6 +1872,87 @@ class SupabaseService {
     }
   }
 
+  /// Extracts coordinates from a Google Maps link.
+  /// Handles both @lat,lng format and q=lat,lng format.
+  static Map<String, double?> extractLatLngFromMapsLink(String urlStr) {
+    if (urlStr.isEmpty) return {'latitude': null, 'longitude': null};
+    
+    // 1. Try matching @-7.973354,113.8801833
+    final atRegex = RegExp(r'@(-?\d+\.\d+),(-?\d+\.\d+)');
+    var match = atRegex.firstMatch(urlStr);
+    if (match != null) {
+      return {
+        'latitude': double.tryParse(match.group(1) ?? ''),
+        'longitude': double.tryParse(match.group(2) ?? ''),
+      };
+    }
+    
+    // 2. Try matching q=-7.973354,113.8801833
+    final qRegex = RegExp(r'[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)');
+    match = qRegex.firstMatch(urlStr);
+    if (match != null) {
+      return {
+        'latitude': double.tryParse(match.group(1) ?? ''),
+        'longitude': double.tryParse(match.group(2) ?? ''),
+      };
+    }
+    
+    return {'latitude': null, 'longitude': null};
+  }
+
+  // Fetch all pharmacies with their user profile details
+  Future<List<Map<String, dynamic>>> fetchAllPharmacies() async {
+    try {
+      final pharmaciesRaw = await _get('user_detail_pharmacist?select=*,user:id(*)', schema: 'public');
+      
+      final List<Map<String, dynamic>> pharmaciesList = [];
+      for (final pharm in pharmaciesRaw) {
+        if (pharm is! Map) continue;
+        final pharmMap = Map<String, dynamic>.from(pharm);
+        final userRaw = pharmMap['user'];
+        if (userRaw != null && userRaw is Map) {
+          final userMap = Map<String, dynamic>.from(userRaw);
+          
+          final subStatus = (pharmMap['subscription_status'] ?? 'INACTIVE').toString().toUpperCase();
+          final subExpiredAt = pharmMap['subscription_expired_at'];
+          bool isSubActive = false;
+          if (subStatus == 'ACTIVE' && subExpiredAt != null) {
+            try {
+              final expiry = DateTime.parse(subExpiredAt.toString());
+              isSubActive = expiry.isAfter(DateTime.now());
+            } catch (_) {}
+          }
+
+          final isVisible = isSubActive && (pharmMap['is_visible'] ?? true);
+
+          pharmaciesList.add({
+            'id': pharmMap['id'] as String,
+            'name': userMap['name'] ?? '',
+            'email': userMap['email'] ?? '',
+            'avatar_url': userMap['avatar_url'] ?? pharmMap['satusehat_photo_url'],
+            'nama_faskes': pharmMap['nama_faskes'] ?? 'Apotek Mandiri',
+            'latitude': pharmMap['latitude'],
+            'longitude': pharmMap['longitude'],
+            'address': userMap['address'] ?? pharmMap['alamat'] ?? '',
+            'province': userMap['province'] ?? '',
+            'district': userMap['district'] ?? '',
+            'sub_district': userMap['sub_district'] ?? '',
+            'village': userMap['village'] ?? '',
+            'google_maps_link': pharmMap['google_maps_link'] ?? '',
+            'subscription_status': subStatus,
+            'subscription_expired_at': subExpiredAt,
+            'about': pharmMap['about'] ?? '',
+            'is_visible': isVisible,
+            'whatsapp_number': pharmMap['whatsapp_number'] ?? userMap['phone_number'] ?? '',
+          });
+        }
+      }
+      return pharmaciesList;
+    } catch (e) {
+      throw Exception('Gagal mengambil daftar apotek: $e');
+    }
+  }
+
   // Create a booking (queue) for a patient with a specific doctor on a given date
   Future<void> createBooking({
     required String doctorId,

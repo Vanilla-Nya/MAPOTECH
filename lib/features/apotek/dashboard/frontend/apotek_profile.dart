@@ -27,17 +27,20 @@ class _ApotekProfileState extends ConsumerState<ApotekProfile> {
   DateTime? _subExpiryDate;
 
   late TextEditingController _addressController;
+  late TextEditingController _mapsLinkController;
 
   @override
   void initState() {
     super.initState();
     _addressController = TextEditingController();
+    _mapsLinkController = TextEditingController();
     _fetchDbData();
   }
 
   @override
   void dispose() {
     _addressController.dispose();
+    _mapsLinkController.dispose();
     super.dispose();
   }
 
@@ -62,6 +65,7 @@ class _ApotekProfileState extends ConsumerState<ApotekProfile> {
       if (detailRes != null) {
         _addressController.text = detailRes['alamat']?.toString() ??
             'Apotek CyrenElysia Cabang Utama Pujer, Jl. Raya Pujer No. 45, Kel. KEJAYAN, Kec. PUJER, KABUPATEN BONDOWOSO';
+        _mapsLinkController.text = detailRes['google_maps_link']?.toString() ?? '';
 
         // Parse subscription details
         _subStatus = (detailRes['subscription_status'] ?? 'INACTIVE')
@@ -170,6 +174,50 @@ class _ApotekProfileState extends ConsumerState<ApotekProfile> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error renewing apotek subscription: $e'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
+  }
+
+  Future<void> _saveApotekLocation() async {
+    final state = ref.read(landingPageProvider);
+    final userId = state.activeApotekId;
+    if (userId == null) return;
+
+    setState(() => _isSaving = true);
+
+    try {
+      final client = SupabaseService.client;
+      final mapsLink = _mapsLinkController.text.trim();
+      final latLng = SupabaseService.extractLatLngFromMapsLink(mapsLink);
+
+      await client
+          .from('user_detail_pharmacist')
+          .update({
+            'alamat': _addressController.text.trim(),
+            'google_maps_link': mapsLink,
+            'latitude': latLng['latitude'],
+            'longitude': latLng['longitude'],
+          })
+          .eq('id', userId);
+
+      await _fetchDbData();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Lokasi & alamat apotek berhasil disimpan!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gagal menyimpan lokasi apotek: $e'),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -469,6 +517,63 @@ class _ApotekProfileState extends ConsumerState<ApotekProfile> {
                             isDense: true,
                           ),
                         ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Google Maps Link Apotek',
+                        style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w700, color: subtitleColor),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: inputBg,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: borderColor),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        child: TextField(
+                          controller: _mapsLinkController,
+                          style: GoogleFonts.outfit(fontSize: 12, color: textColor),
+                          decoration: InputDecoration(
+                            hintText: 'https://www.google.com/maps/place/...',
+                            hintStyle: GoogleFonts.outfit(fontSize: 11, color: subtitleColor.withOpacity(0.6)),
+                            border: InputBorder.none,
+                            isDense: true,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          ElevatedButton.icon(
+                            onPressed: _isSaving ? null : _saveApotekLocation,
+                            icon: _isSaving
+                                ? const SizedBox(
+                                    width: 12,
+                                    height: 12,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Icon(Icons.save_rounded, size: 14),
+                            label: const Text('SIMPAN LOKASI'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: purple,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              textStyle: GoogleFonts.outfit(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),

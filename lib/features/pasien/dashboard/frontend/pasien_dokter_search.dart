@@ -1,4 +1,4 @@
-import 'dart:ui' show ImageFilter;
+import 'dart:ui';
 import 'dart:io' as io;
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -10,6 +10,7 @@ import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/supabase_service.dart';
 import 'package:mapotech/shared/widgets/empty_state_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:mapotech/features/dokter/dashboard/frontend/web_map_widget.dart';
 
 /// Cari Praktik Mandiri - Pasien Dashboard Page
 class PasienDokterSearch extends ConsumerStatefulWidget {
@@ -627,6 +628,203 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
   List<Map<String, dynamic>> _schedules = [];
   bool _loadingSchedules = true;
   String? _scheduleError;
+
+  double _zoomLevel = 15.0;
+
+  String _getMapEmbedUrl(String inputLink) {
+    if (inputLink.isEmpty) {
+      final faskes = widget.dokter['nama_faskes']?.toString() ?? '';
+      final address = widget.dokter['address']?.toString() ?? '';
+      final village = widget.dokter['village']?.toString() ?? '';
+      final subDistrict = widget.dokter['sub_district']?.toString() ?? '';
+      final district = widget.dokter['district']?.toString() ?? '';
+      final province = widget.dokter['province']?.toString() ?? '';
+
+      final queryParts = [
+        if (faskes.isNotEmpty) faskes,
+        if (address.isNotEmpty && address != faskes) address,
+        if (village.isNotEmpty) village,
+        if (subDistrict.isNotEmpty) subDistrict,
+        if (district.isNotEmpty) district,
+        if (province.isNotEmpty) province,
+      ];
+      final query = queryParts.join(', ');
+      return 'https://maps.google.com/maps?q=${Uri.encodeComponent(query.isNotEmpty ? query : "Panggungan, Bondowoso")}&t=&z=${_zoomLevel.toInt()}&ie=UTF8&iwloc=&output=embed';
+    }
+
+    // Check if coordinates exist in the URL
+    final atRegex = RegExp(r'@(-?\d+\.\d+),(-?\d+\.\d+)');
+    var match = atRegex.firstMatch(inputLink);
+    if (match != null) {
+      final lat = match.group(1);
+      final lng = match.group(2);
+      return 'https://maps.google.com/maps?q=$lat,$lng&t=&z=${_zoomLevel.toInt()}&ie=UTF8&iwloc=&output=embed';
+    }
+
+    final qRegex = RegExp(r'[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)');
+    match = qRegex.firstMatch(inputLink);
+    if (match != null) {
+      final lat = match.group(1);
+      final lng = match.group(2);
+      return 'https://maps.google.com/maps?q=$lat,$lng&t=&z=${_zoomLevel.toInt()}&ie=UTF8&iwloc=&output=embed';
+    }
+
+    // Extract place name from /place/Name+Of+Place/
+    final placeRegex = RegExp(r'/maps/place/([^/]+)');
+    match = placeRegex.firstMatch(inputLink);
+    if (match != null) {
+      final placeName = Uri.decodeComponent(
+        match.group(1)!.replaceAll('+', ' '),
+      );
+      return 'https://maps.google.com/maps?q=${Uri.encodeComponent(placeName)}&t=&z=${_zoomLevel.toInt()}&ie=UTF8&iwloc=&output=embed';
+    }
+
+    if (inputLink.startsWith('http://') || inputLink.startsWith('https://')) {
+      if (inputLink.contains('output=embed') || inputLink.contains('/embed/')) {
+        return inputLink;
+      }
+      return 'https://maps.google.com/maps?q=${Uri.encodeComponent(inputLink)}&t=&z=${_zoomLevel.toInt()}&ie=UTF8&iwloc=&output=embed';
+    }
+
+    return 'https://maps.google.com/maps?q=${Uri.encodeComponent(inputLink)}&t=&z=${_zoomLevel.toInt()}&ie=UTF8&iwloc=&output=embed';
+  }
+
+  Widget _buildZoomButton(IconData icon, VoidCallback onTap) {
+    final isDark = ref.read(landingPageProvider).appearance == 'dark';
+    return Material(
+      color: isDark ? const Color(0xFF334155) : Colors.white,
+      shape: const CircleBorder(),
+      elevation: 2,
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: Container(
+          width: 28,
+          height: 28,
+          alignment: Alignment.center,
+          child: Icon(icon, size: 16, color: isDark ? Colors.white : Colors.black87),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMapContent(bool isDark) {
+    final mapsLink = widget.dokter['google_maps_link']?.toString() ?? '';
+    if (kIsWeb) {
+      final embedUrl = _getMapEmbedUrl(mapsLink);
+      return buildWebMapWidget(mapUrl: embedUrl, isDark: isDark);
+    }
+
+    // Non-web fallback
+    final village = widget.dokter['village']?.toString() ?? '';
+    return Stack(
+      children: [
+        // Map background canvas
+        Container(
+          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+        ),
+        // Custom Painter or Mock Vector Map Graphics
+        Positioned.fill(
+          child: CustomPaint(
+            painter: MapGraphicsPainter(isDark: isDark, zoomLevel: _zoomLevel),
+          ),
+        ),
+        // Center Pin Marker
+        Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(4),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: 4,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  village.isNotEmpty ? village : 'Panggungan',
+                  style: GoogleFonts.outfit(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+              ),
+              const Icon(
+                Icons.location_on_rounded,
+                color: Color(0xFF8DC63F),
+                size: 32,
+              ),
+            ],
+          ),
+        ),
+        // Zoom controls (+ / -)
+        Positioned(
+          right: 12,
+          top: 40,
+          child: Column(
+            children: [
+              _buildZoomButton(Icons.add, () {
+                setState(() {
+                  if (_zoomLevel < 18) _zoomLevel += 1;
+                });
+              }),
+              const SizedBox(height: 4),
+              _buildZoomButton(Icons.remove, () {
+                setState(() {
+                  if (_zoomLevel > 12) _zoomLevel -= 1;
+                });
+              }),
+            ],
+          ),
+        ),
+        // Bottom OSM attribution footer
+        Positioned(
+          bottom: 0,
+          left: 0,
+          right: 0,
+          child: Container(
+            color: Colors.white.withOpacity(0.9),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Report a problem | © OpenStreetMap contributors',
+                  style: GoogleFonts.outfit(
+                    fontSize: 8.5,
+                    color: Colors.black54,
+                  ),
+                ),
+                Text(
+                  'Map displayed via OpenStreetMap',
+                  style: GoogleFonts.outfit(
+                    fontSize: 8.5,
+                    color: Colors.black54,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _getAboutText() {
+    final about = widget.dokter['about']?.toString().trim() ?? '';
+    if (about.isNotEmpty) {
+      return about;
+    }
+    return 'Selamat datang di praktik mandiri ${widget.dokter['name']}. Kami berkomitmen untuk memberikan pelayanan kesehatan terbaik, ramah, dan profesional untuk Anda dan keluarga.';
+  }
 
   // Background Customization State
   String _bgType = 'gradient';
@@ -2803,15 +3001,14 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
   }
 
   void _showUpgradePlansModal() {
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
       builder: (ctx) {
         final isDarkTheme = widget.isDark;
-        final bg = isDarkTheme ? const Color(0xFF1E1E22) : Colors.white;
+        final bg = isDarkTheme ? const Color(0xFF18181B) : Colors.white;
+        final cardBg = isDarkTheme ? const Color(0xFF242427) : const Color(0xFFF9FAFB);
         final text = isDarkTheme ? Colors.white : const Color(0xFF1E1E22);
-        final subText = isDarkTheme ? Colors.white60 : Colors.black54;
+        final subText = isDarkTheme ? Colors.white70 : Colors.black54;
         final border = isDarkTheme ? Colors.white12 : Colors.black12;
 
         int subDaysRemaining = 0;
@@ -2825,151 +3022,221 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
           } catch (_) {}
         }
 
-        return DraggableScrollableSheet(
-          initialChildSize: 0.85,
-          minChildSize: 0.5,
-          maxChildSize: 0.95,
-          builder: (_, controller) {
-            return Container(
-              decoration: BoxDecoration(
-                color: bg,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(24),
-                  topRight: Radius.circular(24),
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 1100),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: border, width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(isDarkTheme ? 0.5 : 0.08),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
                 ),
-              ),
-              padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
-              child: ListView(
-                controller: controller,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: border,
-                        borderRadius: BorderRadius.circular(10),
+              ],
+            ),
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Top Header Row
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const SizedBox(width: 32), // spacer to match close button width
+                    Expanded(
+                      child: Text(
+                        'Pilih Paket Layanan',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.outfit(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          color: text,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      hoverColor: Colors.transparent,
+                      splashColor: Colors.transparent,
+                      highlightColor: Colors.transparent,
+                      icon: Icon(Icons.close_rounded, color: text.withOpacity(0.7), size: 24),
+                      onPressed: () => Navigator.of(ctx).pop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Pilih paket yang sesuai untuk menunjang praktik Anda',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.outfit(
+                    fontSize: 14,
+                    color: subText,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+                const SizedBox(height: 28),
+
+                // Subscription Cards
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final List<Widget> cards = [
+                            _buildPlanCard(
+                              title: 'Standard Subscription (30 Days)',
+                              description: 'Akses penuh ke semua fitur dashboard praktik mandiri & booking pasien selama 30 hari.',
+                              price: 'Rp 1.000',
+                              priceSuffix: '/ 30 Hari',
+                              isPopular: false,
+                              accentColor: const Color(0xFF00BFA6),
+                              textColor: text,
+                              subTextColor: subText,
+                              borderColor: border,
+                              cardBg: cardBg,
+                              features: [
+                                'Akses fitur praktik mandiri',
+                                'Sistem booking & antrean pasien',
+                                'Dashboard statistik dokter',
+                                'Durasi aktif 30 hari',
+                              ],
+                              onTap: () {
+                                Navigator.of(ctx).pop();
+                                _renewPackage('subscription_30', 1000);
+                              },
+                            ),
+                            _buildPlanCard(
+                              title: 'Premium Customizer (30 Days)',
+                              description: 'Buka kustomisasi desain profil lengkap (font nama, tagline, blur level, vignette, custom gradients) selama 30 hari.',
+                              price: 'Rp 1.000',
+                              priceSuffix: '/ 30 Hari',
+                              isPopular: false,
+                              accentColor: const Color(0xFFFFB300),
+                              textColor: text,
+                              subTextColor: subText,
+                              borderColor: border,
+                              cardBg: cardBg,
+                              features: [
+                                'Ubah font nama & tagline profil',
+                                'Kustomisasi background & gradient',
+                                'Efek vignette & blur level',
+                                'Tampilan profil premium',
+                              ],
+                              onTap: () {
+                                Navigator.of(ctx).pop();
+                                _renewPackage('premium_30', 1000);
+                              },
+                            ),
+                            if (subDaysRemaining > 0)
+                              _buildPlanCard(
+                                title: 'Premium Customizer (Sync $subDaysRemaining Days)',
+                                description: 'Sesuaikan durasi Premium Customizer Anda dengan sisa durasi Langganan Praktik Anda saat ini.',
+                                price: 'Rp 1.000',
+                                priceSuffix: '/ $subDaysRemaining Hari',
+                                isPopular: false,
+                                accentColor: const Color(0xFFFFB300),
+                                textColor: text,
+                                subTextColor: subText,
+                                borderColor: border,
+                                cardBg: cardBg,
+                                features: [
+                                  'Durasi sinkron dengan langganan',
+                                  'Semua fitur kustomisasi premium',
+                                  'Lebih hemat & efisien',
+                                ],
+                                onTap: () {
+                                  Navigator.of(ctx).pop();
+                                  _renewPackage('premium_sync', 1000);
+                                },
+                              ),
+                            _buildPlanCard(
+                              title: 'Premium Customizer (Lifetime)',
+                              description: 'Buka kustomisasi desain profil premium. Aktif selama langganan Anda aktif. (Kehilangan status jika langganan dibiarkan kedaluwarsa).',
+                              price: 'Rp 1.000',
+                              priceSuffix: '/ Selamanya',
+                              isPopular: true,
+                              accentColor: const Color(0xFFFFB300),
+                              textColor: text,
+                              subTextColor: subText,
+                              borderColor: border,
+                              cardBg: cardBg,
+                              features: [
+                                'Akses customizer selamanya',
+                                'Bebas perpanjangan bulanan',
+                                'Semua fitur premium terbuka',
+                                'Terikat status langganan',
+                              ],
+                              onTap: () {
+                                Navigator.of(ctx).pop();
+                                _renewPackage('premium_lifetime', 1000);
+                              },
+                            ),
+                            _buildPlanCard(
+                              title: 'Mega Bundle (30 Days)',
+                              description: 'Gabungan akses Layanan Praktik & Kustomisasi Profil Premium selama 30 hari.',
+                              price: 'Rp 1.000',
+                              priceSuffix: '/ 30 Hari',
+                              isPopular: false,
+                              accentColor: const Color(0xFFCB8FFF),
+                              textColor: text,
+                              subTextColor: subText,
+                              borderColor: border,
+                              cardBg: cardBg,
+                              features: [
+                                'Semua fitur Standard Subscription',
+                                'Semua fitur Premium Customizer',
+                                'Lebih hemat dibanding beli terpisah',
+                                'Satu kali pembayaran terpadu',
+                              ],
+                              onTap: () {
+                                Navigator.of(ctx).pop();
+                                _renewPackage('bundle_30', 1000);
+                              },
+                            ),
+                          ];
+
+                          return Center(
+                            child: ScrollConfiguration(
+                              behavior: ScrollConfiguration.of(context).copyWith(
+                                dragDevices: {
+                                  PointerDeviceKind.touch,
+                                  PointerDeviceKind.mouse,
+                                  PointerDeviceKind.trackpad,
+                                },
+                              ),
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: IntrinsicHeight(
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: cards.map((card) {
+                                      return SizedBox(
+                                        width: 255,
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                                          child: card,
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Pilih Paket Layanan',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.outfit(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                      color: text,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Pilih paket yang sesuai untuk menunjang praktik Anda',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.outfit(
-                      fontSize: 12,
-                      color: subText,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Section header: Layanan Praktik
-                  Text(
-                    '1. Layanan Praktik (Subscription)',
-                    style: GoogleFonts.outfit(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w900,
-                      color: text,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  _buildPlanCard(
-                    title: 'Standard Subscription (30 Days)',
-                    description: 'Akses penuh ke semua fitur dashboard praktik mandiri & booking pasien selama 30 hari.',
-                    price: 'Rp 1.000',
-                    isPopular: false,
-                    accentColor: const Color(0xFF00BFA6),
-                    textColor: text,
-                    subTextColor: subText,
-                    borderColor: border,
-                    onTap: () => _renewPackage('subscription_30', 1000),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Section header: Kustomisasi Profil
-                  Text(
-                    '2. Desain Profil Premium',
-                    style: GoogleFonts.outfit(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w900,
-                      color: text,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  _buildPlanCard(
-                    title: 'Premium Customizer (30 Days)',
-                    description: 'Buka kustomisasi desain profil lengkap (font nama, tagline, blur level, vignette, custom gradients) selama 30 hari.',
-                    price: 'Rp 1.000',
-                    isPopular: false,
-                    accentColor: const Color(0xFFFFB300),
-                    textColor: text,
-                    subTextColor: subText,
-                    borderColor: border,
-                    onTap: () => _renewPackage('premium_30', 1000),
-                  ),
-                  if (subDaysRemaining > 0) ...[
-                    const SizedBox(height: 8),
-                    _buildPlanCard(
-                      title: 'Premium Customizer (Sync $subDaysRemaining Days)',
-                      description: 'Sesuaikan durasi Premium Customizer Anda dengan sisa durasi Langganan Praktik Anda saat ini.',
-                      price: 'Rp 1.000',
-                      isPopular: false,
-                      accentColor: const Color(0xFFFFB300),
-                      textColor: text,
-                      subTextColor: subText,
-                      borderColor: border,
-                      onTap: () => _renewPackage('premium_sync', 1000),
-                    ),
-                  ],
-                  const SizedBox(height: 8),
-                  _buildPlanCard(
-                    title: 'Premium Customizer (Lifetime)',
-                    description: 'Buka kustomisasi desain profil premium. Aktif selama langganan Anda aktif. (Kehilangan status jika langganan dibiarkan kedaluwarsa).',
-                    price: 'Rp 1.000',
-                    isPopular: true,
-                    accentColor: const Color(0xFFFFB300),
-                    textColor: text,
-                    subTextColor: subText,
-                    borderColor: border,
-                    onTap: () => _renewPackage('premium_lifetime', 1000),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Section header: Mega Bundle
-                  Text(
-                    '3. Mega Bundle (Subscription + Premium)',
-                    style: GoogleFonts.outfit(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w900,
-                      color: text,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  _buildPlanCard(
-                    title: 'Mega Bundle (30 Days)',
-                    description: 'Gabungan akses Layanan Praktik & Kustomisasi Profil Premium selama 30 hari.',
-                    price: 'Rp 1.000',
-                    isPopular: false,
-                    accentColor: const Color(0xFFCB8FFF),
-                    textColor: text,
-                    subTextColor: subText,
-                    borderColor: border,
-                    onTap: () => _renewPackage('bundle_30', 1000),
-                  ),
-                ],
-              ),
-            );
-          },
+                ),
+              ],
+            ),
+          ),
         );
       },
     );
@@ -2979,46 +3246,61 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
     required String title,
     required String description,
     required String price,
+    required String priceSuffix,
     required bool isPopular,
     required Color accentColor,
     required Color textColor,
     required Color subTextColor,
     required Color borderColor,
+    required Color cardBg,
+    required List<String> features,
     required VoidCallback onTap,
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
+        color: cardBg,
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: isPopular ? accentColor : borderColor,
-          width: isPopular ? 2 : 1,
+          width: isPopular ? 2.5 : 1,
         ),
+        boxShadow: isPopular
+            ? [
+                BoxShadow(
+                  color: accentColor.withOpacity(0.15),
+                  blurRadius: 16,
+                  spreadRadius: 2,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : null,
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Expanded(
                     child: Text(
                       title,
                       style: GoogleFonts.outfit(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
                         color: textColor,
                       ),
                     ),
                   ),
-                  if (isPopular)
+                  if (isPopular) ...[
+                    const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
                         color: accentColor,
                         borderRadius: BorderRadius.circular(12),
@@ -3032,46 +3314,94 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
                         ),
                       ),
                     ),
+                  ],
                 ],
               ),
-              const SizedBox(height: 6),
-              Text(
-                description,
-                style: GoogleFonts.outfit(
-                  fontSize: 11,
-                  color: subTextColor,
-                  height: 1.4,
-                ),
-              ),
               const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.center,
+              Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 4,
+                runSpacing: 4,
                 children: [
                   Text(
                     price,
                     style: GoogleFonts.outfit(
-                      fontSize: 16,
+                      fontSize: 26,
                       fontWeight: FontWeight.w900,
-                      color: accentColor,
+                      color: textColor,
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: accentColor,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      'Pilih Paket',
-                      style: GoogleFonts.outfit(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
+                  Text(
+                    priceSuffix,
+                    style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: subTextColor,
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                description,
+                style: GoogleFonts.outfit(
+                  fontSize: 12,
+                  color: subTextColor,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: onTap,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: accentColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  elevation: 0,
+                  shadowColor: Colors.transparent,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  'Pilih Paket',
+                  style: GoogleFonts.outfit(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Divider(color: borderColor, height: 1),
+              const SizedBox(height: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: features.map((feat) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.check_circle_rounded,
+                          size: 16,
+                          color: accentColor,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            feat,
+                            style: GoogleFonts.outfit(
+                              fontSize: 11.5,
+                              color: textColor.withOpacity(0.85),
+                              height: 1.3,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
               ),
             ],
           ),
@@ -3932,9 +4262,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    _formatFullAddress().isNotEmpty
-                                        ? _formatFullAddress()
-                                        : 'Alamat praktik tidak tersedia.',
+                                    _getAboutText(),
                                     style: GoogleFonts.outfit(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w500,
@@ -3964,7 +4292,55 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
                           child: _buildSchedulesWidget(textColor, subtitleColor, themeAccent),
                         ),
 
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 24),
+
+                        // Lokasi Praktik
+                        _buildSectionHeader(
+                            'Lokasi Praktik',
+                            Icons.location_on_outlined,
+                            themeAccent,
+                            textColor),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: sectionBg,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: borderColor),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _formatFullAddress().isNotEmpty
+                                    ? _formatFullAddress()
+                                    : 'Alamat praktik tidak tersedia.',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: textColor,
+                                  height: 1.5,
+                                ),
+                              ),
+                              if (_hasMapsLink()) ...[
+                                const SizedBox(height: 12),
+                                Container(
+                                  height: 220,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: borderColor),
+                                  ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(11),
+                                    child: _buildMapContent(isDark),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 24),
                         // Quick book button
                         SizedBox(
                           width: double.infinity,
@@ -4037,6 +4413,149 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
         ],
       ),
     );
+  }
+}
+
+class MapGraphicsPainter extends CustomPainter {
+  final bool isDark;
+  final double zoomLevel;
+
+  MapGraphicsPainter({required this.isDark, required this.zoomLevel});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Paint landPaint = Paint()
+      ..color = isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
+    final Paint roadPaint = Paint()
+      ..color = isDark ? const Color(0xFF334155) : Colors.white
+      ..strokeWidth = 6 * (zoomLevel / 15.0)
+      ..style = PaintingStyle.stroke;
+    final Paint secondaryRoadPaint = Paint()
+      ..color = isDark
+          ? const Color(0xFF475569).withOpacity(0.5)
+          : const Color(0xFFE2E8F0)
+      ..strokeWidth = 3 * (zoomLevel / 15.0)
+      ..style = PaintingStyle.stroke;
+    final Paint parkPaint = Paint()
+      ..color = isDark
+          ? const Color(0xFF14532D).withOpacity(0.3)
+          : const Color(0xFFDCFCE7);
+    final Paint waterPaint = Paint()
+      ..color = isDark
+          ? const Color(0xFF1E3A8A).withOpacity(0.5)
+          : const Color(0xFFE0F2FE);
+    final Paint buildingPaint = Paint()
+      ..color = isDark
+          ? const Color(0xFF334155).withOpacity(0.4)
+          : const Color(0xFFE2E8F0).withOpacity(0.8);
+
+    // Land
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), landPaint);
+
+    final double cx = size.width / 2;
+    final double cy = size.height / 2;
+
+    // Scale spacing based on zoom level
+    final double spacing = 80.0 * (zoomLevel / 15.0);
+
+    // Parks (zooms relative to center)
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(cx - spacing * 2, cy - spacing),
+        width: 180 * (zoomLevel / 15.0),
+        height: 100 * (zoomLevel / 15.0),
+      ),
+      parkPaint,
+    );
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(cx + spacing * 2, cy + spacing),
+        width: 150 * (zoomLevel / 15.0),
+        height: 120 * (zoomLevel / 15.0),
+      ),
+      parkPaint,
+    );
+
+    // Water channel (river)
+    final Path waterPath = Path();
+    waterPath.moveTo(0, size.height - 40 * (zoomLevel / 15.0));
+    waterPath.quadraticBezierTo(
+      cx - spacing,
+      size.height - 60 * (zoomLevel / 15.0),
+      cx,
+      size.height - 20 * (zoomLevel / 15.0),
+    );
+    waterPath.quadraticBezierTo(
+      cx + spacing,
+      size.height + 20 * (zoomLevel / 15.0),
+      size.width,
+      size.height - 10 * (zoomLevel / 15.0),
+    );
+    waterPath.lineTo(size.width, size.height);
+    waterPath.lineTo(0, size.height);
+    waterPath.close();
+    canvas.drawPath(waterPath, waterPaint);
+
+    // Draw some mock building blocks
+    final double buildingSize = 25.0 * (zoomLevel / 15.0);
+    for (double x = cx - spacing * 3; x < size.width + spacing; x += spacing) {
+      for (
+        double y = cy - spacing * 2;
+        y < size.height + spacing;
+        y += spacing
+      ) {
+        if ((x - cx).abs() > 10 && (y - cy).abs() > 10) {
+          canvas.drawRRect(
+            RRect.fromRectAndRadius(
+              Rect.fromLTWH(
+                x + 10 * (zoomLevel / 15.0),
+                y + 10 * (zoomLevel / 15.0),
+                buildingSize,
+                buildingSize,
+              ),
+              const Radius.circular(4),
+            ),
+            buildingPaint,
+          );
+        }
+      }
+    }
+
+    // Roads layout grid (relative to center to avoid horizontal stretching)
+    // Vertical secondary roads
+    for (double x = cx; x < size.width + spacing; x += spacing) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), secondaryRoadPaint);
+    }
+    for (double x = cx - spacing; x > -spacing; x -= spacing) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), secondaryRoadPaint);
+    }
+
+    // Horizontal secondary roads
+    for (double y = cy; y < size.height + spacing; y += spacing) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), secondaryRoadPaint);
+    }
+    for (double y = cy - spacing; y > -spacing; y -= spacing) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), secondaryRoadPaint);
+    }
+
+    // Main Diagonal Road
+    canvas.drawLine(
+      Offset(cx - size.width, cy - size.width * 0.5),
+      Offset(cx + size.width, cy + size.width * 0.5),
+      roadPaint,
+    );
+
+    // Crossing Main Road
+    canvas.drawLine(
+      Offset(cx - size.width, cy + size.width * 0.3),
+      Offset(cx + size.width, cy - size.width * 0.3),
+      roadPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant MapGraphicsPainter oldDelegate) {
+    return oldDelegate.isDark != isDark || oldDelegate.zoomLevel != zoomLevel;
   }
 }
 
