@@ -6156,6 +6156,11 @@ class _InvoicePrintPreviewDialogState
     final doctorName = state.loggedInUser?['name']?.toString() ?? 'Dr. -';
     final doctorSpecialty =
         state.loggedInUser?['specialty']?.toString() ?? 'Dokter Umum';
+    final avatarUrl = state.loggedInUser?['avatar_url']?.toString() ??
+        state.loggedInUser?['photo_url']?.toString() ??
+        state.loggedInUser?['satusehat_photo_url']?.toString() ??
+        state.loggedInUser?['avatarUrl']?.toString() ??
+        '';
     final dateStr = _formatDate(widget.queue.dateQueue ?? DateTime.now());
     final hasEResep = widget.electronicPrescriptionId != null;
     final qrData = hasEResep
@@ -6166,6 +6171,7 @@ class _InvoicePrintPreviewDialogState
       'paperSize': paperSize,
       'doctorName': doctorName,
       'doctorSpecialty': doctorSpecialty,
+      'avatarUrl': avatarUrl,
       'invoiceNo': widget.invoiceNo,
       'date': dateStr,
       'patientName': widget.queue.nama,
@@ -6215,7 +6221,7 @@ class _InvoicePrintPreviewDialogState
             containerMaxWidth = '120mm';
           } else if (paperSize === 'Thermal 58mm') {
             pageSize = '58mm auto';
-            margin = '3mm';
+            margin = '0mm';
             containerMaxWidth = '48mm';
             sizes = {
               clinicName: '11px', doctorName: '9px', doctorSpecialty: '8px',
@@ -6229,7 +6235,7 @@ class _InvoicePrintPreviewDialogState
             };
           } else if (paperSize === 'Thermal 80mm') {
             pageSize = '80mm auto';
-            margin = '5mm';
+            margin = '0mm';
             containerMaxWidth = '70mm';
             sizes = {
               clinicName: '13px', doctorName: '11px', doctorSpecialty: '9px',
@@ -6262,12 +6268,19 @@ class _InvoicePrintPreviewDialogState
           iframe.style.overflow = 'hidden';
           document.body.appendChild(iframe);
 
+          var logoHtml = '';
+          if (data.avatarUrl && data.avatarUrl.trim().length > 0) {
+            logoHtml = '<div style="margin-bottom: 4px; text-align: center;"><img src="' + data.avatarUrl + '" class="logo-img" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; display: inline-block; border: 1px solid #ECEEF2;" /></div>';
+          } else {
+            logoHtml = '<div class="logo"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#0F9D58" stroke-width="3" stroke-linecap="round"/></svg></div>';
+          }
+
           // Build HTML content (no print script inside — parent triggers print)
           var html = '<!DOCTYPE html><html><head><title>Print Invoice ' + data.invoiceNo + '</title>';
           html += '<style>';
           html += '@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;700;900&display=swap");';
           html += 'body { font-family: "Outfit", -apple-system, sans-serif; margin: 0; padding: 0; background: #fff; color: #1B0C3C; -webkit-print-color-adjust: exact; print-color-adjust: exact; }';
-          html += '.invoice-container { width: 100%; max-width: ' + containerMaxWidth + '; margin: 0 auto; box-sizing: border-box; }';
+          html += '.invoice-container { width: 100%; max-width: ' + containerMaxWidth + '; margin: 0 auto; box-sizing: border-box; ' + (isThermalSize ? 'padding: 4px 2px;' : '') + ' }';
           html += '.header { text-align: center; margin-bottom: 12px; }';
           html += '.logo { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; margin-bottom: 4px; background: rgba(15, 157, 88, 0.12); }';
           html += '.clinic-name { margin: 0; font-size: ' + sizes.clinicName + '; font-weight: 900; color: #1B0C3C; }';
@@ -6301,16 +6314,17 @@ class _InvoicePrintPreviewDialogState
           html += '.manual-prescription-title { font-size: ' + sizes.manualTitle + '; font-weight: 900; color: #6F6A8A; letter-spacing: 0.3px; margin-bottom: 4px; }';
           html += '.manual-prescription-item { display: flex; align-items: center; font-size: ' + sizes.manualItem + '; color: #3D3D5C; margin-bottom: 2px; }';
           html += '.bullet { color: #9E9EB0; margin-right: 6px; font-weight: bold; }';
-          html += '.footer { text-align: center; margin-top: 16px; font-size: ' + sizes.footer + '; }';
+          html += '.footer { text-align: center; margin-top: 12px; font-size: ' + sizes.footer + '; }';
           html += '.footer-thankyou { color: #9E9EB0; }';
           html += '.footer-powered { font-weight: bold; color: #BBBBCC; margin-top: 2px; }';
+          html += '@media print { body { margin: 0 !important; padding: 0 !important; } .invoice-container { page-break-inside: avoid !important; break-inside: avoid !important; } }';
           html += '</style></head><body>';
           
           html += '<div class="invoice-container">';
           
           // Header
           html += '<div class="header">';
-          html += '<div class="logo"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#0F9D58" stroke-width="3" stroke-linecap="round"/></svg></div>';
+          html += logoHtml;
           html += '<h1 class="clinic-name">Praktik Mandiri</h1>';
           html += '<div class="doctor-name">' + data.doctorName + '</div>';
           html += '<div class="doctor-specialty">' + data.doctorSpecialty + '</div>';
@@ -6412,16 +6426,18 @@ class _InvoicePrintPreviewDialogState
               try {
                 var iframeDoc = iframe.contentWindow.document;
                 var pageStyle = pageSize;
+                var effectiveMargin = margin;
                 if (isThermalSize) {
+                  effectiveMargin = '0mm';
                   // Measure real content height to avoid multi-page print
                   var contentHeightPx = iframeDoc.body.scrollHeight;
-                  var contentHeightMm = Math.ceil(contentHeightPx * 0.2646) + 8;
+                  var contentHeightMm = Math.ceil(contentHeightPx * 0.2646) + 4;
                   var widthPart = pageSize.split(' ')[0];
                   pageStyle = widthPart + ' ' + contentHeightMm + 'mm';
                 }
                 // Inject @page rule with correct size into iframe document
                 var styleTag = iframeDoc.createElement('style');
-                styleTag.textContent = '@page { size: ' + pageStyle + '; margin: ' + margin + '; }';
+                styleTag.textContent = '@page { size: ' + pageStyle + '; margin: ' + effectiveMargin + '; } @media print { @page { margin: ' + effectiveMargin + ' !important; } html, body { margin: 0 !important; padding: 0 !important; } .invoice-container { page-break-inside: avoid !important; break-inside: avoid !important; } }';
                 iframeDoc.head.appendChild(styleTag);
                 // Print the iframe from the parent window context
                 iframe.contentWindow.print();
@@ -6668,20 +6684,63 @@ class _InvoicePrintPreviewDialogState
                         Center(
                           child: Column(
                             children: [
-                              Container(
-                                width: 40,
-                                height: 40,
-                                decoration: BoxDecoration(
-                                  color: green.withOpacity(0.12),
-                                  shape: BoxShape.circle,
+                              if ((state.loggedInUser?['avatar_url'] ??
+                                      state.loggedInUser?['photo_url'] ??
+                                      state.loggedInUser?['satusehat_photo_url'] ??
+                                      state.loggedInUser?['avatarUrl']) != null &&
+                                  (state.loggedInUser?['avatar_url'] ??
+                                          state.loggedInUser?['photo_url'] ??
+                                          state.loggedInUser?['satusehat_photo_url'] ??
+                                          state.loggedInUser?['avatarUrl'])
+                                      .toString()
+                                      .isNotEmpty)
+                                Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: const BoxDecoration(
+                                    shape: BoxShape.circle,
+                                  ),
+                                  clipBehavior: Clip.antiAlias,
+                                  child: Image.network(
+                                    (state.loggedInUser?['avatar_url'] ??
+                                            state.loggedInUser?['photo_url'] ??
+                                            state.loggedInUser?['satusehat_photo_url'] ??
+                                            state.loggedInUser?['avatarUrl'])
+                                        .toString(),
+                                    width: 44,
+                                    height: 44,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (ctx, err, stack) => Container(
+                                      width: 40,
+                                      height: 40,
+                                      decoration: BoxDecoration(
+                                        color: green.withOpacity(0.12),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Icon(
+                                        Icons.local_hospital_rounded,
+                                        color: green,
+                                        size: 20,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              else
+                                Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    color: green.withOpacity(0.12),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Icon(
+                                    Icons.local_hospital_rounded,
+                                    color: green,
+                                    size: 20,
+                                  ),
                                 ),
-                                alignment: Alignment.center,
-                                child: Icon(
-                                  Icons.local_hospital_rounded,
-                                  color: green,
-                                  size: 20,
-                                ),
-                              ),
                               const SizedBox(height: 6),
                               Text(
                                 'Praktik Mandiri',
