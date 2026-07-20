@@ -1,0 +1,19 @@
+#!/bin/bash
+# Add the locally cloned Flutter to the PATH
+export PATH="$PATH:$PWD/flutter/bin"
+
+# 1. Dynamically create the 'env' file expected by your pubspec.yaml
+cat << EOF > env
+SUPABASE_URL=$SUPABASE_URL
+SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY
+RESEND_API_KEY=$RESEND_API_KEY
+DUITKU_MERCHANT_CODE=$DUITKU_MERCHANT_CODE
+DUITKU_MERCHANT_KEY=$DUITKU_MERCHANT_KEY
+DUITKU_INQUIRY_URL=$DUITKU_INQUIRY_URL
+DUITKU_CALLBACK_URL=$DUITKU_CALLBACK_URL
+DUITKU_RETURN_URL=$DUITKU_RETURN_URL
+DUITKU_PAYMENT_METHOD=$DUITKU_PAYMENT_METHOD
+EOF
+
+# 2. Build the Flutter Web application
+flutter build web --release
