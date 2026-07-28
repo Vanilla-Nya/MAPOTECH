@@ -14,6 +14,7 @@ class LocationSelectorWidget extends StatefulWidget {
   final Color borderColor;
   final Color dropdownColor;
   final double fontSize;
+  final bool showVillage;
   final Function(String province, String district, String subDistrict, String village) onChanged;
 
   const LocationSelectorWidget({
@@ -28,6 +29,7 @@ class LocationSelectorWidget extends StatefulWidget {
     required this.borderColor,
     required this.dropdownColor,
     this.fontSize = 11,
+    this.showVillage = true,
     required this.onChanged,
   }) : super(key: key);
 
@@ -395,11 +397,17 @@ class _LocationSelectorWidgetState extends State<LocationSelectorWidget> {
                             _districtId = dist.id;
                             _loadingVillages = true;
                           });
-                          final vills = await LocationService.getVillages(dist.id);
-                          setState(() {
-                            _villages = vills;
-                            _loadingVillages = false;
-                          });
+                          if (widget.showVillage) {
+                            final vills = await LocationService.getVillages(dist.id);
+                            setState(() {
+                              _villages = vills;
+                              _loadingVillages = false;
+                            });
+                          } else {
+                            setState(() {
+                              _loadingVillages = false;
+                            });
+                          }
                         }
                       }
                       _triggerChanged();
@@ -408,43 +416,45 @@ class _LocationSelectorWidgetState extends State<LocationSelectorWidget> {
                 ],
               ),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Kelurahan/Desa',
-                    style: GoogleFonts.outfit(
-                      fontSize: 9,
-                      color: widget.subtitleColor,
-                      fontWeight: FontWeight.bold,
+            if (widget.showVillage) ...[
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Kelurahan/Desa',
+                      style: GoogleFonts.outfit(
+                        fontSize: 9,
+                        color: widget.subtitleColor,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  _SearchableDropdown(
-                    value: _selectedVillage,
-                    hint: 'Pilih Kelurahan/Desa',
-                    items: _villages.map((v) => v.name).toList(),
-                    enabled: !_loadingVillages && _districtId != null,
-                    loading: _loadingVillages,
-                    fieldBg: widget.fieldBg,
-                    textColor: widget.textColor,
-                    borderColor: widget.borderColor,
-                    dropdownColor: widget.dropdownColor,
-                    fontSize: widget.fontSize,
-                    onChanged: (String? val) {
-                      if (val == null || val == _selectedVillage) return;
+                    const SizedBox(height: 6),
+                    _SearchableDropdown(
+                      value: _selectedVillage,
+                      hint: 'Pilih Kelurahan/Desa',
+                      items: _villages.map((v) => v.name).toList(),
+                      enabled: !_loadingVillages && _districtId != null,
+                      loading: _loadingVillages,
+                      fieldBg: widget.fieldBg,
+                      textColor: widget.textColor,
+                      borderColor: widget.borderColor,
+                      dropdownColor: widget.dropdownColor,
+                      fontSize: widget.fontSize,
+                      onChanged: (String? val) {
+                        if (val == null || val == _selectedVillage) return;
 
-                      setState(() {
-                        _selectedVillage = val;
-                      });
-                      _triggerChanged();
-                    },
-                  ),
-                ],
+                        setState(() {
+                          _selectedVillage = val;
+                        });
+                        _triggerChanged();
+                      },
+                    ),
+                  ],
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ],

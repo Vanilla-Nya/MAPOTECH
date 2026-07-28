@@ -33,6 +33,10 @@ import 'package:mapotech/features/apotek/dashboard/frontend/apotek_penjualan.dar
 import 'package:mapotech/features/apotek/dashboard/frontend/apotek_inventori.dart';
 import 'package:mapotech/features/apotek/dashboard/frontend/apotek_laporan.dart';
 import 'package:mapotech/shared/widgets/segera_hadir_mockup.dart';
+import 'package:mapotech/features/puskesmas/dashboard/frontend/puskesmas_dashboard.dart';
+import 'package:mapotech/features/puskesmas/dashboard/frontend/puskesmas_pasien.dart';
+import 'package:mapotech/features/puskesmas/dashboard/frontend/puskesmas_pantauan_ibu_hamil.dart';
+import 'package:mapotech/features/puskesmas/dashboard/frontend/puskesmas_form_ibu_hamil.dart';
 import 'package:mapotech/features/puskesmas/dashboard/frontend/puskesmas_profile.dart';
 import 'package:mapotech/features/ponkesdes/dashboard/frontend/ponkesdes_profile.dart';
 
@@ -736,25 +740,31 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
       }
     } else if (role == 'puskesmas') {
       switch (_activeMenu) {
+        case 'dashboard':
+          return const PuskesmasDashboard();
+        case 'pasien':
+          return const PuskesmasPasien();
+        case 'dlc_pantauan_ibu_hamil':
+          return PuskesmasPantauanIbuHamil(
+            onNavigateToForm: (menu) {
+              setState(() {
+                _activeMenu = menu;
+              });
+            },
+          );
+        case 'dlc_form_ibu_hamil':
+          return const PuskesmasFormIbuHamil();
         case 'profile':
           return const PuskesmasProfile();
         case 'settings':
           return const DokterSettings();
-        case 'pasien':
-          return const DokterPasien();
-        case 'obat':
-          return const DokterObat();
-        case 'antrian':
-          return const DokterAntrian();
         case 'pemeriksaan':
-          return const DokterPemeriksaan();
         case 'pembukuan':
-          return const DokterPembukuan();
+        case 'obat':
+        case 'antrian':
         case 'asisten_praktik':
-          return const DokterAsisten();
-        case 'dashboard':
         default:
-          return const DokterDashboard();
+          return SegeraHadirMockup(portalPath: 'PUSKESMAS/$_activeMenu');
       }
     } else if (role == 'ponkesdes') {
       switch (_activeMenu) {

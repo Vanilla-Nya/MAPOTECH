@@ -350,7 +350,23 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
       if (inputLink.contains('output=embed') || inputLink.contains('/embed/')) {
         return inputLink;
       }
-      return 'https://maps.google.com/maps?q=${Uri.encodeComponent(inputLink)}&t=&z=${_zoomLevel.toInt()}&ie=UTF8&iwloc=&output=embed';
+      final faskes = _faskesController.text.trim();
+      final address = _addressDetailController.text.trim();
+      final kel = _selectedKelurahan;
+      final kec = _selectedKecamatan;
+      final kab = _selectedKabupaten;
+      final prov = _selectedProvinsi;
+
+      final queryParts = [
+        if (faskes.isNotEmpty) faskes,
+        if (address.isNotEmpty && address != faskes) address,
+        if (kel.isNotEmpty) kel,
+        if (kec.isNotEmpty) kec,
+        if (kab.isNotEmpty) kab,
+        if (prov.isNotEmpty) prov,
+      ];
+      final query = queryParts.isNotEmpty ? queryParts.join(', ') : inputLink;
+      return 'https://maps.google.com/maps?q=${Uri.encodeComponent(query)}&t=&z=${_zoomLevel.toInt()}&ie=UTF8&iwloc=&output=embed';
     }
 
     return 'https://maps.google.com/maps?q=${Uri.encodeComponent(inputLink)}&t=&z=${_zoomLevel.toInt()}&ie=UTF8&iwloc=&output=embed';

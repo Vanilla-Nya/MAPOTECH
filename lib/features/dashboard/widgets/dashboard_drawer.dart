@@ -13,23 +13,96 @@ class DrawerMenuItem {
   final String id;
   final String label;
   final IconData icon;
+  final List<String> clusters;
+  final String? badgeText;
 
   const DrawerMenuItem({
     required this.id,
     required this.label,
     required this.icon,
+    this.clusters = const ['all'],
+    this.badgeText,
   });
 }
 
-List<DrawerMenuItem> getMenuItemsForRole(String role, String lang, {LandingPageState? state}) {
+class PuskesmasClusterInfo {
+  final String id;
+  final String labelId;
+  final String labelEn;
+  final IconData icon;
+  final Color accentColor;
+
+  const PuskesmasClusterInfo({
+    required this.id,
+    required this.labelId,
+    required this.labelEn,
+    required this.icon,
+    required this.accentColor,
+  });
+}
+
+const List<PuskesmasClusterInfo> puskesmasClusterList = [
+  PuskesmasClusterInfo(
+    id: 'all',
+    labelId: 'Semua Cluster',
+    labelEn: 'All Clusters',
+    icon: Icons.grid_view_rounded,
+    accentColor: Color(0xFF48C9B0),
+  ),
+  PuskesmasClusterInfo(
+    id: 'cluster_1',
+    labelId: 'Cluster 1 (Manajemen)',
+    labelEn: 'Cluster 1 (Management)',
+    icon: Icons.business_center_rounded,
+    accentColor: Color(0xFF3498DB),
+  ),
+  PuskesmasClusterInfo(
+    id: 'cluster_2',
+    labelId: 'Cluster 2 (Ibu & Anak)',
+    labelEn: 'Cluster 2 (Maternal & Child)',
+    icon: Icons.child_care_rounded,
+    accentColor: Color(0xFFE91E63),
+  ),
+  PuskesmasClusterInfo(
+    id: 'cluster_3',
+    labelId: 'Cluster 3 (Dewasa & Lansia)',
+    labelEn: 'Cluster 3 (Adult & Elderly)',
+    icon: Icons.elderly_rounded,
+    accentColor: Color(0xFF9B59B6),
+  ),
+  PuskesmasClusterInfo(
+    id: 'lintas_cluster',
+    labelId: 'Lintas Cluster',
+    labelEn: 'Cross Cluster',
+    icon: Icons.hub_rounded,
+    accentColor: Color(0xFFE67E22),
+  ),
+  PuskesmasClusterInfo(
+    id: 'custom_menu',
+    labelId: 'Custom Menu (DLC)',
+    labelEn: 'Custom Menu (DLC)',
+    icon: Icons.extension_rounded,
+    accentColor: Color(0xFF1ABC9C),
+  ),
+];
+
+List<DrawerMenuItem> getMenuItemsForRole(
+  String role,
+  String lang, {
+  LandingPageState? state,
+}) {
   final isEn = lang == 'en';
-  
-  if (state != null && !state.isSubscribed && (role == 'dokter' || role == 'apotek')) {
+
+  if (state != null &&
+      !state.isSubscribed &&
+      (role == 'dokter' || role == 'apotek')) {
     return [
       DrawerMenuItem(
         id: 'profile',
         label: isEn ? 'Profile' : 'Profil',
-        icon: role == 'dokter' ? Icons.person_rounded : Icons.account_circle_rounded,
+        icon: role == 'dokter'
+            ? Icons.person_rounded
+            : Icons.account_circle_rounded,
       ),
     ];
   }
@@ -122,41 +195,71 @@ List<DrawerMenuItem> getMenuItemsForRole(String role, String lang, {LandingPageS
         id: 'dashboard',
         label: 'Dashboard',
         icon: Icons.dashboard_rounded,
+        clusters: const ['all', 'cluster_1'],
+        badgeText: 'CL-1',
       ),
       DrawerMenuItem(
         id: 'pasien',
         label: isEn ? 'Patients' : 'Pasien',
         icon: Icons.people_rounded,
+        clusters: const ['all', 'cluster_2', 'cluster_3'],
+        badgeText: 'CL-2 & 3',
+      ),
+      DrawerMenuItem(
+        id: 'dlc_pantauan_ibu_hamil',
+        label: isEn ? 'Maternal Monitoring' : 'Pantauan Ibu Hamil',
+        icon: Icons.pregnant_woman_rounded,
+        clusters: const ['all', 'custom_menu', 'cluster_2'],
+        badgeText: 'DLC KIA',
+      ),
+      DrawerMenuItem(
+        id: 'dlc_form_ibu_hamil',
+        label: isEn ? 'Maternal Exam Form' : 'Form Pemeriksaan Ibu Hamil',
+        icon: Icons.assignment_rounded,
+        clusters: const ['all', 'custom_menu', 'cluster_2'],
+        badgeText: 'DLC KIA',
       ),
       DrawerMenuItem(
         id: 'obat',
         label: isEn ? 'Medicines' : 'Obat',
         icon: Icons.medication_rounded,
+        clusters: const ['all', 'lintas_cluster'],
+        badgeText: 'LINTAS',
       ),
       DrawerMenuItem(
         id: 'antrian',
         label: isEn ? 'Queues' : 'Antrian',
         icon: Icons.hourglass_empty_rounded,
+        clusters: const ['all', 'cluster_2', 'cluster_3', 'lintas_cluster'],
+        badgeText: 'LINTAS',
       ),
       DrawerMenuItem(
         id: 'pemeriksaan',
         label: isEn ? 'Examinations' : 'Pemeriksaan',
         icon: Icons.assignment_rounded,
+        clusters: const ['all', 'cluster_2', 'cluster_3'],
+        badgeText: 'CL-2 & 3',
       ),
       DrawerMenuItem(
         id: 'pembukuan',
         label: isEn ? 'Bookkeeping' : 'Pembukuan',
         icon: Icons.account_balance_wallet_rounded,
+        clusters: const ['all', 'cluster_1'],
+        badgeText: 'CL-1',
       ),
       DrawerMenuItem(
         id: 'asisten_praktik',
         label: isEn ? 'Practice Assistant' : 'Asisten Praktik',
         icon: Icons.badge_rounded,
+        clusters: const ['all', 'cluster_1'],
+        badgeText: 'CL-1',
       ),
       DrawerMenuItem(
         id: 'profile',
         label: isEn ? 'Profile' : 'Profil',
         icon: Icons.domain_rounded,
+        clusters: const ['all', 'cluster_1'],
+        badgeText: 'CL-1',
       ),
     ];
   } else if (role == 'ponkesdes') {
@@ -238,8 +341,11 @@ List<DrawerMenuItem> getMenuItemsForRole(String role, String lang, {LandingPageS
   }
 
   if (state != null && state.isAssistant) {
-    final permsList = state.loggedInUser?['permissions'] as List<dynamic>? ?? [];
-    final Set<String> permissions = permsList.map((p) => p.toString().toUpperCase()).toSet();
+    final permsList =
+        state.loggedInUser?['permissions'] as List<dynamic>? ?? [];
+    final Set<String> permissions = permsList
+        .map((p) => p.toString().toUpperCase())
+        .toSet();
 
     return items.where((item) {
       if (item.id == 'profile' || item.id == 'settings') {
@@ -267,7 +373,11 @@ class DashboardDrawer extends ConsumerWidget {
   });
 
   List<DrawerMenuItem> _getMenuItemsForRole(LandingPageState state) {
-    return getMenuItemsForRole(state.loggedInRole ?? 'pasien', state.language, state: state);
+    return getMenuItemsForRole(
+      state.loggedInRole ?? 'pasien',
+      state.language,
+      state: state,
+    );
   }
 
   @override
@@ -307,7 +417,8 @@ class DashboardDrawer extends ConsumerWidget {
         ? (isEn ? 'PATIENT' : 'PASIEN')
         : (state.loggedInRole == 'dokter'
               ? (() {
-                  final prof = (state.loggedInUser?['profession'] as String?)?.toLowerCase();
+                  final prof = (state.loggedInUser?['profession'] as String?)
+                      ?.toLowerCase();
                   if (prof == 'midwife') {
                     return isEn ? 'MIDWIFE' : 'BIDAN';
                   } else if (prof == 'nurse') {
@@ -591,8 +702,14 @@ class DashboardDrawer extends ConsumerWidget {
           Expanded(
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 8),
-              children:
-                  _getMenuItemsForRole(state).map((item) {
+              children: _getMenuItemsForRole(state)
+                  .where((item) {
+                    // Dashboard is always fixed
+                    if (item.id == 'dashboard') return true;
+                    // Otherwise, only show if marked as favorite
+                    return state.favoriteMenuItems.contains(item.id);
+                  })
+                  .map((item) {
                     return _buildMenuItem(
                       context,
                       item.icon,
@@ -601,8 +718,12 @@ class DashboardDrawer extends ConsumerWidget {
                       showLabels,
                       themeAccent,
                       isDark,
+                      badgeText: state.loggedInRole == 'puskesmas'
+                          ? item.badgeText
+                          : null,
                     );
-                  }).toList(),
+                  })
+                  .toList(),
             ),
           ),
 
@@ -619,6 +740,7 @@ class DashboardDrawer extends ConsumerWidget {
                   showLabels,
                   themeAccent,
                   isDark,
+                  badgeText: state.loggedInRole == 'puskesmas' ? 'CL-1' : null,
                 ),
                 const SizedBox(height: 6),
                 _buildMenuItem(
@@ -651,6 +773,7 @@ class DashboardDrawer extends ConsumerWidget {
     Color accentColor,
     bool isDark, {
     bool isLogout = false,
+    String? badgeText,
     VoidCallback? onTap,
   }) {
     final isSelected = activeMenu == menuId;
@@ -706,6 +829,27 @@ class DashboardDrawer extends ConsumerWidget {
                     ),
                   ),
                 ),
+                if (badgeText != null && badgeText.isNotEmpty) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: accentColor.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(100),
+                    ),
+                    child: Text(
+                      badgeText,
+                      style: GoogleFonts.outfit(
+                        fontSize: 8,
+                        fontWeight: FontWeight.w900,
+                        color: accentColor,
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ],
           ),
@@ -715,7 +859,7 @@ class DashboardDrawer extends ConsumerWidget {
   }
 }
 
-class FullScreenDrawerOverlay extends ConsumerWidget {
+class FullScreenDrawerOverlay extends ConsumerStatefulWidget {
   final String activeMenu;
   final ValueChanged<String> onMenuSelected;
 
@@ -725,12 +869,182 @@ class FullScreenDrawerOverlay extends ConsumerWidget {
     required this.onMenuSelected,
   });
 
-  List<DrawerMenuItem> _getMenuItemsForRole(LandingPageState state) {
-    return getMenuItemsForRole(state.loggedInRole ?? 'pasien', state.language, state: state);
+  @override
+  ConsumerState<FullScreenDrawerOverlay> createState() =>
+      _FullScreenDrawerOverlayState();
+}
+
+class _FullScreenDrawerOverlayState
+    extends ConsumerState<FullScreenDrawerOverlay> {
+  String _selectedClusterFilter = 'all';
+  String _selectedDlcSubCategory = 'all_dlc';
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _showDlcInfoDialog(
+    BuildContext context,
+    String title,
+    String subtitle,
+    String desc,
+  ) {
+    final state = ref.read(landingPageProvider);
+    final isDark = state.appearance == 'dark';
+    final isEn = state.language == 'en';
+    final themeAccent = ref
+        .read(landingPageProvider.notifier)
+        .getPrimaryColor();
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          backgroundColor: isDark ? const Color(0xFF222228) : Colors.white,
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: themeAccent.withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.extension_rounded,
+                  color: themeAccent,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: GoogleFonts.outfit(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: isDark ? Colors.white : const Color(0xFF1B0C3C),
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: GoogleFonts.outfit(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: themeAccent,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          content: Container(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  desc,
+                  style: GoogleFonts.outfit(
+                    fontSize: 12,
+                    color: isDark ? Colors.white70 : Colors.black87,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: themeAccent.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: themeAccent.withOpacity(0.2)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline_rounded,
+                        color: themeAccent,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          isEn
+                              ? 'Fitur DLC Custom Menu dapat dikustomisasi sesuai regulasi & alur Faskes Puskesmas Anda.'
+                              : 'Fitur DLC Custom Menu dapat dikustomisasi sesuai regulasi & alur Faskes Puskesmas Anda.',
+                          style: GoogleFonts.outfit(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: themeAccent,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text(
+                isEn ? 'Close' : 'Tutup',
+                style: GoogleFonts.outfit(
+                  fontWeight: FontWeight.bold,
+                  color: themeAccent,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: themeAccent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      isEn
+                          ? 'Modul DLC "$title" telah diaktifkan dalam mode pratinjau!'
+                          : 'Modul DLC "$title" telah diaktifkan dalam mode pratinjau!',
+                      style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+                    ),
+                    backgroundColor: themeAccent,
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              },
+              child: Text(
+                isEn ? 'Activate DLC' : 'Aktifkan DLC',
+                style: GoogleFonts.outfit(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final state = ref.watch(landingPageProvider);
     final notifier = ref.read(landingPageProvider.notifier);
 
@@ -755,9 +1069,9 @@ class FullScreenDrawerOverlay extends ConsumerWidget {
             ? 'Alvin'
             : (state.loggedInRole == 'dokter'
                   ? 'dr. Agoes Soetanto'
-                  : 'CyrenElysia~♪'));
+                  : 'Puskesmas Sumbersari'));
 
-    String avatarInitials = 'A';
+    String avatarInitials = 'P';
     if (state.loggedInName != null && state.loggedInName!.isNotEmpty) {
       final parts = state.loggedInName!.split(' ');
       if (parts.length > 1) {
@@ -768,13 +1082,14 @@ class FullScreenDrawerOverlay extends ConsumerWidget {
     } else {
       avatarInitials = state.loggedInRole == 'pasien'
           ? 'A'
-          : (state.loggedInRole == 'dokter' ? 'AS' : 'CE');
+          : (state.loggedInRole == 'dokter' ? 'AS' : 'PS');
     }
     final String avatarRoleLabel = state.loggedInRole == 'pasien'
         ? 'PASIEN'
         : (state.loggedInRole == 'dokter'
               ? (() {
-                  final prof = (state.loggedInUser?['profession'] as String?)?.toLowerCase();
+                  final prof = (state.loggedInUser?['profession'] as String?)
+                      ?.toLowerCase();
                   if (prof == 'midwife') {
                     return 'BIDAN';
                   } else if (prof == 'nurse') {
@@ -783,9 +1098,243 @@ class FullScreenDrawerOverlay extends ConsumerWidget {
                     return 'DOKTER';
                   }
                 })()
-              : 'APOTEK');
+              : (state.loggedInRole == 'puskesmas' ? 'PUSKESMAS' : 'APOTEK'));
 
     final isMobile = MediaQuery.of(context).size.width < 768;
+
+    // Filter cards logic
+    List<Widget> gridCards = [];
+
+    if (state.loggedInRole == 'puskesmas' &&
+        _selectedClusterFilter == 'custom_menu') {
+      List<Map<String, dynamic>> allDlcItems = [
+        {
+          'title': 'Pantauan Ibu Hamil',
+          'icon': Icons.pregnant_woman_rounded,
+          'id': 'dlc_pantauan_ibu_hamil',
+          'color': const Color(0xFFE91E63),
+          'badge': 'DLC KIA 1',
+          'category': 'kia_dlc',
+          'onTap': () {
+            widget.onMenuSelected('dlc_pantauan_ibu_hamil');
+            notifier.setDrawerSize(1);
+          },
+        },
+        {
+          'title': 'Form Pemeriksaan Ibu Hamil',
+          'icon': Icons.assignment_rounded,
+          'id': 'dlc_form_ibu_hamil',
+          'color': const Color(0xFFEC407A),
+          'badge': 'DLC KIA 2',
+          'category': 'kia_dlc',
+          'onTap': () {
+            widget.onMenuSelected('dlc_form_ibu_hamil');
+            notifier.setDrawerSize(1);
+          },
+        },
+        {
+          'title': 'Skrining Stunting & Balita',
+          'icon': Icons.child_friendly_rounded,
+          'id': 'dlc_skrining_stunting',
+          'color': const Color(0xFFAB47BC),
+          'badge': 'DLC KIA 3',
+          'category': 'kia_dlc',
+          'onTap': () {
+            _showDlcInfoDialog(
+              context,
+              'Modul DLC Skrining Stunting & Balita',
+              'Deteksi Dini Stunting & Pemantauan KMS Digital',
+              'Modul DLC inovasi untuk pencatatan Z-Score stunting balita, grafik tumbuh kembang KMS digital, dan distribusi Program Makanan Tambahan (PMT) Puskesmas.',
+            );
+          },
+        },
+        {
+          'title': 'Modul DLC Telemedis',
+          'icon': Icons.video_call_rounded,
+          'id': 'dlc_telemedis',
+          'color': const Color(0xFF8E24AA),
+          'badge': 'DLC MED 1',
+          'category': 'pelayanan_dlc',
+          'onTap': () {
+            _showDlcInfoDialog(
+              context,
+              'Modul DLC Telemedis Puskesmas',
+              'Konsultasi Jarak Jauh & e-Resep Puskesmas',
+              'Menyediakan fitur telekonsultasi, pengingat jadwal minum obat pasien, dan peresepan obat jarak jauh untuk kawasan terpencil.',
+            );
+          },
+        },
+        {
+          'title': 'Modul DLC Home Care',
+          'icon': Icons.home_work_rounded,
+          'id': 'dlc_homecare',
+          'color': const Color(0xFF3498DB),
+          'badge': 'DLC MED 2',
+          'category': 'pelayanan_dlc',
+          'onTap': () {
+            _showDlcInfoDialog(
+              context,
+              'Modul DLC Home Care & Posyandu',
+              'Kunjungan Rumah & Pembinaan Wilayah Puskesmas',
+              'Fitur kustomisasi DLC untuk pengelolaan kunjungan tim medis ke rumah pasien lansia/kronis serta pemantauan Posyandu di setiap wilayah kerja Puskesmas.',
+            );
+          },
+        },
+        {
+          'title': 'E-Posyandu & EWRS Risk',
+          'icon': Icons.warning_amber_rounded,
+          'id': 'dlc_eposyandu',
+          'color': const Color(0xFFFF9800),
+          'badge': 'DLC MED 3',
+          'category': 'pelayanan_dlc',
+          'onTap': () {
+            _showDlcInfoDialog(
+              context,
+              'Modul DLC E-Posyandu & EWRS High-Risk',
+              'Early Warning Risk System & Integrasi Posyandu',
+              'Sistem peringatan dini otomatis untuk pasien risiko tinggi kehamilan, hipertensi, TB paru, dan integrasi pelaporan data kader Posyandu.',
+            );
+          },
+        },
+        {
+          'title': 'Modul DLC SatuSehat Pro',
+          'icon': Icons.health_and_safety_rounded,
+          'id': 'dlc_satusehat',
+          'color': const Color(0xFF1ABC9C),
+          'badge': 'DLC SYS 1',
+          'category': 'sistem_dlc',
+          'onTap': () {
+            _showDlcInfoDialog(
+              context,
+              'Modul DLC SatuSehat Pro',
+              'Integrasi RME & BPJS P-Care Terintegrasi',
+              'Modul tambahan DLC ini memperluas alur Rekam Medis Elektronik (RME) Puskesmas dengan otomatisasi validasi NIK SatuSehat dan sinkronisasi bridging P-Care BPJS tanpa jeda.',
+            );
+          },
+        },
+        {
+          'title': 'BPJS P-Care Bridging',
+          'icon': Icons.cloud_sync_rounded,
+          'id': 'dlc_pcare',
+          'color': const Color(0xFF00BCD4),
+          'badge': 'DLC SYS 2',
+          'category': 'sistem_dlc',
+          'onTap': () {
+            _showDlcInfoDialog(
+              context,
+              'Modul DLC BPJS P-Care Automatic Bridging',
+              'Integrasi Klaim & Entri Data BPJS P-Care',
+              'Otomatisasi pengiriman data pendaftaran, diagnosa ICD-10, dan tindakan pasien ke server BPJS P-Care tanpa input ulang secara manual.',
+            );
+          },
+        },
+        {
+          'title': state.language == 'en'
+              ? '+ Add Custom DLC Menu'
+              : '+ Tambah Custom Menu DLC',
+          'icon': Icons.add_circle_outline_rounded,
+          'id': 'dlc_add',
+          'color': const Color(0xFFE67E22),
+          'badge': 'CUSTOM',
+          'category': 'all_dlc',
+          'onTap': () {
+            _showDlcInfoDialog(
+              context,
+              'Tambah Custom Menu (DLC)',
+              'Kustomisasi Modul Khusus Faskes Puskesmas',
+              'Anda dapat meminta modul custom DLC baru yang disesuaikan dengan kebutuhan alur operasional dan regulasi Puskesmas Anda.',
+            );
+          },
+        },
+      ];
+
+      if (_selectedDlcSubCategory != 'all_dlc') {
+        allDlcItems = allDlcItems.where((item) {
+          return item['category'] == _selectedDlcSubCategory ||
+              item['id'] == 'dlc_add';
+        }).toList();
+      }
+
+      gridCards = allDlcItems.map((item) {
+        return _buildGridMenuCard(
+          ref,
+          item['title'] as String,
+          item['icon'] as IconData,
+          item['id'] as String,
+          item['color'] as Color,
+          cardBgColor,
+          isDark,
+          badgeText: item['badge'] as String?,
+          onTap: item['onTap'] as VoidCallback?,
+        );
+      }).toList();
+    } else {
+      var rawItems = getMenuItemsForRole(
+        state.loggedInRole ?? 'pasien',
+        state.language,
+        state: state,
+      );
+
+      if (state.loggedInRole == 'puskesmas' &&
+          _selectedClusterFilter != 'all') {
+        rawItems = rawItems
+            .where((item) => item.clusters.contains(_selectedClusterFilter))
+            .toList();
+      }
+
+      if (_searchQuery.isNotEmpty) {
+        rawItems = rawItems
+            .where(
+              (item) =>
+                  item.label.toLowerCase().contains(_searchQuery.toLowerCase()),
+            )
+            .toList();
+      }
+
+      gridCards = [
+        ...rawItems.map((item) {
+          return _buildGridMenuCard(
+            ref,
+            item.label,
+            item.icon,
+            item.id,
+            themeAccent,
+            cardBgColor,
+            isDark,
+            badgeText: state.loggedInRole == 'puskesmas'
+                ? item.badgeText
+                : null,
+          );
+        }),
+        if (_searchQuery.isEmpty &&
+            (_selectedClusterFilter == 'all' ||
+                _selectedClusterFilter == 'cluster_1')) ...[
+          _buildGridMenuCard(
+            ref,
+            state.language == 'en' ? 'Settings' : 'Pengaturan',
+            Icons.settings_rounded,
+            'settings',
+            themeAccent,
+            cardBgColor,
+            isDark,
+            badgeText: state.loggedInRole == 'puskesmas' ? 'CL-1' : null,
+          ),
+          _buildGridMenuCard(
+            ref,
+            state.language == 'en' ? 'Logout' : 'Keluar',
+            Icons.logout_rounded,
+            'logout',
+            Colors.redAccent,
+            cardBgColor,
+            isDark,
+            isLogout: true,
+            onTap: () {
+              notifier.logout();
+            },
+          ),
+        ],
+      ];
+    }
 
     return Container(
       color: bgColor,
@@ -1031,6 +1580,12 @@ class FullScreenDrawerOverlay extends ConsumerWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: TextField(
+                      controller: _searchController,
+                      onChanged: (val) {
+                        setState(() {
+                          _searchQuery = val.trim();
+                        });
+                      },
                       style: GoogleFonts.outfit(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
@@ -1043,6 +1598,17 @@ class FullScreenDrawerOverlay extends ConsumerWidget {
                           color: subtitleColor.withOpacity(0.5),
                         ),
                         border: InputBorder.none,
+                        suffixIcon: _searchQuery.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear_rounded, size: 18),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() {
+                                    _searchQuery = '';
+                                  });
+                                },
+                              )
+                            : null,
                       ),
                     ),
                   ),
@@ -1051,7 +1617,195 @@ class FullScreenDrawerOverlay extends ConsumerWidget {
             ),
           ),
 
-          const SizedBox(height: 36),
+          // Puskesmas Cluster Level Filter Bar
+          if (state.loggedInRole == 'puskesmas') ...[
+            const SizedBox(height: 20),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Row(
+                children: [
+                  Icon(Icons.tune_rounded, size: 14, color: themeAccent),
+                  const SizedBox(width: 8),
+                  Text(
+                    state.language == 'en'
+                        ? 'PUSKESMAS CLUSTER LEVEL FILTER'
+                        : 'FILTER TINGKAT CLUSTER PUSKESMAS',
+                    style: GoogleFonts.outfit(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      color: themeAccent,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    _selectedClusterFilter == 'all'
+                        ? (state.language == 'en'
+                              ? 'Showing All'
+                              : 'Menampilkan Semua')
+                        : puskesmasClusterList
+                              .firstWhere(
+                                (c) => c.id == _selectedClusterFilter,
+                                orElse: () => puskesmasClusterList.first,
+                              )
+                              .labelId,
+                    style: GoogleFonts.outfit(
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                      color: subtitleColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 42,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                itemCount: puskesmasClusterList.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 10),
+                itemBuilder: (context, index) {
+                  final cluster = puskesmasClusterList[index];
+                  final isSelected = _selectedClusterFilter == cluster.id;
+                  final label = state.language == 'en'
+                      ? cluster.labelEn
+                      : cluster.labelId;
+
+                  return InkWell(
+                    onTap: () {
+                      setState(() {
+                        _selectedClusterFilter = cluster.id;
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(100),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? cluster.accentColor
+                            : (isDark
+                                  ? const Color(0xFF1E1E22)
+                                  : const Color(0xFFF1EEFA)),
+                        borderRadius: BorderRadius.circular(100),
+                        border: Border.all(
+                          color: isSelected ? cluster.accentColor : borderColor,
+                          width: isSelected ? 2 : 1,
+                        ),
+                        boxShadow: isSelected
+                            ? [
+                                BoxShadow(
+                                  color: cluster.accentColor.withOpacity(0.35),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ]
+                            : [],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            cluster.icon,
+                            size: 16,
+                            color: isSelected
+                                ? Colors.white
+                                : (isDark
+                                      ? Colors.white70
+                                      : const Color(0xFF1B0C3C)),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            label,
+                            style: GoogleFonts.outfit(
+                              fontSize: 11,
+                              fontWeight: isSelected
+                                  ? FontWeight.w900
+                                  : FontWeight.w600,
+                              color: isSelected
+                                  ? Colors.white
+                                  : (isDark
+                                        ? Colors.white
+                                        : const Color(0xFF1B0C3C)),
+                            ),
+                          ),
+                          if (cluster.id == 'custom_menu') ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? Colors.white.withOpacity(0.25)
+                                    : themeAccent.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(100),
+                              ),
+                              child: Text(
+                                'DLC',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.w900,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : themeAccent,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+
+          if (state.loggedInRole == 'puskesmas' &&
+              _selectedClusterFilter == 'custom_menu') ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 36,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                children: [
+                  _buildDlcSubFilterChip(
+                    'all_dlc',
+                    'Semua Inovasi DLC',
+                    Icons.auto_awesome_rounded,
+                  ),
+                  const SizedBox(width: 8),
+                  _buildDlcSubFilterChip(
+                    'kia_dlc',
+                    'Kesehatan Ibu & Anak (KIA)',
+                    Icons.pregnant_woman_rounded,
+                  ),
+                  const SizedBox(width: 8),
+                  _buildDlcSubFilterChip(
+                    'pelayanan_dlc',
+                    'Pelayanan Medis & Posyandu',
+                    Icons.medical_services_rounded,
+                  ),
+                  const SizedBox(width: 8),
+                  _buildDlcSubFilterChip(
+                    'sistem_dlc',
+                    'Integrasi Sistem & SatuSehat',
+                    Icons.dns_rounded,
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 24),
 
           // Grid Menu Cards
           Expanded(
@@ -1061,44 +1815,66 @@ class FullScreenDrawerOverlay extends ConsumerWidget {
               crossAxisSpacing: 16,
               mainAxisSpacing: 16,
               childAspectRatio: 1.1,
-              children: [
-                ..._getMenuItemsForRole(state).map((item) {
-                  return _buildGridMenuCard(
-                    ref,
-                    item.label,
-                    item.icon,
-                    item.id,
-                    themeAccent,
-                    cardBgColor,
-                    isDark,
-                  );
-                }),
-                _buildGridMenuCard(
-                  ref,
-                  state.language == 'en' ? 'Settings' : 'Pengaturan',
-                  Icons.settings_rounded,
-                  'settings',
-                  themeAccent,
-                  cardBgColor,
-                  isDark,
-                ),
-                _buildGridMenuCard(
-                  ref,
-                  state.language == 'en' ? 'Logout' : 'Keluar',
-                  Icons.logout_rounded,
-                  'logout',
-                  Colors.redAccent,
-                  cardBgColor,
-                  isDark,
-                  isLogout: true,
-                  onTap: () {
-                    notifier.logout();
-                  },
-                ),
-              ],
+              children: gridCards,
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildDlcSubFilterChip(String id, String label, IconData icon) {
+    final isSelected = _selectedDlcSubCategory == id;
+    final state = ref.watch(landingPageProvider);
+    final isDark = state.appearance == 'dark';
+    final themeAccent = ref
+        .read(landingPageProvider.notifier)
+        .getPrimaryColor();
+    final borderColor = ref.read(landingPageProvider.notifier).getBorderColor();
+
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _selectedDlcSubCategory = id;
+        });
+      },
+      borderRadius: BorderRadius.circular(100),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? themeAccent.withOpacity(0.18)
+              : (isDark ? const Color(0xFF1E1E22) : const Color(0xFFF1EEFA)),
+          borderRadius: BorderRadius.circular(100),
+          border: Border.all(
+            color: isSelected ? themeAccent : borderColor,
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 13,
+              color: isSelected
+                  ? themeAccent
+                  : (isDark ? Colors.white70 : const Color(0xFF1B0C3C)),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: GoogleFonts.outfit(
+                fontSize: 10,
+                fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
+                color: isSelected
+                    ? themeAccent
+                    : (isDark ? Colors.white : const Color(0xFF1B0C3C)),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1137,13 +1913,16 @@ class FullScreenDrawerOverlay extends ConsumerWidget {
     Color cardBgColor,
     bool isDark, {
     bool isLogout = false,
+    String? badgeText,
     VoidCallback? onTap,
   }) {
-    final isSelected = activeMenu == menuId;
+    final isSelected = widget.activeMenu == menuId;
     final notifier = ref.read(landingPageProvider.notifier);
 
     final state = ref.watch(landingPageProvider);
     final isRev = state.appearance == 'rev';
+    final isFav = state.favoriteMenuItems.contains(menuId);
+    final showFavButton = !isLogout && menuId != 'dlc_add';
 
     final Color cardBg;
     if (isSelected) {
@@ -1180,7 +1959,7 @@ class FullScreenDrawerOverlay extends ConsumerWidget {
         onTap:
             onTap ??
             () {
-              onMenuSelected(menuId);
+              widget.onMenuSelected(menuId);
               notifier.setDrawerSize(1);
             },
         child: AnimatedContainer(
@@ -1197,34 +1976,112 @@ class FullScreenDrawerOverlay extends ConsumerWidget {
               ),
             ],
           ),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+          child: Stack(
             children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: iconBoxBg,
-                  shape: BoxShape.circle,
+              if (showFavButton)
+                Positioned(
+                  top: 10,
+                  left: 10,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () {
+                        notifier.toggleFavoriteMenuItem(menuId);
+                      },
+                      borderRadius: BorderRadius.circular(100),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: isFav
+                              ? (isDark
+                                    ? const Color(0xFFFFB800).withOpacity(0.25)
+                                    : const Color(0xFFFFF8E1))
+                              : (isDark
+                                    ? Colors.white.withOpacity(0.06)
+                                    : Colors.black.withOpacity(0.04)),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isFav
+                                ? const Color(0xFFFFB800).withOpacity(0.6)
+                                : Colors.transparent,
+                            width: 1,
+                          ),
+                        ),
+                        child: Icon(
+                          isFav
+                              ? Icons.star_rounded
+                              : Icons.star_border_rounded,
+                          color: isFav
+                              ? const Color(0xFFFFB800)
+                              : (isDark
+                                    ? Colors.white38
+                                    : const Color(0xFFB0BEC5)),
+                          size: 18,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
-                alignment: Alignment.center,
-                child: Icon(icon, color: iconColor, size: 24),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.outfit(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w900,
-                  color: isLogout
-                      ? Colors.redAccent
-                      : (isDark
-                            ? Colors.white
-                            : (isRev
-                                  ? const Color(0xFF5E1B8C)
-                                  : const Color(0xFF1B4F42))),
+              if (badgeText != null && badgeText.isNotEmpty)
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? accentColor
+                          : accentColor.withOpacity(0.18),
+                      borderRadius: BorderRadius.circular(100),
+                    ),
+                    child: Text(
+                      badgeText,
+                      style: GoogleFonts.outfit(
+                        fontSize: 8,
+                        fontWeight: FontWeight.w900,
+                        color: isSelected ? Colors.white : accentColor,
+                      ),
+                    ),
+                  ),
+                ),
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: iconBoxBg,
+                          shape: BoxShape.circle,
+                        ),
+                        alignment: Alignment.center,
+                        child: Icon(icon, color: iconColor, size: 24),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        label,
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                          color: isLogout
+                              ? Colors.redAccent
+                              : (isDark
+                                    ? Colors.white
+                                    : (isRev
+                                          ? const Color(0xFF5E1B8C)
+                                          : const Color(0xFF1B4F42))),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],

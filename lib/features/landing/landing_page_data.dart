@@ -99,6 +99,7 @@ class LandingPageState {
   final double defaultServiceFee;
   final String receiptPaperSize; // 'A4', 'A5', 'Thermal 58mm', 'Thermal 80mm'
   final bool isSubscribed;
+  final Set<String> favoriteMenuItems;
 
   bool get isAssistant =>
       loggedInUser?['role'] == 'asisten_dokter' ||
@@ -141,6 +142,33 @@ class LandingPageState {
     this.defaultServiceFee = 0.0,
     this.receiptPaperSize = 'A4',
     this.isSubscribed = true,
+    this.favoriteMenuItems = const {
+      'dashboard',
+      'pasien',
+      'obat',
+      'antrian',
+      'pemeriksaan',
+      'pembukuan',
+      'asisten_praktik',
+      'profile',
+      'penjualan',
+      'inventori',
+      'pesanan',
+      'laporan',
+      'staff',
+      'history',
+      'prescription',
+      'dokter_search',
+      'apotek_search',
+      'dlc_satusehat',
+      'dlc_homecare',
+      'dlc_telemedis',
+      'dlc_pantauan_ibu_hamil',
+      'dlc_form_ibu_hamil',
+      'dlc_skrining_stunting',
+      'dlc_eposyandu',
+      'dlc_pcare',
+    },
   });
 
   LandingPageState copyWith({
@@ -158,6 +186,7 @@ class LandingPageState {
     double? defaultServiceFee,
     String? receiptPaperSize,
     bool? isSubscribed,
+    Set<String>? favoriteMenuItems,
   }) {
     return LandingPageState(
       activeTab: activeTab ?? this.activeTab,
@@ -174,6 +203,7 @@ class LandingPageState {
       defaultServiceFee: defaultServiceFee ?? this.defaultServiceFee,
       receiptPaperSize: receiptPaperSize ?? this.receiptPaperSize,
       isSubscribed: isSubscribed ?? this.isSubscribed,
+      favoriteMenuItems: favoriteMenuItems ?? this.favoriteMenuItems,
     );
   }
 }
@@ -254,6 +284,20 @@ class LandingPageNotifier extends StateNotifier<LandingPageState> {
   void toggleFullScreenDrawer() {
     // Toggles between full-screen (2) and expanded (1)
     state = state.copyWith(drawerSize: state.drawerSize == 2 ? 1 : 2);
+  }
+
+  void toggleFavoriteMenuItem(String menuId) {
+    final currentFavorites = Set<String>.from(state.favoriteMenuItems);
+    if (currentFavorites.contains(menuId)) {
+      currentFavorites.remove(menuId);
+    } else {
+      currentFavorites.add(menuId);
+    }
+    state = state.copyWith(favoriteMenuItems: currentFavorites);
+  }
+
+  bool isFavoriteMenuItem(String menuId) {
+    return state.favoriteMenuItems.contains(menuId);
   }
 
   void setActiveTab(String tab) {

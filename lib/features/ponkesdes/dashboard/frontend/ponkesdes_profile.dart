@@ -141,9 +141,9 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
 
       // Fetch weekly schedules
       final schedules = await SupabaseService.client
-          .from('doctor_schedules')
-          .select('day, open_time, close_time, is_off')
-          .eq('id_doctor', userId);
+          .from('village_clinic_schedules')
+          .select('id, day, open_time, close_time, is_off')
+          .eq('id_ponkesdes', userId);
 
       if (schedules != null && schedules.isNotEmpty) {
         for (var dayMap in _scheduleDays) {
@@ -152,6 +152,7 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
           );
           if (matchedList.isNotEmpty) {
             final matched = matchedList.first;
+            dayMap['id'] = matched['id'];
             dayMap['active'] = !(matched['is_off'] as bool? ?? false);
             dayMap['start'] = _parseTimeFromDb(matched['open_time'] as String?);
             dayMap['end'] = _parseTimeFromDb(matched['close_time'] as String?);
@@ -335,17 +336,46 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
       });
 
       // Save schedules
-      final schedulesToUpsert = _scheduleDays.map((dayMap) {
-        return {
-          'id_doctor': userId,
+      final schedulesToUpsert = <Map<String, dynamic>>[];
+      for (var dayMap in _scheduleDays) {
+        final item = <String, dynamic>{
+          'id_ponkesdes': userId,
           'day': dayMap['day'],
-          'open_time': _formatTimeToDb(dayMap['start'] as String),
-          'close_time': _formatTimeToDb(dayMap['end'] as String),
+          'open_time': dayMap['active'] == true
+              ? _formatTimeToDb(dayMap['start'] as String)
+              : null,
+          'close_time': dayMap['active'] == true
+              ? _formatTimeToDb(dayMap['end'] as String)
+              : null,
           'is_off': !(dayMap['active'] as bool),
         };
-      }).toList();
+        if (dayMap['id'] != null) {
+          item['id'] = dayMap['id'];
+        }
+        schedulesToUpsert.add(item);
+      }
 
-      await SupabaseService.client.from('doctor_schedules').upsert(schedulesToUpsert);
+      bool hasAllIds = _scheduleDays.every((d) => d['id'] != null);
+      if (hasAllIds) {
+        await SupabaseService.client
+            .from('village_clinic_schedules')
+            .upsert(schedulesToUpsert);
+      } else {
+        await SupabaseService.client
+            .from('village_clinic_schedules')
+            .delete()
+            .eq('id_ponkesdes', userId);
+
+        final freshInsert = schedulesToUpsert.map((item) {
+          final copy = Map<String, dynamic>.from(item);
+          copy.remove('id');
+          return copy;
+        }).toList();
+
+        await SupabaseService.client
+            .from('village_clinic_schedules')
+            .insert(freshInsert);
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -807,15 +837,44 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
   }
 
   String _getMapEmbedUrl(String inputLink) {
-    if (inputLink.isEmpty) {
-      final placeName = '${_nameController.text.trim()} ${_selectedProvinsi}';
-      return 'https://maps.google.com/maps?q=${Uri.encodeComponent(placeName)}&t=&z=${_zoomLevel.toInt()}&ie=UTF8&iwloc=&output=embed';
+    String query = '';
+
+    if (inputLink.isNotEmpty) {
+      if (inputLink.contains('output=embed') || inputLink.contains('/embed/')) {
+        return inputLink;
+      }
+
+      // Try extracting coordinates if available in URL e.g. @-8.0276,113.7764
+      final coordRegexp = RegExp(r'@(-?\d+\.\d+),(-?\d+\.\d+)');
+      final match = coordRegexp.firstMatch(inputLink);
+      if (match != null) {
+        final lat = match.group(1);
+        final lng = match.group(2);
+        query = '$lat,$lng';
+      } else {
+        // Try extracting place name from /place/Name+Here/
+        final placeRegexp = RegExp(r'/place/([^/@]+)');
+        final placeMatch = placeRegexp.firstMatch(inputLink);
+        if (placeMatch != null) {
+          query = Uri.decodeComponent(placeMatch.group(1)!.replaceAll('+', ' '));
+        }
+      }
     }
-    if (inputLink.startsWith('http://') || inputLink.startsWith('https://')) {
-      if (inputLink.contains('output=embed') || inputLink.contains('/embed/')) return inputLink;
-      return 'https://maps.google.com/maps?q=${Uri.encodeComponent(inputLink)}&t=&z=${_zoomLevel.toInt()}&ie=UTF8&iwloc=&output=embed';
+
+    // Fallback to facility name + address details for pinpointing exact location
+    if (query.isEmpty) {
+      final parts = <String>[];
+      if (_nameController.text.trim().isNotEmpty) {
+        parts.add(_nameController.text.trim());
+      }
+      if (_selectedKecamatan.isNotEmpty) parts.add(_selectedKecamatan);
+      if (_selectedKabupaten.isNotEmpty) parts.add(_selectedKabupaten);
+      if (_selectedProvinsi.isNotEmpty) parts.add(_selectedProvinsi);
+
+      query = parts.isNotEmpty ? parts.join(', ') : 'Ponkesdes, Bondowoso';
     }
-    return 'https://maps.google.com/maps?q=${Uri.encodeComponent(inputLink)}&t=&z=${_zoomLevel.toInt()}&ie=UTF8&iwloc=&output=embed';
+
+    return 'https://maps.google.com/maps?q=${Uri.encodeComponent(query)}&t=&z=${_zoomLevel.toInt()}&ie=UTF8&iwloc=&output=embed';
   }
 
   Widget _buildMapContent(bool isDark) {

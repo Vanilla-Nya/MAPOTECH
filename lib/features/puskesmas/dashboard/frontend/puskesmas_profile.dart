@@ -16,6 +16,7 @@ import 'package:mapotech/shared/widgets/skeleton_loading.dart';
 import 'package:mapotech/shared/widgets/location_selector_widget.dart';
 import 'package:mapotech/features/dokter/dashboard/frontend/web_map_widget.dart';
 import 'package:mapotech/shared/widgets/animated_transitions.dart';
+import 'package:mapotech/shared/widgets/revgeo_wilayah_map_widget.dart';
 import 'package:image/image.dart' as img;
 
 class PuskesmasProfile extends ConsumerStatefulWidget {
@@ -34,7 +35,7 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
 
   // Profile data state
   String _avatarUrl = '';
-  
+
   // Controllers
   late TextEditingController _nameController;
   late TextEditingController _phoneController;
@@ -43,6 +44,11 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
   late TextEditingController _aboutController;
   late TextEditingController _addressDetailController;
   late TextEditingController _mapsLinkController;
+
+  // RevGeo API Controller & Territory Map state
+  late TextEditingController _revgeoApiUrlController;
+  bool _showBatasWilayahOnMap = true;
+  String _batasHighlightColor = '#1ABC9C';
 
   // API Controllers
   late TextEditingController _ssOrgIdController;
@@ -72,13 +78,55 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
 
   // Schedule operational hours
   final List<Map<String, dynamic>> _scheduleDays = [
-    {'day': 'Monday', 'initial': 'M', 'active': true, 'start': '08:00 AM', 'end': '04:00 PM'},
-    {'day': 'Tuesday', 'initial': 'T', 'active': true, 'start': '08:00 AM', 'end': '04:00 PM'},
-    {'day': 'Wednesday', 'initial': 'W', 'active': true, 'start': '08:00 AM', 'end': '04:00 PM'},
-    {'day': 'Thursday', 'initial': 'T', 'active': true, 'start': '08:00 AM', 'end': '04:00 PM'},
-    {'day': 'Friday', 'initial': 'F', 'active': true, 'start': '08:00 AM', 'end': '02:00 PM'},
-    {'day': 'Saturday', 'initial': 'S', 'active': true, 'start': '08:00 AM', 'end': '12:00 PM'},
-    {'day': 'Sunday', 'initial': 'S', 'active': false, 'start': '08:00 AM', 'end': '12:00 PM'},
+    {
+      'day': 'Monday',
+      'initial': 'M',
+      'active': true,
+      'start': '08:00 AM',
+      'end': '04:00 PM',
+    },
+    {
+      'day': 'Tuesday',
+      'initial': 'T',
+      'active': true,
+      'start': '08:00 AM',
+      'end': '04:00 PM',
+    },
+    {
+      'day': 'Wednesday',
+      'initial': 'W',
+      'active': true,
+      'start': '08:00 AM',
+      'end': '04:00 PM',
+    },
+    {
+      'day': 'Thursday',
+      'initial': 'T',
+      'active': true,
+      'start': '08:00 AM',
+      'end': '04:00 PM',
+    },
+    {
+      'day': 'Friday',
+      'initial': 'F',
+      'active': true,
+      'start': '08:00 AM',
+      'end': '02:00 PM',
+    },
+    {
+      'day': 'Saturday',
+      'initial': 'S',
+      'active': true,
+      'start': '08:00 AM',
+      'end': '12:00 PM',
+    },
+    {
+      'day': 'Sunday',
+      'initial': 'S',
+      'active': false,
+      'start': '08:00 AM',
+      'end': '12:00 PM',
+    },
   ];
 
   double _zoomLevel = 15.0;
@@ -93,6 +141,9 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
     _aboutController = TextEditingController();
     _addressDetailController = TextEditingController();
     _mapsLinkController = TextEditingController();
+    _revgeoApiUrlController = TextEditingController(
+      text: 'https://revgeo.relvastudio.com/',
+    );
 
     _ssOrgIdController = TextEditingController();
     _ssClientIdController = TextEditingController();
@@ -112,6 +163,7 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
     _aboutController.dispose();
     _addressDetailController.dispose();
     _mapsLinkController.dispose();
+    _revgeoApiUrlController.dispose();
 
     _ssOrgIdController.dispose();
     _ssClientIdController.dispose();
@@ -129,26 +181,31 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
     try {
       final db = SupabaseService();
       final detail = await db.fetchPuskesmasDetail(userId);
-      
+
       final user = await SupabaseService.client
           .from('user')
-          .select('email, avatar_url, gender, subscription_status, subscription_expires_at')
+          .select(
+            'email, avatar_url, gender, subscription_status, subscription_expires_at',
+          )
           .eq('id', userId)
           .maybeSingle();
 
       // Fetch weekly schedules
       final schedules = await SupabaseService.client
-          .from('doctor_schedules')
-          .select('day, open_time, close_time, is_off')
-          .eq('id_doctor', userId);
+          .from('public_health_center_schedules')
+          .select('id, day, open_time, close_time, is_off')
+          .eq('id_puskesmas', userId);
 
       if (schedules != null && schedules.isNotEmpty) {
         for (var dayMap in _scheduleDays) {
           final matchedList = schedules.where(
-            (s) => s['day'].toString().toLowerCase() == dayMap['day'].toString().toLowerCase(),
+            (s) =>
+                s['day'].toString().toLowerCase() ==
+                dayMap['day'].toString().toLowerCase(),
           );
           if (matchedList.isNotEmpty) {
             final matched = matchedList.first;
+            dayMap['id'] = matched['id'];
             dayMap['active'] = !(matched['is_off'] as bool? ?? false);
             dayMap['start'] = _parseTimeFromDb(matched['open_time'] as String?);
             dayMap['end'] = _parseTimeFromDb(matched['close_time'] as String?);
@@ -158,12 +215,17 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
 
       if (mounted) {
         setState(() {
-          _nameController.text = detail?['facility_name'] ?? state.loggedInName ?? '';
-          _faskesController.text = detail?['facility_name'] ?? state.loggedInName ?? '';
+          _nameController.text =
+              detail?['facility_name'] ?? state.loggedInName ?? '';
+          _faskesController.text =
+              detail?['facility_name'] ?? state.loggedInName ?? '';
           _phoneController.text = detail?['phone'] ?? '';
           _emailController.text = user?['email'] ?? '';
           _avatarUrl = user?['avatar_url'] ?? '';
-          _selectedGender = (user?['gender'] == 'female' || user?['gender'] == 'Female') ? 'Female' : 'Male';
+          _selectedGender =
+              (user?['gender'] == 'female' || user?['gender'] == 'Female')
+              ? 'Female'
+              : 'Male';
 
           _aboutController.text = detail?['about'] ?? '';
           _addressDetailController.text = detail?['address'] ?? '';
@@ -175,7 +237,8 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
           _bpjsApiKeyController.text = detail?['bpjs_api_key'] ?? '';
           _jknApiKeyController.text = detail?['jkn_api_key'] ?? '';
           _ssClientIdController.text = detail?['satusehat_client_id'] ?? '';
-          _ssClientSecretController.text = detail?['satusehat_client_secret'] ?? '';
+          _ssClientSecretController.text =
+              detail?['satusehat_client_secret'] ?? '';
           _ssOrgIdController.text = detail?['satusehat_org_id'] ?? '';
           _ssAutoSync = detail?['satusehat_auto_sync'] as bool? ?? true;
           _showProfileInSearch = detail?['is_visible'] as bool? ?? true;
@@ -183,16 +246,31 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
           _mapsLinkController.text = detail?['google_maps_link'] ?? '';
 
           if (user != null) {
-            _subStatus = (user['subscription_status'] ?? 'INACTIVE').toString().toUpperCase();
+            _subStatus = (user['subscription_status'] ?? 'INACTIVE')
+                .toString()
+                .toUpperCase();
             if (user['subscription_expires_at'] != null) {
               try {
-                final expiryDate = DateTime.parse(user['subscription_expires_at'].toString());
+                final expiryDate = DateTime.parse(
+                  user['subscription_expires_at'].toString(),
+                );
                 _subExpiryDate = expiryDate;
                 const months = [
-                  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+                  'Jan',
+                  'Feb',
+                  'Mar',
+                  'Apr',
+                  'May',
+                  'Jun',
+                  'Jul',
+                  'Aug',
+                  'Sep',
+                  'Oct',
+                  'Nov',
+                  'Dec',
                 ];
-                _subExpiry = '${expiryDate.day.toString().padLeft(2, '0')} ${months[expiryDate.month - 1]} ${expiryDate.year}';
+                _subExpiry =
+                    '${expiryDate.day.toString().padLeft(2, '0')} ${months[expiryDate.month - 1]} ${expiryDate.year}';
 
                 final now = DateTime.now();
                 final diff = expiryDate.difference(now);
@@ -220,7 +298,10 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
               _subMinutesRemaining = 0;
             }
           }
-          final bool isSubActive = _subStatus == 'ACTIVE' && _subExpiryDate != null && _subExpiryDate!.isAfter(DateTime.now());
+          final bool isSubActive =
+              _subStatus == 'ACTIVE' &&
+              _subExpiryDate != null &&
+              _subExpiryDate!.isAfter(DateTime.now());
           ref.read(landingPageProvider.notifier).setSubscribed(isSubActive);
 
           _isLoading = false;
@@ -292,7 +373,7 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
 
     try {
       final db = SupabaseService();
-      
+
       final detailData = {
         'facility_name': _nameController.text.trim(),
         'phone': _phoneController.text.trim(),
@@ -324,30 +405,62 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
           })
           .eq('id', userId);
 
-      notifier.updateUser({
-        'name': _nameController.text.trim(),
-      });
+      notifier.updateUser({'name': _nameController.text.trim()});
 
       // Save schedules
-      final schedulesToUpsert = _scheduleDays.map((dayMap) {
-        return {
-          'id_doctor': userId,
+      final schedulesToUpsert = <Map<String, dynamic>>[];
+      for (var dayMap in _scheduleDays) {
+        final item = <String, dynamic>{
+          'id_puskesmas': userId,
           'day': dayMap['day'],
-          'open_time': _formatTimeToDb(dayMap['start'] as String),
-          'close_time': _formatTimeToDb(dayMap['end'] as String),
+          'open_time': dayMap['active'] == true
+              ? _formatTimeToDb(dayMap['start'] as String)
+              : null,
+          'close_time': dayMap['active'] == true
+              ? _formatTimeToDb(dayMap['end'] as String)
+              : null,
           'is_off': !(dayMap['active'] as bool),
         };
-      }).toList();
+        if (dayMap['id'] != null) {
+          item['id'] = dayMap['id'];
+        }
+        schedulesToUpsert.add(item);
+      }
 
-      await SupabaseService.client.from('doctor_schedules').upsert(schedulesToUpsert);
+      bool hasAllIds = _scheduleDays.every((d) => d['id'] != null);
+      if (hasAllIds) {
+        await SupabaseService.client
+            .from('public_health_center_schedules')
+            .upsert(schedulesToUpsert);
+      } else {
+        await SupabaseService.client
+            .from('public_health_center_schedules')
+            .delete()
+            .eq('id_puskesmas', userId);
+
+        final freshInsert = schedulesToUpsert.map((item) {
+          final copy = Map<String, dynamic>.from(item);
+          copy.remove('id');
+          return copy;
+        }).toList();
+
+        await SupabaseService.client
+            .from('public_health_center_schedules')
+            .insert(freshInsert);
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: notifier.getPrimaryColor(),
             content: Text(
-              state.language == 'id' ? 'Profil berhasil disimpan!' : 'Profile saved successfully!',
-              style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white),
+              state.language == 'id'
+                  ? 'Profil berhasil disimpan!'
+                  : 'Profile saved successfully!',
+              style: GoogleFonts.outfit(
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
           ),
         );
@@ -359,8 +472,13 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
           SnackBar(
             backgroundColor: Colors.redAccent,
             content: Text(
-              state.language == 'id' ? 'Gagal menyimpan profil: $e' : 'Failed to save profile: $e',
-              style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white),
+              state.language == 'id'
+                  ? 'Gagal menyimpan profil: $e'
+                  : 'Failed to save profile: $e',
+              style: GoogleFonts.outfit(
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
           ),
         );
@@ -379,7 +497,13 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
       final size = image.width < image.height ? image.width : image.height;
       final x = (image.width - size) ~/ 2;
       final y = (image.height - size) ~/ 2;
-      final cropped = img.copyCrop(image, x: x, y: y, width: size, height: size);
+      final cropped = img.copyCrop(
+        image,
+        x: x,
+        y: y,
+        width: size,
+        height: size,
+      );
       return Uint8List.fromList(img.encodeJpg(cropped, quality: 85));
     } catch (e) {
       return originalBytes;
@@ -408,14 +532,22 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
 
             return AlertDialog(
               backgroundColor: cardBg,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
               title: Row(
                 children: [
                   Icon(Icons.add_a_photo_rounded, color: tealColor),
                   const SizedBox(width: 8),
                   Text(
-                    state.language == 'id' ? 'Update Foto Profil' : 'Update Profile Photo',
-                    style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 18),
+                    state.language == 'id'
+                        ? 'Update Foto Profil'
+                        : 'Update Profile Photo',
+                    style: GoogleFonts.outfit(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      fontSize: 18,
+                    ),
                   ),
                 ],
               ),
@@ -430,8 +562,13 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                       child: Column(
                         children: [
                           Text(
-                            state.language == 'id' ? 'Foto Profil Saat Ini:' : 'Current Profile Photo:',
-                            style: GoogleFonts.outfit(color: Colors.grey[400], fontSize: 11),
+                            state.language == 'id'
+                                ? 'Foto Profil Saat Ini:'
+                                : 'Current Profile Photo:',
+                            style: GoogleFonts.outfit(
+                              color: Colors.grey[400],
+                              fontSize: 11,
+                            ),
                           ),
                           const SizedBox(height: 6),
                           Container(
@@ -439,16 +576,30 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                             height: 60,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white24, width: 2),
+                              border: Border.all(
+                                color: Colors.white24,
+                                width: 2,
+                              ),
                             ),
                             child: ClipOval(
                               child: _avatarUrl.isNotEmpty
                                   ? Image.network(
                                       _avatarUrl,
                                       fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.person_rounded, color: Colors.grey)),
+                                      errorBuilder: (_, __, ___) =>
+                                          const Center(
+                                            child: Icon(
+                                              Icons.person_rounded,
+                                              color: Colors.grey,
+                                            ),
+                                          ),
                                     )
-                                  : const Center(child: Icon(Icons.person_rounded, color: Colors.grey)),
+                                  : const Center(
+                                      child: Icon(
+                                        Icons.person_rounded,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
                             ),
                           ),
                         ],
@@ -463,17 +614,30 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                       children: [
                         Expanded(
                           child: InkWell(
-                            onTap: () => setStateDialog(() => activeUploadTab = 'upload'),
+                            onTap: () => setStateDialog(
+                              () => activeUploadTab = 'upload',
+                            ),
                             child: Container(
                               alignment: Alignment.center,
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               decoration: BoxDecoration(
-                                border: Border(bottom: BorderSide(color: activeUploadTab == 'upload' ? tealColor : Colors.transparent, width: 2)),
+                                border: Border(
+                                  bottom: BorderSide(
+                                    color: activeUploadTab == 'upload'
+                                        ? tealColor
+                                        : Colors.transparent,
+                                    width: 2,
+                                  ),
+                                ),
                               ),
                               child: Text(
-                                state.language == 'id' ? 'Upload File' : 'Upload File',
+                                state.language == 'id'
+                                    ? 'Upload File'
+                                    : 'Upload File',
                                 style: GoogleFonts.outfit(
-                                  color: activeUploadTab == 'upload' ? Colors.white : Colors.grey[400],
+                                  color: activeUploadTab == 'upload'
+                                      ? Colors.white
+                                      : Colors.grey[400],
                                   fontWeight: FontWeight.bold,
                                   fontSize: 13,
                                 ),
@@ -483,17 +647,29 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                         ),
                         Expanded(
                           child: InkWell(
-                            onTap: () => setStateDialog(() => activeUploadTab = 'link'),
+                            onTap: () =>
+                                setStateDialog(() => activeUploadTab = 'link'),
                             child: Container(
                               alignment: Alignment.center,
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               decoration: BoxDecoration(
-                                border: Border(bottom: BorderSide(color: activeUploadTab == 'link' ? tealColor : Colors.transparent, width: 2)),
+                                border: Border(
+                                  bottom: BorderSide(
+                                    color: activeUploadTab == 'link'
+                                        ? tealColor
+                                        : Colors.transparent,
+                                    width: 2,
+                                  ),
+                                ),
                               ),
                               child: Text(
-                                state.language == 'id' ? 'Input Link URL' : 'Input Link URL',
+                                state.language == 'id'
+                                    ? 'Input Link URL'
+                                    : 'Input Link URL',
                                 style: GoogleFonts.outfit(
-                                  color: activeUploadTab == 'link' ? Colors.white : Colors.grey[400],
+                                  color: activeUploadTab == 'link'
+                                      ? Colors.white
+                                      : Colors.grey[400],
                                   fontWeight: FontWeight.bold,
                                   fontSize: 13,
                                 ),
@@ -515,14 +691,31 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 color: inputBg,
-                                border: Border.all(color: tealColor.withOpacity(0.5), width: 2),
+                                border: Border.all(
+                                  color: tealColor.withOpacity(0.5),
+                                  width: 2,
+                                ),
                               ),
                               child: ClipOval(
                                 child: isProcessingImage
-                                    ? Center(child: CircularProgressIndicator(strokeWidth: 2, color: tealColor))
+                                    ? Center(
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: tealColor,
+                                        ),
+                                      )
                                     : selectedFileBytes != null
-                                        ? Image.memory(selectedFileBytes!, fit: BoxFit.cover)
-                                        : Center(child: Icon(Icons.person_rounded, size: 60, color: Colors.grey[600])),
+                                    ? Image.memory(
+                                        selectedFileBytes!,
+                                        fit: BoxFit.cover,
+                                      )
+                                    : Center(
+                                        child: Icon(
+                                          Icons.person_rounded,
+                                          size: 60,
+                                          color: Colors.grey[600],
+                                        ),
+                                      ),
                               ),
                             ),
                             const SizedBox(height: 12),
@@ -531,14 +724,29 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                                   ? null
                                   : () async {
                                       try {
-                                        final pickerResult = await FilePicker.platform.pickFiles(type: FileType.image, withData: true);
-                                        if (pickerResult != null && pickerResult.files.isNotEmpty) {
-                                          setStateDialog(() => isProcessingImage = true);
-                                          await Future.delayed(const Duration(milliseconds: 100));
-                                          final pickedFile = pickerResult.files.first;
+                                        final pickerResult = await FilePicker
+                                            .platform
+                                            .pickFiles(
+                                              type: FileType.image,
+                                              withData: true,
+                                            );
+                                        if (pickerResult != null &&
+                                            pickerResult.files.isNotEmpty) {
+                                          setStateDialog(
+                                            () => isProcessingImage = true,
+                                          );
+                                          await Future.delayed(
+                                            const Duration(milliseconds: 100),
+                                          );
+                                          final pickedFile =
+                                              pickerResult.files.first;
                                           Uint8List? bytes = pickedFile.bytes;
-                                          if (bytes == null && !kIsWeb && pickedFile.path != null) {
-                                            bytes = io.File(pickedFile.path!).readAsBytesSync();
+                                          if (bytes == null &&
+                                              !kIsWeb &&
+                                              pickedFile.path != null) {
+                                            bytes = io.File(
+                                              pickedFile.path!,
+                                            ).readAsBytesSync();
                                           }
                                           setStateDialog(() {
                                             selectedFileBytes = bytes;
@@ -547,26 +755,48 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                                           });
                                         }
                                       } catch (err) {
-                                        setStateDialog(() => isProcessingImage = false);
+                                        setStateDialog(
+                                          () => isProcessingImage = false,
+                                        );
                                       }
                                     },
-                              icon: const Icon(Icons.photo_library_rounded, size: 16),
+                              icon: const Icon(
+                                Icons.photo_library_rounded,
+                                size: 16,
+                              ),
                               label: Text(
                                 selectedFileBytes == null
-                                    ? (state.language == 'id' ? 'Pilih Gambar' : 'Choose Image')
-                                    : (state.language == 'id' ? 'Ganti Gambar' : 'Change Image'),
-                                style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 12),
+                                    ? (state.language == 'id'
+                                          ? 'Pilih Gambar'
+                                          : 'Choose Image')
+                                    : (state.language == 'id'
+                                          ? 'Ganti Gambar'
+                                          : 'Change Image'),
+                                style: GoogleFonts.outfit(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
                               ),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF2E4053),
                                 foregroundColor: Colors.white,
                                 elevation: 0,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
                               ),
                             ),
                             if (selectedFileName != null) ...[
                               const SizedBox(height: 6),
-                              Text(selectedFileName!, maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.outfit(color: Colors.grey[400], fontSize: 11)),
+                              Text(
+                                selectedFileName!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.outfit(
+                                  color: Colors.grey[400],
+                                  fontSize: 11,
+                                ),
+                              ),
                             ],
                             const SizedBox(height: 12),
                             Text(
@@ -574,28 +804,50 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                                   ? 'Pilih file gambar lokal Anda untuk menyesuaikan foto profil.'
                                   : 'Select your local image file to adjust your profile photo.',
                               textAlign: TextAlign.center,
-                              style: GoogleFonts.outfit(color: Colors.grey[400], fontSize: 11, height: 1.4),
+                              style: GoogleFonts.outfit(
+                                color: Colors.grey[400],
+                                fontSize: 11,
+                                height: 1.4,
+                              ),
                             ),
                           ],
                         ),
                       ),
                     ] else ...[
                       Text(
-                        state.language == 'id' ? 'Masukkan URL link gambar foto profil:' : 'Enter profile photo image URL:',
-                        style: GoogleFonts.outfit(color: Colors.grey[300], fontSize: 12, height: 1.5),
+                        state.language == 'id'
+                            ? 'Masukkan URL link gambar foto profil:'
+                            : 'Enter profile photo image URL:',
+                        style: GoogleFonts.outfit(
+                          color: Colors.grey[300],
+                          fontSize: 12,
+                          height: 1.5,
+                        ),
                       ),
                       const SizedBox(height: 12),
                       TextField(
                         controller: urlController,
                         onChanged: (val) => setStateDialog(() {}),
-                        style: GoogleFonts.outfit(color: Colors.white, fontSize: 13),
+                        style: GoogleFonts.outfit(
+                          color: Colors.white,
+                          fontSize: 13,
+                        ),
                         decoration: InputDecoration(
                           hintText: 'https://...',
-                          hintStyle: GoogleFonts.outfit(color: Colors.grey[600], fontSize: 13),
+                          hintStyle: GoogleFonts.outfit(
+                            color: Colors.grey[600],
+                            fontSize: 13,
+                          ),
                           filled: true,
                           fillColor: inputBg,
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -603,7 +855,13 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                         Center(
                           child: Column(
                             children: [
-                              Text('Preview Gambar Link:', style: GoogleFonts.outfit(color: Colors.grey[400], fontSize: 11)),
+                              Text(
+                                'Preview Gambar Link:',
+                                style: GoogleFonts.outfit(
+                                  color: Colors.grey[400],
+                                  fontSize: 11,
+                                ),
+                              ),
                               const SizedBox(height: 6),
                               Container(
                                 width: 120,
@@ -611,13 +869,20 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   color: inputBg,
-                                  border: Border.all(color: tealColor.withOpacity(0.5), width: 2),
+                                  border: Border.all(
+                                    color: tealColor.withOpacity(0.5),
+                                    width: 2,
+                                  ),
                                 ),
                                 child: ClipOval(
                                   child: Image.network(
                                     urlController.text.trim(),
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_rounded, color: Colors.redAccent, size: 30),
+                                    errorBuilder: (_, __, ___) => const Icon(
+                                      Icons.broken_image_rounded,
+                                      color: Colors.redAccent,
+                                      size: 30,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -632,7 +897,10 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(ctx).pop(null),
-                  child: Text(state.language == 'id' ? 'Batal' : 'Cancel', style: GoogleFonts.outfit(color: Colors.grey)),
+                  child: Text(
+                    state.language == 'id' ? 'Batal' : 'Cancel',
+                    style: GoogleFonts.outfit(color: Colors.grey),
+                  ),
                 ),
                 ElevatedButton(
                   onPressed: isProcessingImage
@@ -649,12 +917,20 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                           } else {
                             final url = urlController.text.trim();
                             if (url.isNotEmpty) {
-                              Navigator.of(ctx).pop({'type': 'link', 'url': url});
+                              Navigator.of(
+                                ctx,
+                              ).pop({'type': 'link', 'url': url});
                             }
                           }
                         },
-                  style: ElevatedButton.styleFrom(backgroundColor: tealColor, foregroundColor: Colors.white),
-                  child: Text(state.language == 'id' ? 'Simpan' : 'Save', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: tealColor,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: Text(
+                    state.language == 'id' ? 'Simpan' : 'Save',
+                    style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+                  ),
                 ),
               ],
             );
@@ -674,7 +950,8 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
 
         final Uint8List croppedBytes = _cropImageToSquare(originalBytes);
 
-        final storagePath = 'avatars/$userId/${DateTime.now().millisecondsSinceEpoch}_$fileName';
+        final storagePath =
+            'avatars/$userId/${DateTime.now().millisecondsSinceEpoch}_$fileName';
         await SupabaseService.client.storage
             .from('profiles')
             .uploadBinary(storagePath, croppedBytes);
@@ -721,7 +998,7 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
 
     try {
       final userId = ref.read(landingPageProvider).loggedInUser?['id'] ?? '';
-      
+
       if (mounted) {
         Navigator.of(context).pop();
         loaderDismissed = true;
@@ -729,15 +1006,23 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
 
       final Map<String, dynamic> faskesMap = {
         'id': userId,
-        'name': _nameController.text.isNotEmpty ? _nameController.text : 'Puskesmas Sumbersari',
-        'email': _emailController.text.isNotEmpty ? _emailController.text : 'puskesmas@company.com',
+        'name': _nameController.text.isNotEmpty
+            ? _nameController.text
+            : 'Puskesmas Sumbersari',
+        'email': _emailController.text.isNotEmpty
+            ? _emailController.text
+            : 'puskesmas@company.com',
         'avatar_url': _avatarUrl.isNotEmpty ? _avatarUrl : null,
-        'nama_faskes': _faskesController.text.isNotEmpty ? _faskesController.text : 'Puskesmas Sumbersari',
+        'nama_faskes': _faskesController.text.isNotEmpty
+            ? _faskesController.text
+            : 'Puskesmas Sumbersari',
         'profession': 'Puskesmas',
         'is_visible': _showProfileInSearch,
         'is_bpjs': _serveBPJSPatients,
         'about': _aboutController.text,
-        'whatsapp_number': _phoneController.text.isNotEmpty ? _phoneController.text : '085259930755',
+        'whatsapp_number': _phoneController.text.isNotEmpty
+            ? _phoneController.text
+            : '085259930755',
         'address': _addressDetailController.text,
         'province': _selectedProvinsi,
         'district': _selectedKabupaten,
@@ -764,9 +1049,15 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
     }
   }
 
-  void _selectTime(BuildContext context, Map<String, dynamic> dayMap, bool isStart) async {
-    final timeStr = isStart ? dayMap['start'] as String : dayMap['end'] as String;
-    
+  void _selectTime(
+    BuildContext context,
+    Map<String, dynamic> dayMap,
+    bool isStart,
+  ) async {
+    final timeStr = isStart
+        ? dayMap['start'] as String
+        : dayMap['end'] as String;
+
     // Parse time display string back to TimeOfDay
     TimeOfDay initialTime = const TimeOfDay(hour: 8, minute: 0);
     try {
@@ -804,15 +1095,47 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
   }
 
   String _getMapEmbedUrl(String inputLink) {
-    if (inputLink.isEmpty) {
-      final placeName = '${_faskesController.text.trim()} ${_selectedProvinsi}';
-      return 'https://maps.google.com/maps?q=${Uri.encodeComponent(placeName)}&t=&z=${_zoomLevel.toInt()}&ie=UTF8&iwloc=&output=embed';
+    String query = '';
+
+    if (inputLink.isNotEmpty) {
+      if (inputLink.contains('output=embed') || inputLink.contains('/embed/')) {
+        return inputLink;
+      }
+
+      // Try extracting coordinates if available in URL e.g. @-8.0276,113.7764
+      final coordRegexp = RegExp(r'@(-?\d+\.\d+),(-?\d+\.\d+)');
+      final match = coordRegexp.firstMatch(inputLink);
+      if (match != null) {
+        final lat = match.group(1);
+        final lng = match.group(2);
+        query = '$lat,$lng';
+      } else {
+        // Try extracting place name from /place/Name+Here/
+        final placeRegexp = RegExp(r'/place/([^/@]+)');
+        final placeMatch = placeRegexp.firstMatch(inputLink);
+        if (placeMatch != null) {
+          query = Uri.decodeComponent(placeMatch.group(1)!.replaceAll('+', ' '));
+        }
+      }
     }
-    if (inputLink.startsWith('http://') || inputLink.startsWith('https://')) {
-      if (inputLink.contains('output=embed') || inputLink.contains('/embed/')) return inputLink;
-      return 'https://maps.google.com/maps?q=${Uri.encodeComponent(inputLink)}&t=&z=${_zoomLevel.toInt()}&ie=UTF8&iwloc=&output=embed';
+
+    // Fallback to facility name + address details for pinpointing exact location
+    if (query.isEmpty) {
+      final parts = <String>[];
+      if (_faskesController.text.trim().isNotEmpty) {
+        parts.add(_faskesController.text.trim());
+      }
+      if (_addressDetailController.text.trim().isNotEmpty) {
+        parts.add(_addressDetailController.text.trim());
+      }
+      if (_selectedKecamatan.isNotEmpty) parts.add(_selectedKecamatan);
+      if (_selectedKabupaten.isNotEmpty) parts.add(_selectedKabupaten);
+      if (_selectedProvinsi.isNotEmpty) parts.add(_selectedProvinsi);
+
+      query = parts.isNotEmpty ? parts.join(', ') : 'Puskesmas Sumber Wringin, Bondowoso';
     }
-    return 'https://maps.google.com/maps?q=${Uri.encodeComponent(inputLink)}&t=&z=${_zoomLevel.toInt()}&ie=UTF8&iwloc=&output=embed';
+
+    return 'https://maps.google.com/maps?q=${Uri.encodeComponent(query)}&t=&z=${_zoomLevel.toInt()}&ie=UTF8&iwloc=&output=embed';
   }
 
   Widget _buildMapContent(bool isDark) {
@@ -830,8 +1153,14 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
           const Icon(Icons.map_rounded, size: 48, color: Colors.grey),
           const SizedBox(height: 12),
           Text(
-            isDark ? 'Interactive Map active on Web' : 'Peta Interaktif aktif di Web',
-            style: GoogleFonts.outfit(color: Colors.grey[500], fontSize: 12, fontWeight: FontWeight.bold),
+            isDark
+                ? 'Interactive Map active on Web'
+                : 'Peta Interaktif aktif di Web',
+            style: GoogleFonts.outfit(
+              color: Colors.grey[500],
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ],
       ),
@@ -855,11 +1184,19 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
     if (_isLoading) {
       return const Column(
         children: [
-          SkeletonLoading(height: 120, width: double.infinity, borderRadius: 20),
+          SkeletonLoading(
+            height: 120,
+            width: double.infinity,
+            borderRadius: 20,
+          ),
           SizedBox(height: 20),
           SkeletonLoading(height: 48, width: double.infinity, borderRadius: 30),
           SizedBox(height: 20),
-          SkeletonLoading(height: 300, width: double.infinity, borderRadius: 20),
+          SkeletonLoading(
+            height: 300,
+            width: double.infinity,
+            borderRadius: 20,
+          ),
         ],
       );
     }
@@ -916,7 +1253,8 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                     clipBehavior: Clip.none,
                     alignment: Alignment.bottomCenter,
                     children: [
-                      if (_avatarUrl.isNotEmpty && state.blurProfileEffectEnabled)
+                      if (_avatarUrl.isNotEmpty &&
+                          state.blurProfileEffectEnabled)
                         Positioned.fill(
                           child: ClipRRect(
                             borderRadius: const BorderRadius.only(
@@ -924,12 +1262,20 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                               topRight: Radius.circular(20),
                             ),
                             child: ImageFiltered(
-                              imageFilter: ImageFilter.blur(sigmaX: 15.0, sigmaY: 15.0),
-                              child: Image.network(_avatarUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox()),
+                              imageFilter: ImageFilter.blur(
+                                sigmaX: 15.0,
+                                sigmaY: 15.0,
+                              ),
+                              child: Image.network(
+                                _avatarUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => const SizedBox(),
+                              ),
                             ),
                           ),
                         ),
-                      if (_avatarUrl.isNotEmpty && state.blurProfileEffectEnabled)
+                      if (_avatarUrl.isNotEmpty &&
+                          state.blurProfileEffectEnabled)
                         Positioned.fill(
                           child: ClipRRect(
                             borderRadius: const BorderRadius.only(
@@ -937,7 +1283,9 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                               topRight: Radius.circular(20),
                             ),
                             child: Container(
-                              color: isDark ? Colors.black.withOpacity(0.4) : themeAccent.withOpacity(0.15),
+                              color: isDark
+                                  ? Colors.black.withOpacity(0.4)
+                                  : themeAccent.withOpacity(0.15),
                             ),
                           ),
                         ),
@@ -954,34 +1302,56 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                                 height: 90,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  color: isDark ? const Color(0xFF252528) : Colors.white,
-                                  border: Border.all(color: cardBgColor, width: 4),
+                                  color: isDark
+                                      ? const Color(0xFF252528)
+                                      : Colors.white,
+                                  border: Border.all(
+                                    color: cardBgColor,
+                                    width: 4,
+                                  ),
                                   boxShadow: [
-                                    BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, 4)),
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.1),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 4),
+                                    ),
                                   ],
                                 ),
                                 child: ClipOval(
                                   child: _isUploadingPhoto
-                                      ? Center(child: CircularProgressIndicator(strokeWidth: 2, color: themeAccent))
+                                      ? Center(
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: themeAccent,
+                                          ),
+                                        )
                                       : _avatarUrl.isNotEmpty
-                                          ? Image.network(
-                                              _avatarUrl,
-                                              fit: BoxFit.cover,
-                                              width: 90,
-                                              height: 90,
-                                              errorBuilder: (_, __, ___) => Center(
-                                                child: Text(
-                                                  avatarInitials,
-                                                  style: GoogleFonts.outfit(fontSize: 28, fontWeight: FontWeight.w900, color: themeAccent),
-                                                ),
-                                              ),
-                                            )
-                                          : Center(
-                                              child: Text(
-                                                avatarInitials,
-                                                style: GoogleFonts.outfit(fontSize: 28, fontWeight: FontWeight.w900, color: themeAccent),
+                                      ? Image.network(
+                                          _avatarUrl,
+                                          fit: BoxFit.cover,
+                                          width: 90,
+                                          height: 90,
+                                          errorBuilder: (_, __, ___) => Center(
+                                            child: Text(
+                                              avatarInitials,
+                                              style: GoogleFonts.outfit(
+                                                fontSize: 28,
+                                                fontWeight: FontWeight.w900,
+                                                color: themeAccent,
                                               ),
                                             ),
+                                          ),
+                                        )
+                                      : Center(
+                                          child: Text(
+                                            avatarInitials,
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 28,
+                                              fontWeight: FontWeight.w900,
+                                              color: themeAccent,
+                                            ),
+                                          ),
+                                        ),
                                 ),
                               ),
                               // Camera Icon Badge
@@ -991,9 +1361,16 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                                 decoration: BoxDecoration(
                                   color: const Color(0xFF3B82F6),
                                   shape: BoxShape.circle,
-                                  border: Border.all(color: cardBgColor, width: 2),
+                                  border: Border.all(
+                                    color: cardBgColor,
+                                    width: 2,
+                                  ),
                                 ),
-                                child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 14),
+                                child: const Icon(
+                                  Icons.camera_alt_rounded,
+                                  color: Colors.white,
+                                  size: 14,
+                                ),
                               ),
                             ],
                           ),
@@ -1004,13 +1381,25 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                 ),
                 const SizedBox(height: 50),
                 Text(
-                  _nameController.text.isNotEmpty ? _nameController.text : 'Puskesmas Sumbersari',
-                  style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w900, color: textColor),
+                  _nameController.text.isNotEmpty
+                      ? _nameController.text
+                      : 'Puskesmas Sumbersari',
+                  style: GoogleFonts.outfit(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    color: textColor,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  _emailController.text.isNotEmpty ? _emailController.text : 'puskesmas@company.com',
-                  style: GoogleFonts.outfit(fontSize: 13, color: subtitleColor, fontWeight: FontWeight.w500),
+                  _emailController.text.isNotEmpty
+                      ? _emailController.text
+                      : 'puskesmas@company.com',
+                  style: GoogleFonts.outfit(
+                    fontSize: 13,
+                    color: subtitleColor,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
                 const SizedBox(height: 16),
 
@@ -1023,13 +1412,26 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                       ElevatedButton.icon(
                         onPressed: _viewPatientPerspective,
                         icon: const Icon(Icons.visibility_outlined, size: 16),
-                        label: Text(isEn ? 'View Patient Perspective' : 'Lihat Perspektif Pasien', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 12)),
+                        label: Text(
+                          isEn
+                              ? 'View Patient Perspective'
+                              : 'Lihat Perspektif Pasien',
+                          style: GoogleFonts.outfit(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: themeAccent,
                           foregroundColor: Colors.white,
                           elevation: 0,
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(100),
+                          ),
                         ),
                       ),
                     ],
@@ -1056,13 +1458,31 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
             child: Row(
               children: [
                 Expanded(
-                  child: _buildTabItem(0, isEn ? 'Profile & Info' : 'Profil & Info', Icons.domain_rounded, themeAccent, isDark),
+                  child: _buildTabItem(
+                    0,
+                    isEn ? 'Profile & Info' : 'Profil & Info',
+                    Icons.domain_rounded,
+                    themeAccent,
+                    isDark,
+                  ),
                 ),
                 Expanded(
-                  child: _buildTabItem(1, isEn ? 'Practice & Service' : 'Praktik & Layanan', Icons.home_repair_service_rounded, themeAccent, isDark),
+                  child: _buildTabItem(
+                    1,
+                    isEn ? 'Practice & Service' : 'Praktik & Layanan',
+                    Icons.home_repair_service_rounded,
+                    themeAccent,
+                    isDark,
+                  ),
                 ),
                 Expanded(
-                  child: _buildTabItem(2, isEn ? 'API & Integration' : 'API & Integrasi', Icons.integration_instructions_rounded, themeAccent, isDark),
+                  child: _buildTabItem(
+                    2,
+                    isEn ? 'API & Integration' : 'API & Integrasi',
+                    Icons.integration_instructions_rounded,
+                    themeAccent,
+                    isDark,
+                  ),
                 ),
               ],
             ),
@@ -1076,16 +1496,48 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
           delay: const Duration(milliseconds: 150),
           type: EntranceAnimationType.slideUp,
           child: _activeTab == 0
-              ? _buildProfileAndStatusTab(cardBgColor, textColor, subtitleColor, borderColor, inputBg, themeAccent, isEn, isDark)
+              ? _buildProfileAndStatusTab(
+                  cardBgColor,
+                  textColor,
+                  subtitleColor,
+                  borderColor,
+                  inputBg,
+                  themeAccent,
+                  isEn,
+                  isDark,
+                )
               : _activeTab == 1
-                  ? _buildPracticeAndServiceTab(cardBgColor, textColor, subtitleColor, borderColor, inputBg, themeAccent, isEn, isDark)
-                  : _buildApiAndIntegrationTab(cardBgColor, textColor, subtitleColor, borderColor, themeAccent, isEn, isDark),
+              ? _buildPracticeAndServiceTab(
+                  cardBgColor,
+                  textColor,
+                  subtitleColor,
+                  borderColor,
+                  inputBg,
+                  themeAccent,
+                  isEn,
+                  isDark,
+                )
+              : _buildApiAndIntegrationTab(
+                  cardBgColor,
+                  textColor,
+                  subtitleColor,
+                  borderColor,
+                  themeAccent,
+                  isEn,
+                  isDark,
+                ),
         ),
       ],
     );
   }
 
-  Widget _buildTabItem(int index, String label, IconData icon, Color activeColor, bool isDark) {
+  Widget _buildTabItem(
+    int index,
+    String label,
+    IconData icon,
+    Color activeColor,
+    bool isDark,
+  ) {
     final isSelected = _activeTab == index;
     return GestureDetector(
       onTap: () {
@@ -1106,7 +1558,9 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
             Icon(
               icon,
               size: 16,
-              color: isSelected ? Colors.white : (isDark ? Colors.grey[400] : const Color(0xFF64748B)),
+              color: isSelected
+                  ? Colors.white
+                  : (isDark ? Colors.grey[400] : const Color(0xFF64748B)),
             ),
             const SizedBox(width: 8),
             Text(
@@ -1114,7 +1568,9 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
               style: GoogleFonts.outfit(
                 fontSize: 13,
                 fontWeight: FontWeight.bold,
-                color: isSelected ? Colors.white : (isDark ? Colors.grey[400] : const Color(0xFF64748B)),
+                color: isSelected
+                    ? Colors.white
+                    : (isDark ? Colors.grey[400] : const Color(0xFF64748B)),
               ),
             ),
           ],
@@ -1123,7 +1579,16 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
     );
   }
 
-  Widget _buildProfileAndStatusTab(Color cardBgColor, Color textColor, Color subtitleColor, Color borderColor, Color inputBg, Color themeAccent, bool isEn, bool isDark) {
+  Widget _buildProfileAndStatusTab(
+    Color cardBgColor,
+    Color textColor,
+    Color subtitleColor,
+    Color borderColor,
+    Color inputBg,
+    Color themeAccent,
+    bool isEn,
+    bool isDark,
+  ) {
     return Column(
       children: [
         // Card 1: Edit Profile details
@@ -1139,18 +1604,30 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
             children: [
               Row(
                 children: [
-                  Icon(Icons.person_outline_rounded, color: themeAccent, size: 20),
+                  Icon(
+                    Icons.person_outline_rounded,
+                    color: themeAccent,
+                    size: 20,
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       isEn ? 'Edit Profile' : 'Edit Profil',
-                      style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w900, color: textColor),
+                      style: GoogleFonts.outfit(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: textColor,
+                      ),
                     ),
                   ),
                   OutlinedButton.icon(
                     onPressed: () {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Password reset link sent to your email!')),
+                        const SnackBar(
+                          content: Text(
+                            'Password reset link sent to your email!',
+                          ),
+                        ),
                       );
                     },
                     icon: const Icon(Icons.lock_outline, size: 12),
@@ -1158,8 +1635,13 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                     style: OutlinedButton.styleFrom(
                       foregroundColor: themeAccent,
                       side: BorderSide(color: themeAccent),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      textStyle: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      textStyle: GoogleFonts.outfit(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ],
@@ -1171,9 +1653,25 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
               // Name & Phone
               Row(
                 children: [
-                  Expanded(child: _buildInputLabelAndField('Full Name', _nameController, inputBg, textColor, subtitleColor)),
+                  Expanded(
+                    child: _buildInputLabelAndField(
+                      'Full Name',
+                      _nameController,
+                      inputBg,
+                      textColor,
+                      subtitleColor,
+                    ),
+                  ),
                   const SizedBox(width: 16),
-                  Expanded(child: _buildInputLabelAndField('Phone Number', _phoneController, inputBg, textColor, subtitleColor)),
+                  Expanded(
+                    child: _buildInputLabelAndField(
+                      'Phone Number',
+                      _phoneController,
+                      inputBg,
+                      textColor,
+                      subtitleColor,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
@@ -1181,7 +1679,15 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
               // Email & Gender
               Row(
                 children: [
-                  Expanded(child: _buildInputLabelAndField('Email Address', _emailController, inputBg, textColor, subtitleColor)),
+                  Expanded(
+                    child: _buildInputLabelAndField(
+                      'Email Address',
+                      _emailController,
+                      inputBg,
+                      textColor,
+                      subtitleColor,
+                    ),
+                  ),
                   const SizedBox(width: 16),
                   Expanded(
                     child: _buildDropdownField(
@@ -1199,23 +1705,51 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
               const SizedBox(height: 16),
 
               // Faskes Name
-              _buildInputLabelAndField('Faskes / Clinic Name', _faskesController, inputBg, textColor, subtitleColor),
+              _buildInputLabelAndField(
+                'Faskes / Clinic Name',
+                _faskesController,
+                inputBg,
+                textColor,
+                subtitleColor,
+              ),
               const SizedBox(height: 16),
 
               // About
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('ABOUT', style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: subtitleColor, letterSpacing: 1.0)),
+                  Text(
+                    'ABOUT',
+                    style: GoogleFonts.outfit(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w900,
+                      color: subtitleColor,
+                      letterSpacing: 1.0,
+                    ),
+                  ),
                   const SizedBox(height: 6),
                   Container(
-                    decoration: BoxDecoration(color: inputBg, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderColor)),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: inputBg,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: borderColor),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
                     child: TextField(
                       controller: _aboutController,
                       maxLines: 4,
-                      style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: textColor),
-                      decoration: const InputDecoration(border: InputBorder.none, isDense: true),
+                      style: GoogleFonts.outfit(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: textColor,
+                      ),
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        isDense: true,
+                      ),
                     ),
                   ),
                 ],
@@ -1226,7 +1760,15 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
               const SizedBox(height: 20),
 
               // Address dropdowns (using LocationSelectorWidget)
-              Text('ADDRESS', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w900, color: textColor, letterSpacing: 1.0)),
+              Text(
+                'ADDRESS',
+                style: GoogleFonts.outfit(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                  color: textColor,
+                  letterSpacing: 1.0,
+                ),
+              ),
               const SizedBox(height: 12),
               LocationSelectorWidget(
                 initialProvince: _selectedProvinsi,
@@ -1251,8 +1793,15 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
               const SizedBox(height: 16),
 
               // Detail Alamat text field
-              _buildInputLabelAndField('DETAIL ALAMAT', _addressDetailController, inputBg, textColor, subtitleColor, maxLines: 3),
-              
+              _buildInputLabelAndField(
+                'DETAIL ALAMAT',
+                _addressDetailController,
+                inputBg,
+                textColor,
+                subtitleColor,
+                maxLines: 3,
+              ),
+
               const SizedBox(height: 24),
               const Divider(),
               const SizedBox(height: 20),
@@ -1267,11 +1816,26 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: themeAccent,
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(100),
+                      ),
                     ),
                     child: _isSaving
-                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                        : Text(isEn ? 'SAVE CHANGES' : 'SIMPAN PROFIL', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900)),
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Text(
+                            isEn ? 'SAVE CHANGES' : 'SIMPAN PROFIL',
+                            style: GoogleFonts.outfit(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
                   ),
                 ),
               ),
@@ -1282,7 +1846,17 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
         const SizedBox(height: 20),
 
         // Card 2: Subscription Status
-        _buildSubscriptionStatusCard(cardBgColor, textColor, subtitleColor, borderColor, inputBg, themeAccent, const Color(0xFF8A2BE2), isEn, isDark),
+        _buildSubscriptionStatusCard(
+          cardBgColor,
+          textColor,
+          subtitleColor,
+          borderColor,
+          inputBg,
+          themeAccent,
+          const Color(0xFF8A2BE2),
+          isEn,
+          isDark,
+        ),
       ],
     );
   }
@@ -1312,24 +1886,46 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
             children: [
               Row(
                 children: [
-                  Icon(Icons.calendar_today_outlined, color: themeAccent, size: 18),
+                  Icon(
+                    Icons.calendar_today_outlined,
+                    color: themeAccent,
+                    size: 18,
+                  ),
                   const SizedBox(width: 10),
                   Text(
-                    isEn ? 'Weekly Operational Schedule' : 'Jadwal Operasional Mingguan',
-                    style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w900, color: textColor),
+                    isEn
+                        ? 'Weekly Operational Schedule'
+                        : 'Jadwal Operasional Mingguan',
+                    style: GoogleFonts.outfit(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                      color: textColor,
+                    ),
                   ),
                 ],
               ),
               const SizedBox(height: 8),
               Text(
-                isEn ? 'Set your operational hours for each day. Mark as HOLIDAY if not open.' : 'Tentukan jam operasional Puskesmas Anda. Beri tanda HOLIDAY jika tutup.',
+                isEn
+                    ? 'Set your operational hours for each day. Mark as HOLIDAY if not open.'
+                    : 'Tentukan jam operasional Puskesmas Anda. Beri tanda HOLIDAY jika tutup.',
                 style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor),
               ),
               const SizedBox(height: 16),
               const Divider(),
               const SizedBox(height: 16),
 
-              ..._scheduleDays.map((dayMap) => _buildScheduleDayRow(dayMap, isDark, false, inputBg, borderColor, themeAccent, subtitleColor)),
+              ..._scheduleDays.map(
+                (dayMap) => _buildScheduleDayRow(
+                  dayMap,
+                  isDark,
+                  false,
+                  inputBg,
+                  borderColor,
+                  themeAccent,
+                  subtitleColor,
+                ),
+              ),
             ],
           ),
         ),
@@ -1349,12 +1945,20 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
             children: [
               Row(
                 children: [
-                  Icon(Icons.location_on_outlined, color: themeAccent, size: 18),
+                  Icon(
+                    Icons.location_on_outlined,
+                    color: themeAccent,
+                    size: 18,
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       isEn ? 'Clinic Location' : 'Lokasi Praktik',
-                      style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w900, color: textColor),
+                      style: GoogleFonts.outfit(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: textColor,
+                      ),
                     ),
                   ),
                   OutlinedButton.icon(
@@ -1364,8 +1968,13 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                     style: OutlinedButton.styleFrom(
                       foregroundColor: textColor,
                       side: BorderSide(color: borderColor),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      textStyle: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      textStyle: GoogleFonts.outfit(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -1376,8 +1985,13 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                     style: OutlinedButton.styleFrom(
                       foregroundColor: textColor,
                       side: BorderSide(color: borderColor),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      textStyle: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      textStyle: GoogleFonts.outfit(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ],
@@ -1387,7 +2001,9 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF221F2E) : const Color(0xFFF5F0FF),
+                  color: isDark
+                      ? const Color(0xFF221F2E)
+                      : const Color(0xFFF5F0FF),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: themeAccent.withOpacity(0.3)),
                 ),
@@ -1398,18 +2014,39 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            _faskesController.text.isNotEmpty ? _faskesController.text : 'Puskesmas Sumbersari',
-                            style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF3F1B85)),
+                            _faskesController.text.isNotEmpty
+                                ? _faskesController.text
+                                : 'Puskesmas Sumbersari',
+                            style: GoogleFonts.outfit(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: isDark
+                                  ? Colors.white
+                                  : const Color(0xFF3F1B85),
+                            ),
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            _addressDetailController.text.isNotEmpty ? _addressDetailController.text : 'Dusun Krajan RT 01 RW 03 Pujer',
-                            style: GoogleFonts.outfit(fontSize: 11, color: isDark ? Colors.grey[300] : const Color(0xFF5F439E)),
+                            _addressDetailController.text.isNotEmpty
+                                ? _addressDetailController.text
+                                : 'Dusun Krajan RT 01 RW 03 Pujer',
+                            style: GoogleFonts.outfit(
+                              fontSize: 11,
+                              color: isDark
+                                  ? Colors.grey[300]
+                                  : const Color(0xFF5F439E),
+                            ),
                           ),
                           const SizedBox(height: 6),
                           Text(
                             'ID: ',
-                            style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: isDark ? Colors.grey[400] : const Color(0xFF7E64BA)),
+                            style: GoogleFonts.outfit(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: isDark
+                                  ? Colors.grey[400]
+                                  : const Color(0xFF7E64BA),
+                            ),
                           ),
                         ],
                       ),
@@ -1428,8 +2065,13 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF2EC4B6),
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        textStyle: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        textStyle: GoogleFonts.outfit(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ],
@@ -1437,7 +2079,14 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
               ),
               const SizedBox(height: 20),
 
-              Text('Clinic Google Maps Link', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: subtitleColor)),
+              Text(
+                'Clinic Google Maps Link',
+                style: GoogleFonts.outfit(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: subtitleColor,
+                ),
+              ),
               const SizedBox(height: 6),
               Row(
                 children: [
@@ -1445,30 +2094,56 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14),
                       height: 38,
-                      decoration: BoxDecoration(color: inputBg, borderRadius: BorderRadius.circular(8), border: Border.all(color: borderColor)),
+                      decoration: BoxDecoration(
+                        color: inputBg,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: borderColor),
+                      ),
                       child: TextField(
                         controller: _mapsLinkController,
-                        style: GoogleFonts.outfit(fontSize: 11, color: textColor),
-                        decoration: const InputDecoration(border: InputBorder.none, isDense: true),
+                        onChanged: (_) {
+                          setState(() {});
+                        },
+                        style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          color: textColor,
+                        ),
+                        decoration: const InputDecoration(
+                          border: InputBorder.none,
+                          isDense: true,
+                        ),
                       ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   ElevatedButton(
                     onPressed: () async {
+                      setState(() {});
                       final urlStr = _mapsLinkController.text.trim();
                       if (urlStr.isNotEmpty) {
                         final uri = Uri.parse(urlStr);
                         if (await canLaunchUrl(uri)) await launchUrl(uri);
                       }
                     },
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE8D7FF), foregroundColor: const Color(0xFF8A2BE2)),
-                    child: Text('Show', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFE8D7FF),
+                      foregroundColor: const Color(0xFF8A2BE2),
+                    ),
+                    child: Text(
+                      'Show',
+                      style: GoogleFonts.outfit(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
                   ),
                 ],
               ),
               const SizedBox(height: 4),
-              Text('Open Google Maps -> search clinic -> click Share -> select Copy link -> paste here.', style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor)),
+              Text(
+                'Open Google Maps -> search clinic -> click Share -> select Copy link -> paste here.',
+                style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
+              ),
 
               const SizedBox(height: 20),
 
@@ -1477,18 +2152,31 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.location_on, size: 14, color: Colors.redAccent),
+                      const Icon(
+                        Icons.location_on,
+                        size: 14,
+                        color: Colors.redAccent,
+                      ),
                       const SizedBox(width: 4),
                       Text(
-                        _faskesController.text.isNotEmpty ? _faskesController.text : 'Puskesmas Sumbersari',
-                        style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: textColor),
+                        _faskesController.text.isNotEmpty
+                            ? _faskesController.text
+                            : 'Puskesmas Sumbersari',
+                        style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: textColor,
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
                   Container(
                     height: 220,
-                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), border: Border.all(color: borderColor)),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: borderColor),
+                    ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(11),
                       child: _buildMapContent(isDark),
@@ -1502,7 +2190,21 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
 
         const SizedBox(height: 20),
 
-        // Card 3: Search & Registration Settings
+        // Card 3: Wilayah Kerja & Batas Geografis Puskesmas (RevGeo API Integration)
+        _buildWilayahKerjaMapCard(
+          cardBgColor,
+          textColor,
+          subtitleColor,
+          borderColor,
+          inputBg,
+          themeAccent,
+          isEn,
+          isDark,
+        ),
+
+        const SizedBox(height: 20),
+
+        // Card 4: Search & Registration Settings
         Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
@@ -1518,8 +2220,14 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                   Icon(Icons.search_rounded, color: themeAccent, size: 18),
                   const SizedBox(width: 10),
                   Text(
-                    isEn ? 'Search & Registration Settings' : 'Pengaturan Pencarian & Pendaftaran',
-                    style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w900, color: textColor),
+                    isEn
+                        ? 'Search & Registration Settings'
+                        : 'Pengaturan Pencarian & Pendaftaran',
+                    style: GoogleFonts.outfit(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                      color: textColor,
+                    ),
                   ),
                 ],
               ),
@@ -1534,12 +2242,30 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Show Profile in Search', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: textColor)),
-                        Text('If active, your profile can be searched by the public in the "Search Private Practice" menu.', style: GoogleFonts.outfit(fontSize: 9, color: subtitleColor)),
+                        Text(
+                          'Show Profile in Search',
+                          style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: textColor,
+                          ),
+                        ),
+                        Text(
+                          'If active, your profile can be searched by the public in the "Search Private Practice" menu.',
+                          style: GoogleFonts.outfit(
+                            fontSize: 9,
+                            color: subtitleColor,
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                  Switch(value: _showProfileInSearch, activeColor: themeAccent, onChanged: (val) => setState(() => _showProfileInSearch = val)),
+                  Switch(
+                    value: _showProfileInSearch,
+                    activeColor: themeAccent,
+                    onChanged: (val) =>
+                        setState(() => _showProfileInSearch = val),
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
@@ -1551,12 +2277,30 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Serve BPJS Patients', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: textColor)),
-                        Text('If active, patients can register using their BPJS Health card number.', style: GoogleFonts.outfit(fontSize: 9, color: subtitleColor)),
+                        Text(
+                          'Serve BPJS Patients',
+                          style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: textColor,
+                          ),
+                        ),
+                        Text(
+                          'If active, patients can register using their BPJS Health card number.',
+                          style: GoogleFonts.outfit(
+                            fontSize: 9,
+                            color: subtitleColor,
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                  Switch(value: _serveBPJSPatients, activeColor: themeAccent, onChanged: (val) => setState(() => _serveBPJSPatients = val)),
+                  Switch(
+                    value: _serveBPJSPatients,
+                    activeColor: themeAccent,
+                    onChanged: (val) =>
+                        setState(() => _serveBPJSPatients = val),
+                  ),
                 ],
               ),
               const SizedBox(height: 32),
@@ -1571,11 +2315,26 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: themeAccent,
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(100),
+                      ),
                     ),
                     child: _isSaving
-                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                        : Text(isEn ? 'SAVE CHANGES' : 'SIMPAN PROFIL', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900)),
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Text(
+                            isEn ? 'SAVE CHANGES' : 'SIMPAN PROFIL',
+                            style: GoogleFonts.outfit(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
                   ),
                 ),
               ),
@@ -1599,7 +2358,9 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
   ) {
     final isActive = _subStatus == 'ACTIVE';
     final statusColor = isActive ? activeColor : Colors.orangeAccent;
-    final progress = _subDaysRemaining > 0 ? (_subDaysRemaining / 30.0).clamp(0.0, 1.0) : 0.0;
+    final progress = _subDaysRemaining > 0
+        ? (_subDaysRemaining / 30.0).clamp(0.0, 1.0)
+        : 0.0;
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -1607,7 +2368,9 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
         color: cardBg,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isActive ? activeColor.withOpacity(0.35) : Colors.orangeAccent.withOpacity(0.35),
+          color: isActive
+              ? activeColor.withOpacity(0.35)
+              : Colors.orangeAccent.withOpacity(0.35),
           width: 1.5,
         ),
         boxShadow: [
@@ -1631,7 +2394,9 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  isActive ? Icons.verified_rounded : Icons.calendar_month_outlined,
+                  isActive
+                      ? Icons.verified_rounded
+                      : Icons.calendar_month_outlined,
                   color: statusColor,
                   size: 18,
                 ),
@@ -1642,7 +2407,9 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      isEn ? 'Portal Subscription Status' : 'Status Langganan Portal',
+                      isEn
+                          ? 'Portal Subscription Status'
+                          : 'Status Langganan Portal',
                       style: GoogleFonts.outfit(
                         fontSize: 14,
                         fontWeight: FontWeight.w900,
@@ -1651,8 +2418,12 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                     ),
                     Text(
                       isActive
-                          ? (isEn ? 'Your portal subscription is active' : 'Langganan portal Anda aktif')
-                          : (isEn ? 'Portal subscription is inactive/expired' : 'Langganan portal tidak aktif/kedaluwarsa'),
+                          ? (isEn
+                                ? 'Your portal subscription is active'
+                                : 'Langganan portal Anda aktif')
+                          : (isEn
+                                ? 'Portal subscription is inactive/expired'
+                                : 'Langganan portal tidak aktif/kedaluwarsa'),
                       style: GoogleFonts.outfit(
                         fontSize: 10,
                         fontWeight: FontWeight.w500,
@@ -1663,7 +2434,10 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: statusColor.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(100),
@@ -1687,11 +2461,21 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
           if (isActive && _subDaysRemaining > 0) ...[
             Row(
               children: [
-                Expanded(child: _buildTimeBox('', isEn ? 'Days' : 'Hari', statusColor)),
+                Expanded(
+                  child: _buildTimeBox('', isEn ? 'Days' : 'Hari', statusColor),
+                ),
                 const SizedBox(width: 8),
-                Expanded(child: _buildTimeBox('', isEn ? 'Hours' : 'Jam', statusColor)),
+                Expanded(
+                  child: _buildTimeBox('', isEn ? 'Hours' : 'Jam', statusColor),
+                ),
                 const SizedBox(width: 8),
-                Expanded(child: _buildTimeBox('', isEn ? 'Minutes' : 'Menit', statusColor)),
+                Expanded(
+                  child: _buildTimeBox(
+                    '',
+                    isEn ? 'Minutes' : 'Menit',
+                    statusColor,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 16),
@@ -1703,11 +2487,19 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                   children: [
                     Text(
                       isEn ? 'Time Remaining' : 'Sisa Waktu',
-                      style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w600, color: subtitleColor),
+                      style: GoogleFonts.outfit(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: subtitleColor,
+                      ),
                     ),
                     Text(
                       '%',
-                      style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: statusColor),
+                      style: GoogleFonts.outfit(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        color: statusColor,
+                      ),
                     ),
                   ],
                 ),
@@ -1730,18 +2522,28 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
               decoration: BoxDecoration(
                 color: Colors.orangeAccent.withOpacity(0.07),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.orangeAccent.withOpacity(0.25)),
+                border: Border.all(
+                  color: Colors.orangeAccent.withOpacity(0.25),
+                ),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.info_outline_rounded, color: Colors.orangeAccent, size: 20),
+                  const Icon(
+                    Icons.info_outline_rounded,
+                    color: Colors.orangeAccent,
+                    size: 20,
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       isEn
                           ? 'Subscribe to unlock all features, search visibility, and integrations.'
                           : 'Berlangganan untuk membuka semua fitur, visibilitas pencarian, dan integrasi.',
-                      style: GoogleFonts.outfit(fontSize: 12, color: Colors.orangeAccent, height: 1.4),
+                      style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        color: Colors.orangeAccent,
+                        height: 1.4,
+                      ),
                     ),
                   ),
                 ],
@@ -1758,14 +2560,20 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
             ),
             child: Column(
               children: [
-                _buildSubStatusRow(isEn ? 'Expiry Date:' : 'Tanggal Kedaluwarsa:', _subExpiry, textColor, isDark),
+                _buildSubStatusRow(
+                  isEn ? 'Expiry Date:' : 'Tanggal Kedaluwarsa:',
+                  _subExpiry,
+                  textColor,
+                  isDark,
+                ),
                 const Divider(height: 1),
                 _buildSubStatusRow(
-                    isEn ? 'Days Left:' : 'Sisa Hari:',
-                    isActive ? ' ' : 'N/A',
-                    isActive ? activeColor : Colors.orangeAccent,
-                    isDark,
-                    showBold: true),
+                  isEn ? 'Days Left:' : 'Sisa Hari:',
+                  isActive ? ' ' : 'N/A',
+                  isActive ? activeColor : Colors.orangeAccent,
+                  isDark,
+                  showBold: true,
+                ),
               ],
             ),
           ),
@@ -1774,15 +2582,27 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
 
           ElevatedButton.icon(
             onPressed: _isSaving ? null : _renewSubscription,
-            icon: Icon(_isSaving ? Icons.hourglass_top_rounded : Icons.sync, size: 16),
-            label: Text(_isSaving ? (isEn ? 'Renewing...' : 'Memperbarui...') : (isEn ? 'Renew 30 Days' : 'Perbarui 30 Hari')),
+            icon: Icon(
+              _isSaving ? Icons.hourglass_top_rounded : Icons.sync,
+              size: 16,
+            ),
+            label: Text(
+              _isSaving
+                  ? (isEn ? 'Renewing...' : 'Memperbarui...')
+                  : (isEn ? 'Renew 30 Days' : 'Perbarui 30 Hari'),
+            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: premiumColor,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 16),
               elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              textStyle: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              textStyle: GoogleFonts.outfit(
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+              ),
             ),
           ),
         ],
@@ -1790,7 +2610,13 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
     );
   }
 
-  Widget _buildSubStatusRow(String label, String value, Color valColor, bool isDark, {bool showBold = false}) {
+  Widget _buildSubStatusRow(
+    String label,
+    String value,
+    Color valColor,
+    bool isDark, {
+    bool showBold = false,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
@@ -1829,12 +2655,21 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
         children: [
           Text(
             value.padLeft(2, '0'),
-            style: GoogleFonts.outfit(fontSize: 28, fontWeight: FontWeight.w900, color: accentColor),
+            style: GoogleFonts.outfit(
+              fontSize: 28,
+              fontWeight: FontWeight.w900,
+              color: accentColor,
+            ),
           ),
           const SizedBox(height: 2),
           Text(
             label.toUpperCase(),
-            style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: accentColor.withOpacity(0.8), letterSpacing: 0.5),
+            style: GoogleFonts.outfit(
+              fontSize: 9,
+              fontWeight: FontWeight.w900,
+              color: accentColor.withOpacity(0.8),
+              letterSpacing: 0.5,
+            ),
           ),
         ],
       ),
@@ -1903,6 +2738,7 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
       }
     }
   }
+
   Widget _buildScheduleDayRow(
     Map<String, dynamic> dayMap,
     bool isDark,
@@ -1920,9 +2756,15 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isActive ? Colors.transparent : (isDark ? const Color(0xFF1B1B1F) : const Color(0xFFF1F5F9).withOpacity(0.5)),
+        color: isActive
+            ? Colors.transparent
+            : (isDark
+                  ? const Color(0xFF1B1B1F)
+                  : const Color(0xFFF1F5F9).withOpacity(0.5)),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isActive ? borderColor : borderColor.withOpacity(0.5)),
+        border: Border.all(
+          color: isActive ? borderColor : borderColor.withOpacity(0.5),
+        ),
       ),
       child: Opacity(
         opacity: isActive ? 1.0 : 0.5,
@@ -1931,14 +2773,33 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
             Container(
               width: 32,
               height: 32,
-              decoration: BoxDecoration(shape: BoxShape.circle, color: isActive ? themeAccent.withOpacity(0.12) : const Color(0xFFE2E8F0)),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isActive
+                    ? themeAccent.withOpacity(0.12)
+                    : const Color(0xFFE2E8F0),
+              ),
               alignment: Alignment.center,
-              child: Text(dayInitial, style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: isActive ? themeAccent : Colors.grey)),
+              child: Text(
+                dayInitial,
+                style: GoogleFonts.outfit(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: isActive ? themeAccent : Colors.grey,
+                ),
+              ),
             ),
             const SizedBox(width: 12),
             SizedBox(
               width: 90,
-              child: Text(dayName, style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF1B0C3C))),
+              child: Text(
+                dayName,
+                style: GoogleFonts.outfit(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : const Color(0xFF1B0C3C),
+                ),
+              ),
             ),
             const Icon(Icons.access_time, size: 14, color: Colors.grey),
             const SizedBox(width: 8),
@@ -1950,29 +2811,54 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                 width: 90,
                 height: 34,
                 padding: const EdgeInsets.symmetric(horizontal: 8),
-                decoration: BoxDecoration(color: inputBg, borderRadius: BorderRadius.circular(6), border: Border.all(color: borderColor)),
+                decoration: BoxDecoration(
+                  color: inputBg,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: borderColor),
+                ),
                 child: Center(
                   child: Text(
                     dayMap['start'] as String,
-                    style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: isDark ? (isActive ? Colors.white : Colors.grey) : (isActive ? Colors.black87 : Colors.grey)),
+                    style: GoogleFonts.outfit(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: isDark
+                          ? (isActive ? Colors.white : Colors.grey)
+                          : (isActive ? Colors.black87 : Colors.grey),
+                    ),
                   ),
                 ),
               ),
             ),
-            const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('s/d')),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8),
+              child: Text('s/d'),
+            ),
 
             // End Time picker
             GestureDetector(
-              onTap: isActive ? () => _selectTime(context, dayMap, false) : null,
+              onTap: isActive
+                  ? () => _selectTime(context, dayMap, false)
+                  : null,
               child: Container(
                 width: 90,
                 height: 34,
                 padding: const EdgeInsets.symmetric(horizontal: 8),
-                decoration: BoxDecoration(color: inputBg, borderRadius: BorderRadius.circular(6), border: Border.all(color: borderColor)),
+                decoration: BoxDecoration(
+                  color: inputBg,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: borderColor),
+                ),
                 child: Center(
                   child: Text(
                     dayMap['end'] as String,
-                    style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: isDark ? (isActive ? Colors.white : Colors.grey) : (isActive ? Colors.black87 : Colors.grey)),
+                    style: GoogleFonts.outfit(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: isDark
+                          ? (isActive ? Colors.white : Colors.grey)
+                          : (isActive ? Colors.black87 : Colors.grey),
+                    ),
                   ),
                 ),
               ),
@@ -1995,7 +2881,15 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
     );
   }
 
-  Widget _buildApiAndIntegrationTab(Color cardBgColor, Color textColor, Color subtitleColor, Color borderColor, Color themeAccent, bool isEn, bool isDark) {
+  Widget _buildApiAndIntegrationTab(
+    Color cardBgColor,
+    Color textColor,
+    Color subtitleColor,
+    Color borderColor,
+    Color themeAccent,
+    bool isEn,
+    bool isDark,
+  ) {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -2014,13 +2908,19 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
               Expanded(
                 child: Text(
                   isEn ? 'API Linkage Settings' : 'Pengaturan Integrasi API',
-                  style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w900, color: textColor),
+                  style: GoogleFonts.outfit(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: textColor,
+                  ),
                 ),
               ),
               // Pill Selector for SatuSehat, BPJS, Mobile JKN
               Container(
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF252528) : const Color(0xFFF1F5F9),
+                  color: isDark
+                      ? const Color(0xFF252528)
+                      : const Color(0xFFF1F5F9),
                   borderRadius: BorderRadius.circular(30),
                 ),
                 padding: const EdgeInsets.all(4),
@@ -2039,35 +2939,95 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
           const SizedBox(height: 20),
 
           if (_activeApiSubTab == 0) ...[
-            Text('SATUSEHAT CREDENTIALS', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: themeAccent, letterSpacing: 0.5)),
+            Text(
+              'SATUSEHAT CREDENTIALS',
+              style: GoogleFonts.outfit(
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                color: themeAccent,
+                letterSpacing: 0.5,
+              ),
+            ),
             const SizedBox(height: 6),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(color: const Color(0xFFE8F6F3), borderRadius: BorderRadius.circular(6)),
-              child: Text('PRODUCTION ENVIRONMENT', style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.w900, color: const Color(0xFF00A67E))),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F6F3),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                'PRODUCTION ENVIRONMENT',
+                style: GoogleFonts.outfit(
+                  fontSize: 8,
+                  fontWeight: FontWeight.w900,
+                  color: const Color(0xFF00A67E),
+                ),
+              ),
             ),
             const SizedBox(height: 20),
 
             _buildInputLabel('Organization ID', subtitleColor),
-            _buildTextField(_ssOrgIdController, 'e.g. 100062510', textColor, borderColor),
+            _buildTextField(
+              _ssOrgIdController,
+              'e.g. 100062510',
+              textColor,
+              borderColor,
+            ),
             const SizedBox(height: 16),
 
             _buildInputLabel('Client ID', subtitleColor),
-            _buildTextField(_ssClientIdController, 'Enter client_id', textColor, borderColor),
+            _buildTextField(
+              _ssClientIdController,
+              'Enter client_id',
+              textColor,
+              borderColor,
+            ),
             const SizedBox(height: 16),
 
             _buildInputLabel('Client Secret', subtitleColor),
-            _buildTextField(_ssClientSecretController, 'Enter client_secret', textColor, borderColor, obscureText: true),
+            _buildTextField(
+              _ssClientSecretController,
+              'Enter client_secret',
+              textColor,
+              borderColor,
+              obscureText: true,
+            ),
           ] else if (_activeApiSubTab == 1) ...[
-            Text('BPJS KESEHATAN CREDENTIALS', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: themeAccent, letterSpacing: 0.5)),
+            Text(
+              'BPJS KESEHATAN CREDENTIALS',
+              style: GoogleFonts.outfit(
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                color: themeAccent,
+                letterSpacing: 0.5,
+              ),
+            ),
             const SizedBox(height: 20),
             _buildInputLabel('BPJS API KEY / AUTH TOKEN', subtitleColor),
-            _buildTextField(_bpjsApiKeyController, 'Enter BPJS cons_id', textColor, borderColor),
+            _buildTextField(
+              _bpjsApiKeyController,
+              'Enter BPJS cons_id',
+              textColor,
+              borderColor,
+            ),
           ] else ...[
-            Text('MOBILE JKN CREDENTIALS', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: themeAccent, letterSpacing: 0.5)),
+            Text(
+              'MOBILE JKN CREDENTIALS',
+              style: GoogleFonts.outfit(
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                color: themeAccent,
+                letterSpacing: 0.5,
+              ),
+            ),
             const SizedBox(height: 20),
             _buildInputLabel('MOBILE JKN KEY', subtitleColor),
-            _buildTextField(_jknApiKeyController, 'Enter JKN api_key', textColor, borderColor),
+            _buildTextField(
+              _jknApiKeyController,
+              'Enter JKN api_key',
+              textColor,
+              borderColor,
+            ),
           ],
 
           const SizedBox(height: 24),
@@ -2085,11 +3045,26 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: themeAccent,
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(100),
+                  ),
                 ),
                 child: _isSaving
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : Text(isEn ? 'Save API Settings' : 'Simpan API', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900)),
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Text(
+                        isEn ? 'Save API Settings' : 'Simpan API',
+                        style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
               ),
             ),
           ),
@@ -2117,7 +3092,9 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
           style: GoogleFonts.outfit(
             fontSize: 11,
             fontWeight: FontWeight.bold,
-            color: isSelected ? Colors.white : (isDark ? Colors.grey[400] : const Color(0xFF64748B)),
+            color: isSelected
+                ? Colors.white
+                : (isDark ? Colors.grey[400] : const Color(0xFF64748B)),
           ),
         ),
       ),
@@ -2129,7 +3106,12 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
       padding: const EdgeInsets.only(bottom: 6),
       child: Text(
         label,
-        style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: color, letterSpacing: 1.0),
+        style: GoogleFonts.outfit(
+          fontSize: 9,
+          fontWeight: FontWeight.w900,
+          color: color,
+          letterSpacing: 1.0,
+        ),
       ),
     );
   }
@@ -2147,7 +3129,12 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
       children: [
         Text(
           label.toUpperCase(),
-          style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: subtitleColor, letterSpacing: 1.0),
+          style: GoogleFonts.outfit(
+            fontSize: 9,
+            fontWeight: FontWeight.w900,
+            color: subtitleColor,
+            letterSpacing: 1.0,
+          ),
         ),
         const SizedBox(height: 6),
         Container(
@@ -2155,14 +3142,23 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
           decoration: BoxDecoration(
             color: fieldBg,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: ref.read(landingPageProvider.notifier).getBorderColor()),
+            border: Border.all(
+              color: ref.read(landingPageProvider.notifier).getBorderColor(),
+            ),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           child: TextField(
             controller: controller,
             maxLines: maxLines,
-            style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: textColor),
-            decoration: const InputDecoration(border: InputBorder.none, isDense: true),
+            style: GoogleFonts.outfit(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: textColor,
+            ),
+            decoration: const InputDecoration(
+              border: InputBorder.none,
+              isDense: true,
+            ),
           ),
         ),
       ],
@@ -2183,7 +3179,12 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
       children: [
         Text(
           label.toUpperCase(),
-          style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: subtitleColor, letterSpacing: 1.0),
+          style: GoogleFonts.outfit(
+            fontSize: 9,
+            fontWeight: FontWeight.w900,
+            color: subtitleColor,
+            letterSpacing: 1.0,
+          ),
         ),
         const SizedBox(height: 6),
         Container(
@@ -2191,7 +3192,9 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
           decoration: BoxDecoration(
             color: fieldBg,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: ref.read(landingPageProvider.notifier).getBorderColor()),
+            border: Border.all(
+              color: ref.read(landingPageProvider.notifier).getBorderColor(),
+            ),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: DropdownButtonHideUnderline(
@@ -2200,7 +3203,14 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
               items: items.map((val) {
                 return DropdownMenuItem<String>(
                   value: val,
-                  child: Text(val, style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: textColor)),
+                  child: Text(
+                    val,
+                    style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: textColor,
+                    ),
+                  ),
                 );
               }).toList(),
               onChanged: onChanged,
@@ -2218,7 +3228,12 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
       padding: const EdgeInsets.only(bottom: 6),
       child: Text(
         label,
-        style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: color, letterSpacing: 1.0),
+        style: GoogleFonts.outfit(
+          fontSize: 9,
+          fontWeight: FontWeight.w900,
+          color: color,
+          letterSpacing: 1.0,
+        ),
       ),
     );
   }
@@ -2244,14 +3259,56 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
         obscureText: obscureText,
         maxLines: maxLines,
         keyboardType: keyboardType,
-        style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: textColor),
+        style: GoogleFonts.outfit(
+          fontSize: 13,
+          fontWeight: FontWeight.bold,
+          color: textColor,
+        ),
         decoration: InputDecoration(
           hintText: hint,
-          hintStyle: GoogleFonts.outfit(fontSize: 13, color: textColor.withOpacity(0.4)),
+          hintStyle: GoogleFonts.outfit(
+            fontSize: 13,
+            color: textColor.withOpacity(0.4),
+          ),
           border: InputBorder.none,
           isDense: true,
         ),
       ),
+    );
+  }
+
+  Widget _buildWilayahKerjaMapCard(
+    Color cardBgColor,
+    Color textColor,
+    Color subtitleColor,
+    Color borderColor,
+    Color inputBg,
+    Color themeAccent,
+    bool isEn,
+    bool isDark,
+  ) {
+    return RevGeoWilayahMapWidget(
+      initialProvince: _selectedProvinsi,
+      initialDistrict: _selectedKabupaten,
+      initialSubDistrict: _selectedKecamatan,
+      initialVillage: _selectedKelurahan,
+      revgeoApiUrl: _revgeoApiUrlController.text.trim(),
+      fieldBg: inputBg,
+      textColor: textColor,
+      subtitleColor: subtitleColor,
+      borderColor: borderColor,
+      dropdownColor: cardBgColor,
+      themeAccent: themeAccent,
+      isDark: isDark,
+      isEn: isEn,
+      onChanged: (prov, dist, subDist, vill) {
+        setState(() {
+          _selectedProvinsi = prov;
+          _selectedKabupaten = dist;
+          _selectedKecamatan = subDist;
+          _selectedKelurahan = vill;
+        });
+      },
     );
   }
 }
