@@ -612,6 +612,17 @@ class _LoginModalContentState extends State<_LoginModalContent> {
                           }
                         }
 
+                        Set<String>? dbFavorites;
+                        if (user != null && user['id'] != null) {
+                          try {
+                            final userId = user['id'];
+                            final userRole = user['role']?.toString() ?? mappedRole;
+                            dbFavorites = await db.fetchFavoriteMenusFromUserDetail(userId, userRole);
+                          } catch (e) {
+                            debugPrint('Error fetching favorite_menus during login: $e');
+                          }
+                        }
+
                         Navigator.pop(context); // Close the login modal
                         notifier.login(
                           mappedRole,
@@ -620,6 +631,7 @@ class _LoginModalContentState extends State<_LoginModalContent> {
                           defaultServiceFee: defaultFee,
                           satusehatAutoSync: ssAutoSync,
                           language: savedLanguage,
+                          favoriteMenuItems: dbFavorites,
                         );
 
                         ScaffoldMessenger.of(context).showSnackBar(

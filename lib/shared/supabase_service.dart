@@ -539,8 +539,35 @@ class SupabaseService {
 
   // Save public health center (puskesmas) details
   Future<void> savePuskesmasDetail(String id, Map<String, dynamic> data) async {
-    await _patch('user_detail_public_health_center?id=eq.$id', data, schema: 'public');
+    try {
+      await client.from('user_detail_public_health_center').upsert({
+        'id': id,
+        ...data,
+      });
+    } catch (e) {
+      await _patch('user_detail_public_health_center?id=eq.$id', data, schema: 'public');
+    }
   }
+
+  // Save public health center (puskesmas) map location
+  Future<void> savePuskesmasMapLocation({
+    required String puskesmasId,
+    required double latitude,
+    required double longitude,
+    required String locationName,
+  }) async {
+    try {
+      await client.from('user_detail_public_health_center').upsert({
+        'id': puskesmasId,
+        'latitude': latitude.toString(),
+        'longitude': longitude.toString(),
+        'address': locationName,
+      });
+    } catch (e) {
+      print('Error saving puskesmas map location: $e');
+    }
+  }
+
 
   // Fetch village clinic (ponkesdes) details by user ID
   Future<Map<String, dynamic>?> fetchPonkesdesDetail(String id) async {
@@ -568,6 +595,81 @@ class SupabaseService {
   ) async {
     await _patch('user?id=eq.$userId', data, schema: 'public');
   }
+
+  /// Returns the corresponding detail user table name for a given user role.
+  static String? getDetailTableNameForRole(String? role) {
+    if (role == null) return null;
+    final r = role.toLowerCase().trim();
+    if (r == 'dokter' || r == 'doctor' || r == 'praktikmandiri') {
+      return 'user_detail_doctor';
+    } else if (r == 'pasien' || r == 'patient') {
+      return 'user_detail_patient';
+    } else if (r == 'apotek' || r == 'pharmacy' || r == 'pharmacist') {
+      return 'user_detail_pharmacist';
+    } else if (r == 'puskesmas' || r == 'public_health_center') {
+      return 'user_detail_public_health_center';
+    } else if (r == 'ponkesdes' || r == 'village_clinic' || r == 'clinic') {
+      return 'user_detail_village_clinic';
+    } else if (r == 'asisten_dokter' || r == 'assistant') {
+      return 'user_detail_doctor_assistant';
+    } else if (r == 'asisten_apotek' || r == 'pharmacist_staff') {
+      return 'user_detail_pharmacist_staff';
+    }
+    return null;
+  }
+
+  /// Fetches favorite menu items from the user's detail table (JSONB column favorite_menus).
+  Future<Set<String>?> fetchFavoriteMenusFromUserDetail(
+    String userId,
+    String? role,
+  ) async {
+    final tableName = getDetailTableNameForRole(role);
+    if (tableName == null) return null;
+    try {
+      final res = await client
+          .from(tableName)
+          .select('favorite_menus')
+          .eq('id', userId)
+          .maybeSingle();
+      if (res != null && res['favorite_menus'] != null) {
+        final raw = res['favorite_menus'];
+        if (raw is List) {
+          return raw.map((e) => e.toString()).toSet();
+        } else if (raw is String) {
+          try {
+            final decoded = jsonDecode(raw);
+            if (decoded is List) {
+              return decoded.map((e) => e.toString()).toSet();
+            }
+          } catch (_) {}
+        }
+      }
+    } catch (e) {
+      print('Error fetching favorite_menus from $tableName: $e');
+    }
+    return null;
+  }
+
+  /// Saves favorite menu items into the user's detail table (JSONB column favorite_menus).
+  Future<void> saveFavoriteMenusToUserDetail(
+    String userId,
+    String? role,
+    List<String> favoriteMenus,
+  ) async {
+    final tableName = getDetailTableNameForRole(role);
+    if (tableName == null) return;
+    try {
+      await client
+          .from(tableName)
+          .upsert({
+            'id': userId,
+            'favorite_menus': favoriteMenus,
+          });
+    } catch (e) {
+      print('Error saving favorite_menus to $tableName: $e');
+    }
+  }
+
 
   // Fetch patient queue entries from the database
   Future<List<Map<String, dynamic>>> fetchPatientQueues(
@@ -2384,6 +2486,183 @@ class SupabaseService {
         rethrow;
       }
       throw Exception('Gagal mendaftarkan pasien: $e');
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  // PEKERJA (Public Health Center Staff) CRUD
+  // ─────────────────────────────────────────────────────────────────
+
+  static const String _staffTable = 'user_detail_public_health_center_staff';
+
+  /// Fetches all workers registered under a given Puskesmas owner.
+  Future<List<Map<String, dynamic>>> fetchPekerjaList(String ownerId) async {
+    try {
+      final rows = await client
+          .from(_staffTable)
+          .select()
+          .eq('owner_id', ownerId)
+          .order('created_at', ascending: true);
+      return List<Map<String, dynamic>>.from(rows);
+    } catch (e) {
+      print('Error fetching pekerja list: $e');
+      return [];
+    }
+  }
+
+  /// Inserts a new worker row. Returns the created row map.
+  Future<Map<String, dynamic>?> insertPekerja({
+    required String ownerId,
+    required String nama,
+    String? email,
+    String? nik,
+    String? idPekerja,
+    String? peran,
+    String? telepon,
+    String? username,
+    String? gender,
+    String? birthPlace,
+    String? birthDate,
+    String? address,
+    String? province,
+    String? district,
+    String? subDistrict,
+    String? village,
+    bool isBertugas = true,
+    List<String> permissions = const [],
+    String avatarColor = '#48C9B0',
+  }) async {
+    try {
+      final payload = <String, dynamic>{
+        'owner_id': ownerId,
+        'nama': nama,
+        if (email != null && email.isNotEmpty) 'email': email,
+        if (nik != null && nik.isNotEmpty) 'nik': nik,
+        if (idPekerja != null && idPekerja.isNotEmpty) 'id_pekerja': idPekerja,
+        if (peran != null && peran.isNotEmpty) 'peran': peran,
+        if (telepon != null && telepon.isNotEmpty) 'telepon': telepon,
+        if (username != null && username.isNotEmpty) 'username': username,
+        if (gender != null && gender.isNotEmpty) 'gender': gender,
+        if (birthPlace != null && birthPlace.isNotEmpty) 'birth_place': birthPlace,
+        if (birthDate != null && birthDate.isNotEmpty) 'birth_date': birthDate,
+        if (address != null && address.isNotEmpty) 'address': address,
+        if (province != null && province.isNotEmpty) 'province': province,
+        if (district != null && district.isNotEmpty) 'district': district,
+        if (subDistrict != null && subDistrict.isNotEmpty) 'sub_district': subDistrict,
+        if (village != null && village.isNotEmpty) 'village': village,
+        'is_bertugas': isBertugas,
+        'permissions': permissions,
+        'avatar_color': avatarColor,
+      };
+
+      final rows = await client
+          .from(_staffTable)
+          .insert(payload)
+          .select();
+
+      return rows.isNotEmpty ? Map<String, dynamic>.from(rows.first) : null;
+    } catch (e) {
+      print('Error inserting pekerja: $e');
+      rethrow;
+    }
+  }
+
+  /// Updates an existing worker row by its UUID.
+  Future<bool> updatePekerja({
+    required String workerId,
+    String? nama,
+    String? email,
+    String? nik,
+    String? idPekerja,
+    String? peran,
+    String? telepon,
+    String? username,
+    String? gender,
+    String? birthPlace,
+    String? birthDate,
+    String? address,
+    String? province,
+    String? district,
+    String? subDistrict,
+    String? village,
+    bool? isBertugas,
+    List<String>? permissions,
+    String? avatarColor,
+  }) async {
+    try {
+      final payload = <String, dynamic>{
+        if (nama != null) 'nama': nama,
+        if (email != null) 'email': email,
+        if (nik != null) 'nik': nik,
+        if (idPekerja != null) 'id_pekerja': idPekerja,
+        if (peran != null) 'peran': peran,
+        if (telepon != null) 'telepon': telepon,
+        if (username != null) 'username': username,
+        if (gender != null) 'gender': gender,
+        if (birthPlace != null) 'birth_place': birthPlace,
+        if (birthDate != null) 'birth_date': birthDate,
+        if (address != null) 'address': address,
+        if (province != null) 'province': province,
+        if (district != null) 'district': district,
+        if (subDistrict != null) 'sub_district': subDistrict,
+        if (village != null) 'village': village,
+        if (isBertugas != null) 'is_bertugas': isBertugas,
+        if (permissions != null) 'permissions': permissions,
+        if (avatarColor != null) 'avatar_color': avatarColor,
+      };
+
+      await client
+          .from(_staffTable)
+          .update(payload)
+          .eq('id', workerId);
+
+      return true;
+    } catch (e) {
+      print('Error updating pekerja: $e');
+      return false;
+    }
+  }
+
+  /// Deletes a worker row by its UUID.
+  Future<bool> deletePekerja(String workerId) async {
+    try {
+      await client
+          .from(_staffTable)
+          .delete()
+          .eq('id', workerId);
+      return true;
+    } catch (e) {
+      print('Error deleting pekerja: $e');
+      return false;
+    }
+  }
+
+  /// Toggles the is_bertugas flag for a single worker.
+  Future<bool> togglePekerjaDuty(String workerId, bool isBertugas) async {
+    try {
+      await client
+          .from(_staffTable)
+          .update({'is_bertugas': isBertugas})
+          .eq('id', workerId);
+      return true;
+    } catch (e) {
+      print('Error toggling pekerja duty: $e');
+      return false;
+    }
+  }
+
+  /// Updates only the permissions jsonb column for a worker.
+  Future<bool> updatePekerjaPermissions(
+      String workerId, List<String> permissions) async {
+    try {
+      await client
+          .from(_staffTable)
+          .update({'permissions': permissions})
+          .eq('id', workerId);
+      return true;
+    } catch (e) {
+      print('Error updating pekerja permissions: $e');
+      return false;
     }
   }
 }

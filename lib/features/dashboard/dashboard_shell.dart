@@ -39,6 +39,7 @@ import 'package:mapotech/features/puskesmas/dashboard/frontend/puskesmas_pantaua
 import 'package:mapotech/features/puskesmas/dashboard/frontend/puskesmas_form_ibu_hamil.dart';
 import 'package:mapotech/features/puskesmas/dashboard/frontend/puskesmas_profile.dart';
 import 'package:mapotech/features/ponkesdes/dashboard/frontend/ponkesdes_profile.dart';
+import 'package:mapotech/features/pekerja/dashboard/frontend/management_pekerja.dart';
 
 bool _isCorsafeUrl(String url) {
   if (url.isEmpty) return false;
@@ -729,6 +730,8 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
           return const DokterPembukuan();
         case 'asisten_praktik':
           return const DokterAsisten();
+        case 'management_pekerja':
+          return const ManagementPekerjaWidget();
         case 'profile':
           return const DokterProfile();
         case 'settings':
@@ -754,6 +757,8 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
           );
         case 'dlc_form_ibu_hamil':
           return const PuskesmasFormIbuHamil();
+        case 'management_pekerja':
+          return const ManagementPekerjaWidget();
         case 'profile':
           return const PuskesmasProfile();
         case 'settings':
@@ -784,6 +789,8 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
           return const DokterPembukuan();
         case 'asisten_praktik':
           return const DokterAsisten();
+        case 'management_pekerja':
+          return const ManagementPekerjaWidget();
         case 'dashboard':
         default:
           return const DokterDashboard();
@@ -796,6 +803,8 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
           return const ApotekDashboard();
         case 'staff':
           return const ApotekAsisten();
+        case 'management_pekerja':
+          return const ManagementPekerjaWidget();
         case 'penjualan':
           return const ApotekPenjualan();
         case 'inventori':

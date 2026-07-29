@@ -184,6 +184,11 @@ List<DrawerMenuItem> getMenuItemsForRole(
         icon: Icons.groups_rounded,
       ),
       DrawerMenuItem(
+        id: 'management_pekerja',
+        label: isEn ? 'Worker Management' : 'Management Pekerja',
+        icon: Icons.engineering_rounded,
+      ),
+      DrawerMenuItem(
         id: 'profile',
         label: isEn ? 'Profile' : 'Profil',
         icon: Icons.account_circle_rounded,
@@ -248,9 +253,9 @@ List<DrawerMenuItem> getMenuItemsForRole(
         badgeText: 'CL-1',
       ),
       DrawerMenuItem(
-        id: 'asisten_praktik',
-        label: isEn ? 'Practice Assistant' : 'Asisten Praktik',
-        icon: Icons.badge_rounded,
+        id: 'management_pekerja',
+        label: isEn ? 'Worker Management' : 'Management Pekerja',
+        icon: Icons.engineering_rounded,
         clusters: const ['all', 'cluster_1'],
         badgeText: 'CL-1',
       ),
@@ -354,6 +359,9 @@ List<DrawerMenuItem> getMenuItemsForRole(
       String permKey = item.id.toUpperCase();
       if (permKey == 'ASISTEN_PRAKTIK') {
         permKey = 'ASISTEN';
+      }
+      if (permKey == 'MANAGEMENT_PEKERJA') {
+        permKey = 'PEKERJA';
       }
       return permissions.contains(permKey);
     }).toList();

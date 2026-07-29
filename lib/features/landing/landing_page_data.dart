@@ -150,6 +150,7 @@ class LandingPageState {
       'pemeriksaan',
       'pembukuan',
       'asisten_praktik',
+      'management_pekerja',
       'profile',
       'penjualan',
       'inventori',
@@ -240,6 +241,7 @@ class LandingPageNotifier extends StateNotifier<LandingPageState> {
     double? defaultServiceFee,
     bool? satusehatAutoSync,
     String? language,
+    Set<String>? favoriteMenuItems,
   }) {
     state = state.copyWith(
       isLoggedIn: true,
@@ -250,7 +252,24 @@ class LandingPageNotifier extends StateNotifier<LandingPageState> {
       defaultServiceFee: defaultServiceFee ?? state.defaultServiceFee,
       satusehatAutoSync: satusehatAutoSync ?? state.satusehatAutoSync,
       language: language ?? state.language,
+      favoriteMenuItems: favoriteMenuItems ?? state.favoriteMenuItems,
     );
+
+    if (favoriteMenuItems == null && user != null && user['id'] != null) {
+      loadFavoriteMenusFromDb();
+    }
+  }
+
+  Future<void> loadFavoriteMenusFromDb() async {
+    final userId = state.loggedInUser?['id'];
+    final userRole = state.loggedInUser?['role']?.toString() ?? state.loggedInRole;
+    if (userId != null && userRole != null) {
+      final db = SupabaseService();
+      final favs = await db.fetchFavoriteMenusFromUserDetail(userId, userRole);
+      if (favs != null) {
+        state = state.copyWith(favoriteMenuItems: favs);
+      }
+    }
   }
 
   void logout() {
@@ -286,7 +305,7 @@ class LandingPageNotifier extends StateNotifier<LandingPageState> {
     state = state.copyWith(drawerSize: state.drawerSize == 2 ? 1 : 2);
   }
 
-  void toggleFavoriteMenuItem(String menuId) {
+  void toggleFavoriteMenuItem(String menuId) async {
     final currentFavorites = Set<String>.from(state.favoriteMenuItems);
     if (currentFavorites.contains(menuId)) {
       currentFavorites.remove(menuId);
@@ -294,6 +313,17 @@ class LandingPageNotifier extends StateNotifier<LandingPageState> {
       currentFavorites.add(menuId);
     }
     state = state.copyWith(favoriteMenuItems: currentFavorites);
+
+    final userId = state.loggedInUser?['id'];
+    final userRole = state.loggedInUser?['role']?.toString() ?? state.loggedInRole;
+    if (userId != null && userRole != null) {
+      final db = SupabaseService();
+      await db.saveFavoriteMenusToUserDetail(
+        userId,
+        userRole,
+        currentFavorites.toList(),
+      );
+    }
   }
 
   bool isFavoriteMenuItem(String menuId) {
@@ -510,8 +540,7 @@ class LandingPageNotifier extends StateNotifier<LandingPageState> {
       EntityItem(
           id: 'puskesmas',
           label: t('selection_puskesmas'),
-          icon: Icons.domain_rounded,
-          isSoon: true),
+          icon: Icons.domain_rounded),
       EntityItem(
           id: 'rumahsakit',
           label: t('selection_rumahsakit'),
@@ -520,8 +549,7 @@ class LandingPageNotifier extends StateNotifier<LandingPageState> {
       EntityItem(
           id: 'ponkesdes',
           label: t('selection_ponkesdes'),
-          icon: Icons.home_work_rounded,
-          isSoon: true),
+          icon: Icons.home_work_rounded),
       EntityItem(
           id: 'posyandu',
           label: t('selection_posyandu'),

@@ -81,7 +81,7 @@ class _SelectionModalContent extends StatelessWidget {
         'id': 'puskesmas',
         'label': 'PUSKESMAS',
         'icon': Icons.domain_rounded,
-        'isSoon': true,
+        'isSoon': false,
       },
       {
         'id': 'rumahsakit',
@@ -93,7 +93,7 @@ class _SelectionModalContent extends StatelessWidget {
         'id': 'ponkesdes',
         'label': 'PONKESDES',
         'icon': Icons.home_work_rounded,
-        'isSoon': true,
+        'isSoon': false,
       },
       {
         'id': 'posyandu',

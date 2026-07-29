@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -543,45 +544,70 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
           _buildBrandLogo(),
 
           // Desktop capsule selection
-          if (!isMobile) _buildNavbarCapsule(state, notifier),
+          if (!isMobile)
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: ScrollConfiguration(
+                  behavior: ScrollConfiguration.of(context).copyWith(
+                    dragDevices: {
+                      PointerDeviceKind.touch,
+                      PointerDeviceKind.mouse,
+                      PointerDeviceKind.trackpad,
+                    },
+                  ),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    child: Center(
+                      child: _buildNavbarCapsule(state, notifier),
+                    ),
+                  ),
+                ),
+              ),
+            ),
 
           // Desktop menu or Mobile menu
           if (!isMobile)
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Login & Register Buttons
-                CustomButton(
-                  text: notifier.t('login'),
-                  isSecondary: true,
-                  height: 44,
-                  primaryColor: Colors.transparent,
-                  textColor: state.appearance == 'dark'
-                      ? Colors.white
-                      : (state.appearance == 'rev'
-                            ? const Color(0xFF5E1B8C)
-                            : const Color(0xFF1B4F42)),
-                  borderColor: state.appearance == 'dark'
-                      ? const Color(0xFF333333)
-                      : (state.appearance == 'rev'
-                            ? const Color(0xFFE2C4F9)
-                            : const Color(0xFFECECEC)),
-                  onPressed: () {
-                    showLoginModal(context, ref);
-                  },
-                ),
-                const SizedBox(width: 12),
-                CustomButton(
-                  text: notifier.t('register'),
-                  height: 44,
-                  primaryColor: activeColor,
-                  textColor: state.appearance == 'dark'
-                      ? Colors.black
-                      : Colors.white,
-                  onPressed: () {
-                    showRegisterModal(context, ref);
-                  },
-                ),
+                if (state.isLoggedIn)
+                  _buildLoggedInNavbarUser(context, state, notifier)
+                else ...[
+                  // Login & Register Buttons
+                  CustomButton(
+                    text: notifier.t('login'),
+                    isSecondary: true,
+                    height: 44,
+                    primaryColor: Colors.transparent,
+                    textColor: state.appearance == 'dark'
+                        ? Colors.white
+                        : (state.appearance == 'rev'
+                              ? const Color(0xFF5E1B8C)
+                              : const Color(0xFF1B4F42)),
+                    borderColor: state.appearance == 'dark'
+                        ? const Color(0xFF333333)
+                        : (state.appearance == 'rev'
+                              ? const Color(0xFFE2C4F9)
+                              : const Color(0xFFECECEC)),
+                    onPressed: () {
+                      showLoginModal(context, ref);
+                    },
+                  ),
+                  const SizedBox(width: 12),
+                  CustomButton(
+                    text: notifier.t('register'),
+                    height: 44,
+                    primaryColor: activeColor,
+                    textColor: state.appearance == 'dark'
+                        ? Colors.black
+                        : Colors.white,
+                    onPressed: () {
+                      showRegisterModal(context, ref);
+                    },
+                  ),
+                ],
               ],
             )
           else
@@ -598,6 +624,88 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
                 Scaffold.of(context).openDrawer();
               },
             ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoggedInNavbarUser(
+    BuildContext context,
+    LandingPageState state,
+    LandingPageNotifier notifier,
+  ) {
+    final avatarUrl = state.loggedInUser?['avatar_url'] as String?;
+    final name = state.loggedInName ?? 'User';
+    final role = (state.loggedInRole ?? 'pasien').toUpperCase();
+    final initials = name.isNotEmpty
+        ? name
+            .split(' ')
+            .map((p) => p[0])
+            .take(2)
+            .join('')
+            .toUpperCase()
+        : 'U';
+    final isDark = state.appearance == 'dark';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2C2C2C) : Colors.grey[200]!,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CircleAvatar(
+            radius: 14,
+            backgroundColor: const Color(0xFF48C9B0),
+            backgroundImage:
+                (avatarUrl != null && avatarUrl.isNotEmpty) ? NetworkImage(avatarUrl) : null,
+            child: (avatarUrl == null || avatarUrl.isEmpty)
+                ? Text(
+                    initials,
+                    style: GoogleFonts.outfit(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  )
+                : null,
+          ),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                name,
+                style: GoogleFonts.outfit(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : const Color(0xFF1B4F42),
+                ),
+              ),
+              Text(
+                role,
+                style: GoogleFonts.outfit(
+                  fontSize: 9,
+                  color: Colors.grey[500],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.logout_rounded, size: 18, color: Colors.grey),
+            onPressed: () {
+              notifier.logout();
+            },
+            tooltip: 'Keluar',
+            visualDensity: VisualDensity.compact,
+          ),
         ],
       ),
     );
