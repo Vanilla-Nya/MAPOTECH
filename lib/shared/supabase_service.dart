@@ -588,12 +588,202 @@ class SupabaseService {
     await _patch('user_detail_village_clinic?id=eq.$id', data, schema: 'public');
   }
 
-  // Update patient profile data in the database
+  // Update patient profile data and patient_details in the database
   Future<void> updatePatientProfile(
     String userId,
-    Map<String, dynamic> data,
-  ) async {
-    await _patch('user?id=eq.$userId', data, schema: 'public');
+    Map<String, dynamic> data, {
+    Map<String, dynamic>? patientDetailData,
+  }) async {
+    try {
+      await client.from('user').update(data).eq('id', userId);
+    } catch (e) {
+      print('Error updating user: $e');
+    }
+
+    if (patientDetailData != null && patientDetailData.isNotEmpty) {
+      try {
+        await client.from('user_detail_patient').upsert({
+          'id': userId,
+          ...patientDetailData,
+        });
+      } catch (e) {
+        print('Error updating user_detail_patient: $e');
+      }
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  // PATIENT FAMILY MEMBERS CRUD (patient_family_members table)
+  // ─────────────────────────────────────────────────────────────────
+
+  Future<List<Map<String, dynamic>>> fetchFamilyMembers(String patientId) async {
+    try {
+      final response = await client
+          .from('patient_family_members')
+          .select()
+          .eq('patient_id', patientId)
+          .order('created_at', ascending: true);
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      print('Error fetching family members: $e');
+      return [];
+    }
+  }
+
+  Future<Map<String, dynamic>?> addFamilyMember(Map<String, dynamic> memberData) async {
+    try {
+      final response = await client
+          .from('patient_family_members')
+          .insert(memberData)
+          .select();
+      if (response.isNotEmpty) {
+        return Map<String, dynamic>.from(response.first);
+      }
+    } catch (e) {
+      print('Error adding family member: $e');
+    }
+    return null;
+  }
+
+  Future<bool> disbandKkGroup(String patientId) async {
+    try {
+      // 1. Update status is_kepala_keluarga to false
+      await client.from('user_detail_patient').upsert({
+        'id': patientId,
+        'is_kepala_keluarga': false,
+      });
+
+      // 2. Remove all family members connected under this patient
+      await client
+          .from('patient_family_members')
+          .delete()
+          .eq('patient_id', patientId);
+      return true;
+    } catch (e) {
+      print('Error disbanding KK group: $e');
+      return false;
+    }
+  }
+
+  Future<bool> updateKepalaKeluargaStatus(String patientId, bool isKepala, {String? noKk}) async {
+    try {
+      final payload = <String, dynamic>{
+        'id': patientId,
+        'is_kepala_keluarga': isKepala,
+        'accept_kk': true,
+      };
+      if (noKk != null && noKk.isNotEmpty) {
+        payload['no_kk'] = noKk;
+      }
+      await client.from('user_detail_patient').upsert(payload);
+      return true;
+    } catch (e) {
+      print('Error updating status kepala keluarga: $e');
+      return false;
+    }
+  }
+
+  Future<bool> deleteFamilyMember(String id) async {
+    try {
+      await client
+          .from('patient_family_members')
+          .delete()
+          .eq('id', id);
+      return true;
+    } catch (e) {
+      print('Error deleting family member: $e');
+      return false;
+    }
+  }
+
+  // Search registered patients in public.user table
+  Future<List<Map<String, dynamic>>> searchPatients(String query) async {
+    try {
+      final safe = Uri.encodeComponent(query);
+      final response = await client
+          .from('user')
+          .select('id, name, nik, gender, birth_date, phone_number')
+          .or('role.eq.pasien,role.eq.patient')
+          .or('name.ilike.%$safe%,nik.ilike.%$safe%')
+          .limit(10);
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      print('Error searching patients: $e');
+      return [];
+    }
+  }
+
+  // Request to join a KK by 16-digit KK number (accept_kk = false)
+  Future<bool> joinKkByNumber({
+    required String patientId,
+    required String patientName,
+    required String patientNik,
+    required String noKk,
+  }) async {
+    try {
+      // 1. Find if there's any host patient with this no_kk in user_detail_patient
+      final hostRows = await client
+          .from('user_detail_patient')
+          .select('id, no_kk')
+          .eq('no_kk', noKk)
+          .neq('id', patientId)
+          .limit(1);
+
+      final String hostPatientId = hostRows.isNotEmpty
+          ? hostRows.first['id'].toString()
+          : patientId;
+
+      // 2. Set user_detail_patient for joining user to accept_kk = false
+      await client.from('user_detail_patient').upsert({
+        'id': patientId,
+        'no_kk': noKk,
+        'accept_kk': false,
+      });
+
+      // 3. Add row to patient_family_members under host's patient_id with accept_kk = false
+      await client.from('patient_family_members').insert({
+        'patient_id': hostPatientId,
+        'member_user_id': patientId,
+        'nama': patientName,
+        'nik': patientNik,
+        'hubungan': 'Anggota KK (Permintaan Gabung)',
+        'status_kesehatan': 'Menunggu Persetujuan KK',
+        'accept_kk': false,
+      });
+
+      return true;
+    } catch (e) {
+      print('Error joining KK: $e');
+      return false;
+    }
+  }
+
+  // Accept or reject a family member join request
+  Future<bool> updateFamilyMemberAcceptStatus(String memberId, {required bool accept, String? memberUserId}) async {
+    try {
+      if (accept) {
+        await client
+            .from('patient_family_members')
+            .update({'accept_kk': true, 'status_kesehatan': 'Disetujui / Aktif'})
+            .eq('id', memberId);
+
+        if (memberUserId != null) {
+          await client
+              .from('user_detail_patient')
+              .update({'accept_kk': true})
+              .eq('id', memberUserId);
+        }
+      } else {
+        await client
+            .from('patient_family_members')
+            .delete()
+            .eq('id', memberId);
+      }
+      return true;
+    } catch (e) {
+      print('Error updating accept_kk status: $e');
+      return false;
+    }
   }
 
   /// Returns the corresponding detail user table name for a given user role.
@@ -2662,6 +2852,147 @@ class SupabaseService {
       return true;
     } catch (e) {
       print('Error updating pekerja permissions: $e');
+      return false;
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  // PUSTU / PONKESDES CRUD
+  // ─────────────────────────────────────────────────────────────────
+
+  static const String _pustuTable = 'user_detail_pustu_ponkesdes';
+
+  Future<List<Map<String, dynamic>>> fetchPustuPonkesdesList(String ownerId) async {
+    try {
+      final rows = await client
+          .from(_pustuTable)
+          .select()
+          .eq('owner_id', ownerId)
+          .order('created_at', ascending: true);
+      return List<Map<String, dynamic>>.from(rows);
+    } catch (e) {
+      print('Note: Supabase table $_pustuTable exception or not created yet: $e');
+      return [];
+    }
+  }
+
+  Future<Map<String, dynamic>?> insertPustuPonkesdes({
+    required String ownerId,
+    required String nama,
+    required String tipe,
+    String? kodeUnit,
+    String? penanggungJawab,
+    String? nikPenanggungJawab,
+    String? telepon,
+    String? alamat,
+    String? village,
+    String? kecamatan,
+    double? latitude,
+    double? longitude,
+    String? statusOperasional,
+    String? jamLayanan,
+    List<String> permissions = const [],
+    String avatarColor = '#48C9B0',
+  }) async {
+    try {
+      final payload = <String, dynamic>{
+        'owner_id': ownerId,
+        'nama': nama,
+        'tipe': tipe,
+        if (kodeUnit != null) 'kode_unit': kodeUnit,
+        if (penanggungJawab != null) 'penanggung_jawab': penanggungJawab,
+        if (nikPenanggungJawab != null) 'nik_penanggung_jawab': nikPenanggungJawab,
+        if (telepon != null) 'telepon': telepon,
+        if (alamat != null) 'alamat': alamat,
+        if (village != null) 'village': village,
+        if (kecamatan != null) 'kecamatan': kecamatan,
+        if (latitude != null) 'latitude': latitude,
+        if (longitude != null) 'longitude': longitude,
+        'status_operasional': statusOperasional ?? 'Aktif / Buka',
+        if (jamLayanan != null) 'jam_layanan': jamLayanan,
+        'permissions': permissions,
+        'avatar_color': avatarColor,
+      };
+
+      final rows = await client
+          .from(_pustuTable)
+          .insert(payload)
+          .select();
+
+      return rows.isNotEmpty ? Map<String, dynamic>.from(rows.first) : null;
+    } catch (e) {
+      print('Error inserting pustu/ponkesdes: $e');
+      return null;
+    }
+  }
+
+  Future<bool> updatePustuPonkesdes({
+    required String unitId,
+    String? nama,
+    String? tipe,
+    String? kodeUnit,
+    String? penanggungJawab,
+    String? nikPenanggungJawab,
+    String? telepon,
+    String? alamat,
+    String? village,
+    String? kecamatan,
+    double? latitude,
+    double? longitude,
+    String? statusOperasional,
+    String? jamLayanan,
+  }) async {
+    try {
+      final payload = <String, dynamic>{
+        if (nama != null) 'nama': nama,
+        if (tipe != null) 'tipe': tipe,
+        if (kodeUnit != null) 'kode_unit': kodeUnit,
+        if (penanggungJawab != null) 'penanggung_jawab': penanggungJawab,
+        if (nikPenanggungJawab != null) 'nik_penanggung_jawab': nikPenanggungJawab,
+        if (telepon != null) 'telepon': telepon,
+        if (alamat != null) 'alamat': alamat,
+        if (village != null) 'village': village,
+        if (kecamatan != null) 'kecamatan': kecamatan,
+        if (latitude != null) 'latitude': latitude,
+        if (longitude != null) 'longitude': longitude,
+        if (statusOperasional != null) 'status_operasional': statusOperasional,
+        if (jamLayanan != null) 'jam_layanan': jamLayanan,
+      };
+
+      await client
+          .from(_pustuTable)
+          .update(payload)
+          .eq('id', unitId);
+
+      return true;
+    } catch (e) {
+      print('Error updating pustu/ponkesdes: $e');
+      return false;
+    }
+  }
+
+  Future<bool> deletePustuPonkesdes(String unitId) async {
+    try {
+      await client
+          .from(_pustuTable)
+          .delete()
+          .eq('id', unitId);
+      return true;
+    } catch (e) {
+      print('Error deleting pustu/ponkesdes: $e');
+      return false;
+    }
+  }
+
+  Future<bool> togglePustuPonkesdesStatus(String unitId, String newStatus) async {
+    try {
+      await client
+          .from(_pustuTable)
+          .update({'status_operasional': newStatus})
+          .eq('id', unitId);
+      return true;
+    } catch (e) {
+      print('Error toggling status pustu/ponkesdes: $e');
       return false;
     }
   }

@@ -40,6 +40,7 @@ import 'package:mapotech/features/puskesmas/dashboard/frontend/puskesmas_form_ib
 import 'package:mapotech/features/puskesmas/dashboard/frontend/puskesmas_profile.dart';
 import 'package:mapotech/features/ponkesdes/dashboard/frontend/ponkesdes_profile.dart';
 import 'package:mapotech/features/pekerja/dashboard/frontend/management_pekerja.dart';
+import 'package:mapotech/features/puskesmas/dashboard/frontend/management_pustu_ponkesdes.dart';
 
 bool _isCorsafeUrl(String url) {
   if (url.isEmpty) return false;
@@ -83,21 +84,34 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         showDialog(
           context: context,
-          barrierDismissible: false,
+          barrierDismissible: true,
           builder: (ctx) => AlertDialog(
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
             title: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Icon(
-                  Icons.warning_amber_rounded,
-                  color: Colors.redAccent,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.warning_amber_rounded,
+                      color: Colors.redAccent,
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      isEn ? 'Subscription Expired' : 'Langganan Kedaluwarsa',
+                      style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 10),
-                Text(
-                  isEn ? 'Subscription Expired' : 'Langganan Kedaluwarsa',
-                  style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, size: 20),
+                  onPressed: () => Navigator.pop(ctx),
+                  splashRadius: 18,
+                  color: Colors.grey,
+                  tooltip: isEn ? 'Close' : 'Tutup',
                 ),
               ],
             ),
@@ -108,6 +122,15 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
               style: GoogleFonts.outfit(fontSize: 14),
             ),
             actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(
+                  isEn ? 'Dismiss' : 'Tutup',
+                  style: GoogleFonts.outfit(
+                    color: Colors.grey,
+                  ),
+                ),
+              ),
               TextButton(
                 onPressed: () {
                   Navigator.pop(ctx);
@@ -759,6 +782,8 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
           return const PuskesmasFormIbuHamil();
         case 'management_pekerja':
           return const ManagementPekerjaWidget();
+        case 'management_pustu_ponkesdes':
+          return const ManagementPustuPonkesdesWidget();
         case 'profile':
           return const PuskesmasProfile();
         case 'settings':

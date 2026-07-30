@@ -24,6 +24,8 @@ class RevGeoWilayahMapWidget extends StatefulWidget {
   final Color themeAccent;
   final bool isDark;
   final bool isEn;
+  final bool showOnlyMap;
+  final List<Map<String, dynamic>>? markers;
   final Function(String province, String district, String subDistrict, String village) onChanged;
 
   const RevGeoWilayahMapWidget({
@@ -42,6 +44,8 @@ class RevGeoWilayahMapWidget extends StatefulWidget {
     required this.themeAccent,
     required this.isDark,
     required this.isEn,
+    this.showOnlyMap = false,
+    this.markers,
     required this.onChanged,
   });
 
@@ -90,13 +94,16 @@ class _RevGeoWilayahMapWidgetState extends State<RevGeoWilayahMapWidget> {
   }
 
   /// Builds a clean HTML document string that loads ONLY Leaflet map canvas (no header, no form controls)
-  /// and automatically fetches & draws the GeoJSON boundary highlight for the selected district.
+  /// and automatically fetches & draws the GeoJSON boundary highlight for the selected district,
+  /// as well as any custom patient location pins.
   String _buildCleanLeafletHtmlDataUri() {
     final cleanProv = _cleanRegion(_selectedProvince);
     final cleanReg = _cleanRegion(_selectedRegency);
     final cleanDist = _cleanRegion(_selectedDistrict);
     final colorHex = _highlightColorHex;
     final isDark = widget.isDark;
+
+    final markersJson = jsonEncode(widget.markers ?? []);
 
     final htmlContent = '''
 <!DOCTYPE html>
@@ -119,12 +126,48 @@ class _RevGeoWilayahMapWidgetState extends State<RevGeoWilayahMapWidget> {
     .leaflet-container {
       background: ${isDark ? '#1e293b' : '#e2e8f0'};
     }
+    @keyframes pinPulse {
+      0% { transform: scale(0.6); opacity: 0.8; }
+      100% { transform: scale(1.7); opacity: 0; }
+    }
+    .custom-pin-container {
+      position: relative;
+      width: 32px;
+      height: 32px;
+    }
+    .custom-pin-pulse {
+      position: absolute;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      animation: pinPulse 2s infinite ease-out;
+    }
+    .custom-pin-body {
+      position: absolute;
+      top: 4px;
+      left: 4px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50% 50% 50% 0;
+      transform: rotate(-45deg);
+      border: 2px solid #ffffff;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .custom-pin-dot {
+      width: 8px;
+      height: 8px;
+      background: #ffffff;
+      border-radius: 50%;
+    }
   </style>
 </head>
 <body>
   <div id="map"></div>
   <script>
-    const map = L.map('map', { zoomControl: true }).setView([-2.5489, 118.0149], 5);
+    const map = L.map('map', { zoomControl: true }).setView([-7.96, 113.91], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '&copy; OpenStreetMap contributors'
@@ -135,7 +178,7 @@ class _RevGeoWilayahMapWidgetState extends State<RevGeoWilayahMapWidget> {
     function cleanName(str) {
       if (!str) return '';
       return str.toString().toUpperCase()
-        .replace(/^(PROVINSI|PROV|KABUPATEN|KAB|KOTA|KECAMATAN|KEC|KELURAHAN|DESA)\\.?\\s+/i, '')
+        .replace(/^(PROVINSI|PROV|KABUPATEN|KAB|KOTA|KECAMATAN|KEC|KELURAHAN|DESA)\\\\.?\\\\s+/i, '')
         .trim();
     }
 
@@ -187,11 +230,13 @@ class _RevGeoWilayahMapWidgetState extends State<RevGeoWilayahMapWidget> {
             color: targetColor,
             weight: 3.5,
             fillColor: targetColor,
-            fillOpacity: 0.35
+            fillOpacity: 0.25
           }
         }).addTo(map);
 
-        map.fitBounds(currentLayer.getBounds(), { padding: [30, 30] });
+        if (!window.hasMarkerBounds) {
+          map.fitBounds(currentLayer.getBounds(), { padding: [30, 30] });
+        }
 
       } catch (err) {
         console.warn('RevGeo fetch fallback:', err);
@@ -210,15 +255,65 @@ class _RevGeoWilayahMapWidgetState extends State<RevGeoWilayahMapWidget> {
               color: '${colorHex}',
               weight: 3.5,
               fillColor: '${colorHex}',
-              fillOpacity: 0.35
+              fillOpacity: 0.25
             }
           }).addTo(map);
-          map.fitBounds(currentLayer.getBounds(), { padding: [30, 30] });
+          if (!window.hasMarkerBounds) {
+            map.fitBounds(currentLayer.getBounds(), { padding: [30, 30] });
+          }
         }
       } catch (e) {}
     }
 
     loadDistrictBoundary("${cleanProv.replaceAll('"', '')}", "${cleanReg.replaceAll('"', '')}", "${cleanDist.replaceAll('"', '')}", "${colorHex}");
+
+    // Render Patient Pins
+    const rawMarkersData = ${markersJson};
+    window.hasMarkerBounds = false;
+    if (Array.isArray(rawMarkersData) && rawMarkersData.length > 0) {
+      const markerBounds = [];
+      rawMarkersData.forEach(m => {
+        if (m.lat && m.lng) {
+          const lat = parseFloat(m.lat);
+          const lng = parseFloat(m.lng);
+          const color = m.color || '#E91E63';
+          markerBounds.push([lat, lng]);
+
+          const pinIcon = L.divIcon({
+            className: 'custom-patient-pin',
+            html: \`
+              <div class="custom-pin-container">
+                <div class="custom-pin-pulse" style="background-color: \${color};"></div>
+                <div class="custom-pin-body" style="background-color: \${color};">
+                  <div class="custom-pin-dot"></div>
+                </div>
+              </div>
+            \`,
+            iconSize: [32, 32],
+            iconAnchor: [16, 32],
+            popupAnchor: [0, -32]
+          });
+
+          const popupHtml = \`
+            <div style="font-family: system-ui, -apple-system, sans-serif; padding: 6px 8px; min-width: 190px;">
+              <div style="font-size: 13px; font-weight: 800; color: #0f172a; margin-bottom: 2px;">\${m.title || 'Pasien'}</div>
+              \${m.subtitle ? \`<div style="display: inline-block; padding: 2px 8px; border-radius: 12px; background-color: \${color}22; color: \${color}; font-size: 10px; font-weight: 700; margin-bottom: 6px;">\${m.subtitle}</div>\` : ''}
+              \${m.info ? \`<div style="font-size: 11px; color: #475569; line-height: 1.4;">\${m.info}</div>\` : ''}
+              \${m.details ? \`<div style="font-size: 10px; color: #64748b; margin-top: 6px; border-top: 1px dashed #cbd5e1; padding-top: 4px;">\${m.details}</div>\` : ''}
+            </div>
+          \`;
+
+          L.marker([lat, lng], { icon: pinIcon })
+            .addTo(map)
+            .bindPopup(popupHtml);
+        }
+      });
+
+      if (markerBounds.length > 0) {
+        window.hasMarkerBounds = true;
+        map.fitBounds(markerBounds, { padding: [50, 50], maxZoom: 15 });
+      }
+    }
   </script>
 </body>
 </html>
@@ -235,6 +330,110 @@ class _RevGeoWilayahMapWidgetState extends State<RevGeoWilayahMapWidget> {
   Widget build(BuildContext context) {
     final cleanDistName = _cleanRegion(_selectedDistrict);
     final isDistrictSelected = cleanDistName.isNotEmpty;
+
+    final mapDisplayWidget = Container(
+      height: widget.height,
+      decoration: BoxDecoration(
+        color: widget.fieldBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: widget.borderColor),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          KeyedSubtree(
+            key: ValueKey('map_key_${_selectedProvince}_${_selectedRegency}_${_selectedDistrict}_${_highlightColorHex}_${widget.markers?.length ?? 0}_${widget.markers.hashCode}_$_refreshKey'),
+            child: buildWebMapWidget(
+              mapUrl: _buildCleanLeafletHtmlDataUri(),
+              isDark: widget.isDark,
+            ),
+          ),
+
+          // Floating Overlay Badge for Active District Location
+          Positioned(
+            top: 12,
+            left: 12,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: (widget.isDark ? Colors.black : Colors.white).withOpacity(0.9),
+                borderRadius: BorderRadius.circular(100),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.15),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.pin_drop_rounded, size: 14, color: widget.themeAccent),
+                  const SizedBox(width: 6),
+                  Text(
+                    isDistrictSelected
+                        ? 'Kecamatan $cleanDistName, ${_cleanRegion(_selectedRegency)}'
+                        : 'Peta Wilayah Puskesmas',
+                    style: GoogleFonts.outfit(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      color: widget.textColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Floating Action Control to Refresh Map
+          Positioned(
+            bottom: 12,
+            right: 12,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: widget.themeAccent,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    elevation: 3,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _refreshKey++;
+                    });
+                  },
+                  icon: const Icon(Icons.refresh_rounded, size: 14),
+                  label: Text(
+                    'Refresh Map',
+                    style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton.filled(
+                  style: IconButton.styleFrom(
+                    backgroundColor: widget.isDark ? const Color(0xFF2B2B32) : Colors.white,
+                    foregroundColor: widget.textColor,
+                  ),
+                  icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                  onPressed: () async {
+                    final uri = Uri.parse(widget.revgeoApiUrl);
+                    if (await canLaunchUrl(uri)) await launchUrl(uri);
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (widget.showOnlyMap) {
+      return mapDisplayWidget;
+    }
 
     return Container(
       decoration: BoxDecoration(
@@ -407,104 +606,7 @@ class _RevGeoWilayahMapWidgetState extends State<RevGeoWilayahMapWidget> {
           const SizedBox(height: 16),
 
           // ── Clean Street Map Display (No headers, no duplicate select boxes) ─
-          Container(
-            height: widget.height,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: widget.borderColor),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: Stack(
-              children: [
-                KeyedSubtree(
-                  key: ValueKey('map_key_${_selectedProvince}_${_selectedRegency}_${_selectedDistrict}_${_highlightColorHex}_$_refreshKey'),
-                  child: buildWebMapWidget(
-                    mapUrl: _buildCleanLeafletHtmlDataUri(),
-                    isDark: widget.isDark,
-                  ),
-                ),
-
-                // Floating Overlay Badge for Active District Location
-                Positioned(
-                  top: 12,
-                  left: 12,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: (widget.isDark ? Colors.black : Colors.white).withOpacity(0.9),
-                      borderRadius: BorderRadius.circular(100),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.15),
-                          blurRadius: 8,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.pin_drop_rounded, size: 14, color: widget.themeAccent),
-                        const SizedBox(width: 6),
-                        Text(
-                          isDistrictSelected
-                              ? 'Kecamatan $cleanDistName, ${_cleanRegion(_selectedRegency)}'
-                              : 'Peta Wilayah Puskesmas',
-                          style: GoogleFonts.outfit(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
-                            color: widget.textColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // Floating Action Control to Refresh Map
-                Positioned(
-                  bottom: 12,
-                  right: 12,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: widget.themeAccent,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          elevation: 3,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _refreshKey++;
-                          });
-                        },
-                        icon: const Icon(Icons.refresh_rounded, size: 14),
-                        label: Text(
-                          'Refresh Map',
-                          style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton.filled(
-                        style: IconButton.styleFrom(
-                          backgroundColor: widget.isDark ? const Color(0xFF2B2B32) : Colors.white,
-                          foregroundColor: widget.textColor,
-                        ),
-                        icon: const Icon(Icons.open_in_new_rounded, size: 16),
-                        onPressed: () async {
-                          final uri = Uri.parse(widget.revgeoApiUrl);
-                          if (await canLaunchUrl(uri)) await launchUrl(uri);
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
+          mapDisplayWidget,
         ],
       ),
     );

@@ -101,6 +101,64 @@ class _PuskesmasPekerjaDashboardState extends ConsumerState<PuskesmasPekerjaDash
 
     final userName = state.loggedInName ?? 'Staf Puskesmas Sumbersari';
 
+    final patientMarkers = allPatients.map((p) {
+      final String name = p.nama.isNotEmpty ? p.nama : 'Pasien';
+      final String id = p.id;
+      final double lat = -7.9582;
+      final double lng = 113.9123;
+      final String status = 'Aktif';
+      return {
+        'lat': lat,
+        'lng': lng,
+        'title': '👤 $name',
+        'subtitle': 'Status Pasien: $status',
+        'info': 'No. Pasien: $id',
+        'details': '📍 Wilayah Puskesmas',
+        'color': '#3498DB',
+      };
+    }).toList();
+
+    if (patientMarkers.isEmpty) {
+      patientMarkers.addAll([
+        {
+          'lat': -7.9582,
+          'lng': 113.9123,
+          'title': '🤰 Siti Rahmawati (27 th)',
+          'subtitle': 'Risiko Rendah (KRR)',
+          'info': '• Usia Hamil: 28 Minggu<br/>• HPL: 14 Aug 2026',
+          'details': '📍 Dusun Krajan, RT 02/RW 01',
+          'color': '#2ECC71',
+        },
+        {
+          'lat': -7.9645,
+          'lng': 113.9056,
+          'title': '🤰 Dewi Lestari (34 th)',
+          'subtitle': 'Risiko Tinggi (KRT)',
+          'info': '• Usia Hamil: 32 Minggu<br/>• HPL: 18 Jul 2026',
+          'details': '📍 Dusun Tengah, RT 05/RW 02',
+          'color': '#E67E22',
+        },
+        {
+          'lat': -7.9512,
+          'lng': 113.9210,
+          'title': '🤰 Anisa Putri (22 th)',
+          'subtitle': 'Risiko Rendah (KRR)',
+          'info': '• Usia Hamil: 14 Minggu<br/>• HPL: 20 Nov 2026',
+          'details': '📍 Dusun Barat, RT 01/RW 03',
+          'color': '#2ECC71',
+        },
+        {
+          'lat': -7.9698,
+          'lng': 113.8990,
+          'title': '🤰 Maria Ulfa (38 th)',
+          'subtitle': 'Risiko Sangat Tinggi (KRST)',
+          'info': '• Usia Hamil: 36 Minggu<br/>• HPL: 02 Jun 2026',
+          'details': '📍 Dusun Selatan, RT 04/RW 01',
+          'color': '#E74C3C',
+        },
+      ]);
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -188,7 +246,7 @@ class _PuskesmasPekerjaDashboardState extends ConsumerState<PuskesmasPekerjaDash
             Row(
               children: [
                 Text(
-                  'MAPS WILAYAH PUSKESMAS',
+                  'MAPS WILAYAH PUSKESMAS & PASIEN',
                   style: GoogleFonts.outfit(
                     fontSize: 12,
                     fontWeight: FontWeight.w900,
@@ -215,8 +273,8 @@ class _PuskesmasPekerjaDashboardState extends ConsumerState<PuskesmasPekerjaDash
               ],
             ),
             Text(
-              'Ditentukan oleh Owner',
-              style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor, fontStyle: FontStyle.italic),
+              '${patientMarkers.length} Pin Tempat Pasien',
+              style: GoogleFonts.outfit(fontSize: 10, color: themeAccent, fontWeight: FontWeight.bold),
             ),
           ],
         ),
@@ -239,7 +297,9 @@ class _PuskesmasPekerjaDashboardState extends ConsumerState<PuskesmasPekerjaDash
             themeAccent: themeAccent,
             isDark: isDark,
             isEn: state.language == 'en',
-            height: 420,
+            height: 450,
+            showOnlyMap: true,
+            markers: patientMarkers,
             onChanged: (prov, reg, dist, vill) {
               setState(() {
                 _selectedProvince = prov;

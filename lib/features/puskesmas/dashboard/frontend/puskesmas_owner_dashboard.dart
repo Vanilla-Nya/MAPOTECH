@@ -489,7 +489,8 @@ class _PuskesmasOwnerDashboardState extends ConsumerState<PuskesmasOwnerDashboar
             themeAccent: themeAccent,
             isDark: isDark,
             isEn: state.language == 'en',
-            height: 420,
+            height: 450,
+            showOnlyMap: true,
             onChanged: (prov, reg, dist, vill) {
               setState(() {
                 _selectedProvince = prov;

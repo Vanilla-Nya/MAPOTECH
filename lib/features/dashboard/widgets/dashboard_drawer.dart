@@ -260,6 +260,13 @@ List<DrawerMenuItem> getMenuItemsForRole(
         badgeText: 'CL-1',
       ),
       DrawerMenuItem(
+        id: 'management_pustu_ponkesdes',
+        label: isEn ? 'Pustu/Ponkesdes Management' : 'Management Pustu/Ponkesdes',
+        icon: Icons.home_work_rounded,
+        clusters: const ['all', 'cluster_1'],
+        badgeText: 'PUSTU',
+      ),
+      DrawerMenuItem(
         id: 'profile',
         label: isEn ? 'Profile' : 'Profil',
         icon: Icons.domain_rounded,
