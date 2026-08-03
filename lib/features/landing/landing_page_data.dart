@@ -160,6 +160,8 @@ class LandingPageState {
       'history',
       'prescription',
       'dokter_search',
+      'puskesmas_search',
+      'pustu_search',
       'apotek_search',
       'dlc_satusehat',
       'dlc_homecare',

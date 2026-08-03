@@ -733,197 +733,202 @@ class _ManagementPustuPonkesdesWidgetState
           ),
         ],
       ),
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Top Row: Unit Initial Avatar + Title + Code + Options
-          Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: unit.avatarBg.withOpacity(0.15),
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  unit.nama.isNotEmpty ? unit.nama.substring(0, 2).toUpperCase() : 'PU',
-                  style: GoogleFonts.outfit(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                    color: unit.avatarBg,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () => _showPustuFormDialog(context, ref, existingUnit: unit),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Top Row: Unit Initial Avatar + Title + Code + Options
+                Row(
                   children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            unit.nama,
-                            style: GoogleFonts.outfit(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                              color: textColor,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: unit.avatarBg.withOpacity(0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        unit.nama.isNotEmpty ? unit.nama.substring(0, 2).toUpperCase() : 'PU',
+                        style: GoogleFonts.outfit(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                          color: unit.avatarBg,
                         ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: typeBadgeColor.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            unit.tipe,
-                            style: GoogleFonts.outfit(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w900,
-                              color: typeBadgeColor,
-                            ),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Kode Unit: ${unit.kodeUnit} • Jam: ${unit.jamLayanan}',
-                      style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  unit.nama,
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                    color: textColor,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: typeBadgeColor.withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  unit.tipe,
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w900,
+                                    color: typeBadgeColor,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Kode Unit: ${unit.kodeUnit} • Jam: ${unit.jamLayanan}',
+                            style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Status Badge Toggle
+                    GestureDetector(
+                      onTap: () {
+                        ref
+                            .read(pustuPonkesdesListProvider.notifier)
+                            .toggleStatus(unit.id, unit.statusOperasional);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: (isAktif ? const Color(0xFF2ECC71) : Colors.redAccent)
+                              .withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(100),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: isAktif ? const Color(0xFF2ECC71) : Colors.redAccent,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              isAktif ? 'AKTIF' : 'TUTUP',
+                              style: GoogleFonts.outfit(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w900,
+                                color: isAktif ? const Color(0xFF2ECC71) : Colors.redAccent,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ],
                 ),
-              ),
-              // Status Badge Toggle
-              GestureDetector(
-                onTap: () {
-                  ref
-                      .read(pustuPonkesdesListProvider.notifier)
-                      .toggleStatus(unit.id, unit.statusOperasional);
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: (isAktif ? const Color(0xFF2ECC71) : Colors.redAccent)
-                        .withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(100),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: isAktif ? const Color(0xFF2ECC71) : Colors.redAccent,
-                        ),
+
+                const SizedBox(height: 16),
+                const Divider(height: 1),
+                const SizedBox(height: 14),
+
+                // Details List: PJ, NIK, Telepon, Alamat
+                _buildInfoRow(Icons.badge_outlined, 'PJ', unit.penanggungJawab, textColor, subtitleColor),
+                const SizedBox(height: 6),
+                _buildInfoRow(Icons.fingerprint_rounded, 'NIK PJ', unit.nikPenanggungJawab, textColor, subtitleColor),
+                const SizedBox(height: 6),
+                _buildInfoRow(Icons.phone_outlined, 'Kontak', unit.telepon, textColor, subtitleColor),
+                const SizedBox(height: 6),
+                _buildInfoRow(Icons.location_on_outlined, 'Wilayah', '${unit.alamat}, Desa ${unit.village}', textColor, subtitleColor),
+
+                const SizedBox(height: 14),
+
+                // Module Permissions Chips
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: unit.permissions.map((p) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: textColor.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(6),
                       ),
-                      const SizedBox(width: 6),
-                      Text(
-                        isAktif ? 'AKTIF' : 'TUTUP',
+                      child: Text(
+                        p.replaceAll('_', ' '),
                         style: GoogleFonts.outfit(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w900,
-                          color: isAktif ? const Color(0xFF2ECC71) : Colors.redAccent,
+                          fontSize: 8.5,
+                          fontWeight: FontWeight.w700,
+                          color: subtitleColor,
                         ),
                       ),
-                    ],
-                  ),
+                    );
+                  }).toList(),
                 ),
-              ),
-            ],
-          ),
 
-          const SizedBox(height: 16),
-          const Divider(height: 1),
-          const SizedBox(height: 14),
+                const SizedBox(height: 16),
 
-          // Details List: PJ, NIK, Telepon, Alamat
-          _buildInfoRow(Icons.badge_outlined, 'PJ', unit.penanggungJawab, textColor, subtitleColor),
-          const SizedBox(height: 6),
-          _buildInfoRow(Icons.fingerprint_rounded, 'NIK PJ', unit.nikPenanggungJawab, textColor, subtitleColor),
-          const SizedBox(height: 6),
-          _buildInfoRow(Icons.phone_outlined, 'Kontak', unit.telepon, textColor, subtitleColor),
-          const SizedBox(height: 6),
-          _buildInfoRow(Icons.location_on_outlined, 'Wilayah', '${unit.alamat}, Desa ${unit.village}', textColor, subtitleColor),
-
-          const SizedBox(height: 14),
-
-          // Module Permissions Chips
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: unit.permissions.map((p) {
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: textColor.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  p.replaceAll('_', ' '),
-                  style: GoogleFonts.outfit(
-                    fontSize: 8.5,
-                    fontWeight: FontWeight.w700,
-                    color: subtitleColor,
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-
-          const SizedBox(height: 16),
-
-          // Action Buttons: Focus Map, Edit, Delete
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              TextButton.icon(
-                onPressed: () {
-                  setState(() => _selectedMapFocusUnit = unit);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Fokus lokasi peta diatur ke ${unit.nama}'),
-                      duration: const Duration(seconds: 2),
+                // Action Buttons: Focus Map, Delete
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    TextButton.icon(
+                      onPressed: () {
+                        setState(() => _selectedMapFocusUnit = unit);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Fokus lokasi peta diatur ke ${unit.nama}'),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                      icon: Icon(Icons.my_location_rounded, size: 14, color: themeAccent),
+                      label: Text(
+                        'Lihat di Map',
+                        style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: themeAccent,
+                        ),
+                      ),
                     ),
-                  );
-                },
-                icon: Icon(Icons.my_location_rounded, size: 14, color: themeAccent),
-                label: Text(
-                  'Lihat di Map',
-                  style: GoogleFonts.outfit(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: themeAccent,
-                  ),
+                    Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Colors.redAccent),
+                          onPressed: () => _confirmDeleteUnit(context, ref, unit),
+                          tooltip: 'Hapus Unit',
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-              ),
-              Row(
-                children: [
-                  IconButton(
-                    icon: Icon(Icons.edit_outlined, size: 18, color: subtitleColor),
-                    onPressed: () => _showPustuFormDialog(context, ref, existingUnit: unit),
-                    tooltip: 'Edit Unit',
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Colors.redAccent),
-                    onPressed: () => _confirmDeleteUnit(context, ref, unit),
-                    tooltip: 'Hapus Unit',
-                  ),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -1067,22 +1072,693 @@ class _ManagementPustuPonkesdesWidgetState
 
     String tipeSelected = existingUnit?.tipe ?? 'PUSTU';
     String statusSelected = existingUnit?.statusOperasional ?? 'Aktif / Buka';
+    String? selectedPhotoUrl;
     List<String> selectedPermissions = List.from(
       existingUnit?.permissions ?? ['DASHBOARD', 'ANTRIAN', 'FORM_IBU_HAMIL', 'PANTAUAN_IBU_HAMIL'],
     );
 
     bool isSaving = false;
+    int activeLeftTab = 0; // 0: Informasi Pustu / Ponkesdes, 1: Jadwal Operasional
 
     showDialog(
       context: context,
       builder: (dialogCtx) => StatefulBuilder(
         builder: (context, setModalState) {
           final notifier = ref.read(landingPageProvider.notifier);
+          final isDark = ref.watch(landingPageProvider).appearance == 'dark';
           final cardBg = notifier.getCardColor();
           final textColor = notifier.getTextColor();
           final subtitleColor = notifier.getBodyTextColor();
           final borderColor = notifier.getBorderColor();
           final themeAccent = notifier.getPrimaryColor();
+
+          final screenWidth = MediaQuery.of(context).size.width;
+          final dialogWidth = screenWidth > 960 ? 880.0 : (screenWidth > 600 ? 640.0 : screenWidth * 0.9);
+          final isWide = dialogWidth > 720;
+
+          // ── Left Side Panel: Tabbed Pane (Informasi / Jadwal) ─────────────
+          final leftFormContent = Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Tabbed Pane Switcher Header (Left Side)
+              Container(
+                decoration: BoxDecoration(
+                  color: textColor.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: borderColor),
+                ),
+                padding: const EdgeInsets.all(4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => setModalState(() => activeLeftTab = 0),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          decoration: BoxDecoration(
+                            color: activeLeftTab == 0 ? themeAccent : Colors.transparent,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          alignment: Alignment.center,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.edit_note_rounded,
+                                size: 14,
+                                color: activeLeftTab == 0 ? Colors.white : subtitleColor,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Informasi Faskes',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: activeLeftTab == 0 ? Colors.white : subtitleColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => setModalState(() => activeLeftTab = 1),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          decoration: BoxDecoration(
+                            color: activeLeftTab == 1 ? themeAccent : Colors.transparent,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          alignment: Alignment.center,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.calendar_today_rounded,
+                                size: 13,
+                                color: activeLeftTab == 1 ? Colors.white : subtitleColor,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Jadwal Operasional',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: activeLeftTab == 1 ? Colors.white : subtitleColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 14),
+
+              // Tab 0 Content: Informasi Pustu / Ponkesdes Form Fields
+              if (activeLeftTab == 0) ...[
+                // Tipe Unit & Status Operasional
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('TIPE UNIT', style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.bold, color: subtitleColor)),
+                          const SizedBox(height: 6),
+                          DropdownButtonFormField<String>(
+                            initialValue: tipeSelected,
+                            dropdownColor: cardBg,
+                            decoration: InputDecoration(
+                              filled: true,
+                              fillColor: cardBg,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: borderColor)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            ),
+                            items: const [
+                              DropdownMenuItem(value: 'PUSTU', child: Text('PUSTU')),
+                              DropdownMenuItem(value: 'PONKESDES', child: Text('PONKESDES')),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) setModalState(() => tipeSelected = val);
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('STATUS OPERASIONAL', style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.bold, color: subtitleColor)),
+                          const SizedBox(height: 6),
+                          DropdownButtonFormField<String>(
+                            initialValue: statusSelected,
+                            dropdownColor: cardBg,
+                            decoration: InputDecoration(
+                              filled: true,
+                              fillColor: cardBg,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: borderColor)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            ),
+                            items: const [
+                              DropdownMenuItem(value: 'Aktif / Buka', child: Text('Aktif / Buka')),
+                              DropdownMenuItem(value: 'Tutup', child: Text('Tutup')),
+                              DropdownMenuItem(value: 'Dalam Perbaikan', child: Text('Dalam Perbaikan')),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) setModalState(() => statusSelected = val);
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 14),
+
+                // Nama Unit & Kode Unit
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: _buildTextField('NAMA UNIT', namaCtrl, 'e.g. Pustu Sukorejo 1', textColor, subtitleColor, cardBg, borderColor),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 1,
+                      child: _buildTextField('KODE UNIT', kodeCtrl, 'PST-001', textColor, subtitleColor, cardBg, borderColor),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 14),
+
+                // Penanggung Jawab & NIK PJ
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildTextField('PENANGGUNG JAWAB (BIDAN/PERAWAT)', pjCtrl, 'Nama PJ', textColor, subtitleColor, cardBg, borderColor),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildTextField('NIK PENANGGUNG JAWAB', nikCtrl, '16 Digit NIK', textColor, subtitleColor, cardBg, borderColor),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 14),
+
+                // Telepon & Desa
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildTextField('NO TELEPON / KONTAK', telpCtrl, '081234567890', textColor, subtitleColor, cardBg, borderColor),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildTextField('DESA / KELURAHAN', villageCtrl, 'Nama Desa', textColor, subtitleColor, cardBg, borderColor),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 14),
+
+                // Alamat / Jalan
+                _buildTextField('ALAMAT / JALAN', alamatCtrl, 'Jl. Raya Desa...', textColor, subtitleColor, cardBg, borderColor),
+
+                const SizedBox(height: 14),
+
+                // Coordinat Latitude & Longitude
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildTextField('LATITUDE MAP', latCtrl, '-7.9797', textColor, subtitleColor, cardBg, borderColor),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildTextField('LONGITUDE MAP', lngCtrl, '113.8228', textColor, subtitleColor, cardBg, borderColor),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+
+                // Akses Fitur Permissions Checkboxes
+                Text('IZIN AKSES SUB-MODUL', style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.bold, color: subtitleColor)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    'DASHBOARD',
+                    'MANAGEMENT_PEKERJA',
+                    'ANTRIAN',
+                    'FORM_IBU_HAMIL',
+                    'PANTAUAN_IBU_HAMIL',
+                  ].map((perm) {
+                    final isChecked = selectedPermissions.contains(perm);
+                    return FilterChip(
+                      label: Text(perm.replaceAll('_', ' '), style: GoogleFonts.outfit(fontSize: 10)),
+                      selected: isChecked,
+                      selectedColor: themeAccent.withOpacity(0.2),
+                      onSelected: (val) {
+                        setModalState(() {
+                          if (val) {
+                            selectedPermissions.add(perm);
+                          } else {
+                            selectedPermissions.remove(perm);
+                          }
+                        });
+                      },
+                    );
+                  }).toList(),
+                ),
+              ],
+
+              // Tab 1 Content: Weekly Operational Schedule Card
+              if (activeLeftTab == 1)
+                Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF161619) : Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: borderColor),
+                  ),
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.calendar_today_outlined, size: 16, color: themeAccent),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Weekly Operational Schedule',
+                            style: GoogleFonts.outfit(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.bold,
+                              color: textColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        'Set your operational hours for each day. Mark as HOLIDAY if not open.',
+                        style: GoogleFonts.outfit(
+                          fontSize: 9.5,
+                          color: subtitleColor,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      ...[
+                        {'initial': 'M', 'name': 'Monday', 'startTime': '08:00 AM', 'endTime': '04:00 PM', 'isOpen': true},
+                        {'initial': 'T', 'name': 'Tuesday', 'startTime': '08:00 AM', 'endTime': '04:00 PM', 'isOpen': true},
+                        {'initial': 'W', 'name': 'Wednesday', 'startTime': '08:00 AM', 'endTime': '04:00 PM', 'isOpen': true},
+                        {'initial': 'T', 'name': 'Thursday', 'startTime': '08:00 AM', 'endTime': '04:00 PM', 'isOpen': true},
+                        {'initial': 'F', 'name': 'Friday', 'startTime': '08:00 AM', 'endTime': '02:00 PM', 'isOpen': true},
+                        {'initial': 'S', 'name': 'Saturday', 'startTime': '08:00 AM', 'endTime': '12:00 PM', 'isOpen': true},
+                        {'initial': 'S', 'name': 'Sunday', 'startTime': '08:00 AM', 'endTime': '12:00 PM', 'isOpen': true},
+                      ].map((day) {
+                        final isOpen = day['isOpen'] as bool;
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF222226) : const Color(0xFFFAFAFC),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: borderColor.withValues(alpha: 0.7)),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 24,
+                                height: 24,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: themeAccent.withValues(alpha: 0.12),
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  day['initial'] as String,
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w900,
+                                    color: themeAccent,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              SizedBox(
+                                width: 66,
+                                child: Text(
+                                  day['name'] as String,
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: textColor,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: isOpen
+                                    ? Row(
+                                        children: [
+                                          Icon(Icons.access_time_rounded, size: 12, color: subtitleColor),
+                                          const SizedBox(width: 4),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: textColor.withValues(alpha: 0.06),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: Text(
+                                              day['startTime'] as String,
+                                              style: GoogleFonts.outfit(
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.bold,
+                                                color: textColor,
+                                              ),
+                                            ),
+                                          ),
+                                          Padding(
+                                            padding: const EdgeInsets.symmetric(horizontal: 3),
+                                            child: Text(
+                                              's/d',
+                                              style: GoogleFonts.outfit(fontSize: 9, color: subtitleColor),
+                                            ),
+                                          ),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: textColor.withValues(alpha: 0.06),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: Text(
+                                              day['endTime'] as String,
+                                              style: GoogleFonts.outfit(
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.bold,
+                                                color: textColor,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      )
+                                    : Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: Colors.redAccent.withValues(alpha: 0.12),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          'HOLIDAY',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.redAccent,
+                                          ),
+                                        ),
+                                      ),
+                              ),
+                              Transform.scale(
+                                scale: 0.7,
+                                child: Switch(
+                                  value: isOpen,
+                                  activeColor: Colors.white,
+                                  activeTrackColor: themeAccent,
+                                  onChanged: (val) {
+                                    setModalState(() {
+                                      day['isOpen'] = val;
+                                    });
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+            ],
+          );
+
+          // ── Right Side Panel: Profile Photo & Location Map ───────────────
+          final rightSidePanel = Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 1. Photo Profile Box
+              Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: textColor.withOpacity(0.03),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: borderColor),
+                ),
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.add_a_photo_outlined, size: 16, color: themeAccent),
+                        const SizedBox(width: 8),
+                        Text(
+                          'FOTO PROFIL FASKES',
+                          style: GoogleFonts.outfit(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: subtitleColor,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Stack(
+                      alignment: Alignment.bottomRight,
+                      children: [
+                        Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: (existingUnit?.avatarBg ?? themeAccent).withOpacity(0.15),
+                            border: Border.all(color: themeAccent.withOpacity(0.4), width: 3),
+                            boxShadow: [
+                              BoxShadow(
+                                color: themeAccent.withOpacity(0.12),
+                                blurRadius: 10,
+                                spreadRadius: 2,
+                              ),
+                            ],
+                          ),
+                          alignment: Alignment.center,
+                          child: selectedPhotoUrl != null && selectedPhotoUrl!.isNotEmpty
+                              ? ClipOval(
+                                  child: Image.network(
+                                    selectedPhotoUrl!,
+                                    width: 94,
+                                    height: 94,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => Text(
+                                      namaCtrl.text.isNotEmpty ? namaCtrl.text.substring(0, 2).toUpperCase() : 'PU',
+                                      style: GoogleFonts.outfit(fontSize: 26, fontWeight: FontWeight.w900, color: themeAccent),
+                                    ),
+                                  ),
+                                )
+                              : Text(
+                                  namaCtrl.text.isNotEmpty ? namaCtrl.text.substring(0, 2).toUpperCase() : 'PU',
+                                  style: GoogleFonts.outfit(fontSize: 26, fontWeight: FontWeight.w900, color: themeAccent),
+                                ),
+                        ),
+                        InkWell(
+                          onTap: () {
+                            setModalState(() {
+                              selectedPhotoUrl = 'https://images.unsplash.com/photo-1586773860418-d37222d8fce3?w=500&auto=format&fit=crop&q=60';
+                            });
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Foto Profil Faskes diperbarui!')),
+                            );
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: BoxDecoration(
+                              color: themeAccent,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.2),
+                                  blurRadius: 4,
+                                ),
+                              ],
+                            ),
+                            child: const Icon(Icons.camera_alt_rounded, size: 14, color: Colors.white),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      namaCtrl.text.isEmpty ? 'Pustu / Ponkesdes' : namaCtrl.text,
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: textColor),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 3),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: (tipeSelected == 'PUSTU' ? const Color(0xFF3498DB) : const Color(0xFF9B59B6)).withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(100),
+                      ),
+                      child: Text(
+                        '$tipeSelected • ${kodeCtrl.text}',
+                        style: GoogleFonts.outfit(
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          color: tipeSelected == 'PUSTU' ? const Color(0xFF3498DB) : const Color(0xFF9B59B6),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        setModalState(() {
+                          selectedPhotoUrl = selectedPhotoUrl == null
+                              ? 'https://images.unsplash.com/photo-1586773860418-d37222d8fce3?w=500&auto=format&fit=crop&q=60'
+                              : null;
+                        });
+                      },
+                      icon: const Icon(Icons.upload_file_rounded, size: 13),
+                      label: Text(
+                        selectedPhotoUrl == null ? 'Unggah Foto Profil' : 'Hapus Foto',
+                        style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.w600),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 14),
+
+              // 2. Peta Lokasi Faskes Map Card
+              Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF161619) : Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: borderColor),
+                ),
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.map_rounded, size: 16, color: themeAccent),
+                            const SizedBox(width: 8),
+                            Text(
+                              'PETA LOKASI FASKES',
+                              style: GoogleFonts.outfit(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: textColor,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: themeAccent.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(100),
+                          ),
+                          child: Text(
+                            '${latCtrl.text}, ${lngCtrl.text}',
+                            style: GoogleFonts.outfit(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              color: themeAccent,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Lokasi presisi unit faskes penunjang di wilayah kecamatan',
+                      style: GoogleFonts.outfit(fontSize: 9.5, color: subtitleColor),
+                    ),
+                    const SizedBox(height: 12),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(14),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: borderColor),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: RevGeoWilayahMapWidget(
+                          initialProvince: 'JAWA TIMUR',
+                          initialDistrict: 'KABUPATEN BONDOWOSO',
+                          initialSubDistrict: kecCtrl.text.isNotEmpty ? kecCtrl.text : 'SUMBER WRINGIN',
+                          fieldBg: cardBg,
+                          textColor: textColor,
+                          subtitleColor: subtitleColor,
+                          borderColor: borderColor,
+                          dropdownColor: cardBg,
+                          themeAccent: themeAccent,
+                          isDark: isDark,
+                          isEn: false,
+                          height: 250,
+                          showOnlyMap: true,
+                          onChanged: (prov, reg, dist, vill) {},
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Icon(Icons.location_on_rounded, size: 14, color: themeAccent),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            '${alamatCtrl.text.isEmpty ? "Alamat Faskes" : alamatCtrl.text}, Desa ${villageCtrl.text}',
+                            style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
 
           return AlertDialog(
             backgroundColor: cardBg,
@@ -1124,184 +1800,29 @@ class _ManagementPustuPonkesdesWidgetState
             ),
             content: SingleChildScrollView(
               child: SizedBox(
-                width: 520,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Tipe Unit & Status
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('TIPE UNIT', style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.bold, color: subtitleColor)),
-                              const SizedBox(height: 6),
-                              DropdownButtonFormField<String>(
-                                initialValue: tipeSelected,
-                                dropdownColor: cardBg,
-                                decoration: InputDecoration(
-                                  filled: true,
-                                  fillColor: cardBg,
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: borderColor)),
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                ),
-                                items: const [
-                                  DropdownMenuItem(value: 'PUSTU', child: Text('PUSTU')),
-                                  DropdownMenuItem(value: 'PONKESDES', child: Text('PONKESDES')),
-                                ],
-                                onChanged: (val) {
-                                  if (val != null) setModalState(() => tipeSelected = val);
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('STATUS OPERASIONAL', style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.bold, color: subtitleColor)),
-                              const SizedBox(height: 6),
-                              DropdownButtonFormField<String>(
-                                initialValue: statusSelected,
-                                dropdownColor: cardBg,
-                                decoration: InputDecoration(
-                                  filled: true,
-                                  fillColor: cardBg,
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: borderColor)),
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                ),
-                                items: const [
-                                  DropdownMenuItem(value: 'Aktif / Buka', child: Text('Aktif / Buka')),
-                                  DropdownMenuItem(value: 'Tutup', child: Text('Tutup')),
-                                  DropdownMenuItem(value: 'Dalam Perbaikan', child: Text('Dalam Perbaikan')),
-                                ],
-                                onChanged: (val) {
-                                  if (val != null) setModalState(() => statusSelected = val);
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    // Nama Unit & Kode Unit
-                    Row(
-                      children: [
-                        Expanded(
-                          flex: 2,
-                          child: _buildTextField('NAMA UNIT', namaCtrl, 'e.g. Pustu Sukorejo 1', textColor, subtitleColor, cardBg, borderColor),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          flex: 1,
-                          child: _buildTextField('KODE UNIT', kodeCtrl, 'PST-001', textColor, subtitleColor, cardBg, borderColor),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    // Penanggung Jawab & NIK PJ
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildTextField('PENANGGUNG JAWAB (BIDAN/PERAWAT)', pjCtrl, 'Nama PJ', textColor, subtitleColor, cardBg, borderColor),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildTextField('NIK PENANGGUNG JAWAB', nikCtrl, '16 Digit NIK', textColor, subtitleColor, cardBg, borderColor),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    // Telepon & Jam Layanan
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildTextField('NO TELEPON / KONTAK', telpCtrl, '081234567890', textColor, subtitleColor, cardBg, borderColor),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildTextField('JAM LAYANAN', jamCtrl, '08:00 - 14:00 WIB', textColor, subtitleColor, cardBg, borderColor),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    // Alamat & Desa
-                    Row(
-                      children: [
-                        Expanded(
-                          flex: 2,
-                          child: _buildTextField('ALAMAT / JALAN', alamatCtrl, 'Jl. Raya Desa...', textColor, subtitleColor, cardBg, borderColor),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          flex: 1,
-                          child: _buildTextField('DESA / KELURAHAN', villageCtrl, 'Nama Desa', textColor, subtitleColor, cardBg, borderColor),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    // Coordinat Latitude & Longitude
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildTextField('LATITUDE MAP', latCtrl, '-7.9797', textColor, subtitleColor, cardBg, borderColor),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildTextField('LONGITUDE MAP', lngCtrl, '113.8228', textColor, subtitleColor, cardBg, borderColor),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Akses Fitur Permissions Checkboxes
-                    Text('IZIN AKSES SUB-MODUL', style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.bold, color: subtitleColor)),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
-                      children: [
-                        'DASHBOARD',
-                        'MANAGEMENT_PEKERJA',
-                        'ANTRIAN',
-                        'FORM_IBU_HAMIL',
-                        'PANTAUAN_IBU_HAMIL',
-                      ].map((perm) {
-                        final isChecked = selectedPermissions.contains(perm);
-                        return FilterChip(
-                          label: Text(perm.replaceAll('_', ' '), style: GoogleFonts.outfit(fontSize: 10)),
-                          selected: isChecked,
-                          selectedColor: themeAccent.withOpacity(0.2),
-                          onSelected: (val) {
-                            setModalState(() {
-                              if (val) {
-                                selectedPermissions.add(perm);
-                              } else {
-                                selectedPermissions.remove(perm);
-                              }
-                            });
-                          },
-                        );
-                      }).toList(),
-                    ),
-                  ],
-                ),
+                width: dialogWidth,
+                child: isWide
+                    ? Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(flex: 5, child: leftFormContent),
+                          const SizedBox(width: 20),
+                          Container(width: 1, height: 480, color: borderColor),
+                          const SizedBox(width: 20),
+                          Expanded(flex: 4, child: rightSidePanel),
+                        ],
+                      )
+                    : Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          leftFormContent,
+                          const SizedBox(height: 20),
+                          const Divider(),
+                          const SizedBox(height: 10),
+                          rightSidePanel,
+                        ],
+                      ),
               ),
             ),
             actions: [
@@ -1427,6 +1948,47 @@ class _ManagementPustuPonkesdesWidgetState
             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: borderColor)),
             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: borderColor)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPillTextField(
+    String label,
+    TextEditingController controller,
+    String hint,
+    Color textColor,
+    Color subtitleColor,
+    Color cardBg,
+    Color themeAccent,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.bold, color: subtitleColor)),
+        const SizedBox(height: 6),
+        TextField(
+          controller: controller,
+          style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: textColor),
+          decoration: InputDecoration(
+            hintText: hint,
+            filled: true,
+            fillColor: cardBg,
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(20),
+              borderSide: BorderSide(color: themeAccent, width: 1.5),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(20),
+              borderSide: BorderSide(color: themeAccent, width: 1.5),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(20),
+              borderSide: BorderSide(color: themeAccent, width: 2.0),
+            ),
           ),
         ),
       ],

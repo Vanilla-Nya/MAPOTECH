@@ -265,6 +265,30 @@ final Map<String, Map<String, PageTutorialData>> _idTutorials = {
         ),
       ],
     ),
+    'puskesmas_search': const PageTutorialData(
+      title: 'Cari Puskesmas Terdekat',
+      description: 'Temukan fasilitas kesehatan Puskesmas terdekat, layanan UGD, rawat inap, poli kesehatan ibu & anak.',
+      steps: [
+        TutorialStep(
+          title: 'Layanan Puskesmas',
+          description: 'Lihat daftar poli yang tersedia seperti Poli Umum, KIA, Gigi, dan Laboratorium.',
+        ),
+        TutorialStep(
+          title: 'Integrasi BPJS & P-Care',
+          description: 'Akses layanan puskesmas yang terintegrasi BPJS Kesehatan.',
+        ),
+      ],
+    ),
+    'pustu_search': const PageTutorialData(
+      title: 'Cari Pustu & Ponkesdes',
+      description: 'Temukan Puskesmas Pembantu (Pustu) dan Pondok Kesehatan Desa (Ponkesdes) terdekat di wilayah desa Anda.',
+      steps: [
+        TutorialStep(
+          title: 'Layanan Desa',
+          description: 'Lihat lokasi Pustu dan Ponkesdes untuk pelayanan kesehatan dasar terdekat.',
+        ),
+      ],
+    ),
     'apotek_search': const PageTutorialData(
       title: 'Cari Apotek & Tebus Obat',
       description: 'Temukan apotek terdekat yang memiliki stok obat lengkap, bandingkan harga obat, dan pesan obat untuk diantar.',
@@ -566,6 +590,30 @@ final Map<String, Map<String, PageTutorialData>> _enTutorials = {
         TutorialStep(
           title: 'Doctor Profile',
           description: 'Read reviews from other patients, educational history, and clinical experience before booking.',
+        ),
+      ],
+    ),
+    'puskesmas_search': const PageTutorialData(
+      title: 'Search Puskesmas Centers',
+      description: 'Locate nearby public health centers (Puskesmas), emergency services, inpatient care, maternal and child clinics.',
+      steps: [
+        TutorialStep(
+          title: 'Puskesmas Services',
+          description: 'Explore available polyclinics such as General, Maternal & Child, Dental, and Lab Services.',
+        ),
+        TutorialStep(
+          title: 'BPJS Integration',
+          description: 'Access public healthcare facilities integrated with BPJS and national health networks.',
+        ),
+      ],
+    ),
+    'pustu_search': const PageTutorialData(
+      title: 'Search Pustu & Ponkesdes',
+      description: 'Find auxiliary health centers (Pustu) and village health posts (Ponkesdes) in your local community.',
+      steps: [
+        TutorialStep(
+          title: 'Community Care',
+          description: 'Locate primary healthcare units providing localized village health services.',
         ),
       ],
     ),

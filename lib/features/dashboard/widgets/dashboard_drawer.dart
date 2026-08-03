@@ -330,6 +330,16 @@ List<DrawerMenuItem> getMenuItemsForRole(
         icon: Icons.search_rounded,
       ),
       DrawerMenuItem(
+        id: 'puskesmas_search',
+        label: isEn ? 'Search Puskesmas' : 'Cari Puskesmas',
+        icon: Icons.health_and_safety_rounded,
+      ),
+      DrawerMenuItem(
+        id: 'pustu_search',
+        label: isEn ? 'Search Pustu/Ponkesdes' : 'Cari Pustu/Ponkesdes',
+        icon: Icons.home_work_rounded,
+      ),
+      DrawerMenuItem(
         id: 'apotek_search',
         label: isEn ? 'Search Pharmacy' : 'Cari Apotek',
         icon: Icons.local_pharmacy_rounded,

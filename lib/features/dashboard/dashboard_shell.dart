@@ -845,7 +845,11 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
       // Pasien role: route by active menu
       switch (_activeMenu) {
         case 'dokter_search':
-          return const PasienDokterSearch();
+          return const PasienDokterSearch(initialFilter: 'dokter');
+        case 'puskesmas_search':
+          return const PasienDokterSearch(initialFilter: 'puskesmas');
+        case 'pustu_search':
+          return const PasienDokterSearch(initialFilter: 'ponkesdes');
         case 'apotek_search':
           return const PasienApotekSearch();
         case 'history':
