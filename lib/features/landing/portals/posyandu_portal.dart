@@ -6,6 +6,7 @@ import 'package:mapotech/shared/layouts/responsive_layout.dart';
 import 'package:mapotech/shared/widgets/custom_button.dart';
 import 'package:mapotech/shared/widgets/three_dimensional_device_wrapper.dart';
 import 'package:mapotech/shared/widgets/segera_hadir_mockup.dart';
+import 'package:mapotech/shared/widgets/ui.dart';
 
 class PosyanduPortal extends ConsumerWidget {
   const PosyanduPortal({super.key});
@@ -40,17 +41,12 @@ class PosyanduPortal extends ConsumerWidget {
     Widget heroText = Column(
       crossAxisAlignment: isMobile ? CrossAxisAlignment.center : CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(100), border: Border.all(color: activeColor.withValues(alpha: 0.2)), boxShadow: [BoxShadow(color: activeColor.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 2))]),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.favorite_rounded, color: activeColor, size: 14),
-              const SizedBox(width: 8),
-              Text(notifier.getHeroTagline(), style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.5, color: textColor.withValues(alpha: 0.7))),
-            ],
-          ),
+        PortalTaglineBadge(
+          icon: Icons.favorite_rounded,
+          text: notifier.getHeroTagline(),
+          activeColor: activeColor,
+          cardColor: cardColor,
+          textColor: textColor,
         ),
         const SizedBox(height: 24),
         Text(notifier.getHeroTitle(), textAlign: isMobile ? TextAlign.center : TextAlign.start,
@@ -76,8 +72,22 @@ class PosyanduPortal extends ConsumerWidget {
         Wrap(
           spacing: 8, runSpacing: 8,
           children: [
-            _buildBadge(cardColor, borderColor, textColor, Icons.child_friendly_rounded, Colors.pink, lang == 'id' ? 'Tumbuh Kembang Balita' : 'Toddler Growth'),
-            _buildBadge(cardColor, borderColor, textColor, Icons.vaccines_rounded, Colors.orange, lang == 'id' ? 'Imunisasi Digital' : 'Digital Immunization'),
+            PortalBadgeChip(
+              cardColor: cardColor,
+              borderColor: borderColor,
+              textColor: textColor,
+              icon: Icons.child_friendly_rounded,
+              iconColor: Colors.pink,
+              label: lang == 'id' ? 'Tumbuh Kembang Balita' : 'Toddler Growth',
+            ),
+            PortalBadgeChip(
+              cardColor: cardColor,
+              borderColor: borderColor,
+              textColor: textColor,
+              icon: Icons.vaccines_rounded,
+              iconColor: Colors.orange,
+              label: lang == 'id' ? 'Imunisasi Digital' : 'Digital Immunization',
+            ),
           ],
         ),
       ],
@@ -90,17 +100,6 @@ class PosyanduPortal extends ConsumerWidget {
       return Column(children: [heroText, const SizedBox(height: 48), heroVisual]);
     }
     return Row(children: [Expanded(child: heroText), const SizedBox(width: 60), Expanded(child: heroVisual)]);
-  }
-
-  Widget _buildBadge(Color cardColor, Color borderColor, Color textColor, IconData icon, Color iconColor, String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(100), border: Border.all(color: borderColor)),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [Icon(icon, size: 13, color: iconColor), const SizedBox(width: 6), Text(label, style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700, color: textColor))],
-      ),
-    );
   }
 
   Widget _buildPosyanduMockup(bool isDark, Color borderColor, Color cardColor, Color activeColor, Color textColor, Color bodyTextColor, String lang) {
@@ -380,47 +379,50 @@ class PosyanduPortal extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Center(
-          child: Column(
-            children: [
-              Text(lang == 'id' ? 'FITUR POSYANDU' : 'POSYANDU FEATURES',
-                style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 2, color: activeColor)),
-              const SizedBox(height: 8),
-              Text(lang == 'id' ? 'Tumbuh Kembang Prima' : 'Prime Growth & Development',
-                textAlign: TextAlign.center, style: GoogleFonts.outfit(fontSize: 28, fontWeight: FontWeight.w900, color: textColor)),
-              const SizedBox(height: 8),
-              Text(lang == 'id' ? 'Sistem pemantauan balita, imunisasi, dan gizi ibu terintegrasi di tingkat posyandu.' : 'Integrated toddler monitoring, immunization, and maternal nutrition system at posyandu level.',
-                textAlign: TextAlign.center, style: GoogleFonts.outfit(fontSize: 14, color: bodyTextColor, height: 1.5)),
-            ],
-          ),
+        PortalSectionHeader(
+          category: lang == 'id' ? 'FITUR POSYANDU' : 'POSYANDU FEATURES',
+          title: lang == 'id' ? 'Tumbuh Kembang Prima' : 'Prime Growth & Development',
+          description: lang == 'id' ? 'Sistem pemantauan balita, imunisasi, dan gizi ibu terintegrasi di tingkat posyandu.' : 'Integrated toddler monitoring, immunization, and maternal nutrition system at posyandu level.',
+          activeColor: activeColor,
+          textColor: textColor,
+          bodyTextColor: bodyTextColor,
+          isMobile: isMobile,
         ),
         const SizedBox(height: 48),
         if (isMobile)
-          ...features.map((f) => Padding(padding: const EdgeInsets.only(bottom: 16), child: _buildFeatureCard(f, cardColor, borderColor, textColor, bodyTextColor)))
+          ...features.map((f) => Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: PortalFeatureCard(
+                  icon: f['icon'] as IconData,
+                  title: f['title'] as String,
+                  description: f['desc'] as String,
+                  color: f['color'] as Color,
+                  cardColor: cardColor,
+                  borderColor: borderColor,
+                  textColor: textColor,
+                  bodyTextColor: bodyTextColor,
+                ),
+              ))
         else
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: features.map((f) => Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 8), child: _buildFeatureCard(f, cardColor, borderColor, textColor, bodyTextColor)))).toList(),
+            children: features.map((f) => Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: PortalFeatureCard(
+                  icon: f['icon'] as IconData,
+                  title: f['title'] as String,
+                  description: f['desc'] as String,
+                  color: f['color'] as Color,
+                  cardColor: cardColor,
+                  borderColor: borderColor,
+                  textColor: textColor,
+                  bodyTextColor: bodyTextColor,
+                ),
+              ),
+            )).toList(),
           ),
       ],
-    );
-  }
-
-  Widget _buildFeatureCard(Map<String, dynamic> feature, Color cardColor, Color borderColor, Color textColor, Color bodyTextColor) {
-    final color = feature['color'] as Color;
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(20), border: Border.all(color: borderColor)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)), child: Icon(feature['icon'] as IconData, color: color, size: 22)),
-          const SizedBox(height: 16),
-          Text(feature['title'] as String, style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w800, color: textColor)),
-          const SizedBox(height: 8),
-          Text(feature['desc'] as String, style: GoogleFonts.outfit(fontSize: 13, color: bodyTextColor, height: 1.5)),
-        ],
-      ),
     );
   }
 }

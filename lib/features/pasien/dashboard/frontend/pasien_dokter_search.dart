@@ -74,12 +74,6 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
       } else if (_selectedFilter == 'bidan') {
         final prof = d['profession']?.toString().toLowerCase() ?? '';
         filterMatches = prof.contains('bid') || prof.contains('mid') || prof.contains('nurse') || prof.contains('perawat');
-      } else if (_selectedFilter == 'puskesmas') {
-        final prof = d['profession']?.toString().toLowerCase() ?? '';
-        filterMatches = prof.contains('pusk');
-      } else if (_selectedFilter == 'ponkesdes') {
-        final prof = d['profession']?.toString().toLowerCase() ?? '';
-        filterMatches = prof.contains('ponk') || prof.contains('village') || prof.contains('clinic');
       }
 
       return textMatches && filterMatches;
@@ -122,7 +116,7 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Search Card Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+        // ──────────────────────────────────────────────────────────────────
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
@@ -199,24 +193,6 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
                   ),
                   const SizedBox(width: 8),
                   _buildFilterChip(
-                    'Puskesmas',
-                    'puskesmas',
-                    subtitleColor,
-                    purpleAccent,
-                    borderColor,
-                    cardBgColor,
-                  ),
-                  const SizedBox(width: 8),
-                  _buildFilterChip(
-                    'Ponkesdes',
-                    'ponkesdes',
-                    subtitleColor,
-                    purpleAccent,
-                    borderColor,
-                    cardBgColor,
-                  ),
-                  const SizedBox(width: 8),
-                  _buildFilterChip(
                     'Dokter',
                     'dokter',
                     subtitleColor,
@@ -255,7 +231,7 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
 
         const SizedBox(height: 24),
 
-        // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Results Header Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+        // ──────────────────────────────────────────────────────────────────
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           crossAxisAlignment: CrossAxisAlignment.end,
@@ -878,6 +854,8 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
   String? _selectedTimeSlot;
   bool _isBooking = false;
   bool _bookingSuccess = false;
+  String _bookedForPatientName = '';
+  String _bookedForRelationship = '';
   late TabController _tabController;
 
   // Clock picker state
@@ -1643,7 +1621,9 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
               ),
               const SizedBox(height: 8),
               Text(
-                'Janji temu Anda telah dibuat.\nSilakan datang sesuai jadwal yang dipilih.',
+                _bookedForPatientName.isNotEmpty
+                    ? 'Janji temu untuk $_bookedForPatientName${_bookedForRelationship.isNotEmpty ? " ($_bookedForRelationship)" : ""} telah dibuat.\nSilakan datang sesuai jadwal yang dipilih.'
+                    : 'Janji temu Anda telah dibuat.\nSilakan datang sesuai jadwal yang dipilih.',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.outfit(
                   fontSize: 12,
@@ -1658,6 +1638,8 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
                     _bookingSuccess = false;
                     _selectedDate = null;
                     _selectedTimeSlot = null;
+                    _bookedForPatientName = '';
+                    _bookedForRelationship = '';
                   });
                 },
                 style: ElevatedButton.styleFrom(
@@ -1953,7 +1935,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: isSelfPreview ? null : (_isBooking ? null : _submitBooking),
+              onPressed: isSelfPreview ? null : (_isBooking ? null : _onBookingConfirmPressed),
               icon: _isBooking
                   ? const SizedBox(
                       width: 14,
@@ -1987,7 +1969,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
     );
   }
 
-  Future<void> _submitBooking() async {
+  Future<void> _onBookingConfirmPressed() async {
     final user = ref.read(landingPageProvider).loggedInUser;
     final isSelfPreview = widget.isPreview || (user != null && user['id'] == widget.dokter['id']);
     if (isSelfPreview) return;
@@ -2005,6 +1987,46 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
       return;
     }
 
+    if (_selectedDate == null || _selectedTimeSlot == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Silakan pilih tanggal dan jam terlebih dahulu.',
+            style: GoogleFonts.outfit(),
+          ),
+          backgroundColor: Colors.orange[400],
+        ),
+      );
+      return;
+    }
+
+    // Open Patient Selection Modal (Self or Family Member from KK)
+    await showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.55),
+      builder: (modalCtx) => _PatientBookingSelectionDialog(
+        user: user,
+        dokter: widget.dokter,
+        selectedDate: _selectedDate!,
+        selectedTimeSlot: _selectedTimeSlot!,
+        isDark: widget.isDark,
+        onConfirmed: (patientId, patientName, relationship) async {
+          Navigator.pop(modalCtx);
+          await _executeBooking(
+            patientId: patientId,
+            patientName: patientName,
+            relationship: relationship,
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _executeBooking({
+    required String patientId,
+    required String patientName,
+    required String relationship,
+  }) async {
     setState(() => _isBooking = true);
     try {
       DateTime bookingDateTime = _selectedDate!;
@@ -2024,13 +2046,15 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
       }
       await _db.createBooking(
         doctorId: widget.dokter['id'] as String,
-        patientId: user['id'] as String,
+        patientId: patientId,
         date: bookingDateTime,
       );
       if (mounted) {
         setState(() {
           _isBooking = false;
           _bookingSuccess = true;
+          _bookedForPatientName = patientName;
+          _bookedForRelationship = relationship;
         });
       }
     } catch (e) {
@@ -4580,6 +4604,589 @@ class MapGraphicsPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant MapGraphicsPainter oldDelegate) {
     return oldDelegate.isDark != isDark || oldDelegate.zoomLevel != zoomLevel;
+  }
+}
+
+/// Modal Dialog to select patient (Self vs Family Member via KK)
+class _PatientBookingSelectionDialog extends ConsumerStatefulWidget {
+  final Map<String, dynamic> user;
+  final Map<String, dynamic> dokter;
+  final DateTime selectedDate;
+  final String selectedTimeSlot;
+  final bool isDark;
+  final Function(String patientId, String patientName, String relationship) onConfirmed;
+
+  const _PatientBookingSelectionDialog({
+    required this.user,
+    required this.dokter,
+    required this.selectedDate,
+    required this.selectedTimeSlot,
+    required this.isDark,
+    required this.onConfirmed,
+  });
+
+  @override
+  ConsumerState<_PatientBookingSelectionDialog> createState() => _PatientBookingSelectionDialogState();
+}
+
+class _PatientBookingSelectionDialogState extends ConsumerState<_PatientBookingSelectionDialog> {
+  final SupabaseService _db = SupabaseService();
+  String _selectedType = 'self'; // 'self' or 'family'
+  Map<String, dynamic>? _selectedFamilyMember;
+  List<Map<String, dynamic>> _familyMembers = [];
+  bool _isLoadingFamily = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFamilyMembers();
+  }
+
+  Future<void> _loadFamilyMembers() async {
+    try {
+      final userId = widget.user['id']?.toString() ?? '';
+      if (userId.isNotEmpty) {
+        final list = await _db.fetchAllFamilyMembersForUser(userId);
+        if (mounted) {
+          setState(() {
+            _familyMembers = list;
+            if (list.isNotEmpty) {
+              _selectedFamilyMember = list.first;
+            }
+            _isLoadingFamily = false;
+          });
+        }
+      } else {
+        if (mounted) setState(() => _isLoadingFamily = false);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingFamily = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final notifier = ref.read(landingPageProvider.notifier);
+    final cardBgColor = notifier.getCardColor();
+    final textColor = notifier.getTextColor();
+    final subtitleColor = notifier.getBodyTextColor();
+    final borderColor = notifier.getBorderColor();
+    final themeAccent = notifier.getPrimaryColor();
+    final isDark = widget.isDark;
+
+    final userName = widget.user['name']?.toString() ?? 'Saya Sendiri';
+    final userNik = widget.user['nik']?.toString() ?? '-';
+
+    final monthNames = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+      'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'
+    ];
+    final dateFormatted = '${widget.selectedDate.day} ${monthNames[widget.selectedDate.month - 1]} ${widget.selectedDate.year} pukul ${widget.selectedTimeSlot}';
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      child: Container(
+        width: 520,
+        constraints: const BoxConstraints(maxHeight: 700),
+        decoration: BoxDecoration(
+          color: cardBgColor,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: borderColor),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.25),
+              blurRadius: 25,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: isDark
+                        ? [const Color(0xFF2D1B4E), const Color(0xFF1B0C3C)]
+                        : [const Color(0xFFF3E8FF), const Color(0xFFE9D5FF)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  border: Border(bottom: BorderSide(color: borderColor)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: themeAccent.withOpacity(0.18),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: themeAccent.withOpacity(0.4)),
+                      ),
+                      alignment: Alignment.center,
+                      child: Icon(Icons.people_alt_rounded, color: themeAccent, size: 22),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Pilih Pasien Berobat',
+                            style: GoogleFonts.outfit(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              color: textColor,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Janji temu untuk diri sendiri atau keluarga di KK',
+                            style: GoogleFonts.outfit(
+                              fontSize: 11,
+                              color: subtitleColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.close_rounded, color: subtitleColor, size: 20),
+                      onPressed: () => Navigator.pop(context),
+                      splashRadius: 18,
+                    ),
+                  ],
+                ),
+              ),
+
+              // Content Body
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Appointment summary mini card
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF1E1E22) : const Color(0xFFF8FAFD),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: borderColor),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.calendar_today_rounded, size: 16, color: themeAccent),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    dateFormatted,
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800,
+                                      color: textColor,
+                                    ),
+                                  ),
+                                  Text(
+                                    widget.dokter['name']?.toString() ?? 'Dokter',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 11,
+                                      color: subtitleColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 18),
+
+                      // Segmented type selector
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildTypeSegmentButton(
+                              label: 'Diri Sendiri',
+                              icon: Icons.person_rounded,
+                              isSelected: _selectedType == 'self',
+                              onTap: () => setState(() => _selectedType = 'self'),
+                              themeAccent: themeAccent,
+                              borderColor: borderColor,
+                              isDark: isDark,
+                              textColor: textColor,
+                              subtitleColor: subtitleColor,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _buildTypeSegmentButton(
+                              label: 'Keluarga (KK)',
+                              icon: Icons.family_restroom_rounded,
+                              isSelected: _selectedType == 'family',
+                              onTap: () => setState(() => _selectedType = 'family'),
+                              themeAccent: themeAccent,
+                              borderColor: borderColor,
+                              isDark: isDark,
+                              textColor: textColor,
+                              subtitleColor: subtitleColor,
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // Selection Details
+                      if (_selectedType == 'self') ...[
+                        _buildPatientOptionCard(
+                          isSelected: true,
+                          title: userName,
+                          subtitle: userNik.isNotEmpty && userNik != '-' ? 'NIK: $userNik' : 'Akun Utama',
+                          badge: 'Saya Sendiri',
+                          icon: Icons.person_rounded,
+                          accentColor: themeAccent,
+                          borderColor: borderColor,
+                          isDark: isDark,
+                          textColor: textColor,
+                          subtitleColor: subtitleColor,
+                          onTap: () {},
+                        ),
+                      ] else ...[
+                        if (_isLoadingFamily)
+                          Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: CircularProgressIndicator(color: themeAccent),
+                            ),
+                          )
+                        else if (_familyMembers.isEmpty)
+                          Container(
+                            padding: const EdgeInsets.all(18),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF1E1E22) : const Color(0xFFF8FAFD),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: borderColor),
+                            ),
+                            child: Column(
+                              children: [
+                                Icon(Icons.family_restroom_rounded, size: 36, color: subtitleColor.withOpacity(0.5)),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Belum Ada Anggota Keluarga',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: textColor,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Tidak ada anggota keluarga yang terhubung pada KK akun Anda. Tambahkan anggota keluarga melalui menu Profil.',
+                                  textAlign: TextAlign.center,
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 11,
+                                    color: subtitleColor,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                OutlinedButton.icon(
+                                  icon: const Icon(Icons.person_rounded, size: 14),
+                                  label: Text('Gunakan Diri Sendiri', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold)),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: themeAccent,
+                                    side: BorderSide(color: themeAccent),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                  onPressed: () => setState(() => _selectedType = 'self'),
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          Column(
+                            children: _familyMembers.map((member) {
+                              final name = member['nama']?.toString() ?? 'Anggota Keluarga';
+                              final hubungan = member['hubungan']?.toString() ?? 'Keluarga';
+                              final nik = member['nik']?.toString() ?? '-';
+                              final isSelected = _selectedFamilyMember == member;
+
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: _buildPatientOptionCard(
+                                  isSelected: isSelected,
+                                  title: name,
+                                  subtitle: nik.isNotEmpty && nik != '-' ? 'NIK: $nik' : hubungan,
+                                  badge: hubungan,
+                                  icon: Icons.family_restroom_rounded,
+                                  accentColor: themeAccent,
+                                  borderColor: borderColor,
+                                  isDark: isDark,
+                                  textColor: textColor,
+                                  subtitleColor: subtitleColor,
+                                  onTap: () => setState(() => _selectedFamilyMember = member),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+
+              // Bottom Actions
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: cardBgColor,
+                  border: Border(top: BorderSide(color: borderColor)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: subtitleColor,
+                          side: BorderSide(color: borderColor),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: Text(
+                          'Batal',
+                          style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          if (_selectedType == 'self') {
+                            widget.onConfirmed(
+                              widget.user['id']?.toString() ?? '',
+                              userName,
+                              'Diri Sendiri',
+                            );
+                          } else {
+                            if (_selectedFamilyMember != null) {
+                              final memberId = _selectedFamilyMember!['member_user_id']?.toString();
+                              final patientId = (memberId != null && memberId.isNotEmpty)
+                                  ? memberId
+                                  : (widget.user['id']?.toString() ?? '');
+                              final memberName = _selectedFamilyMember!['nama']?.toString() ?? 'Keluarga';
+                              final relationship = _selectedFamilyMember!['hubungan']?.toString() ?? 'Keluarga';
+                              widget.onConfirmed(
+                                patientId,
+                                memberName,
+                                relationship,
+                              );
+                            } else {
+                              widget.onConfirmed(
+                                widget.user['id']?.toString() ?? '',
+                                userName,
+                                'Diri Sendiri',
+                              );
+                            }
+                          }
+                        },
+                        icon: const Icon(Icons.check_circle_rounded, size: 16),
+                        label: Text(
+                          _selectedType == 'self'
+                              ? 'Booking Untuk Saya'
+                              : 'Booking Untuk ${_selectedFamilyMember?['nama'] ?? "Keluarga"}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 12, color: Colors.white),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: themeAccent,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 0,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTypeSegmentButton({
+    required String label,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+    required Color themeAccent,
+    required Color borderColor,
+    required bool isDark,
+    required Color textColor,
+    required Color subtitleColor,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? themeAccent.withOpacity(0.12)
+              : (isDark ? const Color(0xFF1E1E22) : const Color(0xFFF8FAFD)),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? themeAccent : borderColor,
+            width: isSelected ? 1.8 : 1.0,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isSelected ? themeAccent : subtitleColor,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: GoogleFonts.outfit(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                color: isSelected ? themeAccent : textColor,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPatientOptionCard({
+    required bool isSelected,
+    required String title,
+    required String subtitle,
+    required String badge,
+    required IconData icon,
+    required Color accentColor,
+    required Color borderColor,
+    required bool isDark,
+    required Color textColor,
+    required Color subtitleColor,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? accentColor.withOpacity(0.08)
+              : (isDark ? const Color(0xFF1E1E22) : const Color(0xFFF8FAFD)),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected ? accentColor : borderColor,
+            width: isSelected ? 1.8 : 1.0,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: accentColor.withOpacity(0.15),
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: Icon(icon, size: 18, color: accentColor),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          title,
+                          style: GoogleFonts.outfit(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: textColor,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: accentColor.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(100),
+                        ),
+                        child: Text(
+                          badge,
+                          style: GoogleFonts.outfit(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: accentColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: GoogleFonts.outfit(
+                      fontSize: 11,
+                      color: subtitleColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isSelected ? accentColor : Colors.transparent,
+                border: Border.all(
+                  color: isSelected ? accentColor : borderColor,
+                  width: 1.5,
+                ),
+              ),
+              alignment: Alignment.center,
+              child: isSelected
+                  ? const Icon(Icons.check_rounded, size: 14, color: Colors.white)
+                  : null,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

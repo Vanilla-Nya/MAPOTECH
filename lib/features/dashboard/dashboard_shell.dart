@@ -12,6 +12,7 @@ import 'package:mapotech/shared/widgets/animated_portal_switcher.dart';
 import 'package:mapotech/features/dashboard/widgets/dashboard_drawer.dart';
 import 'package:mapotech/features/pasien/dashboard/frontend/pasien_dashboard.dart';
 import 'package:mapotech/features/pasien/dashboard/frontend/pasien_dokter_search.dart';
+import 'package:mapotech/features/pasien/dashboard/frontend/pasien_puskesmas_search.dart';
 import 'package:mapotech/features/pasien/dashboard/frontend/pasien_apotek_search.dart';
 import 'package:mapotech/features/pasien/dashboard/frontend/pasien_history.dart';
 import 'package:mapotech/features/pasien/dashboard/frontend/pasien_prescription.dart';
@@ -423,15 +424,22 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
 
                     // Inner Scrollable Panel
                     Expanded(
-                      child: SingleChildScrollView(
-                        padding: EdgeInsets.all(isMobile ? 16 : 28),
-                        child: AnimatedPortalSwitcher(
-                          switcherKey: _activeMenu,
-                          child: _buildRoleDashboardBody(
-                            state.loggedInRole ?? 'pasien',
-                          ),
-                        ),
-                      ),
+                      child: (_activeMenu == 'penjualan' && (state.loggedInRole == 'apotek'))
+                          ? AnimatedPortalSwitcher(
+                              switcherKey: _activeMenu,
+                              child: _buildRoleDashboardBody(
+                                state.loggedInRole ?? 'pasien',
+                              ),
+                            )
+                          : SingleChildScrollView(
+                              padding: EdgeInsets.all(isMobile ? 16 : 28),
+                              child: AnimatedPortalSwitcher(
+                                switcherKey: _activeMenu,
+                                child: _buildRoleDashboardBody(
+                                  state.loggedInRole ?? 'pasien',
+                                ),
+                              ),
+                            ),
                     ),
                   ],
                 ),
@@ -846,6 +854,8 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
       switch (_activeMenu) {
         case 'dokter_search':
           return const PasienDokterSearch();
+        case 'puskesmas_search':
+          return const PasienPuskesmasSearch();
         case 'apotek_search':
           return const PasienApotekSearch();
         case 'history':

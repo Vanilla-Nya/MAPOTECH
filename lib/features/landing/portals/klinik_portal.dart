@@ -6,6 +6,7 @@ import 'package:mapotech/shared/layouts/responsive_layout.dart';
 import 'package:mapotech/shared/widgets/custom_button.dart';
 import 'package:mapotech/shared/widgets/three_dimensional_device_wrapper.dart';
 import 'package:mapotech/shared/widgets/segera_hadir_mockup.dart';
+import 'package:mapotech/shared/widgets/ui.dart';
 
 class KlinikPortal extends ConsumerWidget {
   const KlinikPortal({super.key});
@@ -42,25 +43,12 @@ class KlinikPortal extends ConsumerWidget {
       crossAxisAlignment:
           isMobile ? CrossAxisAlignment.center : CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: cardColor,
-            borderRadius: BorderRadius.circular(100),
-            border: Border.all(color: activeColor.withValues(alpha: 0.2)),
-            boxShadow: [BoxShadow(color: activeColor.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 2))],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.local_hospital_rounded, color: activeColor, size: 14),
-              const SizedBox(width: 8),
-              Text(
-                notifier.getHeroTagline(),
-                style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.5, color: textColor.withValues(alpha: 0.7)),
-              ),
-            ],
-          ),
+        PortalTaglineBadge(
+          icon: Icons.local_hospital_rounded,
+          text: notifier.getHeroTagline(),
+          activeColor: activeColor,
+          cardColor: cardColor,
+          textColor: textColor,
         ),
         const SizedBox(height: 24),
         Text(
@@ -89,25 +77,13 @@ class KlinikPortal extends ConsumerWidget {
           ],
         ),
         const SizedBox(height: 32),
-        // Badge
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: BoxDecoration(
-            color: cardColor,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: borderColor),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.verified_rounded, color: activeColor, size: 16),
-              const SizedBox(width: 8),
-              Text(
-                lang == 'id' ? 'Terintegrasi SatuSehat & BPJS' : 'SatuSehat & BPJS Integrated',
-                style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: textColor),
-              ),
-            ],
-          ),
+        PortalBadgeChip(
+          cardColor: cardColor,
+          borderColor: borderColor,
+          textColor: textColor,
+          icon: Icons.verified_rounded,
+          iconColor: activeColor,
+          label: lang == 'id' ? 'Terintegrasi SatuSehat & BPJS' : 'SatuSehat & BPJS Integrated',
         ),
       ],
     );
@@ -424,33 +400,29 @@ class KlinikPortal extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Center(
-          child: Column(
-            children: [
-              Text(
-                lang == 'id' ? 'FITUR SISTEM KLINIK' : 'CLINIC SYSTEM FEATURES',
-                style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 2, color: activeColor),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                lang == 'id' ? 'Solusi Klinik Terpadu' : 'Integrated Clinic Solution',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.outfit(fontSize: 28, fontWeight: FontWeight.w900, color: textColor),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                lang == 'id' ? 'RME, Antrean, Kasir, dan lebih banyak lagi — dalam satu sistem.' : 'EMR, Queue, POS, and more — in one system.',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.outfit(fontSize: 14, color: bodyTextColor, height: 1.5),
-              ),
-            ],
-          ),
+        PortalSectionHeader(
+          category: lang == 'id' ? 'FITUR SISTEM KLINIK' : 'CLINIC SYSTEM FEATURES',
+          title: lang == 'id' ? 'Solusi Klinik Terpadu' : 'Integrated Clinic Solution',
+          description: lang == 'id' ? 'RME, Antrean, Kasir, dan lebih banyak lagi — dalam satu sistem.' : 'EMR, Queue, POS, and more — in one system.',
+          activeColor: activeColor,
+          textColor: textColor,
+          bodyTextColor: bodyTextColor,
+          isMobile: isMobile,
         ),
         const SizedBox(height: 48),
         if (isMobile)
           ...features.map((f) => Padding(
                 padding: const EdgeInsets.only(bottom: 16),
-                child: _buildFeatureCard(f, cardColor, borderColor, textColor, bodyTextColor),
+                child: PortalFeatureCard(
+                  icon: f['icon'] as IconData,
+                  title: f['title'] as String,
+                  description: f['desc'] as String,
+                  color: f['color'] as Color,
+                  cardColor: cardColor,
+                  borderColor: borderColor,
+                  textColor: textColor,
+                  bodyTextColor: bodyTextColor,
+                ),
               ))
         else
           Row(
@@ -458,37 +430,20 @@ class KlinikPortal extends ConsumerWidget {
             children: features.map((f) => Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: _buildFeatureCard(f, cardColor, borderColor, textColor, bodyTextColor),
+                child: PortalFeatureCard(
+                  icon: f['icon'] as IconData,
+                  title: f['title'] as String,
+                  description: f['desc'] as String,
+                  color: f['color'] as Color,
+                  cardColor: cardColor,
+                  borderColor: borderColor,
+                  textColor: textColor,
+                  bodyTextColor: bodyTextColor,
+                ),
               ),
             )).toList(),
           ),
       ],
-    );
-  }
-
-  Widget _buildFeatureCard(Map<String, dynamic> feature, Color cardColor, Color borderColor, Color textColor, Color bodyTextColor) {
-    final color = feature['color'] as Color;
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: borderColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
-            child: Icon(feature['icon'] as IconData, color: color, size: 22),
-          ),
-          const SizedBox(height: 16),
-          Text(feature['title'] as String, style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w800, color: textColor)),
-          const SizedBox(height: 8),
-          Text(feature['desc'] as String, style: GoogleFonts.outfit(fontSize: 13, color: bodyTextColor, height: 1.5)),
-        ],
-      ),
     );
   }
 }

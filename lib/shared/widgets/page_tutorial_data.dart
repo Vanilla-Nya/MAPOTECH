@@ -265,6 +265,20 @@ final Map<String, Map<String, PageTutorialData>> _idTutorials = {
         ),
       ],
     ),
+    'puskesmas_search': const PageTutorialData(
+      title: 'Cari Puskesmas & Faskes Publik',
+      description: 'Temukan Puskesmas, Ponkesdes, dan Pustu terdekat untuk mendapatkan pelayanan kesehatan masyarakat.',
+      steps: [
+        TutorialStep(
+          title: 'Informasi Layanan & BPJS',
+          description: 'Lihat status penerimaan BPJS, jam layanan, dan fasilitas klaster yang tersedia.',
+        ),
+        TutorialStep(
+          title: 'Peta & Petunjuk Arah',
+          description: 'Buka peta dan petunjuk arah langsung menuju fasilitas kesehatan pilihan Anda.',
+        ),
+      ],
+    ),
     'apotek_search': const PageTutorialData(
       title: 'Cari Apotek & Tebus Obat',
       description: 'Temukan apotek terdekat yang memiliki stok obat lengkap, bandingkan harga obat, dan pesan obat untuk diantar.',
@@ -566,6 +580,20 @@ final Map<String, Map<String, PageTutorialData>> _enTutorials = {
         TutorialStep(
           title: 'Doctor Profile',
           description: 'Read reviews from other patients, educational history, and clinical experience before booking.',
+        ),
+      ],
+    ),
+    'puskesmas_search': const PageTutorialData(
+      title: 'Search Public Health Centers',
+      description: 'Find nearby Puskesmas, Ponkesdes, and Pustu for comprehensive public healthcare services.',
+      steps: [
+        TutorialStep(
+          title: 'Service Info & BPJS',
+          description: 'Check BPJS coverage status, operating hours, and integrated healthcare cluster facilities.',
+        ),
+        TutorialStep(
+          title: 'Maps & Directions',
+          description: 'Get directions and map locations directly to your selected health center.',
         ),
       ],
     ),
