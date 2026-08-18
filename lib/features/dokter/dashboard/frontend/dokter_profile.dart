@@ -1908,7 +1908,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
       );
       return;
     }
-    final userId = _effectiveUserId;
+    final doctorId = _effectiveDoctorId;
 
     setState(() => _isSaving = true);
 
@@ -1924,25 +1924,37 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
       await SupabaseService.client
           .from('user_detail_doctor')
           .update({'qr_token': newToken})
-          .eq('id', userId);
+          .eq('id', doctorId);
+
+      if (mounted) {
+        setState(() {
+          _qrToken = newToken;
+        });
+      }
 
       await _fetchDbData();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('QR Code regenerated! New token: $newToken'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('QR Code berhasil diperbarui! Token: $newToken'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error regenerating QR token: $e'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error regenerating QR token: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
     } finally {
-      setState(() => _isSaving = false);
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
   }
 
@@ -6221,28 +6233,20 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                     ],
                   ),
                   child: _qrToken.isNotEmpty
-                      ? Image.network(
-                          'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=$_qrToken',
-                          width: 150,
-                          height: 150,
-                          loadingBuilder: (context, child, loadingProgress) {
-                            if (loadingProgress == null) return child;
-                            return const Center(
-                              child: SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              ),
-                            );
-                          },
-                          errorBuilder: (context, error, stackTrace) {
-                            return CustomPaint(
-                              size: const Size(150, 150),
-                              painter: QrPatternPainter(),
-                            );
-                          },
+                      ? QrImageView(
+                          data: _qrToken,
+                          version: QrVersions.auto,
+                          size: 150,
+                          backgroundColor: Colors.white,
+                          errorCorrectionLevel: QrErrorCorrectLevel.M,
+                          eyeStyle: const QrEyeStyle(
+                            eyeShape: QrEyeShape.square,
+                            color: Color(0xFF1B0C3C),
+                          ),
+                          dataModuleStyle: const QrDataModuleStyle(
+                            dataModuleShape: QrDataModuleShape.square,
+                            color: Color(0xFF1B0C3C),
+                          ),
                         )
                       : CustomPaint(
                           size: const Size(150, 150),
