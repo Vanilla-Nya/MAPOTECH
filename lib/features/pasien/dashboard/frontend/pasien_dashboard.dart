@@ -9,9 +9,11 @@ import 'package:mapotech/shared/widgets/custom_button.dart';
 import 'package:mapotech/shared/supabase_service.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:mapotech/features/pasien/dashboard/frontend/pasien_dokter_search.dart';
+import 'package:mapotech/features/pasien/dashboard/frontend/widgets/pasien_qr_scanner_dialog.dart';
+import 'package:mapotech/features/pasien/dashboard/frontend/widgets/pasien_apotek_pos_dialog.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:geolocator/geolocator.dart';
 
 class PasienDashboard extends ConsumerStatefulWidget {
   final Function(String menu)? onNavigate;
@@ -224,6 +226,48 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
     }
   }
 
+  void _openQrScanner(BuildContext context) {
+    final state = ref.read(landingPageProvider);
+    final isDark = state.appearance == 'dark';
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.55),
+      builder: (ctx) => PasienQrScannerDialog(
+        onDoctorScanned: (doctor) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Dokter terdeteksi: ${doctor["name"] ?? "Dokter"}. Membuka pendaftaran...',
+                style: GoogleFonts.outfit(),
+              ),
+              backgroundColor: const Color(0xFF0F9D58),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+          showDialog(
+            context: context,
+            barrierColor: Colors.black.withOpacity(0.45),
+            builder: (dCtx) => DoctorDetailDialog(
+              dokter: doctor,
+              isDark: isDark,
+              initialTabIndex: 1,
+            ),
+          );
+        },
+        onApotekScanned: (apotek) {
+          showDialog(
+            context: context,
+            barrierColor: Colors.black.withOpacity(0.55),
+            builder: (dCtx) => PasienApotekPosDialog(
+              pharmacy: apotek,
+              isDark: isDark,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(landingPageProvider);
@@ -333,15 +377,43 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                         ),
                       ),
 
-                      // Edit profile action button
+                      // Profile action buttons
                       if (!isMobile)
-                        CustomButton(
-                          text: 'Edit Profil',
-                          icon: Icons.edit_rounded,
-                          height: 38,
-                          onPressed: () {
-                            widget.onNavigate?.call('profile');
-                          },
+                        Row(
+                          children: [
+                            ElevatedButton.icon(
+                              onPressed: () => _openQrScanner(context),
+                              icon: const Icon(Icons.qr_code_scanner_rounded, size: 16),
+                              label: Text(
+                                'Scan QR',
+                                style: GoogleFonts.outfit(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: themeAccent,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 12,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            CustomButton(
+                              text: 'Edit Profil',
+                              icon: Icons.edit_rounded,
+                              height: 38,
+                              onPressed: () {
+                                widget.onNavigate?.call('profile');
+                              },
+                            ),
+                          ],
                         ),
                     ],
                   ),
@@ -350,166 +422,109 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
 
               const SizedBox(height: 20),
 
-              // Main booking cards (dr. Agoes Soetanto quick link, prescription QR card)
+              // Main booking cards (Booking Dokter, Scan QR Dokter / Apotek, Prescription QR card)
               AnimatedEntrance(
                 delay: const Duration(milliseconds: 100),
                 type: EntranceAnimationType.scale,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Left link: Booking Dokter
-                    Expanded(
-                      child: MouseRegion(
-                        cursor: SystemMouseCursors.click,
-                        child: GestureDetector(
-                          onTap: () {
-                            widget.onNavigate?.call('dokter_search');
-                          },
-                          child: Container(
-                            height: 120,
-                            padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              color: cardBgColor,
-                              borderRadius: BorderRadius.circular(24),
-                              border: Border.all(color: borderColor),
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 48,
-                                  height: 48,
-                                  decoration: BoxDecoration(
-                                    color: themeAccent.withOpacity(0.12),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  alignment: Alignment.center,
-                                  child: Icon(
-                                    Icons.sync_rounded,
-                                    color: themeAccent,
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        'BOOKING LAGI',
-                                        style: GoogleFonts.outfit(
-                                          fontSize: 8,
-                                          fontWeight: FontWeight.bold,
-                                          color: subtitleColor,
-                                          letterSpacing: 0.5,
-                                        ),
-                                      ),
-                                      Text(
-                                        'dr. Agoes Soetanto',
-                                        style: GoogleFonts.outfit(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w900,
-                                          color: textColor,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Icon(
-                                  Icons.chevron_right_rounded,
-                                  color: themeAccent,
-                                ),
-                              ],
+                child: isMobile
+                    ? Column(
+                        children: [
+                          _buildBookingQuickCard(
+                            title: 'BOOKING LAGI',
+                            subtitle: _doctorName.isNotEmpty
+                                ? _doctorName
+                                : 'dr. Agoes Soetanto',
+                            icon: Icons.sync_rounded,
+                            cardBgColor: cardBgColor,
+                            borderColor: borderColor,
+                            themeAccent: themeAccent,
+                            textColor: textColor,
+                            subtitleColor: subtitleColor,
+                            onTap: () => widget.onNavigate?.call('dokter_search'),
+                          ),
+                          const SizedBox(height: 12),
+                          _buildScanQrQuickCard(
+                            cardBgColor: cardBgColor,
+                            borderColor: borderColor,
+                            themeAccent: const Color(0xFF0F9D58),
+                            textColor: textColor,
+                            subtitleColor: subtitleColor,
+                            onTap: () => _openQrScanner(context),
+                          ),
+                          const SizedBox(height: 12),
+                          _buildPrescriptionQuickCard(
+                            cardBgColor: cardBgColor,
+                            borderColor: borderColor,
+                            themeAccent: themeAccent,
+                            textColor: textColor,
+                            subtitleColor: subtitleColor,
+                            activePrescriptionsCount: _activePrescriptionsCount,
+                            onTap: () {
+                              if (_activePrescriptionsCount > 0) {
+                                widget.onNavigate?.call('prescription');
+                              } else {
+                                widget.onNavigate?.call('dokter_search');
+                              }
+                            },
+                          ),
+                        ],
+                      )
+                    : Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Left link: Booking Dokter
+                          Expanded(
+                            child: _buildBookingQuickCard(
+                              title: 'BOOKING LAGI',
+                              subtitle: _doctorName.isNotEmpty
+                                  ? _doctorName
+                                  : 'dr. Agoes Soetanto',
+                              icon: Icons.sync_rounded,
+                              cardBgColor: cardBgColor,
+                              borderColor: borderColor,
+                              themeAccent: themeAccent,
+                              textColor: textColor,
+                              subtitleColor: subtitleColor,
+                              onTap: () =>
+                                  widget.onNavigate?.call('dokter_search'),
                             ),
                           ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 20),
+                          const SizedBox(width: 16),
 
-                    // Right link: QR Prescription
-                    Expanded(
-                      child: MouseRegion(
-                        cursor: SystemMouseCursors.click,
-                        child: GestureDetector(
-                          onTap: () {
-                            if (_activePrescriptionsCount > 0) {
-                              widget.onNavigate?.call('prescription');
-                            } else {
-                              widget.onNavigate?.call('dokter_search');
-                            }
-                          },
-                          child: Container(
-                            height: 120,
-                            padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              color: cardBgColor,
-                              borderRadius: BorderRadius.circular(24),
-                              border: Border.all(color: borderColor),
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 48,
-                                  height: 48,
-                                  decoration: BoxDecoration(
-                                    color: themeAccent.withOpacity(0.12),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  alignment: Alignment.center,
-                                  child: Icon(
-                                    Icons.qr_code_rounded,
-                                    color: themeAccent,
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        'QR RESEP',
-                                        style: GoogleFonts.outfit(
-                                          fontSize: 8,
-                                          color: subtitleColor,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      Text(
-                                        _activePrescriptionsCount > 0
-                                            ? 'Ada $_activePrescriptionsCount resep aktif yang belum tebus'
-                                            : 'Konsultasi dulu untuk mendapatkan resep',
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: GoogleFonts.outfit(
-                                          fontSize: 10,
-                                          color: subtitleColor,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        _activePrescriptionsCount > 0
-                                            ? 'LIHAT RESEP SEKARANG >'
-                                            : 'BOOKING SEKARANG >',
-                                        style: GoogleFonts.outfit(
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.w900,
-                                          color: themeAccent,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
+                          // Center link: Scan QR Dokter / Apotek (Auto Pendaftaran & POS Connect)
+                          Expanded(
+                            child: _buildScanQrQuickCard(
+                              cardBgColor: cardBgColor,
+                              borderColor: borderColor,
+                              themeAccent: const Color(0xFF0F9D58),
+                              textColor: textColor,
+                              subtitleColor: subtitleColor,
+                              onTap: () => _openQrScanner(context),
                             ),
                           ),
-                        ),
+                          const SizedBox(width: 16),
+
+                          // Right link: QR Prescription
+                          Expanded(
+                            child: _buildPrescriptionQuickCard(
+                              cardBgColor: cardBgColor,
+                              borderColor: borderColor,
+                              themeAccent: themeAccent,
+                              textColor: textColor,
+                              subtitleColor: subtitleColor,
+                              activePrescriptionsCount:
+                                  _activePrescriptionsCount,
+                              onTap: () {
+                                if (_activePrescriptionsCount > 0) {
+                                  widget.onNavigate?.call('prescription');
+                                } else {
+                                  widget.onNavigate?.call('dokter_search');
+                                }
+                              },
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
-                ),
               ),
 
               const SizedBox(height: 28),
@@ -1028,6 +1043,276 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
       ],
     );
   }
+
+  Widget _buildBookingQuickCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color cardBgColor,
+    required Color borderColor,
+    required Color themeAccent,
+    required Color textColor,
+    required Color subtitleColor,
+    required VoidCallback onTap,
+  }) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          height: 120,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: cardBgColor,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: borderColor),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.03),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: themeAccent.withOpacity(0.12),
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: Icon(icon, color: themeAccent, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      title,
+                      style: GoogleFonts.outfit(
+                        fontSize: 8.5,
+                        fontWeight: FontWeight.bold,
+                        color: subtitleColor,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: GoogleFonts.outfit(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                        color: textColor,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: themeAccent),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildScanQrQuickCard({
+    required Color cardBgColor,
+    required Color borderColor,
+    required Color themeAccent,
+    required Color textColor,
+    required Color subtitleColor,
+    required VoidCallback onTap,
+  }) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          height: 120,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: cardBgColor,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: themeAccent.withOpacity(0.4),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: themeAccent.withOpacity(0.08),
+                blurRadius: 14,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      themeAccent.withOpacity(0.2),
+                      themeAccent.withOpacity(0.08),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: Icon(
+                  Icons.qr_code_scanner_rounded,
+                  color: themeAccent,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'SCAN QR INSTAN',
+                      style: GoogleFonts.outfit(
+                        fontSize: 8.5,
+                        fontWeight: FontWeight.bold,
+                        color: themeAccent,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Dokter & Apotek',
+                      style: GoogleFonts.outfit(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                        color: textColor,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Auto Pendaftaran & POS Connect',
+                      style: GoogleFonts.outfit(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w600,
+                        color: subtitleColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: themeAccent),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPrescriptionQuickCard({
+    required Color cardBgColor,
+    required Color borderColor,
+    required Color themeAccent,
+    required Color textColor,
+    required Color subtitleColor,
+    required int activePrescriptionsCount,
+    required VoidCallback onTap,
+  }) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          height: 120,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: cardBgColor,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: borderColor),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.03),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: themeAccent.withOpacity(0.12),
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: Icon(
+                  Icons.receipt_long_rounded,
+                  color: themeAccent,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'QR RESEP DIGITAL',
+                      style: GoogleFonts.outfit(
+                        fontSize: 8.5,
+                        color: subtitleColor,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      activePrescriptionsCount > 0
+                          ? '$activePrescriptionsCount Resep Aktif'
+                          : 'Tebus Obat Online',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.outfit(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                        color: textColor,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      activePrescriptionsCount > 0
+                          ? 'LIHAT RESEP >'
+                          : 'CARI DOKTER >',
+                      style: GoogleFonts.outfit(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w900,
+                        color: themeAccent,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: themeAccent),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class PharmacyDetailDialog extends StatelessWidget {
@@ -1303,7 +1588,7 @@ class PharmacyDetailDialog extends StatelessWidget {
               Text(
                 value,
                 style: GoogleFonts.outfit(
-                  fontSize: 12,
+                  fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: textColor,
                 ),
@@ -1315,3 +1600,4 @@ class PharmacyDetailDialog extends StatelessWidget {
     );
   }
 }
+

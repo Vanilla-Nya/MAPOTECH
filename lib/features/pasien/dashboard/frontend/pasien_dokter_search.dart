@@ -11,6 +11,8 @@ import 'package:mapotech/shared/supabase_service.dart';
 import 'package:mapotech/shared/widgets/empty_state_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:mapotech/features/dokter/dashboard/frontend/web_map_widget.dart';
+import 'package:mapotech/features/pasien/dashboard/frontend/widgets/pasien_qr_scanner_dialog.dart';
+import 'package:mapotech/features/pasien/dashboard/frontend/widgets/pasien_apotek_pos_dialog.dart';
 
 /// Cari Praktik Mandiri - Pasien Dashboard Page
 class PasienDokterSearch extends ConsumerStatefulWidget {
@@ -80,7 +82,7 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
     }).toList();
   }
 
-  void _showDoctorDetail(BuildContext context, Map<String, dynamic> dokter) {
+  void _showDoctorDetail(BuildContext context, Map<String, dynamic> dokter, {int initialTabIndex = 0}) {
     final state = ref.read(landingPageProvider);
     final isDark = state.appearance == 'dark';
     showDialog(
@@ -89,6 +91,41 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
       builder: (ctx) => DoctorDetailDialog(
         dokter: dokter,
         isDark: isDark,
+        initialTabIndex: initialTabIndex,
+      ),
+    );
+  }
+
+  void _openQrScanner(BuildContext context) {
+    final state = ref.read(landingPageProvider);
+    final isDark = state.appearance == 'dark';
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.55),
+      builder: (ctx) => PasienQrScannerDialog(
+        onDoctorScanned: (doctor) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Dokter terdeteksi: ${doctor["name"] ?? "Dokter"}. Membuka pendaftaran...',
+                style: GoogleFonts.outfit(),
+              ),
+              backgroundColor: const Color(0xFF0F9D58),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+          _showDoctorDetail(context, doctor, initialTabIndex: 1);
+        },
+        onApotekScanned: (apotek) {
+          showDialog(
+            context: context,
+            barrierColor: Colors.black.withOpacity(0.55),
+            builder: (dCtx) => PasienApotekPosDialog(
+              pharmacy: apotek,
+              isDark: isDark,
+            ),
+          );
+        },
       ),
     );
   }
@@ -179,49 +216,76 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
 
               const SizedBox(height: 14),
 
-              // Filter Row
+              // Action & Filter Row
               Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                   _buildFilterChip(
-                    'Semua',
-                    'semua',
-                    subtitleColor,
-                    purpleAccent,
-                    borderColor,
-                    cardBgColor,
-                  ),
-                  const SizedBox(width: 8),
-                  _buildFilterChip(
-                    'Dokter',
-                    'dokter',
-                    subtitleColor,
-                    purpleAccent,
-                    borderColor,
-                    cardBgColor,
-                  ),
-                  const SizedBox(width: 8),
-                  _buildFilterChip(
-                    'Bidan',
-                    'bidan',
-                    subtitleColor,
-                    purpleAccent,
-                    borderColor,
-                    cardBgColor,
-                  ),
-                  const SizedBox(width: 8),
-                  Icon(
-                    Icons.keyboard_arrow_down_rounded,
-                    size: 18,
-                    color: subtitleColor,
-                  ),
-                  Text(
-                    'Filter Urutan',
-                    style: GoogleFonts.outfit(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: subtitleColor,
+                  ElevatedButton.icon(
+                    onPressed: () => _openQrScanner(context),
+                    icon: const Icon(Icons.qr_code_scanner_rounded, size: 16),
+                    label: Text(
+                      'Scan QR Dokter',
+                      style: GoogleFonts.outfit(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 11.5,
+                      ),
                     ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: themeAccent,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      _buildFilterChip(
+                        'Semua',
+                        'semua',
+                        subtitleColor,
+                        purpleAccent,
+                        borderColor,
+                        cardBgColor,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildFilterChip(
+                        'Dokter',
+                        'dokter',
+                        subtitleColor,
+                        purpleAccent,
+                        borderColor,
+                        cardBgColor,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildFilterChip(
+                        'Bidan',
+                        'bidan',
+                        subtitleColor,
+                        purpleAccent,
+                        borderColor,
+                        cardBgColor,
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        size: 18,
+                        color: subtitleColor,
+                      ),
+                      Text(
+                        'Filter Urutan',
+                        style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: subtitleColor,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -611,11 +675,13 @@ class DoctorDetailDialog extends ConsumerStatefulWidget {
   final Map<String, dynamic> dokter;
   final bool isDark;
   final bool isPreview;
+  final int initialTabIndex;
 
   const DoctorDetailDialog({
     required this.dokter,
     required this.isDark,
     this.isPreview = false,
+    this.initialTabIndex = 0,
   });
 
   @override
@@ -872,7 +938,11 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(
+      length: 3,
+      vsync: this,
+      initialIndex: widget.initialTabIndex.clamp(0, 2),
+    );
     _hourController = TextEditingController();
     _minuteController = TextEditingController();
     _hourFocus = FocusNode();

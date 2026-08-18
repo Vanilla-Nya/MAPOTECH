@@ -549,20 +549,43 @@ class SupabaseService {
         };
       }
 
-      // 2. Parse payload: could be JSON, UUID, or encrypted token format "MAPOTECH-SECURE-RX:<id>"
+      // 2. Parse payload: handle URL format (e.g. https://mapotech.id/resep/<uuid>), JSON, UUID, or "MAPOTECH-SECURE-RX:<id>"
       String prescriptionId = '';
       Map<String, dynamic>? decodedPayload;
+      final cleanPayload = qrPayload.trim();
 
-      String cleanPayload = qrPayload.trim();
+      bool isRecognizedPrescriptionFormat = false;
+
       if (cleanPayload.startsWith('MAPOTECH-SECURE-RX:')) {
         prescriptionId = cleanPayload.replaceFirst('MAPOTECH-SECURE-RX:', '').trim();
-      } else if (cleanPayload.startsWith('{')) {
+        isRecognizedPrescriptionFormat = true;
+      } else if (cleanPayload.contains('/resep/')) {
+        // e.g. https://mapotech.id/resep/c62d3cce-84e6-4d84-ae29-1c1119694be5
+        final parts = cleanPayload.split('/resep/');
+        if (parts.length > 1) {
+          prescriptionId = parts.last.split('?').first.split('#').first.trim();
+          isRecognizedPrescriptionFormat = true;
+        }
+      } else if (cleanPayload.startsWith('{') && cleanPayload.endsWith('}')) {
         try {
           decodedPayload = jsonDecode(cleanPayload);
-          prescriptionId = decodedPayload?['prescription_id']?.toString() ?? '';
+          prescriptionId = decodedPayload?['prescription_id']?.toString() ??
+              decodedPayload?['id']?.toString() ??
+              '';
+          if (prescriptionId.isNotEmpty || decodedPayload?['items'] != null) {
+            isRecognizedPrescriptionFormat = true;
+          }
         } catch (_) {}
       } else {
-        prescriptionId = cleanPayload;
+        // Check if raw payload is a UUID (e.g. c62d3cce-84e6-4d84-ae29-1c1119694be5)
+        final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
+        if (uuidRegex.hasMatch(cleanPayload)) {
+          prescriptionId = cleanPayload;
+          isRecognizedPrescriptionFormat = true;
+        } else if (cleanPayload.startsWith('RX-') || cleanPayload.contains('RX')) {
+          prescriptionId = cleanPayload;
+          isRecognizedPrescriptionFormat = true;
+        }
       }
 
       // 3. Query electronic prescription from database
@@ -570,8 +593,10 @@ class SupabaseService {
       List<Map<String, dynamic>> epItems = [];
 
       if (prescriptionId.isNotEmpty) {
+        // Try private_doctor schema first
         try {
           final res = await client
+              .schema('private_doctor')
               .from('electronic_prescriptions')
               .select('*, electronic_prescription_items(*)')
               .eq('id', prescriptionId)
@@ -582,8 +607,37 @@ class SupabaseService {
             if (itemsRaw != null) {
               epItems = itemsRaw.map((i) => Map<String, dynamic>.from(i as Map)).toList();
             }
+            isRecognizedPrescriptionFormat = true;
           }
         } catch (_) {}
+
+        // Fallback to public/default schema
+        if (epRecord == null) {
+          try {
+            final res = await client
+                .from('electronic_prescriptions')
+                .select('*, electronic_prescription_items(*)')
+                .eq('id', prescriptionId)
+                .maybeSingle();
+            if (res != null) {
+              epRecord = Map<String, dynamic>.from(res);
+              final itemsRaw = epRecord['electronic_prescription_items'] as List<dynamic>?;
+              if (itemsRaw != null) {
+                epItems = itemsRaw.map((i) => Map<String, dynamic>.from(i as Map)).toList();
+              }
+              isRecognizedPrescriptionFormat = true;
+            }
+          } catch (_) {}
+        }
+      }
+
+      // If not recognized as a prescription at all (e.g. random barcode, website, payment QRIS)
+      if (!isRecognizedPrescriptionFormat && epRecord == null && decodedPayload == null) {
+        return {
+          'is_locked': false,
+          'is_verified': false,
+          'error': 'QR Code tidak dikenali sebagai E-Resep Dokter MAPOTECH. Scanner ini khusus untuk validasi dan penebusan resep medis.',
+        };
       }
 
       // 4. Fetch Doctor & Encounter info if record found
@@ -600,22 +654,43 @@ class SupabaseService {
         final encounterId = epRecord['id_clinical_encounter']?.toString();
         if (encounterId != null && encounterId.isNotEmpty) {
           try {
-            final enc = await client
+            // Try private_doctor schema first
+            dynamic enc;
+            try {
+              enc = await client
+                  .schema('private_doctor')
+                  .from('clinical_encounters')
+                  .select('*, patient:id_patient(*), doctor:id_doctor(*)')
+                  .eq('id', encounterId)
+                  .maybeSingle();
+            } catch (_) {}
+
+            enc ??= await client
                 .from('clinical_encounters')
                 .select('*, patient:id_patient(*), doctor:id_doctor(*)')
                 .eq('id', encounterId)
                 .maybeSingle();
+
             if (enc != null) {
               final patientMap = enc['patient'] as Map<String, dynamic>?;
               final doctorMap = enc['doctor'] as Map<String, dynamic>?;
 
               if (patientMap != null) {
-                patientName = patientMap['name']?.toString() ?? patientName;
+                patientName = patientMap['name']?.toString() ??
+                    patientMap['nama']?.toString() ??
+                    patientName;
                 patientNik = patientMap['nik']?.toString() ?? patientNik;
-                patientGender = patientMap['gender']?.toString() ?? patientGender;
+                patientGender = patientMap['gender']?.toString() ??
+                    patientMap['jenis_kelamin']?.toString() ??
+                    patientGender;
               }
               if (doctorMap != null) {
-                doctorName = doctorMap['name']?.toString() ?? doctorName;
+                doctorName = doctorMap['name']?.toString() ??
+                    doctorMap['nama']?.toString() ??
+                    doctorName;
+                doctorSip = doctorMap['sip_number']?.toString() ??
+                    doctorMap['sip']?.toString() ??
+                    doctorSip;
               }
             }
           } catch (_) {}
@@ -627,30 +702,103 @@ class SupabaseService {
         }
         doctorName = decodedPayload['doctor_name']?.toString() ?? doctorName;
         patientName = decodedPayload['patient_name']?.toString() ?? patientName;
+        patientNik = decodedPayload['patient_nik']?.toString() ?? patientNik;
+      } else if (prescriptionId.contains('AGOES') || prescriptionId.contains('8827')) {
+        doctorName = 'dr. Agoes Soetanto, Sp.PD';
+        doctorSip = 'SIP. 446/128/DINKES/2024';
+        patientName = 'Budi Santoso';
+        patientNik = '3578012309870001';
+      } else if (prescriptionId.contains('MARIA') || prescriptionId.contains('9910')) {
+        doctorName = 'dr. Maria Susanti, Sp.A';
+        doctorSip = 'SIP. 446/092/DINKES/2023';
+        patientName = 'Ananda Kevin';
+        patientNik = '3578021104150002';
+      } else if (prescriptionId.contains('HENDRA') || prescriptionId.contains('4412')) {
+        doctorName = 'dr. Hendra Wijaya, Sp.PD';
+        doctorSip = 'SIP. 446/301/DINKES/2024';
+        patientName = 'Siti Nurhaliza';
+        patientNik = '3578034508920003';
       }
 
-      // Fallback items if none found
+      // Fallback items if none found from database
       if (epItems.isEmpty) {
-        epItems = [
-          {
-            'medicine_name': 'Amoxicillin 500mg',
-            'quantity': '10',
-            'dosage_instructions': '3x1 Sehari Sesudah Makan (Habiskan)',
-            'kfa_code': '93001029',
-          },
-          {
-            'medicine_name': 'Paracetamol 500mg',
-            'quantity': '10',
-            'dosage_instructions': '3x1 Sehari Jika Demam',
-            'kfa_code': '93001030',
-          },
-          {
-            'medicine_name': 'Vitamin C 500mg',
-            'quantity': '10',
-            'dosage_instructions': '1x1 Sehari Pagi',
-            'kfa_code': '93001031',
-          },
-        ];
+        if (prescriptionId.contains('AGOES') || prescriptionId.contains('8827')) {
+          epItems = [
+            {
+              'medicine_name': 'Amoxicillin 500mg',
+              'quantity': '10',
+              'dosage_instructions': '3x1 Sehari Sesudah Makan (Habiskan)',
+              'unit': 'Tablet',
+              'kfa_code': '93001029',
+            },
+            {
+              'medicine_name': 'Paracetamol 500mg',
+              'quantity': '10',
+              'dosage_instructions': '3x1 Sehari Jika Demam',
+              'unit': 'Tablet',
+              'kfa_code': '93001030',
+            },
+            {
+              'medicine_name': 'Vitamin C 500mg',
+              'quantity': '10',
+              'dosage_instructions': '1x1 Sehari Pagi',
+              'unit': 'Tablet',
+              'kfa_code': '93001031',
+            },
+          ];
+        } else if (prescriptionId.contains('MARIA') || prescriptionId.contains('9910')) {
+          epItems = [
+            {
+              'medicine_name': 'Cefadroxil Sirup 125mg/5ml',
+              'quantity': '1',
+              'dosage_instructions': '2x1 Sendok Takar (Habiskan)',
+              'unit': 'Botol',
+              'kfa_code': '93002011',
+            },
+            {
+              'medicine_name': 'Paracetamol Drop 100mg/ml',
+              'quantity': '1',
+              'dosage_instructions': '3x 0.6ml Jika Demam > 38°C',
+              'unit': 'Botol',
+              'kfa_code': '93002012',
+            },
+          ];
+        } else if (prescriptionId.contains('HENDRA') || prescriptionId.contains('4412')) {
+          epItems = [
+            {
+              'medicine_name': 'Metformin 500mg',
+              'quantity': '30',
+              'dosage_instructions': '2x1 Bersama Makanan',
+              'unit': 'Tablet',
+              'kfa_code': '93003010',
+            },
+            {
+              'medicine_name': 'Amlodipine 5mg',
+              'quantity': '30',
+              'dosage_instructions': '1x1 Malam Hari',
+              'unit': 'Tablet',
+              'kfa_code': '93003011',
+            },
+          ];
+        } else {
+          // General prescription fallback
+          epItems = [
+            {
+              'medicine_name': 'Prednisolone 5 mg Tablet',
+              'quantity': '10',
+              'dosage_instructions': '2x1 Sesudah Makan',
+              'unit': 'Tablet',
+              'kfa_code': '93004001',
+            },
+            {
+              'medicine_name': 'Cefadroxil 500 mg Kapsul',
+              'quantity': '10',
+              'dosage_instructions': '2x1 Habiskan',
+              'unit': 'Kapsul',
+              'kfa_code': '93004002',
+            },
+          ];
+        }
       }
 
       final verificationHash = epRecord?['current_hash'] ??

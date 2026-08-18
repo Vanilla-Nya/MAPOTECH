@@ -320,6 +320,11 @@ List<DrawerMenuItem> getMenuItemsForRole(
         icon: Icons.dashboard_rounded,
       ),
       DrawerMenuItem(
+        id: 'qr_scanner',
+        label: isEn ? 'Scan QR Code' : 'Scan QR Dokter & Apotek',
+        icon: Icons.qr_code_scanner_rounded,
+      ),
+      DrawerMenuItem(
         id: 'dokter_search',
         label: isEn ? 'Search Private Practice' : 'Cari Praktik Mandiri',
         icon: Icons.person_search_rounded,

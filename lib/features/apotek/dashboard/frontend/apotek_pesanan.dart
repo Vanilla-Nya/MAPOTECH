@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/shared/widgets/skeleton_loading.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/supabase_service.dart';
+import 'widgets/web_qr_scanner.dart';
 
 class IncomingPrescription {
   final String id;
@@ -635,6 +636,8 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
   bool _isTorchOn = false;
   bool _isFrontCamera = false;
   bool _isProcessing = false;
+  bool _isCameraReady = false;
+  String? _cameraStatusMessage;
   Map<String, dynamic>? _scanResult;
 
   final List<Map<String, String>> _samplePrescriptions = [
@@ -675,17 +678,379 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
     super.dispose();
   }
 
+  Future<void> _showConfirmationModal(Map<String, dynamic> data) async {
+    final isDark = widget.isDark;
+    final cardBgColor = widget.cardBgColor;
+    final textColor = widget.textColor;
+    final subtitleColor = widget.subtitleColor;
+    final borderColor = widget.borderColor;
+    final themeAccent = widget.themeAccent;
+
+    final doctorName = data['doctor_name']?.toString() ?? 'dr. Agoes Soetanto, Sp.PD';
+    final doctorSip = data['doctor_sip']?.toString() ?? 'SIP. 446/128/DINKES/2024';
+    final patientName = data['patient_name']?.toString() ?? 'Pasien';
+    final patientNik = data['patient_nik']?.toString() ?? '-';
+    final items = (data['items'] as List<dynamic>? ?? []);
+
+    await showDialog(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.65),
+      builder: (modalCtx) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+          child: Container(
+            width: 520,
+            constraints: const BoxConstraints(maxHeight: 680),
+            decoration: BoxDecoration(
+              color: cardBgColor,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: borderColor),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.35),
+                  blurRadius: 30,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Top Banner
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: isDark
+                            ? [const Color(0xFF1E3A34), const Color(0xFF132723)]
+                            : [const Color(0xFF7BE5D3), const Color(0xFF48C9B0)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 42,
+                          height: 42,
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                          alignment: Alignment.center,
+                          child: const Icon(Icons.assignment_turned_in_rounded, color: Color(0xFF27AE60), size: 24),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Konfirmasi Penerimaan Resep',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Apakah Anda yakin ingin menerima resep dokter ini?',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 10.5,
+                                  color: Colors.white.withValues(alpha: 0.9),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded, color: Colors.white),
+                          onPressed: () => Navigator.pop(modalCtx),
+                          splashRadius: 18,
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Content Body
+                  Flexible(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Doctor & Patient Info Cards
+                          Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF1E1E22) : const Color(0xFFF8FAFD),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: borderColor),
+                            ),
+                            child: Column(
+                              children: [
+                                // Doctor Row
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 36,
+                                      height: 36,
+                                      decoration: BoxDecoration(
+                                        color: themeAccent.withValues(alpha: 0.15),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Icon(Icons.medical_services_rounded, size: 18, color: themeAccent),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'DARI DOKTER:',
+                                            style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.w800, color: subtitleColor),
+                                          ),
+                                          Text(
+                                            doctorName,
+                                            style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: textColor),
+                                          ),
+                                          Text(
+                                            doctorSip,
+                                            style: GoogleFonts.outfit(fontSize: 9.5, color: subtitleColor),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  child: Divider(height: 1, color: borderColor),
+                                ),
+
+                                // Patient Row
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 36,
+                                      height: 36,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF3B82F6).withValues(alpha: 0.15),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: const Icon(Icons.person_rounded, size: 18, color: Color(0xFF3B82F6)),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'UNTUK PASIEN:',
+                                            style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.w800, color: subtitleColor),
+                                          ),
+                                          Text(
+                                            patientName,
+                                            style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: textColor),
+                                          ),
+                                          Text(
+                                            'NIK: $patientNik',
+                                            style: GoogleFonts.outfit(fontSize: 9.5, color: subtitleColor),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          // Prescription Items Section
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'DAFTAR OBAT & ATURAN PAKAI:',
+                                style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: textColor),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF27AE60).withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(100),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.verified_rounded, size: 11, color: Color(0xFF27AE60)),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '${items.length} Macam Obat',
+                                      style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.w900, color: const Color(0xFF27AE60)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+
+                          Container(
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF1E1E22) : const Color(0xFFF8FAFD),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: borderColor),
+                            ),
+                            child: ListView.separated(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              padding: const EdgeInsets.all(10),
+                              itemCount: items.length,
+                              separatorBuilder: (_, _) => Divider(height: 12, color: borderColor),
+                              itemBuilder: (context, index) {
+                                final it = items[index];
+                                return Row(
+                                  children: [
+                                    Container(
+                                      width: 28,
+                                      height: 28,
+                                      decoration: BoxDecoration(
+                                        color: themeAccent.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Icon(Icons.medication_rounded, size: 14, color: themeAccent),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            it['name']?.toString() ?? 'Obat',
+                                            style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: textColor),
+                                          ),
+                                          Text(
+                                            '${it['dosage'] ?? '-'} ${it['instructions'] != null && it['instructions'].toString().isNotEmpty ? '• ${it['instructions']}' : ''}',
+                                            style: GoogleFonts.outfit(fontSize: 9.5, color: subtitleColor),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: cardBgColor,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: borderColor),
+                                      ),
+                                      child: Text(
+                                        '${it['qty']} ${it['unit']}',
+                                        style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w800, color: themeAccent),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // Bottom Action Buttons
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF18181B) : const Color(0xFFFAFAFC),
+                      border: Border(top: BorderSide(color: borderColor)),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(modalCtx),
+                            style: OutlinedButton.styleFrom(
+                              side: BorderSide(color: borderColor),
+                              padding: const EdgeInsets.symmetric(vertical: 13),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            child: Text(
+                              'Batal',
+                              style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w600, color: subtitleColor),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(modalCtx);
+                              widget.onPrescriptionAccepted(data);
+                            },
+                            icon: const Icon(Icons.check_circle_rounded, size: 16, color: Colors.white),
+                            label: Text(
+                              'Ya, Terima Resep Ini',
+                              style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF27AE60),
+                              padding: const EdgeInsets.symmetric(vertical: 13),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              elevation: 0,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _processScan({String? customPayload}) async {
     final rawText = (customPayload ?? _qrInputController.text).trim();
-    if (rawText.isEmpty) return;
+    if (rawText.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Arahkan QR Code E-Resep ke kamera atau gunakan sampel resep di bawah.'),
+            duration: Duration(seconds: 2),
+            backgroundColor: Color(0xFF1E293B),
+          ),
+        );
+      }
+      return;
+    }
+
+    if (customPayload != null) {
+      _qrInputController.text = customPayload;
+    }
 
     setState(() {
       _isProcessing = true;
       _scanResult = null;
     });
 
-    // Simulate real camera scanning and network decryption delay
-    await Future.delayed(const Duration(milliseconds: 400));
+    // Brief processing delay for responsive UI feedback
+    await Future.delayed(const Duration(milliseconds: 300));
 
     if (!_isApotekMode) {
       // Simulate general public / unauthorized scanner
@@ -711,8 +1076,15 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
     if (mounted) {
       setState(() {
         _isProcessing = false;
-        _scanResult = result;
       });
+
+      if (result['is_verified'] == true) {
+        _showConfirmationModal(result);
+      } else {
+        setState(() {
+          _scanResult = result;
+        });
+      }
     }
   }
 
@@ -912,7 +1284,7 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                       if (_scanModeIsCamera) ...[
                         Container(
                           width: double.infinity,
-                          height: 240,
+                          height: 250,
                           decoration: BoxDecoration(
                             color: const Color(0xFF0F141C),
                             borderRadius: BorderRadius.circular(20),
@@ -928,14 +1300,55 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                           child: Stack(
                             alignment: Alignment.center,
                             children: [
-                              // Subtle Camera Matrix / Lens Backdrop
+                              // Live Camera Feed from PC webcam
                               Positioned.fill(
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(20),
-                                  child: CustomPaint(
-                                    painter: _CameraGridPainter(),
+                                  child: buildWebQrScannerWidget(
+                                    onScanned: (scannedCode) {
+                                      _processScan(customPayload: scannedCode);
+                                    },
+                                    isFrontCamera: _isFrontCamera,
+                                    isTorchOn: _isTorchOn,
+                                    onCameraStatusChanged: (isReady, msg) {
+                                      if (mounted) {
+                                        setState(() {
+                                          _isCameraReady = isReady;
+                                          _cameraStatusMessage = msg;
+                                        });
+                                      }
+                                    },
+                                    onCameraSwitch: () {
+                                      setState(() {
+                                        _isFrontCamera = !_isFrontCamera;
+                                      });
+                                    },
                                   ),
                                 ),
+                              ),
+
+                              // Viewfinder Target Box in the middle
+                              AnimatedBuilder(
+                                animation: _laserAnimation,
+                                builder: (context, child) {
+                                  return SizedBox(
+                                    width: 170,
+                                    height: 170,
+                                    child: CustomPaint(
+                                      painter: _ScannerTargetPainter(
+                                        laserProgress: _laserAnimation.value,
+                                        accentColor: themeAccent,
+                                      ),
+                                      child: Center(
+                                        child: Icon(
+                                          Icons.qr_code_2_rounded,
+                                          size: 70,
+                                          color: Colors.white.withValues(alpha: 0.08),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
 
                               // Live Status Pill & Controls on top of camera
@@ -949,9 +1362,13 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                       decoration: BoxDecoration(
-                                        color: Colors.black.withValues(alpha: 0.6),
+                                        color: Colors.black.withValues(alpha: 0.65),
                                         borderRadius: BorderRadius.circular(100),
-                                        border: Border.all(color: const Color(0xFF27AE60).withValues(alpha: 0.6)),
+                                        border: Border.all(
+                                          color: _isCameraReady
+                                              ? const Color(0xFF27AE60).withValues(alpha: 0.6)
+                                              : Colors.amber.withValues(alpha: 0.6),
+                                        ),
                                       ),
                                       child: Row(
                                         mainAxisSize: MainAxisSize.min,
@@ -959,18 +1376,20 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                                           Container(
                                             width: 7,
                                             height: 7,
-                                            decoration: const BoxDecoration(
-                                              color: Color(0xFF2ECC71),
+                                            decoration: BoxDecoration(
+                                              color: _isCameraReady ? const Color(0xFF2ECC71) : Colors.amber,
                                               shape: BoxShape.circle,
                                             ),
                                           ),
                                           const SizedBox(width: 6),
                                           Text(
-                                            'KAMERA AKTIF',
+                                            _isCameraReady
+                                                ? (_cameraStatusMessage?.toUpperCase() ?? 'KAMERA AKTIF')
+                                                : 'MENDETEKSI KAMERA...',
                                             style: GoogleFonts.outfit(
                                               fontSize: 9,
                                               fontWeight: FontWeight.w900,
-                                              color: const Color(0xFF2ECC71),
+                                              color: _isCameraReady ? const Color(0xFF2ECC71) : Colors.amber,
                                               letterSpacing: 0.5,
                                             ),
                                           ),
@@ -1026,30 +1445,6 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                                 ),
                               ),
 
-                              // Viewfinder Target Box in the middle
-                              AnimatedBuilder(
-                                animation: _laserAnimation,
-                                builder: (context, child) {
-                                  return SizedBox(
-                                    width: 170,
-                                    height: 170,
-                                    child: CustomPaint(
-                                      painter: _ScannerTargetPainter(
-                                        laserProgress: _laserAnimation.value,
-                                        accentColor: themeAccent,
-                                      ),
-                                      child: Center(
-                                        child: Icon(
-                                          Icons.qr_code_2_rounded,
-                                          size: 70,
-                                          color: Colors.white.withValues(alpha: 0.12),
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-
                               // Bottom guide instruction text
                               Positioned(
                                 bottom: 10,
@@ -1060,7 +1455,9 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                                     borderRadius: BorderRadius.circular(100),
                                   ),
                                   child: Text(
-                                    'Arahkan QR Code pasien ke dalam kotak pemindai',
+                                    _isProcessing
+                                        ? 'Memindai & mendekripsi E-Resep...'
+                                        : 'Arahkan QR Code E-Resep pasien ke dalam kotak pemindai',
                                     style: GoogleFonts.outfit(
                                       fontSize: 9.5,
                                       color: Colors.white.withValues(alpha: 0.85),
@@ -1074,7 +1471,7 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
 
                         const SizedBox(height: 12),
 
-                        // Shutter / Capture Button
+                        // Shutter / Manual Capture Button
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton.icon(
@@ -1253,146 +1650,45 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                               ],
                             ),
                           ),
-                        ] else if (_scanResult!['is_verified'] == true) ...[
-                          // ─── UNLOCKED & VERIFIED STATE ───
+                        ] else if (_scanResult!['error'] != null) ...[
+                          // ─── UNRECOGNIZED / INVALID QR STATE ───
                           Container(
-                            padding: const EdgeInsets.all(16),
+                            padding: const EdgeInsets.all(18),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF27AE60).withValues(alpha: isDark ? 0.12 : 0.06),
-                              borderRadius: BorderRadius.circular(18),
-                              border: Border.all(color: const Color(0xFF27AE60).withValues(alpha: 0.3)),
+                              color: Colors.amber.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
                             ),
                             child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // Success Badge
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        const Icon(Icons.lock_open_rounded, size: 16, color: Color(0xFF27AE60)),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          'RESEP TERVERIFIKASI & TERBUKA',
-                                          style: GoogleFonts.outfit(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w900,
-                                            color: const Color(0xFF27AE60),
-                                            letterSpacing: 0.5,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF27AE60).withValues(alpha: 0.15),
-                                        borderRadius: BorderRadius.circular(100),
-                                      ),
-                                      child: Text(
-                                        'BLOCKCHAIN SHA-256',
-                                        style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.w900, color: const Color(0xFF27AE60)),
-                                      ),
-                                    ),
-                                  ],
+                                Container(
+                                  width: 48,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    color: Colors.amber.withValues(alpha: 0.15),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: const Icon(Icons.warning_amber_rounded, size: 24, color: Colors.amber),
                                 ),
-                                const SizedBox(height: 12),
-
-                                // Doctor & Patient Info
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            'DOKTER PRAKTIK',
-                                            style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.bold, color: subtitleColor),
-                                          ),
-                                          Text(
-                                            _scanResult!['doctor_name'] ?? 'Dokter',
-                                            style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w800, color: textColor),
-                                          ),
-                                          Text(
-                                            _scanResult!['doctor_sip'] ?? 'SIP. Aktif',
-                                            style: GoogleFonts.outfit(fontSize: 9.5, color: subtitleColor),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            'PASIEN',
-                                            style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.bold, color: subtitleColor),
-                                          ),
-                                          Text(
-                                            _scanResult!['patient_name'] ?? 'Pasien',
-                                            style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w800, color: textColor),
-                                          ),
-                                          Text(
-                                            'NIK: ${_scanResult!['patient_nik'] ?? "-"}',
-                                            style: GoogleFonts.outfit(fontSize: 9.5, color: subtitleColor),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-
-                                const SizedBox(height: 12),
-                                Divider(color: borderColor),
-                                const SizedBox(height: 8),
-
-                                // Items Table
+                                const SizedBox(height: 10),
                                 Text(
-                                  'DAFTAR OBAT & ATURAN PAKAI:',
-                                  style: GoogleFonts.outfit(fontSize: 9.5, fontWeight: FontWeight.w900, color: textColor),
+                                  'QR CODE BUKAN E-RESEP VALID',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.amber.shade700,
+                                    letterSpacing: 0.5,
+                                  ),
                                 ),
                                 const SizedBox(height: 6),
-                                ...((_scanResult!['items'] as List<dynamic>? ?? []).map((it) {
-                                  return Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 4),
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.medication_rounded, size: 14, color: themeAccent),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            it['name']?.toString() ?? 'Obat',
-                                            style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: textColor),
-                                          ),
-                                        ),
-                                        Text(
-                                          '${it['qty']} ${it['unit']} • ${it['dosage']}',
-                                          style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                })),
-
-                                const SizedBox(height: 16),
-
-                                // Confirm & Ingest Action Button
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: ElevatedButton.icon(
-                                    onPressed: () => widget.onPrescriptionAccepted(_scanResult!),
-                                    icon: const Icon(Icons.playlist_add_check_rounded, size: 16, color: Colors.white),
-                                    label: Text(
-                                      'Terima & Masukkan ke Antrian Pesanan',
-                                      style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
-                                    ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF27AE60),
-                                      padding: const EdgeInsets.symmetric(vertical: 12),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                      elevation: 0,
-                                    ),
+                                Text(
+                                  _scanResult!['error'] ?? 'QR Code tidak dikenali sebagai E-Resep MAPOTECH.',
+                                  textAlign: TextAlign.center,
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 11,
+                                    color: subtitleColor,
+                                    height: 1.5,
                                   ),
                                 ),
                               ],
@@ -1554,26 +1850,5 @@ class _ScannerTargetPainter extends CustomPainter {
   bool shouldRepaint(covariant _ScannerTargetPainter oldDelegate) {
     return oldDelegate.laserProgress != laserProgress || oldDelegate.accentColor != accentColor;
   }
-}
-
-/// Subtle matrix grid pattern painter for camera viewfinder background
-class _CameraGridPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final gridPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.03)
-      ..strokeWidth = 0.8;
-
-    const step = 24.0;
-    for (double x = 0; x < size.width; x += step) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), gridPaint);
-    }
-    for (double y = 0; y < size.height; y += step) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 

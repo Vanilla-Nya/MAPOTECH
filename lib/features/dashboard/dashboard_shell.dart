@@ -18,6 +18,7 @@ import 'package:mapotech/features/pasien/dashboard/frontend/pasien_history.dart'
 import 'package:mapotech/features/pasien/dashboard/frontend/pasien_prescription.dart';
 import 'package:mapotech/features/pasien/dashboard/frontend/pasien_profile.dart';
 import 'package:mapotech/features/pasien/dashboard/frontend/pasien_settings.dart';
+import 'package:mapotech/features/pasien/dashboard/frontend/pasien_qr_scanner_page.dart';
 import 'package:mapotech/features/dokter/dashboard/frontend/dokter_dashboard.dart';
 import 'package:mapotech/features/dokter/dashboard/frontend/dokter_pasien.dart';
 import 'package:mapotech/features/dokter/dashboard/frontend/dokter_obat.dart';
@@ -640,6 +641,23 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                   // Right section: Info status indicator and avatar shortcut
                   Row(
                     children: [
+                      if (state.loggedInRole == 'pasien')
+                        Container(
+                          margin: const EdgeInsets.only(right: 8),
+                          child: IconButton(
+                            icon: Icon(
+                              Icons.qr_code_scanner_rounded,
+                              size: 20,
+                              color: textColor.withOpacity(0.8),
+                            ),
+                            tooltip: 'Scan QR Dokter / Apotek',
+                            onPressed: () {
+                              setState(() {
+                                _activeMenu = 'qr_scanner';
+                              });
+                            },
+                          ),
+                        ),
                       // Time & Sparkle Notification
                       Container(
                         margin: const EdgeInsets.only(right: 12),
@@ -852,6 +870,14 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     } else {
       // Pasien role: route by active menu
       switch (_activeMenu) {
+        case 'qr_scanner':
+          return PasienQrScannerPage(
+            onNavigate: (menu) {
+              setState(() {
+                _activeMenu = menu;
+              });
+            },
+          );
         case 'dokter_search':
           return const PasienDokterSearch();
         case 'puskesmas_search':

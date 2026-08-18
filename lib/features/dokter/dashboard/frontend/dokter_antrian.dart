@@ -6164,7 +6164,7 @@ class _InvoicePrintPreviewDialogState
     final dateStr = _formatDate(widget.queue.dateQueue ?? DateTime.now());
     final hasEResep = widget.electronicPrescriptionId != null;
     final qrData = hasEResep
-        ? 'https://mapotech.id/resep/${widget.electronicPrescriptionId}'
+        ? 'https://mapotek.relvastudio.com/resep/${widget.electronicPrescriptionId}'
         : '';
 
     final invoiceData = {
@@ -6472,7 +6472,7 @@ class _InvoicePrintPreviewDialogState
 
     final hasEResep = widget.electronicPrescriptionId != null;
     final qrData = hasEResep
-        ? 'https://mapotech.id/resep/${widget.electronicPrescriptionId}'
+        ? 'https://mapotek.relvastudio.com/resep/${widget.electronicPrescriptionId}'
         : null;
 
     // Determine paper width for preview

@@ -1386,7 +1386,7 @@ class _ApotekProfileState extends ConsumerState<ApotekProfile> {
                   ],
                 ),
                 child: QrImageView(
-                  data: 'https://mapotech.kemenkes.go.id/apotek/cyren-elysia-pujer',
+                  data: 'https://mapotek.relvastudio.com/apotek/${_pharmacyNameCtrl.text.trim().isNotEmpty ? _pharmacyNameCtrl.text.trim().toLowerCase().replaceAll(RegExp(r"[^a-z0-9]+"), "-") : "cyren-elysia-pujer"}',
                   version: QrVersions.auto,
                   size: 160.0,
                   eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: Color(0xFF1B0C3C)),
