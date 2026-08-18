@@ -289,9 +289,6 @@ final Map<String, Map<String, PageTutorialData>> _idTutorials = {
         ),
       ],
     ),
-        ),
-      ],
-    ),
     'apotek_search': const PageTutorialData(
       title: 'Cari Apotek & Tebus Obat',
       description: 'Temukan apotek terdekat yang memiliki stok obat lengkap, bandingkan harga obat, dan pesan obat untuk diantar.',
@@ -617,9 +614,6 @@ final Map<String, Map<String, PageTutorialData>> _enTutorials = {
         TutorialStep(
           title: 'Community Care',
           description: 'Locate primary healthcare units providing localized village health services.',
-        ),
-      ],
-    ),
         ),
       ],
     ),

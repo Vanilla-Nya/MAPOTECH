@@ -810,22 +810,6 @@ class _ManagementPustuPonkesdesWidgetState
                     ),
                   ],
                 ),
-              ),
-              // Status Badge Toggle
-              GestureDetector(
-                onTap: () {
-                  ref
-                      .read(pustuPonkesdesListProvider.notifier)
-                      .toggleStatus(unit.id, unit.statusOperasional);
-                },
-                child: StatusBadge(
-                  label: isAktif ? 'AKTIF' : 'TUTUP',
-                  color: isAktif ? const Color(0xFF2ECC71) : Colors.redAccent,
-                  fontSize: 9,
-                ),
-              ),
-                ),
-
                 const SizedBox(height: 16),
 
                 // Action Buttons: Focus Map, Delete
