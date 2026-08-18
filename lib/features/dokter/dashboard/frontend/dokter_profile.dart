@@ -6268,7 +6268,19 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   OutlinedButton.icon(
-                    onPressed: () {},
+                    onPressed: _qrToken.isEmpty
+                        ? null
+                        : () async {
+                            final uri = Uri.parse(
+                              'https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=$_qrToken',
+                            );
+                            if (await canLaunchUrl(uri)) {
+                              await launchUrl(
+                                uri,
+                                mode: LaunchMode.externalApplication,
+                              );
+                            }
+                          },
                     icon: const Icon(Icons.download, size: 14),
                     label: const Text('Download QR'),
                     style: OutlinedButton.styleFrom(
@@ -6289,7 +6301,19 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                   ),
                   const SizedBox(width: 10),
                   OutlinedButton.icon(
-                    onPressed: () {},
+                    onPressed: _qrToken.isEmpty
+                        ? null
+                        : () async {
+                            final uri = Uri.parse(
+                              'https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=$_qrToken',
+                            );
+                            if (await canLaunchUrl(uri)) {
+                              await launchUrl(
+                                uri,
+                                mode: LaunchMode.externalApplication,
+                              );
+                            }
+                          },
                     icon: const Icon(Icons.print, size: 14),
                     label: const Text('Print QR'),
                     style: OutlinedButton.styleFrom(

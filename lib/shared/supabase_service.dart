@@ -2837,6 +2837,7 @@ class SupabaseService {
             'practice_licenses': docMap['practice_licenses'],
             'google_maps_link': docMap['google_maps_link'] ?? '',
             'header_bg_settings': docMap['header_bg_settings'],
+            'qr_token': docMap['qr_token'] ?? '',
           });
         }
       }
@@ -2844,6 +2845,55 @@ class SupabaseService {
       return doctorsList;
     } catch (e) {
       throw Exception('Gagal mengambil daftar dokter: $e');
+    }
+  }
+
+  /// Direct lookup of a doctor by their queue QR token or ID (bypassing visibility filters)
+  Future<Map<String, dynamic>?> fetchDoctorByQrTokenOrId(String tokenOrId) async {
+    try {
+      final clean = tokenOrId.trim();
+      if (clean.isEmpty) return null;
+
+      // Try by qr_token first
+      var rows = await _get('user_detail_doctor?qr_token=eq.$clean&select=*,user:id(*)', schema: 'public');
+      if (rows.isEmpty) {
+        // Try by ID directly
+        rows = await _get('user_detail_doctor?id=eq.$clean&select=*,user:id(*)', schema: 'public');
+      }
+
+      if (rows.isNotEmpty && rows.first is Map) {
+        final docMap = Map<String, dynamic>.from(rows.first);
+        final userRaw = docMap['user'];
+        final userMap = userRaw is Map ? Map<String, dynamic>.from(userRaw) : <String, dynamic>{};
+        return {
+          'id': docMap['id'] ?? '',
+          'name': userMap['name'] ?? '',
+          'email': userMap['email'] ?? '',
+          'avatar_url': userMap['avatar_url'] ?? docMap['satusehat_photo_url'],
+          'nama_faskes': docMap['nama_faskes'] ?? 'Praktek Mandiri',
+          'profession': docMap['profession'] ?? 'Dokter',
+          'is_visible': docMap['is_visible'] ?? true,
+          'is_bpjs': docMap['is_bpjs'] ?? false,
+          'about': docMap['about'] ?? '',
+          'whatsapp_number': docMap['whatsapp_number'] ?? userMap['phone_number'] ?? '',
+          'latitude': docMap['latitude'],
+          'longitude': docMap['longitude'],
+          'default_service_fee': docMap['default_service_fee'] ?? 0.0,
+          'address': userMap['address'] ?? docMap['nama_faskes'] ?? '',
+          'province': userMap['province'] ?? '',
+          'district': userMap['district'] ?? '',
+          'sub_district': userMap['sub_district'] ?? '',
+          'village': userMap['village'] ?? '',
+          'practice_licenses': docMap['practice_licenses'],
+          'google_maps_link': docMap['google_maps_link'] ?? '',
+          'header_bg_settings': docMap['header_bg_settings'],
+          'qr_token': docMap['qr_token'] ?? '',
+        };
+      }
+      return null;
+    } catch (e) {
+      print('Error looking up doctor by QR token/id: $e');
+      return null;
     }
   }
 

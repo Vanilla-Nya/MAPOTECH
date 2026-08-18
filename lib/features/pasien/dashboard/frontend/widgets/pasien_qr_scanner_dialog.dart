@@ -158,6 +158,13 @@ class _PasienQrScannerDialogState extends ConsumerState<PasienQrScannerDialog>
         }
       }
 
+      if (matchedDoctor == null) {
+        // Direct database lookup by token or ID (for unlisted/private practice tokens)
+        matchedDoctor = await _db.fetchDoctorByQrTokenOrId(
+          targetIdentifier.isNotEmpty ? targetIdentifier : payload,
+        );
+      }
+
       if (matchedDoctor != null) {
         if (mounted) {
           Navigator.pop(context);
@@ -210,11 +217,13 @@ class _PasienQrScannerDialogState extends ConsumerState<PasienQrScannerDialog>
 
     for (final doc in doctors) {
       final id = (doc['id'] ?? '').toString().toLowerCase();
+      final qrToken = (doc['qr_token'] ?? '').toString().toLowerCase();
       final name = (doc['name'] ?? '').toString().toLowerCase();
       final faskes = (doc['nama_faskes'] ?? '').toString().toLowerCase();
       final phone = (doc['whatsapp_number'] ?? '').toString().replaceAll(RegExp(r'\D'), '');
 
       if (id == query.toLowerCase() ||
+          (qrToken.isNotEmpty && qrToken == query.toLowerCase()) ||
           name.contains(q) ||
           q.contains(name) ||
           faskes.contains(q) ||
