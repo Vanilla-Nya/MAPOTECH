@@ -184,8 +184,10 @@ final apotekAsistenListProvider =
       ref,
     ) {
       final userState = ref.watch(landingPageProvider);
-      final apotekId =
-          userState.activeApotekId ?? '10b247b2-94ec-4eb4-829b-e53f9164e313';
+      final loggedInUser = userState.loggedInUser;
+      final apotekId = userState.activeApotekId ??
+          loggedInUser?['id']?.toString() ??
+          '10b247b2-94ec-4eb4-829b-e53f9164e313';
       return ApotekAsistenListNotifier(apotekId);
     });
 
@@ -200,6 +202,14 @@ class ApotekAsisten extends ConsumerStatefulWidget {
 
 class _ApotekAsistenState extends ConsumerState<ApotekAsisten> {
   String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() {
+      ref.read(apotekAsistenListProvider.notifier).loadStaff();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1272,6 +1282,9 @@ class _ApotekAsistenState extends ConsumerState<ApotekAsisten> {
                                           : const Color(0xFFF39C12)),
                               );
 
+                              final nav = Navigator.of(context);
+                              final messenger = ScaffoldMessenger.of(context);
+
                               try {
                                 showDialog(
                                   context: context,
@@ -1289,10 +1302,10 @@ class _ApotekAsistenState extends ConsumerState<ApotekAsisten> {
                                       password: password,
                                     );
 
-                                Navigator.pop(context); // Pop loading dialog
-                                Navigator.pop(context); // Pop form dialog
+                                nav.pop(); // Pop loading dialog
+                                nav.pop(); // Pop form dialog
 
-                                ScaffoldMessenger.of(context).showSnackBar(
+                                messenger.showSnackBar(
                                   SnackBar(
                                     content: Text(
                                       'Staff $name berhasil didaftarkan!',
@@ -1302,8 +1315,8 @@ class _ApotekAsistenState extends ConsumerState<ApotekAsisten> {
                                   ),
                                 );
                               } catch (e) {
-                                Navigator.pop(context); // Pop loading dialog
-                                ScaffoldMessenger.of(context).showSnackBar(
+                                nav.pop(); // Pop loading dialog
+                                messenger.showSnackBar(
                                   SnackBar(
                                     content: Text(
                                       'Gagal mendaftarkan staff: $e',

@@ -184,11 +184,6 @@ List<DrawerMenuItem> getMenuItemsForRole(
         icon: Icons.groups_rounded,
       ),
       DrawerMenuItem(
-        id: 'management_pekerja',
-        label: isEn ? 'Worker Management' : 'Management Pekerja',
-        icon: Icons.engineering_rounded,
-      ),
-      DrawerMenuItem(
         id: 'profile',
         label: isEn ? 'Profile' : 'Profil',
         icon: Icons.account_circle_rounded,
@@ -325,9 +320,19 @@ List<DrawerMenuItem> getMenuItemsForRole(
         icon: Icons.dashboard_rounded,
       ),
       DrawerMenuItem(
+        id: 'qr_scanner',
+        label: isEn ? 'Scan QR Code' : 'Scan QR Dokter & Apotek',
+        icon: Icons.qr_code_scanner_rounded,
+      ),
+      DrawerMenuItem(
         id: 'dokter_search',
         label: isEn ? 'Search Private Practice' : 'Cari Praktik Mandiri',
-        icon: Icons.search_rounded,
+        icon: Icons.person_search_rounded,
+      ),
+      DrawerMenuItem(
+        id: 'puskesmas_search',
+        label: isEn ? 'Search Public Health Center' : 'Cari Puskesmas',
+        icon: Icons.domain_rounded,
       ),
       DrawerMenuItem(
         id: 'puskesmas_search',

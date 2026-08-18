@@ -507,10 +507,10 @@ class _ManagementPustuPonkesdesWidgetState
                       Wrap(
                         spacing: 8,
                         children: [
-                          _buildSummaryChip('Total: $totalUnits Unit', themeAccent, isDark),
-                          _buildSummaryChip('Aktif: $activeUnits Unit', const Color(0xFF2ECC71), isDark),
-                          _buildSummaryChip('Pustu: $pustuCount', const Color(0xFF3498DB), isDark),
-                          _buildSummaryChip('Ponkesdes: $ponkesdesCount', const Color(0xFF9B59B6), isDark),
+                          StatusBadge(label: 'Total: $totalUnits Unit', color: themeAccent, showDot: false),
+                          StatusBadge(label: 'Aktif: $activeUnits Unit', color: const Color(0xFF2ECC71), showDot: false),
+                          StatusBadge(label: 'Pustu: $pustuCount', color: const Color(0xFF3498DB), showDot: false),
+                          StatusBadge(label: 'Ponkesdes: $ponkesdesCount', color: const Color(0xFF9B59B6), showDot: false),
                         ],
                       ),
                   ],
@@ -554,38 +554,18 @@ class _ManagementPustuPonkesdesWidgetState
               runSpacing: 12,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                Container(
+                SizedBox(
                   width: isMobile ? 200 : 320,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    color: cardBgColor,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: borderColor),
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  child: Row(
-                    children: [
-                      Icon(Icons.search_rounded, size: 18, color: subtitleColor),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: TextField(
-                          style: GoogleFonts.outfit(fontSize: 12, color: textColor),
-                          decoration: InputDecoration(
-                            hintText: 'Cari Pustu, Ponkesdes, kode, atau PJ...',
-                            hintStyle: GoogleFonts.outfit(
-                              fontSize: 11,
-                              color: subtitleColor.withOpacity(0.6),
-                            ),
-                            border: InputBorder.none,
-                            isDense: true,
-                            contentPadding: EdgeInsets.zero,
-                          ),
-                          onChanged: (val) => setState(() {
-                            _searchQuery = val;
-                          }),
-                        ),
-                      ),
-                    ],
+                  child: CustomSearchBar(
+                    hintText: 'Cari Pustu, Ponkesdes, kode, atau PJ...',
+                    height: 46,
+                    backgroundColor: cardBgColor,
+                    borderColor: borderColor,
+                    textColor: textColor,
+                    hintColor: subtitleColor,
+                    iconColor: subtitleColor,
+                    onChanged: (val) => setState(() => _searchQuery = val),
+                    onClear: () => setState(() => _searchQuery = ''),
                   ),
                 ),
                 Container(
@@ -682,25 +662,6 @@ class _ManagementPustuPonkesdesWidgetState
           },
         ),
       ],
-    );
-  }
-
-  Widget _buildSummaryChip(String label, Color color, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Text(
-        label,
-        style: GoogleFonts.outfit(
-          fontSize: 10,
-          fontWeight: FontWeight.bold,
-          color: color,
-        ),
-      ),
     );
   }
 
@@ -849,43 +810,20 @@ class _ManagementPustuPonkesdesWidgetState
                     ),
                   ],
                 ),
-
-                const SizedBox(height: 16),
-                const Divider(height: 1),
-                const SizedBox(height: 14),
-
-                // Details List: PJ, NIK, Telepon, Alamat
-                _buildInfoRow(Icons.badge_outlined, 'PJ', unit.penanggungJawab, textColor, subtitleColor),
-                const SizedBox(height: 6),
-                _buildInfoRow(Icons.fingerprint_rounded, 'NIK PJ', unit.nikPenanggungJawab, textColor, subtitleColor),
-                const SizedBox(height: 6),
-                _buildInfoRow(Icons.phone_outlined, 'Kontak', unit.telepon, textColor, subtitleColor),
-                const SizedBox(height: 6),
-                _buildInfoRow(Icons.location_on_outlined, 'Wilayah', '${unit.alamat}, Desa ${unit.village}', textColor, subtitleColor),
-
-                const SizedBox(height: 14),
-
-                // Module Permissions Chips
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: unit.permissions.map((p) {
-                    return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: textColor.withOpacity(0.05),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        p.replaceAll('_', ' '),
-                        style: GoogleFonts.outfit(
-                          fontSize: 8.5,
-                          fontWeight: FontWeight.w700,
-                          color: subtitleColor,
-                        ),
-                      ),
-                    );
-                  }).toList(),
+              ),
+              // Status Badge Toggle
+              GestureDetector(
+                onTap: () {
+                  ref
+                      .read(pustuPonkesdesListProvider.notifier)
+                      .toggleStatus(unit.id, unit.statusOperasional);
+                },
+                child: StatusBadge(
+                  label: isAktif ? 'AKTIF' : 'TUTUP',
+                  color: isAktif ? const Color(0xFF2ECC71) : Colors.redAccent,
+                  fontSize: 9,
+                ),
+              ),
                 ),
 
                 const SizedBox(height: 16),

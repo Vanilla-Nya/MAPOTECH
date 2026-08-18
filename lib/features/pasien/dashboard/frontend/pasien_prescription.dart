@@ -850,9 +850,116 @@ class _ResepDetailDialog extends ConsumerWidget {
                     ),
                   ],
 
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 14),
 
-                  // Info box
+                  // Dedicated Locked QR Resep Card
+                  if (!resep.sudahDiambil) ...[
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E1E22) : const Color(0xFFF8FAFD),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: borderColor),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.lock_rounded, size: 14, color: purpleAccent),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'QR RESEP TERENKRIPSI',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w900,
+                                      color: purpleAccent,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF27AE60).withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(100),
+                                  border: Border.all(color: const Color(0xFF27AE60).withOpacity(0.3)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.security_rounded, size: 10, color: Color(0xFF27AE60)),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'LOCKED QR',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 8.5,
+                                        fontWeight: FontWeight.w900,
+                                        color: const Color(0xFF27AE60),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          Container(
+                            width: 140,
+                            height: 140,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: borderColor, width: 2),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.06),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            padding: const EdgeInsets.all(12),
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                CustomPaint(
+                                  size: const Size(116, 116),
+                                  painter: _QrPatternPainter(),
+                                ),
+                                Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: purpleAccent, width: 1.5),
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Icon(Icons.lock_rounded, size: 16, color: purpleAccent),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            'Token Resep: MAPOTECH-SECURE-RX:${resep.id}',
+                            style: GoogleFonts.outfit(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              color: subtitleColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+
+                  // Security & Usage Guide info box
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
@@ -863,7 +970,7 @@ class _ResepDetailDialog extends ConsumerWidget {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.info_outline_rounded,
+                        const Icon(Icons.verified_user_rounded,
                             size: 16, color: Color(0xFF3498DB)),
                         const SizedBox(width: 10),
                         Expanded(
@@ -871,7 +978,7 @@ class _ResepDetailDialog extends ConsumerWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'PANDUAN PENGGUNAAN',
+                                'KERAHASIAAN MEDIS & VERIFIKASI APOTEK',
                                 style: GoogleFonts.outfit(
                                   fontSize: 9,
                                   fontWeight: FontWeight.w900,
@@ -881,9 +988,7 @@ class _ResepDetailDialog extends ConsumerWidget {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'Silakan scan QR code di atas or tunjukkan halaman ini kepada '
-                                'petugas apotek untuk memvalidasi resep and aturan pakai obat '
-                                'Anda secara digital.',
+                                'QR Code ini terenkripsi dan terlindungi. Jika di-scan oleh kamera umum, detail resep akan terkunci. Hanya Apotek berlisensi yang dapat membuka, memverifikasi, dan memproses resep obat ini.',
                                 style: GoogleFonts.outfit(
                                   fontSize: 11,
                                   color: const Color(0xFF3498DB),

@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
+import 'package:mapotech/shared/supabase_service.dart';
 import 'package:mapotech/shared/widgets/empty_state_widget.dart';
+import 'package:mapotech/features/pasien/dashboard/frontend/widgets/pasien_qr_scanner_dialog.dart';
+import 'package:mapotech/features/pasien/dashboard/frontend/widgets/pasien_apotek_pos_dialog.dart';
+import 'package:mapotech/features/pasien/dashboard/frontend/pasien_dokter_search.dart';
 
 /// Cari Apotek - Pasien Dashboard Page
 class PasienApotekSearch extends ConsumerStatefulWidget {
@@ -13,46 +17,131 @@ class PasienApotekSearch extends ConsumerStatefulWidget {
 }
 
 class _PasienApotekSearchState extends ConsumerState<PasienApotekSearch> {
+  final SupabaseService _db = SupabaseService();
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  bool _isLoading = true;
 
-  // Mock data matching the screenshot
-  final List<Map<String, dynamic>> _allApotek = [
-    {
-      'id': '1',
-      'name': 'CyrenElysia~♪',
-      'address': 'Kel. KEJAYAN, Kec. PUER...',
-      'fullAddress':
-          'Kel. KEJAYAN, Kec. PUERPO, KABUPATEN PASURUAN, Jawa Timur',
-      'jamBuka': 'Jam buka tidak diatur',
-      'isOpen': false,
-      'verified': true,
-      'imageUrl': 'https://api.dicebear.com/7.x/shapes/png?seed=apotek1',
-      'initials': 'CE',
-      'avatarBg': const Color(0xFFFFB5E8),
-    },
-    {
-      'id': '2',
-      'name': 'Dani',
-      'address': 'Kel. LENGGONG, Kec...',
-      'fullAddress':
-          'Kel. LENGGONG, Kec. PASREPAN, KABUPATEN PASURUAN, Jawa Timur',
-      'jamBuka': 'Jam buka tidak diatur',
-      'isOpen': false,
-      'verified': true,
-      'imageUrl': null,
-      'initials': 'DA',
-      'avatarBg': const Color(0xFFE74C3C),
-    },
-  ];
+  // List of pharmacies
+  List<Map<String, dynamic>> _allApotek = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPharmacies();
+  }
+
+  Future<void> _loadPharmacies() async {
+    setState(() => _isLoading = true);
+    try {
+      final fetched = await _db.fetchAllPharmacies();
+      if (fetched.isNotEmpty) {
+        final List<Map<String, dynamic>> list = fetched.map((p) {
+          final name = p['nama_faskes'] ?? p['name'] ?? 'Apotek';
+          final address = p['address'] ?? '';
+          return {
+            'id': p['id'],
+            'name': name,
+            'address': address,
+            'fullAddress': address.isNotEmpty ? address : 'Bondowoso, Jawa Timur',
+            'jamBuka': p['jam_kerja'] ?? '08:00 - 21:00',
+            'isOpen': true,
+            'verified': p['is_visible'] ?? true,
+            'imageUrl': p['avatar_url'],
+            'initials': name.isNotEmpty ? name.substring(0, 1).toUpperCase() : 'AP',
+            'avatarBg': const Color(0xFF0F9D58),
+            'raw': p,
+          };
+        }).toList();
+        if (mounted) {
+          setState(() {
+            _allApotek = list;
+            _isLoading = false;
+          });
+        }
+        return;
+      }
+    } catch (_) {}
+
+    // Fallback data
+    if (mounted) {
+      setState(() {
+        _allApotek = [
+          {
+            'id': '1',
+            'name': 'CyrenElysia~♪',
+            'address': 'Kel. KEJAYAN, Kec. PUJER...',
+            'fullAddress':
+                'Kel. KEJAYAN, Kec. PUJER, KABUPATEN BONDOWOSO, Jawa Timur',
+            'jamBuka': '08:00 - 21:00',
+            'isOpen': true,
+            'verified': true,
+            'imageUrl': 'https://api.dicebear.com/7.x/shapes/png?seed=apotek1',
+            'initials': 'CE',
+            'avatarBg': const Color(0xFFFFB5E8),
+          },
+          {
+            'id': '2',
+            'name': 'Apotek Dani Medika',
+            'address': 'Kel. LENGGONG, Kec. PASREPAN...',
+            'fullAddress':
+                'Kel. LENGGONG, Kec. PASREPAN, KABUPATEN PASURUAN, Jawa Timur',
+            'jamBuka': '08:00 - 20:00',
+            'isOpen': true,
+            'verified': true,
+            'imageUrl': null,
+            'initials': 'DA',
+            'avatarBg': const Color(0xFFE74C3C),
+          },
+        ];
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _openQrScanner(BuildContext context) {
+    final state = ref.read(landingPageProvider);
+    final isDark = state.appearance == 'dark';
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.55),
+      builder: (ctx) => PasienQrScannerDialog(
+        onApotekScanned: (apotek) {
+          _showApotekPos(context, apotek);
+        },
+        onDoctorScanned: (doctor) {
+          showDialog(
+            context: context,
+            barrierColor: Colors.black.withOpacity(0.45),
+            builder: (dCtx) => DoctorDetailDialog(
+              dokter: doctor,
+              isDark: isDark,
+              initialTabIndex: 1,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showApotekPos(BuildContext context, Map<String, dynamic> apotek) {
+    final state = ref.read(landingPageProvider);
+    final isDark = state.appearance == 'dark';
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.55),
+      builder: (ctx) => PasienApotekPosDialog(
+        pharmacy: apotek['raw'] ?? apotek,
+        isDark: isDark,
+      ),
+    );
+  }
 
   List<Map<String, dynamic>> get _filteredApotek {
     return _allApotek.where((a) {
       final q = _searchQuery.toLowerCase();
       final nameMatch = a['name'].toString().toLowerCase().contains(q);
-      final addressMatch = a['fullAddress'].toString().toLowerCase().contains(
-        q,
-      );
+      final addressMatch = a['fullAddress'].toString().toLowerCase().contains(q);
       return q.isEmpty || nameMatch || addressMatch;
     }).toList();
   }
@@ -129,6 +218,30 @@ class _PasienApotekSearchState extends ConsumerState<PasienApotekSearch> {
                 'Tebus resep digital Anda di apotek jejaring Mapotek',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.outfit(fontSize: 12, color: subtitleColor),
+              ),
+              const SizedBox(height: 18),
+              ElevatedButton.icon(
+                onPressed: () => _openQrScanner(context),
+                icon: const Icon(Icons.qr_code_scanner_rounded, size: 16),
+                label: Text(
+                  'Scan QR Apotek / POS',
+                  style: GoogleFonts.outfit(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: themeAccent,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
               ),
             ],
           ),
@@ -289,7 +402,7 @@ class _PasienApotekSearchState extends ConsumerState<PasienApotekSearch> {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
-        onTap: () {},
+        onTap: () => _showApotekPos(context, apotek),
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(

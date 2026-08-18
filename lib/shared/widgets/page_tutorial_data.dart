@@ -266,16 +266,16 @@ final Map<String, Map<String, PageTutorialData>> _idTutorials = {
       ],
     ),
     'puskesmas_search': const PageTutorialData(
-      title: 'Cari Puskesmas Terdekat',
-      description: 'Temukan fasilitas kesehatan Puskesmas terdekat, layanan UGD, rawat inap, poli kesehatan ibu & anak.',
+      title: 'Cari Puskesmas & Faskes Publik',
+      description: 'Temukan Puskesmas, Ponkesdes, dan Pustu terdekat untuk mendapatkan pelayanan kesehatan masyarakat.',
       steps: [
         TutorialStep(
-          title: 'Layanan Puskesmas',
-          description: 'Lihat daftar poli yang tersedia seperti Poli Umum, KIA, Gigi, dan Laboratorium.',
+          title: 'Informasi Layanan & BPJS',
+          description: 'Lihat status penerimaan BPJS, jam layanan, dan fasilitas klaster yang tersedia.',
         ),
         TutorialStep(
-          title: 'Integrasi BPJS & P-Care',
-          description: 'Akses layanan puskesmas yang terintegrasi BPJS Kesehatan.',
+          title: 'Peta & Petunjuk Arah',
+          description: 'Buka peta dan petunjuk arah langsung menuju fasilitas kesehatan pilihan Anda.',
         ),
       ],
     ),
@@ -286,6 +286,9 @@ final Map<String, Map<String, PageTutorialData>> _idTutorials = {
         TutorialStep(
           title: 'Layanan Desa',
           description: 'Lihat lokasi Pustu dan Ponkesdes untuk pelayanan kesehatan dasar terdekat.',
+        ),
+      ],
+    ),
         ),
       ],
     ),
@@ -594,16 +597,16 @@ final Map<String, Map<String, PageTutorialData>> _enTutorials = {
       ],
     ),
     'puskesmas_search': const PageTutorialData(
-      title: 'Search Puskesmas Centers',
-      description: 'Locate nearby public health centers (Puskesmas), emergency services, inpatient care, maternal and child clinics.',
+      title: 'Search Public Health Centers',
+      description: 'Find nearby Puskesmas, Ponkesdes, and Pustu for comprehensive public healthcare services.',
       steps: [
         TutorialStep(
-          title: 'Puskesmas Services',
-          description: 'Explore available polyclinics such as General, Maternal & Child, Dental, and Lab Services.',
+          title: 'Service Info & BPJS',
+          description: 'Check BPJS coverage status, operating hours, and integrated healthcare cluster facilities.',
         ),
         TutorialStep(
-          title: 'BPJS Integration',
-          description: 'Access public healthcare facilities integrated with BPJS and national health networks.',
+          title: 'Maps & Directions',
+          description: 'Get directions and map locations directly to your selected health center.',
         ),
       ],
     ),
@@ -614,6 +617,9 @@ final Map<String, Map<String, PageTutorialData>> _enTutorials = {
         TutorialStep(
           title: 'Community Care',
           description: 'Locate primary healthcare units providing localized village health services.',
+        ),
+      ],
+    ),
         ),
       ],
     ),
