@@ -907,11 +907,25 @@ class SupabaseService {
 
   // Fetch real financial transactions
   Future<List<Map<String, dynamic>>> fetchFinancialTransactions() async {
-    final txs = await _get(
-      'financial_transactions?select=*&order=transaction_date.desc',
-      schema: 'pharmacy',
-    );
-    return txs.map((t) => t as Map<String, dynamic>).toList();
+    try {
+      final res = await client
+          .schema('pharmacy')
+          .from('financial_transactions')
+          .select('*')
+          .order('transaction_date', ascending: false);
+      return List<Map<String, dynamic>>.from(res as List);
+    } catch (_) {
+      try {
+        final resFallback = await client
+            .from('financial_transactions')
+            .select('*')
+            .order('transaction_date', ascending: false);
+        return List<Map<String, dynamic>>.from(resFallback as List);
+      } catch (e) {
+        print('Error fetching financial transactions: $e');
+        return [];
+      }
+    }
   }
 
   // Query a user by email or username

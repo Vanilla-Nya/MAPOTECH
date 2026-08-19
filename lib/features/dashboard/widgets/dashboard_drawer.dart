@@ -331,13 +331,8 @@ List<DrawerMenuItem> getMenuItemsForRole(
       ),
       DrawerMenuItem(
         id: 'puskesmas_search',
-        label: isEn ? 'Search Public Health Center' : 'Cari Puskesmas',
-        icon: Icons.domain_rounded,
-      ),
-      DrawerMenuItem(
-        id: 'puskesmas_search',
         label: isEn ? 'Search Puskesmas' : 'Cari Puskesmas',
-        icon: Icons.health_and_safety_rounded,
+        icon: Icons.domain_rounded,
       ),
       DrawerMenuItem(
         id: 'pustu_search',
@@ -416,7 +411,6 @@ class DashboardDrawer extends ConsumerWidget {
     final notifier = ref.read(landingPageProvider.notifier);
 
     final isDark = state.appearance == 'dark';
-    final isRev = state.appearance == 'rev';
     final cardBgColor = notifier.getCardColor();
     final borderColor = notifier.getBorderColor();
     final themeAccent = notifier.getPrimaryColor();

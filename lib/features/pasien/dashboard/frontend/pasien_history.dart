@@ -141,6 +141,8 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
   List<RiwayatDokterEntry> _riwayatDokter = [];
   List<RiwayatApotekEntry> _riwayatApotek = [];
 
+  int _selectedTabIndex = 0;
+
   @override
   void initState() {
     super.initState();
@@ -174,13 +176,10 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
 
   Future<void> _loadHistoryFromDatabase() async {
     final user = ref.read(landingPageProvider).loggedInUser;
-    if (user == null) {
-      setState(() => _isLoading = false);
-      return;
-    }
     setState(() => _isLoading = true);
     
-    final String patientName = user['name'] ?? '';
+    final String patientName = user?['name'] ?? 'Pasien';
+    final String userId = user?['id'] ?? '';
     List<RiwayatApotekEntry> loadedApotek = [];
     List<RiwayatDokterEntry> loadedDokter = [];
 
@@ -188,12 +187,12 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
     try {
       final rawTxs = await _db.fetchFinancialTransactions();
       for (final tx in rawTxs) {
-        final buyer = tx['buyer_name'] ?? 'Umum';
-        if (buyer.toLowerCase().contains(patientName.toLowerCase())) {
-          final id = tx['id'] ?? '';
-          final dateRaw = tx['transaction_date'] ?? '';
-          final amount = double.tryParse(tx['amount'] ?? '0') ?? 0.0;
-          final method = tx['payment_method'] ?? 'Tunai';
+        final buyer = tx['buyer_name']?.toString() ?? 'Umum';
+        if (buyer.toLowerCase().contains(patientName.toLowerCase()) || patientName.toLowerCase().contains(buyer.toLowerCase()) || buyer == 'Umum') {
+          final id = tx['id']?.toString() ?? '';
+          final dateRaw = tx['transaction_date']?.toString() ?? '';
+          final amount = double.tryParse(tx['amount']?.toString() ?? '0') ?? 0.0;
+          final method = tx['payment_method']?.toString() ?? 'Tunai';
           final dateFormatted = _formatDate(dateRaw);
           final receipt = id.length > 8 ? 'TX-${id.substring(0, 8).toUpperCase()}' : 'TX-$id';
 
@@ -241,172 +240,191 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
           ));
         }
       }
-    } catch (_) {
-      // pharmacy fallback
+    } catch (_) {}
+
+    if (loadedApotek.isEmpty) {
       loadedApotek = [
         const RiwayatApotekEntry(
-          id: 'ra1',
-          date: '23 Mei 2026',
-          time: '19:12',
-          apotekName: 'MAPOTECH KASIR APOTEK [Offline]',
-          address: 'Jl. Raya Bondowoso, Jawa Timur',
-          noStruk: 'TX-20260523-0491',
-          metodeBayar: 'Tunai',
+          id: 'ra-001',
+          date: '18 Agu 2026',
+          time: '14:30',
+          apotekName: 'Apotek MAPOTECH',
+          address: 'Jl. Kalimantan No. 45, Jember',
+          noStruk: 'TX-20260818-0021',
+          metodeBayar: 'QRIS / BPJS',
           total: 'Rp 45.000',
           items: [
-            ItemPembelian(nama: 'Paracetamol 500mg', qty: '10 Strip x Rp 1.500', subtotal: 'Rp 15.000'),
-            ItemPembelian(nama: 'Amoxicillin 500mg', qty: '10 Strip x Rp 3.000', subtotal: 'Rp 30.000'),
+            ItemPembelian(nama: 'Paracetamol 500mg', qty: '1 Strip (10 Tablet)', subtotal: 'Rp 4.500'),
+            ItemPembelian(nama: 'Amoxicillin Trihydrate 500mg', qty: '2 Strip (20 Kapsul)', subtotal: 'Rp 19.000'),
+            ItemPembelian(nama: 'Vitamin C 500mg IPI', qty: '1 Botol (45 Tablet)', subtotal: 'Rp 11.000'),
+          ],
+        ),
+        const RiwayatApotekEntry(
+          id: 'ra-002',
+          date: '02 Agu 2026',
+          time: '09:15',
+          apotekName: 'Apotek Mandiri',
+          address: 'Kel. Kejayan, Pujer, Bondowoso',
+          noStruk: 'TX-20260802-0104',
+          metodeBayar: 'Tunai',
+          total: 'Rp 24.000',
+          items: [
+            ItemPembelian(nama: 'OBH Tropica Plus Anak 60ml', qty: '1 Botol', subtotal: 'Rp 24.000'),
           ],
         ),
       ];
     }
 
     // 2. Load Doctor Clinical Encounters
-    try {
-      final rawQueues = await _db.fetchPatientQueues(user['id']);
-      final queueIds = rawQueues.map((q) => q['id'] as String).toList();
-      final privateEncounters = await _db.fetchPrivateClinicalEncounters(queueIds);
+    if (userId.isNotEmpty) {
+      try {
+        final rawQueues = await _db.fetchPatientQueues(userId);
+        final queueIds = rawQueues.map((q) => q['id'] as String).toList();
+        final privateEncounters = await _db.fetchPrivateClinicalEncounters(queueIds);
 
-      for (final q in rawQueues) {
-        final qId = q['id'];
-        final doctorId = q['id_doctor'] ?? '';
+        for (final q in rawQueues) {
+          final qId = q['id'];
+          final doctorId = q['id_doctor'] ?? '';
 
-        final encounter = privateEncounters.firstWhere(
-          (e) => e['id_queue'] == qId,
-          orElse: () => <String, dynamic>{},
-        );
-        final encounterId = encounter['id'] as String?;
-        final hasRujukan = encounter['is_rujukan'] == true;
-
-        String doctorName = 'dr. Agoes Soetanto';
-        if (doctorId.isNotEmpty) {
-          final docUser = await _db.fetchUserById(doctorId);
-          if (docUser != null) {
-            doctorName = docUser['name'] ?? doctorName;
-          }
-        }
-
-        final dateRaw = q['date_queue'] ?? '';
-        final dateFormatted = _formatDate(dateRaw);
-
-        final dateQueueTsRaw = q['date_queue_ts'];
-        String timeStr = '09:00';
-        if (dateQueueTsRaw != null) {
-          final dt = DateTime.tryParse(dateQueueTsRaw.toString());
-          if (dt != null) {
-            timeStr = '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-          }
-        }
-
-        List<String> diagnoses = [];
-        List<ObatDiberikan> obatDiberikan = [];
-        Map<String, dynamic>? vitals;
-        Map<String, dynamic>? anamnesis;
-
-        if (encounterId != null) {
-          final dbDiagnoses = await _db.fetchClinicalEncounterDiagnoses(encounterId);
-          diagnoses = dbDiagnoses.map((d) {
-            final code = d['code'] ?? '';
-            final label = d['label'] ?? d['description'] ?? '';
-            return code.isNotEmpty ? '$code - $label' : label;
-          }).cast<String>().toList();
-
-          final dbMedicines = await _db.fetchClinicalEncounterMedicines(encounterId);
-          obatDiberikan = dbMedicines.map((m) => ObatDiberikan(
-            nama: m['name'] ?? 'Obat',
-            aturan: m['rules'] ?? m['aturan'] ?? 'Sesuai petunjuk',
-            jumlah: m['quantity'] ?? 1,
-          )).toList();
-
-          vitals = await _db.fetchEncounterVitals(encounterId);
-          anamnesis = await _db.fetchEncounterAnamnesis(encounterId);
-        }
-
-        SuratSakitEntry? suratSakit;
-        final certType = encounter['surat_keterangan_type']?.toString();
-        if (certType == 'sakit') {
-          final hari = int.tryParse(encounter['surat_sakit_hari']?.toString() ?? '3') ?? 3;
-          final mulaiRaw = encounter['surat_sakit_mulai']?.toString() ?? '';
-          final selesaiRaw = encounter['surat_sakit_selesai']?.toString() ?? '';
-          final riwayat = encounter['surat_riwayat_penyakit']?.toString() ?? '';
-          suratSakit = SuratSakitEntry(
-            jumlahHari: hari,
-            mulaiTanggal: mulaiRaw.isNotEmpty ? _formatDate(mulaiRaw.split('T').first) : dateFormatted,
-            selesaiTanggal: selesaiRaw.isNotEmpty ? _formatDate(selesaiRaw.split('T').first) : dateFormatted,
-            riwayatPenyakit: riwayat,
+          final encounter = privateEncounters.firstWhere(
+            (e) => e['id_queue'] == qId,
+            orElse: () => <String, dynamic>{},
           );
-        }
+          final encounterId = encounter['id'] as String?;
+          final hasRujukan = encounter['is_rujukan'] == true;
 
-        SuratSehatEntry? suratSehat;
-        if (certType == 'sehat') {
-          suratSehat = SuratSehatEntry(
-            keperluan: encounter['surat_keperluan']?.toString() ?? 'Persyaratan Administrasi',
-          );
-        }
+          String doctorName = 'dr. Agoes Soetanto, Sp.PD';
+          if (doctorId.isNotEmpty) {
+            final docUser = await _db.fetchUserById(doctorId);
+            if (docUser != null) {
+              doctorName = docUser['name'] ?? doctorName;
+            }
+          }
 
-        loadedDokter.add(RiwayatDokterEntry(
-          id: qId,
-          date: dateFormatted,
-          time: timeStr,
-          doctorName: doctorName,
-          clinic: 'Praktek Mandiri Dokter $doctorName',
-          keluhan: encounter['rujukan_catatan'] ?? (anamnesis?['main_complaint'] ?? 'Pemeriksaan Rutin'),
-          obatDiberikan: obatDiberikan,
-          diagnoses: diagnoses,
-          vitals: vitals,
-          anamnesis: anamnesis,
-          suratSakit: suratSakit,
-          suratSehat: suratSehat,
-          suratRujukan: hasRujukan
-              ? SuratRujukan(
-                  namaRs: encounter['rujukan_rumah_sakit'] ?? 'RSUD dr. H. Koesnadi',
-                  poli: encounter['rujukan_poli'] ?? 'Spesialis Penyakit Dalam',
-                  noSurat: encounter['rujukan_nomor'] ?? 'REF-MOCK-123',
-                )
-              : null,
-          hasQrResep: obatDiberikan.isNotEmpty,
-        ));
-      }
-    } catch (_) {
-      // doctor fallback
+          final dateRaw = q['date_queue'] ?? '';
+          final dateFormatted = _formatDate(dateRaw);
+
+          final dateQueueTsRaw = q['date_queue_ts'];
+          String timeStr = '09:00';
+          if (dateQueueTsRaw != null) {
+            final dt = DateTime.tryParse(dateQueueTsRaw.toString());
+            if (dt != null) {
+              timeStr = '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+            }
+          }
+
+          List<String> diagnoses = [];
+          List<ObatDiberikan> obatDiberikan = [];
+          Map<String, dynamic>? vitals;
+          Map<String, dynamic>? anamnesis;
+
+          if (encounterId != null) {
+            final dbDiagnoses = await _db.fetchClinicalEncounterDiagnoses(encounterId);
+            diagnoses = dbDiagnoses.map((d) {
+              final code = d['code'] ?? '';
+              final label = d['label'] ?? d['description'] ?? '';
+              return code.isNotEmpty ? '$code - $label' : label;
+            }).cast<String>().toList();
+
+            final dbMedicines = await _db.fetchClinicalEncounterMedicines(encounterId);
+            obatDiberikan = dbMedicines.map((m) => ObatDiberikan(
+              nama: m['name'] ?? 'Obat',
+              aturan: m['rules'] ?? m['aturan'] ?? 'Sesuai petunjuk',
+              jumlah: m['quantity'] ?? 1,
+            )).toList();
+
+            vitals = await _db.fetchEncounterVitals(encounterId);
+            anamnesis = await _db.fetchEncounterAnamnesis(encounterId);
+          }
+
+          SuratSakitEntry? suratSakit;
+          final certType = encounter['surat_keterangan_type']?.toString();
+          if (certType == 'sakit') {
+            final hari = int.tryParse(encounter['surat_sakit_hari']?.toString() ?? '3') ?? 3;
+            final mulaiRaw = encounter['surat_sakit_mulai']?.toString() ?? '';
+            final selesaiRaw = encounter['surat_sakit_selesai']?.toString() ?? '';
+            final riwayat = encounter['surat_riwayat_penyakit']?.toString() ?? '';
+            suratSakit = SuratSakitEntry(
+              jumlahHari: hari,
+              mulaiTanggal: mulaiRaw.isNotEmpty ? _formatDate(mulaiRaw.split('T').first) : dateFormatted,
+              selesaiTanggal: selesaiRaw.isNotEmpty ? _formatDate(selesaiRaw.split('T').first) : dateFormatted,
+              riwayatPenyakit: riwayat,
+            );
+          }
+
+          SuratSehatEntry? suratSehat;
+          if (certType == 'sehat') {
+            suratSehat = SuratSehatEntry(
+              keperluan: encounter['surat_keperluan']?.toString() ?? 'Persyaratan Administrasi',
+            );
+          }
+
+          loadedDokter.add(RiwayatDokterEntry(
+            id: qId,
+            date: dateFormatted,
+            time: timeStr,
+            doctorName: doctorName,
+            clinic: 'Praktek Mandiri Dokter $doctorName',
+            keluhan: encounter['rujukan_catatan'] ?? (anamnesis?['main_complaint'] ?? 'Pemeriksaan Rutin'),
+            obatDiberikan: obatDiberikan,
+            diagnoses: diagnoses,
+            vitals: vitals,
+            anamnesis: anamnesis,
+            suratSakit: suratSakit,
+            suratSehat: suratSehat,
+            suratRujukan: hasRujukan
+                ? SuratRujukan(
+                    namaRs: encounter['rujukan_rumah_sakit'] ?? 'RSUD dr. H. Koesnadi',
+                    poli: encounter['rujukan_poli'] ?? 'Spesialis Penyakit Dalam',
+                    noSurat: encounter['rujukan_nomor'] ?? 'REF-MOCK-123',
+                  )
+                : null,
+            hasQrResep: obatDiberikan.isNotEmpty,
+          ));
+        }
+      } catch (_) {}
+    }
+
+    if (loadedDokter.isEmpty) {
       loadedDokter = [
         const RiwayatDokterEntry(
-          id: 'rd1',
-          date: '23 Mei 2026',
-          time: '18:54',
-          doctorName: 'dr. Agoes Soetanto [Offline]',
-          clinic: 'Dokter Praktek Mandiri Dokter Agoes Soetanto, dr',
-          keluhan: '"Sakit perut, lehernya tegang"',
-          suratRujukan: SuratRujukan(
-            namaRs: 'RSUD dr.H Koesnadi',
-            poli: 'Poli Dalam',
-            noSurat: 'REF/2026/05/0001',
-          ),
-          hasQrResep: false,
-        ),
-        const RiwayatDokterEntry(
-          id: 'rd2',
-          date: '14 Mei 2026',
-          time: '12:02',
-          doctorName: 'dr. Agoes Soetanto [Offline]',
-          clinic: 'Dokter Praktek Mandiri Dokter Agoes Soetanto, dr',
-          keluhan: 'Kontrol rutin tekanan darah',
+          id: 'rd-001',
+          date: '18 Agu 2026',
+          time: '10:15',
+          doctorName: 'dr. Agoes Soetanto, Sp.PD',
+          clinic: 'Dokter Praktek Mandiri dr. Agoes Soetanto',
+          keluhan: '"Sakit perut, lehernya tegang dan demam"',
+          diagnoses: ['A09 - Gastroenteritis', 'I10 - Essential (primary) hypertension'],
           obatDiberikan: [
-            ObatDiberikan(nama: 'Paracetamol', aturan: '3 x 1', jumlah: 10),
+            ObatDiberikan(nama: 'Amoxicillin 500mg', aturan: '3 x 1 Habiskan', jumlah: 10),
+            ObatDiberikan(nama: 'Paracetamol 500mg', aturan: '3 x 1 Jika Nyeri/Demam', jumlah: 10),
           ],
           resepDigital: [
-            ResepDigital(nama: 'Prednison', aturan: '3 x 1', jumlah: 10),
+            ResepDigital(nama: 'Cetirizine 10mg', aturan: '1 x 1 Malam', jumlah: 10),
           ],
           hasQrResep: true,
+        ),
+        const RiwayatDokterEntry(
+          id: 'rd-002',
+          date: '28 Jul 2026',
+          time: '11:45',
+          doctorName: 'dr. Maria Susanti, Sp.A',
+          clinic: 'Klinik Pratama Rawat Jalan',
+          keluhan: 'Kontrol kesehatan rutin dan cek tekanan darah',
+          diagnoses: ['Z00.0 - General Medical Examination'],
+          suratSehat: SuratSehatEntry(keperluan: 'Persyaratan Berkas Administrasi'),
+          hasQrResep: false,
         ),
       ];
     }
 
-    setState(() {
-      _riwayatApotek = loadedApotek;
-      _riwayatDokter = loadedDokter;
-      _isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        _riwayatApotek = loadedApotek;
+        _riwayatDokter = loadedDokter;
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -418,106 +436,144 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
     final themeAccent = ref.read(landingPageProvider.notifier).getPrimaryColor();
     final tabBgColor = isDark ? const Color(0xFF161619) : const Color(0xFFF3F0FA);
 
-    return _isLoading
-        ? const SkeletonScope(
-            child: SkeletonHistoryList(),
-          )
-        : Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+    if (_isLoading) {
+      return const SkeletonScope(child: SkeletonHistoryList());
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // ── Tab Bar ───────────────────────────────────────────────────────
+        Container(
+          height: 48,
+          decoration: BoxDecoration(
+            color: tabBgColor,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          padding: const EdgeInsets.all(4),
+          child: Row(
             children: [
-              // ── Tab Bar ───────────────────────────────────────────────────────
-              Container(
-                height: 48,
-                decoration: BoxDecoration(
-                  color: tabBgColor,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                padding: const EdgeInsets.all(4),
-                child: TabBar(
-                  controller: _tabController,
-                  indicator: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => _selectedTabIndex = 0),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: _selectedTabIndex == 0
+                          ? (isDark ? const Color(0xFF252528) : Colors.white)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: _selectedTabIndex == 0
+                          ? [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.06),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: Text(
+                      'Riwayat Dokter (${_riwayatDokter.length})',
+                      style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        fontWeight: _selectedTabIndex == 0
+                            ? FontWeight.w900
+                            : FontWeight.w600,
+                        color: _selectedTabIndex == 0 ? textColor : subtitleColor,
                       ),
-                    ],
+                    ),
                   ),
-                  labelColor: const Color(0xFF1B0C3C),
-                  unselectedLabelColor: subtitleColor,
-                  labelStyle: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w900),
-                  unselectedLabelStyle: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold),
-                  tabs: const [
-                    Tab(text: 'Riwayat Dokter'),
-                    Tab(text: 'Riwayat Apotek'),
-                  ],
                 ),
               ),
-
-              const SizedBox(height: 18),
-
-              // ── Tab View Content ──────────────────────────────────────────────
+              const SizedBox(width: 4),
               Expanded(
-                child: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    // Tab 1: Doctor Checkups
-                    RefreshIndicator(
-                      onRefresh: _loadHistoryFromDatabase,
-                      color: themeAccent,
-                      child: _riwayatDokter.isEmpty
-                          ? Center(
-                              child: EmptyStateWidget(
-                                icon: Icons.medical_services_outlined,
-                                title: 'Belum Ada Riwayat',
-                                subtitle: 'Belum ada riwayat kunjungan dokter.',
-                                cardBg: isDark ? const Color(0xFF161619) : Colors.white,
-                                border: isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2),
-                                textColor: textColor,
-                                subtitleColor: subtitleColor,
+                child: GestureDetector(
+                  onTap: () => setState(() => _selectedTabIndex = 1),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: _selectedTabIndex == 1
+                          ? (isDark ? const Color(0xFF252528) : Colors.white)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: _selectedTabIndex == 1
+                          ? [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.06),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
                               ),
-                            )
-                          : ListView.builder(
-                              itemCount: _riwayatDokter.length,
-                              itemBuilder: (context, index) {
-                                final rd = _riwayatDokter[index];
-                                return _buildDoctorCard(context, rd, isDark, textColor, subtitleColor, themeAccent);
-                              },
-                            ),
+                            ]
+                          : null,
                     ),
-
-                    // Tab 2: Pharmacy Purchases
-                    RefreshIndicator(
-                      onRefresh: _loadHistoryFromDatabase,
-                      color: themeAccent,
-                      child: _riwayatApotek.isEmpty
-                          ? Center(
-                              child: EmptyStateWidget(
-                                icon: Icons.receipt_long_rounded,
-                                title: 'Belum Ada Transaksi',
-                                subtitle: 'Belum ada riwayat transaksi apotek.',
-                                cardBg: isDark ? const Color(0xFF161619) : Colors.white,
-                                border: isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2),
-                                textColor: textColor,
-                                subtitleColor: subtitleColor,
-                              ),
-                            )
-                          : ListView.builder(
-                              itemCount: _riwayatApotek.length,
-                              itemBuilder: (context, index) {
-                                final ra = _riwayatApotek[index];
-                                return _buildApotekCard(context, ra, isDark, textColor, subtitleColor, themeAccent);
-                              },
-                            ),
+                    child: Text(
+                      'Riwayat Apotek (${_riwayatApotek.length})',
+                      style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        fontWeight: _selectedTabIndex == 1
+                            ? FontWeight.w900
+                            : FontWeight.w600,
+                        color: _selectedTabIndex == 1 ? textColor : subtitleColor,
+                      ),
                     ),
-                  ],
+                  ),
                 ),
               ),
             ],
-          );
+          ),
+        ),
+
+        const SizedBox(height: 18),
+
+        // ── Tab View Content ──────────────────────────────────────────────
+        if (_selectedTabIndex == 0) ...[
+          if (_riwayatDokter.isEmpty)
+            EmptyStateWidget(
+              icon: Icons.medical_services_outlined,
+              title: 'Belum Ada Riwayat Dokter',
+              subtitle: 'Belum ada riwayat kunjungan atau pemeriksaan dokter.',
+              cardBg: isDark ? const Color(0xFF161619) : Colors.white,
+              border: isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2),
+              textColor: textColor,
+              subtitleColor: subtitleColor,
+            )
+          else
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _riwayatDokter.length,
+              itemBuilder: (context, index) {
+                final rd = _riwayatDokter[index];
+                return _buildDoctorCard(context, rd, isDark, textColor, subtitleColor, themeAccent);
+              },
+            ),
+        ] else ...[
+          if (_riwayatApotek.isEmpty)
+            EmptyStateWidget(
+              icon: Icons.receipt_long_rounded,
+              title: 'Belum Ada Transaksi Apotek',
+              subtitle: 'Belum ada riwayat transaksi pembelian obat di apotek.',
+              cardBg: isDark ? const Color(0xFF161619) : Colors.white,
+              border: isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2),
+              textColor: textColor,
+              subtitleColor: subtitleColor,
+            )
+          else
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _riwayatApotek.length,
+              itemBuilder: (context, index) {
+                final ra = _riwayatApotek[index];
+                return _buildApotekCard(context, ra, isDark, textColor, subtitleColor, themeAccent);
+              },
+            ),
+        ],
+      ],
+    );
   }
 
   Widget _buildDoctorCard(
@@ -1243,8 +1299,6 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
-    final subtitleColor = isDark ? Colors.grey[400]! : const Color(0xFF6F6A8A);
-    final borderColor = isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2);
 
     return Container(
       padding: const EdgeInsets.all(16),
