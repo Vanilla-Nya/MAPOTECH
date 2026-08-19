@@ -482,9 +482,30 @@ class SupabaseService {
 
     Map<String, dynamic> createdTx = {};
     try {
-      createdTx = await _post('financial_transactions', txData, schema: 'pharmacy');
-    } catch (e) {
-      print('Warning inserting financial_transaction: $e');
+      final res = await client
+          .schema('pharmacy')
+          .from('financial_transactions')
+          .insert(txData)
+          .select();
+      if (res.isNotEmpty) {
+        createdTx = Map<String, dynamic>.from(res.first);
+      }
+    } catch (_) {
+      try {
+        final resFallback = await client
+            .from('financial_transactions')
+            .insert(txData)
+            .select();
+        if (resFallback.isNotEmpty) {
+          createdTx = Map<String, dynamic>.from(resFallback.first);
+        }
+      } catch (e) {
+        try {
+          createdTx = await _post('financial_transactions', txData, schema: 'pharmacy');
+        } catch (e2) {
+          print('Warning inserting financial_transaction: $e2');
+        }
+      }
     }
 
     final txId = createdTx['id'] ?? 'tx-${now.millisecondsSinceEpoch}';
@@ -511,9 +532,17 @@ class SupabaseService {
         };
 
         try {
-          await _post('transaction_items', itemPayload, schema: 'pharmacy');
-        } catch (e) {
-          print('Warning inserting transaction_item: $e');
+          await client.schema('pharmacy').from('transaction_items').insert(itemPayload);
+        } catch (_) {
+          try {
+            await client.from('transaction_items').insert(itemPayload);
+          } catch (_) {
+            try {
+              await _post('transaction_items', itemPayload, schema: 'pharmacy');
+            } catch (e) {
+              print('Warning inserting transaction_item: $e');
+            }
+          }
         }
 
         // Deduct batch stock

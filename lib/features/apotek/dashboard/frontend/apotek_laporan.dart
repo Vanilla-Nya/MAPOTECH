@@ -115,33 +115,45 @@ class _ApotekLaporanState extends ConsumerState<ApotekLaporan> {
     try {
       final client = SupabaseService.client;
       final state = ref.read(landingPageProvider);
-      final apotekId = state.activeApotekId;
+      final List<Map<String, dynamic>> allTx = [];
 
-      // 1. Fetch all financial transactions from 'pharmacy.financial_transactions'
-      dynamic rawTx;
+      // 1. Fetch from pharmacy.financial_transactions
       try {
-        if (apotekId != null) {
-          rawTx = await client
-              .from('financial_transactions')
-              .select()
-              .order('transaction_date', ascending: false);
-        } else {
-          rawTx = await client
-              .from('financial_transactions')
-              .select()
-              .order('transaction_date', ascending: false);
+        final resPharmacy = await client
+            .schema('pharmacy')
+            .from('financial_transactions')
+            .select('*')
+            .order('transaction_date', ascending: false);
+        for (final item in resPharmacy) {
+          allTx.add(Map<String, dynamic>.from(item));
         }
-      } catch (_) {
-        // Fallback: fetch via SupabaseService helper
-        final db = SupabaseService();
-        rawTx = await db.fetchFinancialTransactions();
+      } catch (e) {
+        debugPrint('Note fetching pharmacy schema: $e');
       }
 
-      final List<Map<String, dynamic>> allTx = [];
-      if (rawTx is List) {
-        for (var item in rawTx) {
-          if (item is Map) {
-            allTx.add(Map<String, dynamic>.from(item));
+      // 2. Fetch from public.financial_transactions
+      try {
+        final resPublic = await client
+            .from('financial_transactions')
+            .select('*')
+            .order('transaction_date', ascending: false);
+        for (final item in resPublic) {
+          final map = Map<String, dynamic>.from(item);
+          if (!allTx.any((x) => x['id'] == map['id'] || (x['id_source'] != null && x['id_source'] == map['id_source']))) {
+            allTx.add(map);
+          }
+        }
+      } catch (e) {
+        debugPrint('Note fetching public schema: $e');
+      }
+
+      // 3. Fallback via helper if empty
+      if (allTx.isEmpty) {
+        final db = SupabaseService();
+        final helperTx = await db.fetchFinancialTransactions();
+        for (final item in helperTx) {
+          if (!allTx.any((x) => x['id'] == item['id'])) {
+            allTx.add(item);
           }
         }
       }
@@ -581,33 +593,58 @@ class _ApotekLaporanState extends ConsumerState<ApotekLaporan> {
                             final txTypeStr = selectedType == TransactionType.expense ? 'expense' : 'income';
                             final catStr = selectedCategory.name;
 
+                            final txPayload = {
+                              if (apotekId != null && apotekId.isNotEmpty) 'id_user': apotekId,
+                              'transaction_type': txTypeStr,
+                              'source_type': 'manual',
+                              'category': catStr,
+                              'amount': amt.toString(),
+                              'status': 'Sukses',
+                              'transaction_date': selectedDate.toIso8601String(),
+                              'description': desc,
+                              'buyer_name': state.loggedInName ?? 'CyrenElysia~♪',
+                            };
+
                             if (existing != null) {
-                              // Update Supabase
-                              await SupabaseService.client
-                                  .from('financial_transactions')
-                                  .update({
-                                    'transaction_type': txTypeStr,
-                                    'category': catStr,
-                                    'transaction_date': selectedDate.toIso8601String(),
-                                    'amount': amt.toString(),
-                                    'description': desc,
-                                  })
-                                  .eq('id', existing.id);
+                              try {
+                                await SupabaseService.client
+                                    .schema('pharmacy')
+                                    .from('financial_transactions')
+                                    .update({
+                                      'transaction_type': txTypeStr,
+                                      'category': catStr,
+                                      'transaction_date': selectedDate.toIso8601String(),
+                                      'amount': amt.toString(),
+                                      'description': desc,
+                                    })
+                                    .eq('id', existing.id);
+                              } catch (_) {
+                                await SupabaseService.client
+                                    .from('financial_transactions')
+                                    .update({
+                                      'transaction_type': txTypeStr,
+                                      'category': catStr,
+                                      'transaction_date': selectedDate.toIso8601String(),
+                                      'amount': amt.toString(),
+                                      'description': desc,
+                                    })
+                                    .eq('id', existing.id);
+                              }
                             } else {
-                              // Insert Supabase
-                              await SupabaseService.client
-                                  .from('financial_transactions')
-                                  .insert({
-                                    'id_user': ?apotekId,
-                                    'transaction_type': txTypeStr,
-                                    'source_type': 'manual',
-                                    'category': catStr,
-                                    'amount': amt.toString(),
-                                    'status': 'Sukses',
-                                    'transaction_date': selectedDate.toIso8601String(),
-                                    'description': desc,
-                                    'buyer_name': state.loggedInName ?? 'CyrenElysia~♪',
-                                  });
+                              try {
+                                await SupabaseService.client
+                                    .schema('pharmacy')
+                                    .from('financial_transactions')
+                                    .insert(txPayload);
+                              } catch (_) {
+                                try {
+                                  await SupabaseService.client
+                                      .from('financial_transactions')
+                                      .insert(txPayload);
+                                } catch (e2) {
+                                  debugPrint('Note on insert manual transaction: $e2');
+                                }
+                              }
                             }
 
                             await _fetchDbData();
@@ -622,7 +659,6 @@ class _ApotekLaporanState extends ConsumerState<ApotekLaporan> {
                             }
                           } catch (e) {
                             debugPrint('Error saving transaction: $e');
-                            // Fallback local update
                             setState(() {
                               if (existing != null) {
                                 existing.type = selectedType;
