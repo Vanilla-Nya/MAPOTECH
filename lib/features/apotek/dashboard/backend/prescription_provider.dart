@@ -117,12 +117,14 @@ class ApotekPrescriptionNotifier extends StateNotifier<List<ApotekPrescriptionOr
         }
 
         String displayStatus = 'pending';
-        if (status == 'pending_checkout') {
+        if (status == 'pending_checkout' || status == 'ready' || status == 'siap_checkout') {
           displayStatus = 'ready';
-        } else if (status == 'checked_out') {
+        } else if (status == 'compounding' || status == 'diracik') {
+          displayStatus = 'compounding';
+        } else if (status == 'checked_out' || status == 'completed') {
           displayStatus = 'completed';
         } else {
-          displayStatus = status;
+          displayStatus = 'pending';
         }
 
         loaded.add(ApotekPrescriptionOrder(
@@ -165,6 +167,8 @@ class ApotekPrescriptionNotifier extends StateNotifier<List<ApotekPrescriptionOr
       dbStatus = 'pending_checkout';
     } else if (newStatus == 'completed') {
       dbStatus = 'checked_out';
+    } else if (newStatus == 'compounding') {
+      dbStatus = 'compounding';
     } else {
       dbStatus = newStatus;
     }

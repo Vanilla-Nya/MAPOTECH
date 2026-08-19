@@ -320,6 +320,11 @@ List<DrawerMenuItem> getMenuItemsForRole(
         icon: Icons.dashboard_rounded,
       ),
       DrawerMenuItem(
+        id: 'ai_assistant',
+        label: isEn ? 'AI Helper' : 'Asisten AI',
+        icon: Icons.smart_toy_rounded,
+      ),
+      DrawerMenuItem(
         id: 'qr_scanner',
         label: isEn ? 'Scan QR Code' : 'Scan QR Dokter & Apotek',
         icon: Icons.qr_code_scanner_rounded,
@@ -728,8 +733,10 @@ class DashboardDrawer extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 8),
               children: _getMenuItemsForRole(state)
                   .where((item) {
-                    // Dashboard is always fixed
-                    if (item.id == 'dashboard') return true;
+                    // Dashboard and AI Assistant are always fixed
+                    if (item.id == 'dashboard' || item.id == 'ai_assistant') {
+                      return true;
+                    }
                     // Otherwise, only show if marked as favorite
                     return state.favoriteMenuItems.contains(item.id);
                   })

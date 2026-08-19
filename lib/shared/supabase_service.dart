@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -8,13 +9,16 @@ import 'package:bcrypt/bcrypt.dart';
 
 class SupabaseService {
   static String get _baseUrl {
-    final url = dotenv.env['SUPABASE_URL'] ?? 'https://abdburxhqqwsobmzuwmz.supabase.co';
+    final url =
+        dotenv.env['SUPABASE_URL'] ??
+        'https://abdburxhqqwsobmzuwmz.supabase.co';
     final cleanUrl = url.endsWith('/') ? url.substring(0, url.length - 1) : url;
     return '$cleanUrl/rest/v1';
   }
-  static String get _anonKey => dotenv.env['SUPABASE_ANON_KEY'] ??
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFiZGJ1cnhocXF3c29ibXp1d216Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0OTMyNjYsImV4cCI6MjA5MjA2OTI2Nn0.mB3qIJAHjtWe5UKxE9Oj-RNLQCbQKFYHUZBLaF4nQwk';
 
+  static String get _anonKey =>
+      dotenv.env['SUPABASE_ANON_KEY'] ??
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFiZGJ1cnhocXF3c29ibXp1d216Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0OTMyNjYsImV4cCI6MjA5MjA2OTI2Nn0.mB3qIJAHjtWe5UKxE9Oj-RNLQCbQKFYHUZBLaF4nQwk';
 
   /// Convenience getter for the Supabase client (requires Supabase.initialize() called at startup)
   static SupabaseClient get client => Supabase.instance.client;
@@ -69,11 +73,7 @@ class SupabaseService {
       }
 
       // Send onboarding welcome email via Resend API asynchronously
-      sendWelcomeEmail(
-        email: email,
-        name: name,
-        role: role,
-      ).catchError((e) {
+      sendWelcomeEmail(email: email, name: name, role: role).catchError((e) {
         print('Failed to send welcome email: $e');
         return false;
       });
@@ -95,7 +95,9 @@ class SupabaseService {
   /// Returns true if it exists, false otherwise.
   Future<bool> checkEmailExists(String email) async {
     try {
-      final rows = await _get('user?email=eq.${Uri.encodeComponent(email)}&limit=1');
+      final rows = await _get(
+        'user?email=eq.${Uri.encodeComponent(email)}&limit=1',
+      );
       return rows.isNotEmpty;
     } catch (e) {
       print('Error checking email: $e');
@@ -148,7 +150,8 @@ class SupabaseService {
           'from': 'MAPOTECH <no-reply@Relvastudio.com>',
           'to': email,
           'subject': 'Welcome to MAPOTECH!',
-          'html': '''
+          'html':
+              '''
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en">
 <head>
@@ -190,7 +193,11 @@ class SupabaseService {
                                     <td style="padding: 16px; font-size: 13px; color: #1B4F42; line-height: 1.5;">
                                         <strong>Account Info:</strong><br/>
                                         • Email: $email<br/>
-                                        • Registered As: ${role == 'patient' ? 'Patient (Masyarakat)' : role == 'praktikmandiri' ? 'Private Practice (Doctor)' : 'Pharmacy (Apotek)'}
+                                        • Registered As: ${role == 'patient'
+                  ? 'Patient (Masyarakat)'
+                  : role == 'praktikmandiri'
+                  ? 'Private Practice (Doctor)'
+                  : 'Pharmacy (Apotek)'}
                                     </td>
                                 </tr>
                             </table>
@@ -244,10 +251,7 @@ class SupabaseService {
       // Invoke Supabase Edge Function to send email without CORS errors
       final response = await client.functions.invoke(
         'otp-handler',
-        body: {
-          'action': 'send',
-          'email': email,
-        },
+        body: {'action': 'send', 'email': email},
       );
 
       if (response.status != 200) {
@@ -402,18 +406,51 @@ class SupabaseService {
 
   // Fetch real digital prescriptions
   Future<List<Map<String, dynamic>>> fetchPendingPrescriptions() async {
-    final prescriptions = await _get(
-      'external_prescriptions?select=*&status=neq.checked_out',
-      schema: 'pharmacy',
-    );
-    return prescriptions.map((p) => p as Map<String, dynamic>).toList();
+    try {
+      final res = await client
+          .schema('pharmacy')
+          .from('external_prescriptions')
+          .select('*')
+          .not('status', 'in', '(checked_out,completed)')
+          .order('created_at', ascending: false);
+      return List<Map<String, dynamic>>.from(res);
+    } catch (_) {
+      try {
+        final prescriptions = await _get(
+          'external_prescriptions?select=*&status=neq.checked_out&status=neq.completed',
+          schema: 'pharmacy',
+        );
+        return prescriptions.map((p) => p as Map<String, dynamic>).toList();
+      } catch (e) {
+        return [];
+      }
+    }
   }
 
   // Adjust stock count inside medicine batches
   Future<void> adjustBatchStock(String batchId, int newQuantity) async {
-    await _patch('medicine_batches?id=eq.$batchId', {
-      'quantity_in_stock': newQuantity.toString(),
-    }, schema: 'pharmacy');
+    try {
+      await client.rpc('rpc_adjust_pharmacy_batch_stock', params: {
+        'p_batch_id': batchId,
+        'p_new_quantity': newQuantity.toString(),
+      });
+    } catch (_) {
+      try {
+        await client
+            .schema('pharmacy')
+            .from('medicine_batches')
+            .update({'quantity_in_stock': newQuantity.toString()})
+            .eq('id', batchId);
+      } catch (_) {
+        try {
+          await _patch('medicine_batches?id=eq.$batchId', {
+            'quantity_in_stock': newQuantity.toString(),
+          }, schema: 'pharmacy');
+        } catch (e) {
+          debugPrint('Warning adjusting batch stock: $e');
+        }
+      }
+    }
   }
 
   // Create new medicine
@@ -422,7 +459,10 @@ class SupabaseService {
   }
 
   // Update existing medicine
-  Future<void> updateMedicine(String medicineId, Map<String, dynamic> data) async {
+  Future<void> updateMedicine(
+    String medicineId,
+    Map<String, dynamic> data,
+  ) async {
     await _patch('medicines?id=eq.$medicineId', data, schema: 'pharmacy');
   }
 
@@ -432,12 +472,17 @@ class SupabaseService {
   }
 
   // Create new medicine batch
-  Future<Map<String, dynamic>> createMedicineBatch(Map<String, dynamic> data) async {
+  Future<Map<String, dynamic>> createMedicineBatch(
+    Map<String, dynamic> data,
+  ) async {
     return await _post('medicine_batches', data, schema: 'pharmacy');
   }
 
   // Update existing medicine batch
-  Future<void> updateMedicineBatch(String batchId, Map<String, dynamic> data) async {
+  Future<void> updateMedicineBatch(
+    String batchId,
+    Map<String, dynamic> data,
+  ) async {
     await _patch('medicine_batches?id=eq.$batchId', data, schema: 'pharmacy');
   }
 
@@ -448,9 +493,21 @@ class SupabaseService {
 
   // Update digital prescription status
   Future<void> updatePrescriptionStatus(String rxId, String status) async {
-    await _patch('external_prescriptions?id=eq.$rxId', {
-      'status': status,
-    }, schema: 'pharmacy');
+    try {
+      await client
+          .schema('pharmacy')
+          .from('external_prescriptions')
+          .update({'status': status})
+          .eq('id', rxId);
+    } catch (_) {
+      try {
+        await _patch('external_prescriptions?id=eq.$rxId', {
+          'status': status,
+        }, schema: 'pharmacy');
+      } catch (e) {
+        debugPrint('Warning updating prescription status: $e');
+      }
+    }
   }
 
   // Submit POS checkout transaction & transaction items to database, and deduct batch stock
@@ -462,8 +519,13 @@ class SupabaseService {
     String? idUser,
   }) async {
     final now = DateTime.now();
-    final dateStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-    final receiptNumber = 'STR-${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}-${now.millisecondsSinceEpoch.toString().substring(7)}';
+    final dateStr =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final receiptNumber =
+        'STR-${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}-${now.millisecondsSinceEpoch.toString().substring(7)}';
+
+    final isValidUserUuid =
+        idUser != null && RegExp(r'^[0-9a-fA-F\-]{36}$').hasMatch(idUser);
 
     // 1. Insert into pharmacy.financial_transactions
     final txData = <String, dynamic>{
@@ -477,80 +539,92 @@ class SupabaseService {
       'transaction_date': dateStr,
       'payment_method': paymentMethod,
       'buyer_name': buyerName,
-      if (idUser != null && idUser.isNotEmpty) 'id_user': idUser,
+      if (isValidUserUuid) 'id_user': idUser,
     };
 
     Map<String, dynamic> createdTx = {};
     try {
-      final res = await client
-          .schema('pharmacy')
-          .from('financial_transactions')
-          .insert(txData)
-          .select();
-      if (res.isNotEmpty) {
-        createdTx = Map<String, dynamic>.from(res.first);
+      final rpcRes = await client.rpc('rpc_insert_pharmacy_transaction', params: {
+        'p_transaction_type': 'penjualan',
+        'p_source_type': 'sale',
+        'p_id_source': receiptNumber,
+        'p_description': 'POS sale $receiptNumber',
+        'p_amount': total,
+        'p_category': 'sales',
+        'p_status': 'active',
+        'p_transaction_date': dateStr,
+        'p_payment_method': paymentMethod,
+        'p_buyer_name': buyerName,
+        'p_id_user': isValidUserUuid ? idUser : null,
+      });
+      if (rpcRes != null && rpcRes is Map) {
+        createdTx = Map<String, dynamic>.from(rpcRes);
       }
-    } catch (_) {
+    } catch (e1) {
       try {
-        final resFallback = await client
-            .from('financial_transactions')
+        final res = await client
+            .from('v_pharmacy_financial_transactions')
             .insert(txData)
             .select();
-        if (resFallback.isNotEmpty) {
-          createdTx = Map<String, dynamic>.from(resFallback.first);
+        if (res.isNotEmpty) {
+          createdTx = Map<String, dynamic>.from(res.first);
         }
-      } catch (e) {
+      } catch (e2) {
         try {
-          createdTx = await _post('financial_transactions', txData, schema: 'pharmacy');
-        } catch (e2) {
-          print('Warning inserting financial_transaction: $e2');
+          final resFallback = await client
+              .schema('pharmacy')
+              .from('financial_transactions')
+              .insert(txData)
+              .select();
+          if (resFallback.isNotEmpty) {
+            createdTx = Map<String, dynamic>.from(resFallback.first);
+          }
+        } catch (e3) {
+          debugPrint('Notice inserting transaction: $e1 / $e2 / $e3');
         }
       }
     }
 
-    final txId = createdTx['id'] ?? 'tx-${now.millisecondsSinceEpoch}';
+    final txId = createdTx['id']?.toString();
 
     // 2. Insert line items into pharmacy.transaction_items & deduct batch stock
     for (final item in items) {
       final batchId = item['batchId']?.toString() ?? '';
       final qty = int.tryParse(item['qty']?.toString() ?? '1') ?? 1;
       final price = double.tryParse(item['price']?.toString() ?? '0') ?? 0.0;
-      final subtotal = double.tryParse(item['subtotal']?.toString() ?? '0') ?? (price * qty);
+      final subtotal =
+          double.tryParse(item['subtotal']?.toString() ?? '0') ?? (price * qty);
       final currentStock = int.tryParse(item['stock']?.toString() ?? '0') ?? 0;
+      final isValidBatchUuid = RegExp(r'^[0-9a-fA-F\-]{36}$').hasMatch(batchId);
+      final isValidTxUuid = txId != null && RegExp(r'^[0-9a-fA-F\-]{36}$').hasMatch(txId);
 
       if (batchId.isNotEmpty) {
-        final itemPayload = <String, dynamic>{
-          'id_transaction': txId,
-          'id_medicine_batch': batchId,
-          'quantity': qty.toString(),
-          'unit_price': price.toString(),
-          'subtotal': subtotal.toString(),
-          'tax_amount': '0',
-          'total_amount': subtotal.toString(),
-          'is_refunded': 'false',
-          'notes': 'POS sale $receiptNumber',
-        };
-
-        try {
-          await client.schema('pharmacy').from('transaction_items').insert(itemPayload);
-        } catch (_) {
+        if (isValidTxUuid && isValidBatchUuid) {
           try {
-            await client.from('transaction_items').insert(itemPayload);
-          } catch (_) {
-            try {
-              await _post('transaction_items', itemPayload, schema: 'pharmacy');
-            } catch (e) {
-              print('Warning inserting transaction_item: $e');
-            }
+            await client.rpc('rpc_insert_pharmacy_transaction_item', params: {
+              'p_id_transaction': txId,
+              'p_id_medicine_batch': batchId,
+              'p_quantity': qty.toString(),
+              'p_unit_price': price.toString(),
+              'p_subtotal': subtotal.toString(),
+              'p_tax_amount': '0',
+              'p_total_amount': subtotal.toString(),
+              'p_is_refunded': 'false',
+              'p_notes': 'POS sale $receiptNumber',
+            });
+          } catch (e) {
+            debugPrint('Notice rpc item insert: $e');
           }
         }
 
         // Deduct batch stock
         final newStock = (currentStock - qty).clamp(0, 999999);
-        try {
-          await adjustBatchStock(batchId, newStock);
-        } catch (e) {
-          print('Warning adjusting batch stock: $e');
+        if (isValidBatchUuid) {
+          try {
+            await adjustBatchStock(batchId, newStock);
+          } catch (e) {
+            debugPrint('Notice adjusting batch stock: $e');
+          }
         }
       }
     }
@@ -574,7 +648,8 @@ class SupabaseService {
         return {
           'is_locked': true,
           'is_verified': false,
-          'error': 'Akses Dibatasi: Hanya Apotek resmi yang memiliki otorisasi untuk membuka enkripsi QR Resep Digital.',
+          'error':
+              'Akses Dibatasi: Hanya Apotek resmi yang memiliki otorisasi untuk membuka enkripsi QR Resep Digital.',
         };
       }
 
@@ -586,7 +661,9 @@ class SupabaseService {
       bool isRecognizedPrescriptionFormat = false;
 
       if (cleanPayload.startsWith('MAPOTECH-SECURE-RX:')) {
-        prescriptionId = cleanPayload.replaceFirst('MAPOTECH-SECURE-RX:', '').trim();
+        prescriptionId = cleanPayload
+            .replaceFirst('MAPOTECH-SECURE-RX:', '')
+            .trim();
         isRecognizedPrescriptionFormat = true;
       } else if (cleanPayload.contains('/resep/')) {
         // e.g. https://mapotech.id/resep/c62d3cce-84e6-4d84-ae29-1c1119694be5
@@ -598,7 +675,8 @@ class SupabaseService {
       } else if (cleanPayload.startsWith('{') && cleanPayload.endsWith('}')) {
         try {
           decodedPayload = jsonDecode(cleanPayload);
-          prescriptionId = decodedPayload?['prescription_id']?.toString() ??
+          prescriptionId =
+              decodedPayload?['prescription_id']?.toString() ??
               decodedPayload?['id']?.toString() ??
               '';
           if (prescriptionId.isNotEmpty || decodedPayload?['items'] != null) {
@@ -607,11 +685,14 @@ class SupabaseService {
         } catch (_) {}
       } else {
         // Check if raw payload is a UUID (e.g. c62d3cce-84e6-4d84-ae29-1c1119694be5)
-        final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
+        final uuidRegex = RegExp(
+          r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+        );
         if (uuidRegex.hasMatch(cleanPayload)) {
           prescriptionId = cleanPayload;
           isRecognizedPrescriptionFormat = true;
-        } else if (cleanPayload.startsWith('RX-') || cleanPayload.contains('RX')) {
+        } else if (cleanPayload.startsWith('RX-') ||
+            cleanPayload.contains('RX')) {
           prescriptionId = cleanPayload;
           isRecognizedPrescriptionFormat = true;
         }
@@ -632,9 +713,12 @@ class SupabaseService {
               .maybeSingle();
           if (res != null) {
             epRecord = Map<String, dynamic>.from(res);
-            final itemsRaw = epRecord['electronic_prescription_items'] as List<dynamic>?;
+            final itemsRaw =
+                epRecord['electronic_prescription_items'] as List<dynamic>?;
             if (itemsRaw != null) {
-              epItems = itemsRaw.map((i) => Map<String, dynamic>.from(i as Map)).toList();
+              epItems = itemsRaw
+                  .map((i) => Map<String, dynamic>.from(i as Map))
+                  .toList();
             }
             isRecognizedPrescriptionFormat = true;
           }
@@ -650,9 +734,12 @@ class SupabaseService {
                 .maybeSingle();
             if (res != null) {
               epRecord = Map<String, dynamic>.from(res);
-              final itemsRaw = epRecord['electronic_prescription_items'] as List<dynamic>?;
+              final itemsRaw =
+                  epRecord['electronic_prescription_items'] as List<dynamic>?;
               if (itemsRaw != null) {
-                epItems = itemsRaw.map((i) => Map<String, dynamic>.from(i as Map)).toList();
+                epItems = itemsRaw
+                    .map((i) => Map<String, dynamic>.from(i as Map))
+                    .toList();
               }
               isRecognizedPrescriptionFormat = true;
             }
@@ -661,11 +748,14 @@ class SupabaseService {
       }
 
       // If not recognized as a prescription at all (e.g. random barcode, website, payment QRIS)
-      if (!isRecognizedPrescriptionFormat && epRecord == null && decodedPayload == null) {
+      if (!isRecognizedPrescriptionFormat &&
+          epRecord == null &&
+          decodedPayload == null) {
         return {
           'is_locked': false,
           'is_verified': false,
-          'error': 'QR Code tidak dikenali sebagai E-Resep Dokter MAPOTECH. Scanner ini khusus untuk validasi dan penebusan resep medis.',
+          'error':
+              'QR Code tidak dikenali sebagai E-Resep Dokter MAPOTECH. Scanner ini khusus untuk validasi dan penebusan resep medis.',
         };
       }
 
@@ -705,19 +795,23 @@ class SupabaseService {
               final doctorMap = enc['doctor'] as Map<String, dynamic>?;
 
               if (patientMap != null) {
-                patientName = patientMap['name']?.toString() ??
+                patientName =
+                    patientMap['name']?.toString() ??
                     patientMap['nama']?.toString() ??
                     patientName;
                 patientNik = patientMap['nik']?.toString() ?? patientNik;
-                patientGender = patientMap['gender']?.toString() ??
+                patientGender =
+                    patientMap['gender']?.toString() ??
                     patientMap['jenis_kelamin']?.toString() ??
                     patientGender;
               }
               if (doctorMap != null) {
-                doctorName = doctorMap['name']?.toString() ??
+                doctorName =
+                    doctorMap['name']?.toString() ??
                     doctorMap['nama']?.toString() ??
                     doctorName;
-                doctorSip = doctorMap['sip_number']?.toString() ??
+                doctorSip =
+                    doctorMap['sip_number']?.toString() ??
                     doctorMap['sip']?.toString() ??
                     doctorSip;
               }
@@ -727,22 +821,27 @@ class SupabaseService {
       } else if (decodedPayload != null) {
         final itemsRaw = decodedPayload['items'] as List<dynamic>?;
         if (itemsRaw != null) {
-          epItems = itemsRaw.map((i) => Map<String, dynamic>.from(i as Map)).toList();
+          epItems = itemsRaw
+              .map((i) => Map<String, dynamic>.from(i as Map))
+              .toList();
         }
         doctorName = decodedPayload['doctor_name']?.toString() ?? doctorName;
         patientName = decodedPayload['patient_name']?.toString() ?? patientName;
         patientNik = decodedPayload['patient_nik']?.toString() ?? patientNik;
-      } else if (prescriptionId.contains('AGOES') || prescriptionId.contains('8827')) {
+      } else if (prescriptionId.contains('AGOES') ||
+          prescriptionId.contains('8827')) {
         doctorName = 'dr. Agoes Soetanto, Sp.PD';
         doctorSip = 'SIP. 446/128/DINKES/2024';
         patientName = 'Budi Santoso';
         patientNik = '3578012309870001';
-      } else if (prescriptionId.contains('MARIA') || prescriptionId.contains('9910')) {
+      } else if (prescriptionId.contains('MARIA') ||
+          prescriptionId.contains('9910')) {
         doctorName = 'dr. Maria Susanti, Sp.A';
         doctorSip = 'SIP. 446/092/DINKES/2023';
         patientName = 'Ananda Kevin';
         patientNik = '3578021104150002';
-      } else if (prescriptionId.contains('HENDRA') || prescriptionId.contains('4412')) {
+      } else if (prescriptionId.contains('HENDRA') ||
+          prescriptionId.contains('4412')) {
         doctorName = 'dr. Hendra Wijaya, Sp.PD';
         doctorSip = 'SIP. 446/301/DINKES/2024';
         patientName = 'Siti Nurhaliza';
@@ -751,7 +850,8 @@ class SupabaseService {
 
       // Fallback items if none found from database
       if (epItems.isEmpty) {
-        if (prescriptionId.contains('AGOES') || prescriptionId.contains('8827')) {
+        if (prescriptionId.contains('AGOES') ||
+            prescriptionId.contains('8827')) {
           epItems = [
             {
               'medicine_name': 'Amoxicillin 500mg',
@@ -775,7 +875,8 @@ class SupabaseService {
               'kfa_code': '93001031',
             },
           ];
-        } else if (prescriptionId.contains('MARIA') || prescriptionId.contains('9910')) {
+        } else if (prescriptionId.contains('MARIA') ||
+            prescriptionId.contains('9910')) {
           epItems = [
             {
               'medicine_name': 'Cefadroxil Sirup 125mg/5ml',
@@ -792,7 +893,8 @@ class SupabaseService {
               'kfa_code': '93002012',
             },
           ];
-        } else if (prescriptionId.contains('HENDRA') || prescriptionId.contains('4412')) {
+        } else if (prescriptionId.contains('HENDRA') ||
+            prescriptionId.contains('4412')) {
           epItems = [
             {
               'medicine_name': 'Metformin 500mg',
@@ -830,14 +932,25 @@ class SupabaseService {
         }
       }
 
-      final verificationHash = epRecord?['current_hash'] ??
+      final verificationHash =
+          epRecord?['current_hash'] ??
           (decodedPayload?['verification_hash'] ??
-              sha256.convert(utf8.encode(prescriptionId.isNotEmpty ? prescriptionId : 'MAPOTECH-VERIFIED-RX')).toString());
+              sha256
+                  .convert(
+                    utf8.encode(
+                      prescriptionId.isNotEmpty
+                          ? prescriptionId
+                          : 'MAPOTECH-VERIFIED-RX',
+                    ),
+                  )
+                  .toString());
 
       return {
         'is_locked': false,
         'is_verified': true,
-        'prescription_id': prescriptionId.isNotEmpty ? prescriptionId : 'RX-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
+        'prescription_id': prescriptionId.isNotEmpty
+            ? prescriptionId
+            : 'RX-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
         'doctor_name': doctorName,
         'doctor_sip': doctorSip,
         'clinic_name': clinicName,
@@ -845,13 +958,24 @@ class SupabaseService {
         'patient_nik': patientNik,
         'patient_gender': patientGender,
         'created_at': createdAt,
-        'items': epItems.map((i) => {
-          'name': i['medicine_name'] ?? i['name'] ?? 'Obat',
-          'qty': int.tryParse(i['quantity']?.toString() ?? i['qty']?.toString() ?? '1') ?? 1,
-          'dosage': i['dosage_instructions'] ?? i['dosage'] ?? 'Sesuai Petunjuk',
-          'unit': i['unit'] ?? 'Tablet',
-          'kfa_code': i['kfa_code'] ?? '-',
-        }).toList(),
+        'items': epItems
+            .map(
+              (i) => {
+                'name': i['medicine_name'] ?? i['name'] ?? 'Obat',
+                'qty':
+                    int.tryParse(
+                      i['quantity']?.toString() ?? i['qty']?.toString() ?? '1',
+                    ) ??
+                    1,
+                'dosage':
+                    i['dosage_instructions'] ??
+                    i['dosage'] ??
+                    'Sesuai Petunjuk',
+                'unit': i['unit'] ?? 'Tablet',
+                'kfa_code': i['kfa_code'] ?? '-',
+              },
+            )
+            .toList(),
         'verification_hash': verificationHash,
         'unlocked_by_apotek_id': apotekId,
         'unlocked_at': DateTime.now().toIso8601String(),
@@ -871,7 +995,8 @@ class SupabaseService {
     required String apotekId,
   }) async {
     try {
-      final sourceRxId = prescriptionData['prescription_id']?.toString() ?? _generateUuidV4();
+      final sourceRxId =
+          prescriptionData['prescription_id']?.toString() ?? _generateUuidV4();
       final now = DateTime.now();
       final notesPayload = jsonEncode({
         'patientName': prescriptionData['patient_name'] ?? 'Pasien',
@@ -883,16 +1008,22 @@ class SupabaseService {
       });
 
       final payload = <String, dynamic>{
-        'prescription_number': 'RX-${now.year}${now.month.toString().padLeft(2, '0')}-${now.millisecondsSinceEpoch.toString().substring(7)}',
+        'prescription_number':
+            'RX-${now.year}${now.month.toString().padLeft(2, '0')}-${now.millisecondsSinceEpoch.toString().substring(7)}',
         'prescription_date': now.toIso8601String().split('T').first,
         'prescription_source': 'private_doctor',
         'status': 'pending',
         'notes': notesPayload,
         'received_at': now.toIso8601String(),
-        if (sourceRxId.isNotEmpty && sourceRxId.length > 20) 'id_source_prescription': sourceRxId,
+        if (sourceRxId.isNotEmpty && sourceRxId.length > 20)
+          'id_source_prescription': sourceRxId,
       };
 
-      final created = await _post('external_prescriptions', payload, schema: 'pharmacy');
+      final created = await _post(
+        'external_prescriptions',
+        payload,
+        schema: 'pharmacy',
+      );
       return created;
     } catch (e) {
       print('Error ingesting prescription to pharmacy order: $e');
@@ -918,7 +1049,8 @@ class SupabaseService {
       });
 
       final payload = <String, dynamic>{
-        'prescription_number': 'PHYS-${now.year}${now.month.toString().padLeft(2, '0')}-${now.millisecondsSinceEpoch.toString().substring(7)}',
+        'prescription_number':
+            'PHYS-${now.year}${now.month.toString().padLeft(2, '0')}-${now.millisecondsSinceEpoch.toString().substring(7)}',
         'prescription_date': now.toIso8601String().split('T').first,
         'prescription_source': 'manual',
         'status': 'pending',
@@ -926,7 +1058,11 @@ class SupabaseService {
         'received_at': now.toIso8601String(),
       };
 
-      final created = await _post('external_prescriptions', payload, schema: 'pharmacy');
+      final created = await _post(
+        'external_prescriptions',
+        payload,
+        schema: 'pharmacy',
+      );
       return created;
     } catch (e) {
       print('Error creating physical prescription: $e');
@@ -936,25 +1072,29 @@ class SupabaseService {
 
   // Fetch real financial transactions
   Future<List<Map<String, dynamic>>> fetchFinancialTransactions() async {
+    final List<Map<String, dynamic>> results = [];
     try {
       final res = await client
-          .schema('pharmacy')
-          .from('financial_transactions')
+          .from('v_pharmacy_financial_transactions')
           .select('*')
           .order('transaction_date', ascending: false);
-      return List<Map<String, dynamic>>.from(res as List);
+      for (final item in res) {
+        results.add(Map<String, dynamic>.from(item));
+      }
     } catch (_) {
       try {
         final resFallback = await client
+            .schema('pharmacy')
             .from('financial_transactions')
             .select('*')
             .order('transaction_date', ascending: false);
-        return List<Map<String, dynamic>>.from(resFallback as List);
-      } catch (e) {
-        print('Error fetching financial transactions: $e');
-        return [];
-      }
+        for (final item in resFallback) {
+          results.add(Map<String, dynamic>.from(item));
+        }
+      } catch (_) {}
     }
+
+    return results;
   }
 
   // Query a user by email or username
@@ -1024,7 +1164,11 @@ class SupabaseService {
         ...data,
       });
     } catch (e) {
-      await _patch('user_detail_public_health_center?id=eq.$id', data, schema: 'public');
+      await _patch(
+        'user_detail_public_health_center?id=eq.$id',
+        data,
+        schema: 'public',
+      );
     }
   }
 
@@ -1047,7 +1191,6 @@ class SupabaseService {
     }
   }
 
-
   // Fetch village clinic (ponkesdes) details by user ID
   Future<Map<String, dynamic>?> fetchPonkesdesDetail(String id) async {
     try {
@@ -1064,7 +1207,11 @@ class SupabaseService {
 
   // Save village clinic (ponkesdes) details
   Future<void> savePonkesdesDetail(String id, Map<String, dynamic> data) async {
-    await _patch('user_detail_village_clinic?id=eq.$id', data, schema: 'public');
+    await _patch(
+      'user_detail_village_clinic?id=eq.$id',
+      data,
+      schema: 'public',
+    );
   }
 
   // Update patient profile data and patient_details in the database
@@ -1095,7 +1242,9 @@ class SupabaseService {
   // PATIENT FAMILY MEMBERS CRUD (patient_family_members table)
   // ─────────────────────────────────────────────────────────────────
 
-  Future<List<Map<String, dynamic>>> fetchFamilyMembers(String patientId) async {
+  Future<List<Map<String, dynamic>>> fetchFamilyMembers(
+    String patientId,
+  ) async {
     try {
       final response = await client
           .from('patient_family_members')
@@ -1109,14 +1258,16 @@ class SupabaseService {
     }
   }
 
-  Future<List<Map<String, dynamic>>> fetchAllFamilyMembersForUser(String userId) async {
+  Future<List<Map<String, dynamic>>> fetchAllFamilyMembersForUser(
+    String userId,
+  ) async {
     try {
       final hostRows = await client
           .from('patient_family_members')
           .select()
           .eq('patient_id', userId)
           .order('created_at', ascending: true);
-      
+
       if (hostRows.isNotEmpty) {
         return List<Map<String, dynamic>>.from(hostRows);
       }
@@ -1145,7 +1296,9 @@ class SupabaseService {
     }
   }
 
-  Future<Map<String, dynamic>?> addFamilyMember(Map<String, dynamic> memberData) async {
+  Future<Map<String, dynamic>?> addFamilyMember(
+    Map<String, dynamic> memberData,
+  ) async {
     try {
       final response = await client
           .from('patient_family_members')
@@ -1180,7 +1333,11 @@ class SupabaseService {
     }
   }
 
-  Future<bool> updateKepalaKeluargaStatus(String patientId, bool isKepala, {String? noKk}) async {
+  Future<bool> updateKepalaKeluargaStatus(
+    String patientId,
+    bool isKepala, {
+    String? noKk,
+  }) async {
     try {
       final payload = <String, dynamic>{
         'id': patientId,
@@ -1200,10 +1357,7 @@ class SupabaseService {
 
   Future<bool> deleteFamilyMember(String id) async {
     try {
-      await client
-          .from('patient_family_members')
-          .delete()
-          .eq('id', id);
+      await client.from('patient_family_members').delete().eq('id', id);
       return true;
     } catch (e) {
       print('Error deleting family member: $e');
@@ -1274,12 +1428,19 @@ class SupabaseService {
   }
 
   // Accept or reject a family member join request
-  Future<bool> updateFamilyMemberAcceptStatus(String memberId, {required bool accept, String? memberUserId}) async {
+  Future<bool> updateFamilyMemberAcceptStatus(
+    String memberId, {
+    required bool accept,
+    String? memberUserId,
+  }) async {
     try {
       if (accept) {
         await client
             .from('patient_family_members')
-            .update({'accept_kk': true, 'status_kesehatan': 'Disetujui / Aktif'})
+            .update({
+              'accept_kk': true,
+              'status_kesehatan': 'Disetujui / Aktif',
+            })
             .eq('id', memberId);
 
         if (memberUserId != null) {
@@ -1289,10 +1450,7 @@ class SupabaseService {
               .eq('id', memberUserId);
         }
       } else {
-        await client
-            .from('patient_family_members')
-            .delete()
-            .eq('id', memberId);
+        await client.from('patient_family_members').delete().eq('id', memberId);
       }
       return true;
     } catch (e) {
@@ -1364,17 +1522,14 @@ class SupabaseService {
     final tableName = getDetailTableNameForRole(role);
     if (tableName == null) return;
     try {
-      await client
-          .from(tableName)
-          .upsert({
-            'id': userId,
-            'favorite_menus': favoriteMenus,
-          });
+      await client.from(tableName).upsert({
+        'id': userId,
+        'favorite_menus': favoriteMenus,
+      });
     } catch (e) {
       print('Error saving favorite_menus to $tableName: $e');
     }
   }
-
 
   // Fetch patient queue entries from the database
   Future<List<Map<String, dynamic>>> fetchPatientQueues(
@@ -1459,7 +1614,9 @@ class SupabaseService {
   }
 
   // Fetch anamnesis associated with a clinical encounter
-  Future<Map<String, dynamic>?> fetchEncounterAnamnesis(String encounterId) async {
+  Future<Map<String, dynamic>?> fetchEncounterAnamnesis(
+    String encounterId,
+  ) async {
     try {
       final res = await client
           .schema('private_doctor')
@@ -1487,7 +1644,8 @@ class SupabaseService {
           .eq('id_clinical_encounters', encounterId);
 
       for (final medRow in medicinesRes) {
-        final qty = double.tryParse(medRow['quantity']?.toString() ?? '0') ?? 0.0;
+        final qty =
+            double.tryParse(medRow['quantity']?.toString() ?? '0') ?? 0.0;
         final detailMedId = medRow['id_detail_medicine'];
         if (detailMedId != null) {
           final dmRes = await client
@@ -1536,7 +1694,8 @@ class SupabaseService {
         final items = epRes['electronic_prescription_items'] as List<dynamic>?;
         if (items != null) {
           for (final item in items) {
-            final qty = double.tryParse(item['quantity']?.toString() ?? '1') ?? 1.0;
+            final qty =
+                double.tryParse(item['quantity']?.toString() ?? '1') ?? 1.0;
             medicinesList.add({
               'name': item['medicine_name']?.toString() ?? 'Obat Resep',
               'quantity': qty.toInt(),
@@ -1571,13 +1730,20 @@ class SupabaseService {
             .select('*, medicine_batches(*)')
             .eq('id_transaction', transactionId);
         return List<Map<String, dynamic>>.from(resFallback as List);
-      } catch (e) {
-        print('Error fetching transaction items: $e');
-        return [];
+      } catch (_) {
+        try {
+          final resPublic = await client
+              .from('transaction_items')
+              .select('*')
+              .eq('id_transaction', transactionId);
+          return List<Map<String, dynamic>>.from(resPublic as List);
+        } catch (e) {
+          print('Error fetching transaction items: $e');
+          return [];
+        }
       }
     }
   }
-
 
   // Fetch a user record by ID
   Future<Map<String, dynamic>?> fetchUserById(String userId) async {
@@ -1833,10 +1999,7 @@ class SupabaseService {
       await _patch('user?id=eq.$assistantId', userData, schema: 'public');
 
       // 2. Update user_detail_doctor_assistant table
-      final assistantData = {
-        'sip': sip,
-        'peran': peran,
-      };
+      final assistantData = {'sip': sip, 'peran': peran};
       await _patch(
         'user_detail_doctor_assistant?id=eq.$assistantId',
         assistantData,
@@ -1890,7 +2053,9 @@ class SupabaseService {
   }
 
   // Fetch pharmacist staff
-  Future<List<Map<String, dynamic>>> fetchPharmacistStaff(String apotekId) async {
+  Future<List<Map<String, dynamic>>> fetchPharmacistStaff(
+    String apotekId,
+  ) async {
     try {
       final rows = await _get(
         'user_detail_pharmacist_staff?select=*,user:id(name,email,nik,phone_number,username,gender,birth_place,birth_date,address,province,district,sub_district,village,created_at)&apotek_id=eq.$apotekId',
@@ -1988,11 +2153,7 @@ class SupabaseService {
         'shift': shift,
         'status': 'Active',
       };
-      await _post(
-        'user_detail_pharmacist_staff',
-        staffData,
-        schema: 'public',
-      );
+      await _post('user_detail_pharmacist_staff', staffData, schema: 'public');
     } catch (e) {
       throw Exception('Gagal mendaftarkan staff apotek: $e');
     }
@@ -2015,11 +2176,9 @@ class SupabaseService {
   // Update duty status
   Future<void> updatePharmacistStaffDuty(String staffId, bool isActive) async {
     try {
-      await _patch(
-        'user_detail_pharmacist_staff?id=eq.$staffId',
-        {'status': isActive ? 'Active' : 'Inactive'},
-        schema: 'public',
-      );
+      await _patch('user_detail_pharmacist_staff?id=eq.$staffId', {
+        'status': isActive ? 'Active' : 'Inactive',
+      }, schema: 'public');
     } catch (e) {
       throw Exception('Gagal memperbarui status staff apotek: $e');
     }
@@ -2028,11 +2187,9 @@ class SupabaseService {
   // Update shift
   Future<void> updatePharmacistStaffShift(String staffId, String shift) async {
     try {
-      await _patch(
-        'user_detail_pharmacist_staff?id=eq.$staffId',
-        {'shift': shift},
-        schema: 'public',
-      );
+      await _patch('user_detail_pharmacist_staff?id=eq.$staffId', {
+        'shift': shift,
+      }, schema: 'public');
     } catch (e) {
       throw Exception('Gagal memperbarui shift staff apotek: $e');
     }
@@ -2203,7 +2360,6 @@ class SupabaseService {
     }
   }
 
-
   // ─────────────────────────────────────────────────────────────────
   // DOCTOR'S QUEUE (ANTRIAN) - public schema view & RPCs
   // ─────────────────────────────────────────────────────────────────
@@ -2269,12 +2425,12 @@ class SupabaseService {
   }
 
   // Update patient_type on a queue entry (hash-chain aware via RPC)
-  Future<void> updateQueuePatientType(String queueId, String patientType) async {
+  Future<void> updateQueuePatientType(
+    String queueId,
+    String patientType,
+  ) async {
     try {
-      final rpcData = {
-        'p_queue_id': queueId,
-        'p_patient_type': patientType,
-      };
+      final rpcData = {'p_queue_id': queueId, 'p_patient_type': patientType};
       await _post('rpc/update_queue_patient_type', rpcData, schema: 'public');
     } catch (e) {
       throw Exception('Gagal memperbarui tipe pasien antrian: $e');
@@ -2816,7 +2972,10 @@ class SupabaseService {
   // Fetch all private practice doctors and midwives with their profile details and queues
   Future<List<Map<String, dynamic>>> fetchAllDoctors() async {
     try {
-      final doctorsRaw = await _get('user_detail_doctor?select=*,user:id(*)', schema: 'public');
+      final doctorsRaw = await _get(
+        'user_detail_doctor?select=*,user:id(*)',
+        schema: 'public',
+      );
 
       List<dynamic> queuesRaw = [];
       try {
@@ -2826,13 +2985,13 @@ class SupabaseService {
       }
 
       final Map<String, Map<String, dynamic>> queuesMap = {
-        for (var q in queuesRaw) 
+        for (var q in queuesRaw)
           if (q is Map && q['id_doctor'] != null)
             (q['id_doctor'] as String): Map<String, dynamic>.from(q),
       };
 
       final List<Map<String, dynamic>> doctorsList = [];
-      
+
       // Map Private Practice Doctors & Midwives
       for (final doc in doctorsRaw) {
         if (doc is! Map) continue;
@@ -2840,11 +2999,13 @@ class SupabaseService {
         final userRaw = docMap['user'];
         if (userRaw != null && userRaw is Map) {
           final userMap = Map<String, dynamic>.from(userRaw);
-          
+
           final doctorId = docMap['id'] as String;
           final queueInfo = queuesMap[doctorId];
 
-          final subStatus = (docMap['subscription_status'] ?? 'INACTIVE').toString().toUpperCase();
+          final subStatus = (docMap['subscription_status'] ?? 'INACTIVE')
+              .toString()
+              .toUpperCase();
           final subExpiredAt = docMap['subscription_expired_at'];
           bool isSubActive = false;
           if (subStatus == 'ACTIVE' && subExpiredAt != null) {
@@ -2860,13 +3021,15 @@ class SupabaseService {
             'id': doctorId,
             'name': userMap['name'] ?? '',
             'email': userMap['email'] ?? '',
-            'avatar_url': userMap['avatar_url'] ?? docMap['satusehat_photo_url'],
+            'avatar_url':
+                userMap['avatar_url'] ?? docMap['satusehat_photo_url'],
             'nama_faskes': docMap['nama_faskes'] ?? 'Praktek Mandiri',
             'profession': docMap['profession'] ?? 'Dokter',
             'is_visible': isVisible,
             'is_bpjs': docMap['is_bpjs'] ?? false,
             'about': docMap['about'] ?? '',
-            'whatsapp_number': docMap['whatsapp_number'] ?? userMap['phone_number'] ?? '',
+            'whatsapp_number':
+                docMap['whatsapp_number'] ?? userMap['phone_number'] ?? '',
             'latitude': docMap['latitude'],
             'longitude': docMap['longitude'],
             'default_service_fee': docMap['default_service_fee'] ?? 0.0,
@@ -2892,22 +3055,32 @@ class SupabaseService {
   }
 
   /// Direct lookup of a doctor by their queue QR token or ID (bypassing visibility filters)
-  Future<Map<String, dynamic>?> fetchDoctorByQrTokenOrId(String tokenOrId) async {
+  Future<Map<String, dynamic>?> fetchDoctorByQrTokenOrId(
+    String tokenOrId,
+  ) async {
     try {
       final clean = tokenOrId.trim();
       if (clean.isEmpty) return null;
 
       // Try by qr_token first
-      var rows = await _get('user_detail_doctor?qr_token=eq.$clean&select=*,user:id(*)', schema: 'public');
+      var rows = await _get(
+        'user_detail_doctor?qr_token=eq.$clean&select=*,user:id(*)',
+        schema: 'public',
+      );
       if (rows.isEmpty) {
         // Try by ID directly
-        rows = await _get('user_detail_doctor?id=eq.$clean&select=*,user:id(*)', schema: 'public');
+        rows = await _get(
+          'user_detail_doctor?id=eq.$clean&select=*,user:id(*)',
+          schema: 'public',
+        );
       }
 
       if (rows.isNotEmpty && rows.first is Map) {
         final docMap = Map<String, dynamic>.from(rows.first);
         final userRaw = docMap['user'];
-        final userMap = userRaw is Map ? Map<String, dynamic>.from(userRaw) : <String, dynamic>{};
+        final userMap = userRaw is Map
+            ? Map<String, dynamic>.from(userRaw)
+            : <String, dynamic>{};
         return {
           'id': docMap['id'] ?? '',
           'name': userMap['name'] ?? '',
@@ -2918,7 +3091,8 @@ class SupabaseService {
           'is_visible': docMap['is_visible'] ?? true,
           'is_bpjs': docMap['is_bpjs'] ?? false,
           'about': docMap['about'] ?? '',
-          'whatsapp_number': docMap['whatsapp_number'] ?? userMap['phone_number'] ?? '',
+          'whatsapp_number':
+              docMap['whatsapp_number'] ?? userMap['phone_number'] ?? '',
           'latitude': docMap['latitude'],
           'longitude': docMap['longitude'],
           'default_service_fee': docMap['default_service_fee'] ?? 0.0,
@@ -2945,14 +3119,20 @@ class SupabaseService {
     try {
       List<dynamic> puskesmasRaw = [];
       try {
-        puskesmasRaw = await _get('user_detail_public_health_center?select=*,user:id(*)', schema: 'public');
+        puskesmasRaw = await _get(
+          'user_detail_public_health_center?select=*,user:id(*)',
+          schema: 'public',
+        );
       } catch (e) {
         print('Error fetching puskesmas: $e');
       }
 
       List<dynamic> ponkesdesRaw = [];
       try {
-        ponkesdesRaw = await _get('user_detail_village_clinic?select=*,user:id(*)', schema: 'public');
+        ponkesdesRaw = await _get(
+          'user_detail_village_clinic?select=*,user:id(*)',
+          schema: 'public',
+        );
       } catch (e) {
         print('Error fetching ponkesdes: $e');
       }
@@ -2975,7 +3155,7 @@ class SupabaseService {
           final userMap = Map<String, dynamic>.from(userRaw);
           final puskId = puskMap['id'] as String;
           final isVisible = puskMap['is_visible'] ?? true;
-          
+
           final mapsLink = puskMap['google_maps_link'] ?? '';
           final coords = extractLatLngFromMapsLink(mapsLink);
 
@@ -2991,17 +3171,24 @@ class SupabaseService {
             'is_visible': isVisible,
             'is_bpjs': puskMap['is_bpjs'] ?? true,
             'about': puskMap['about'] ?? '',
-            'whatsapp_number': puskMap['phone'] ?? userMap['phone_number'] ?? '',
+            'whatsapp_number':
+                puskMap['phone'] ?? userMap['phone_number'] ?? '',
             'latitude': coords['latitude'] ?? puskMap['latitude'],
             'longitude': coords['longitude'] ?? puskMap['longitude'],
             'default_service_fee': 0.0,
             'address': puskMap['address'] ?? userMap['address'] ?? '',
             'province': puskMap['province'] ?? userMap['province'] ?? '',
             'district': puskMap['district'] ?? userMap['district'] ?? '',
-            'sub_district': puskMap['sub_district'] ?? userMap['sub_district'] ?? '',
+            'sub_district':
+                puskMap['sub_district'] ?? userMap['sub_district'] ?? '',
             'village': puskMap['village'] ?? userMap['village'] ?? '',
             'google_maps_link': mapsLink,
-            'clusters': const ['Cluster 1 (Manajemen)', 'Cluster 2 (KIA)', 'Cluster 3 (Dewasa & Lansia)', 'Lintas Cluster (UGD & Lab)'],
+            'clusters': const [
+              'Cluster 1 (Manajemen)',
+              'Cluster 2 (KIA)',
+              'Cluster 3 (Dewasa & Lansia)',
+              'Lintas Cluster (UGD & Lab)',
+            ],
           });
         }
       }
@@ -3015,7 +3202,7 @@ class SupabaseService {
           final userMap = Map<String, dynamic>.from(userRaw);
           final ponkId = ponkMap['id'] as String;
           final isVisible = ponkMap['is_visible'] ?? true;
-          
+
           final mapsLink = ponkMap['google_maps_link'] ?? '';
           final coords = extractLatLngFromMapsLink(mapsLink);
 
@@ -3031,14 +3218,16 @@ class SupabaseService {
             'is_visible': isVisible,
             'is_bpjs': ponkMap['is_bpjs'] ?? false,
             'about': ponkMap['about'] ?? '',
-            'whatsapp_number': ponkMap['phone'] ?? userMap['phone_number'] ?? '',
+            'whatsapp_number':
+                ponkMap['phone'] ?? userMap['phone_number'] ?? '',
             'latitude': coords['latitude'] ?? ponkMap['latitude'],
             'longitude': coords['longitude'] ?? ponkMap['longitude'],
             'default_service_fee': 0.0,
             'address': ponkMap['address'] ?? userMap['address'] ?? '',
             'province': ponkMap['province'] ?? userMap['province'] ?? '',
             'district': ponkMap['district'] ?? userMap['district'] ?? '',
-            'sub_district': ponkMap['sub_district'] ?? userMap['sub_district'] ?? '',
+            'sub_district':
+                ponkMap['sub_district'] ?? userMap['sub_district'] ?? '',
             'village': ponkMap['village'] ?? userMap['village'] ?? '',
             'google_maps_link': mapsLink,
             'clusters': const ['Pelayanan Dasar Desa', 'Kesehatan Ibu & Anak'],
@@ -3064,7 +3253,8 @@ class SupabaseService {
           'profession': pustuMap['tipe'] ?? 'Pustu',
           'is_visible': true,
           'is_bpjs': true,
-          'about': 'Penanggung Jawab: ${pustuMap['penanggung_jawab'] ?? '-'} (${pustuMap['status_operasional'] ?? 'Buka'})',
+          'about':
+              'Penanggung Jawab: ${pustuMap['penanggung_jawab'] ?? '-'} (${pustuMap['status_operasional'] ?? 'Buka'})',
           'whatsapp_number': pustuMap['telepon'] ?? '',
           'latitude': pustuMap['latitude'],
           'longitude': pustuMap['longitude'],
@@ -3075,7 +3265,10 @@ class SupabaseService {
           'sub_district': pustuMap['kecamatan'] ?? '',
           'village': pustuMap['village'] ?? '',
           'google_maps_link': '',
-          'clusters': ['Pelayanan Pembantu Puskesmas', pustuMap['jam_layanan'] ?? 'Jam Kerja'],
+          'clusters': [
+            'Pelayanan Pembantu Puskesmas',
+            pustuMap['jam_layanan'] ?? 'Jam Kerja',
+          ],
         });
       }
 
@@ -3089,7 +3282,7 @@ class SupabaseService {
   /// Handles both @lat,lng format and q=lat,lng format.
   static Map<String, double?> extractLatLngFromMapsLink(String urlStr) {
     if (urlStr.isEmpty) return {'latitude': null, 'longitude': null};
-    
+
     // 1. Try matching @-7.973354,113.8801833
     final atRegex = RegExp(r'@(-?\d+\.\d+),(-?\d+\.\d+)');
     var match = atRegex.firstMatch(urlStr);
@@ -3099,7 +3292,7 @@ class SupabaseService {
         'longitude': double.tryParse(match.group(2) ?? ''),
       };
     }
-    
+
     // 2. Try matching q=-7.973354,113.8801833
     final qRegex = RegExp(r'[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)');
     match = qRegex.firstMatch(urlStr);
@@ -3109,15 +3302,18 @@ class SupabaseService {
         'longitude': double.tryParse(match.group(2) ?? ''),
       };
     }
-    
+
     return {'latitude': null, 'longitude': null};
   }
 
   // Fetch all pharmacies with their user profile details
   Future<List<Map<String, dynamic>>> fetchAllPharmacies() async {
     try {
-      final pharmaciesRaw = await _get('user_detail_pharmacist?select=*,user:id(*)', schema: 'public');
-      
+      final pharmaciesRaw = await _get(
+        'user_detail_pharmacist?select=*,user:id(*)',
+        schema: 'public',
+      );
+
       final List<Map<String, dynamic>> pharmaciesList = [];
       for (final pharm in pharmaciesRaw) {
         if (pharm is! Map) continue;
@@ -3125,8 +3321,10 @@ class SupabaseService {
         final userRaw = pharmMap['user'];
         if (userRaw != null && userRaw is Map) {
           final userMap = Map<String, dynamic>.from(userRaw);
-          
-          final subStatus = (pharmMap['subscription_status'] ?? 'INACTIVE').toString().toUpperCase();
+
+          final subStatus = (pharmMap['subscription_status'] ?? 'INACTIVE')
+              .toString()
+              .toUpperCase();
           final subExpiredAt = pharmMap['subscription_expired_at'];
           bool isSubActive = false;
           if (subStatus == 'ACTIVE' && subExpiredAt != null) {
@@ -3142,7 +3340,8 @@ class SupabaseService {
             'id': pharmMap['id'] as String,
             'name': userMap['name'] ?? '',
             'email': userMap['email'] ?? '',
-            'avatar_url': userMap['avatar_url'] ?? pharmMap['satusehat_photo_url'],
+            'avatar_url':
+                userMap['avatar_url'] ?? pharmMap['satusehat_photo_url'],
             'nama_faskes': pharmMap['nama_faskes'] ?? 'Apotek Mandiri',
             'latitude': pharmMap['latitude'],
             'longitude': pharmMap['longitude'],
@@ -3156,7 +3355,8 @@ class SupabaseService {
             'subscription_expired_at': subExpiredAt,
             'about': pharmMap['about'] ?? '',
             'is_visible': isVisible,
-            'whatsapp_number': pharmMap['whatsapp_number'] ?? userMap['phone_number'] ?? '',
+            'whatsapp_number':
+                pharmMap['whatsapp_number'] ?? userMap['phone_number'] ?? '',
           });
         }
       }
@@ -3173,7 +3373,8 @@ class SupabaseService {
     required DateTime date,
   }) async {
     try {
-      final dateStr = '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+      final dateStr =
+          '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
       // Get count of existing queues for that doctor on that date to assign no_queue
       final existing = await _get(
         'queue?id_doctor=eq.${Uri.encodeComponent(doctorId)}&date_queue=eq.$dateStr&select=id',
@@ -3196,10 +3397,15 @@ class SupabaseService {
   }
 
   // Fetch schedules for a specific doctor
-  Future<List<Map<String, dynamic>>> fetchDoctorSchedules(String doctorId) async {
+  Future<List<Map<String, dynamic>>> fetchDoctorSchedules(
+    String doctorId,
+  ) async {
     try {
       final safeDoctorId = Uri.encodeComponent(doctorId);
-      final schedules = await _get('doctor_schedules?select=*&id_doctor=eq.$safeDoctorId', schema: 'public');
+      final schedules = await _get(
+        'doctor_schedules?select=*&id_doctor=eq.$safeDoctorId',
+        schema: 'public',
+      );
       return schedules.map((s) => Map<String, dynamic>.from(s as Map)).toList();
     } catch (e) {
       throw Exception('Gagal mengambil jadwal dokter: $e');
@@ -3231,8 +3437,11 @@ class SupabaseService {
         throw Exception('NIK sudah terdaftar di sistem MAPOTECH');
       }
 
-      final supabaseUrl = dotenv.env['SUPABASE_URL'] ?? 'https://abdburxhqqwsobmzuwmz.supabase.co';
-      final supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'] ??
+      final supabaseUrl =
+          dotenv.env['SUPABASE_URL'] ??
+          'https://abdburxhqqwsobmzuwmz.supabase.co';
+      final supabaseAnonKey =
+          dotenv.env['SUPABASE_ANON_KEY'] ??
           'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFiZGJ1cnhocXF3c29ibXp1d216Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0OTMyNjYsImV4cCI6MjA5MjA2OTI2Nn0.mB3qIJAHjtWe5UKxE9Oj-RNLQCbQKFYHUZBLaF4nQwk';
 
       // Create a temporary client instance to register the patient.
@@ -3269,11 +3478,9 @@ class SupabaseService {
       }
 
       // Send welcome email asynchronously
-      sendWelcomeEmail(
-        email: email,
-        name: name,
-        role: 'patient',
-      ).catchError((e) {
+      sendWelcomeEmail(email: email, name: name, role: 'patient').catchError((
+        e,
+      ) {
         print('Failed to send welcome email: $e');
         return false;
       });
@@ -3347,22 +3554,21 @@ class SupabaseService {
         if (telepon != null && telepon.isNotEmpty) 'telepon': telepon,
         if (username != null && username.isNotEmpty) 'username': username,
         if (gender != null && gender.isNotEmpty) 'gender': gender,
-        if (birthPlace != null && birthPlace.isNotEmpty) 'birth_place': birthPlace,
+        if (birthPlace != null && birthPlace.isNotEmpty)
+          'birth_place': birthPlace,
         if (birthDate != null && birthDate.isNotEmpty) 'birth_date': birthDate,
         if (address != null && address.isNotEmpty) 'address': address,
         if (province != null && province.isNotEmpty) 'province': province,
         if (district != null && district.isNotEmpty) 'district': district,
-        if (subDistrict != null && subDistrict.isNotEmpty) 'sub_district': subDistrict,
+        if (subDistrict != null && subDistrict.isNotEmpty)
+          'sub_district': subDistrict,
         if (village != null && village.isNotEmpty) 'village': village,
         'is_bertugas': isBertugas,
         'permissions': permissions,
         'avatar_color': avatarColor,
       };
 
-      final rows = await client
-          .from(_staffTable)
-          .insert(payload)
-          .select();
+      final rows = await client.from(_staffTable).insert(payload).select();
 
       return rows.isNotEmpty ? Map<String, dynamic>.from(rows.first) : null;
     } catch (e) {
@@ -3415,10 +3621,7 @@ class SupabaseService {
         if (avatarColor != null) 'avatar_color': avatarColor,
       };
 
-      await client
-          .from(_staffTable)
-          .update(payload)
-          .eq('id', workerId);
+      await client.from(_staffTable).update(payload).eq('id', workerId);
 
       return true;
     } catch (e) {
@@ -3430,10 +3633,7 @@ class SupabaseService {
   /// Deletes a worker row by its UUID.
   Future<bool> deletePekerja(String workerId) async {
     try {
-      await client
-          .from(_staffTable)
-          .delete()
-          .eq('id', workerId);
+      await client.from(_staffTable).delete().eq('id', workerId);
       return true;
     } catch (e) {
       print('Error deleting pekerja: $e');
@@ -3457,7 +3657,9 @@ class SupabaseService {
 
   /// Updates only the permissions jsonb column for a worker.
   Future<bool> updatePekerjaPermissions(
-      String workerId, List<String> permissions) async {
+    String workerId,
+    List<String> permissions,
+  ) async {
     try {
       await client
           .from(_staffTable)
@@ -3476,7 +3678,9 @@ class SupabaseService {
 
   static const String _pustuTable = 'user_detail_pustu_ponkesdes';
 
-  Future<List<Map<String, dynamic>>> fetchPustuPonkesdesList(String ownerId) async {
+  Future<List<Map<String, dynamic>>> fetchPustuPonkesdesList(
+    String ownerId,
+  ) async {
     try {
       final rows = await client
           .from(_pustuTable)
@@ -3485,7 +3689,9 @@ class SupabaseService {
           .order('created_at', ascending: true);
       return List<Map<String, dynamic>>.from(rows);
     } catch (e) {
-      print('Note: Supabase table $_pustuTable exception or not created yet: $e');
+      print(
+        'Note: Supabase table $_pustuTable exception or not created yet: $e',
+      );
       return [];
     }
   }
@@ -3515,7 +3721,8 @@ class SupabaseService {
         'tipe': tipe,
         if (kodeUnit != null) 'kode_unit': kodeUnit,
         if (penanggungJawab != null) 'penanggung_jawab': penanggungJawab,
-        if (nikPenanggungJawab != null) 'nik_penanggung_jawab': nikPenanggungJawab,
+        if (nikPenanggungJawab != null)
+          'nik_penanggung_jawab': nikPenanggungJawab,
         if (telepon != null) 'telepon': telepon,
         if (alamat != null) 'alamat': alamat,
         if (village != null) 'village': village,
@@ -3528,10 +3735,7 @@ class SupabaseService {
         'avatar_color': avatarColor,
       };
 
-      final rows = await client
-          .from(_pustuTable)
-          .insert(payload)
-          .select();
+      final rows = await client.from(_pustuTable).insert(payload).select();
 
       return rows.isNotEmpty ? Map<String, dynamic>.from(rows.first) : null;
     } catch (e) {
@@ -3562,7 +3766,8 @@ class SupabaseService {
         if (tipe != null) 'tipe': tipe,
         if (kodeUnit != null) 'kode_unit': kodeUnit,
         if (penanggungJawab != null) 'penanggung_jawab': penanggungJawab,
-        if (nikPenanggungJawab != null) 'nik_penanggung_jawab': nikPenanggungJawab,
+        if (nikPenanggungJawab != null)
+          'nik_penanggung_jawab': nikPenanggungJawab,
         if (telepon != null) 'telepon': telepon,
         if (alamat != null) 'alamat': alamat,
         if (village != null) 'village': village,
@@ -3573,10 +3778,7 @@ class SupabaseService {
         if (jamLayanan != null) 'jam_layanan': jamLayanan,
       };
 
-      await client
-          .from(_pustuTable)
-          .update(payload)
-          .eq('id', unitId);
+      await client.from(_pustuTable).update(payload).eq('id', unitId);
 
       return true;
     } catch (e) {
@@ -3587,10 +3789,7 @@ class SupabaseService {
 
   Future<bool> deletePustuPonkesdes(String unitId) async {
     try {
-      await client
-          .from(_pustuTable)
-          .delete()
-          .eq('id', unitId);
+      await client.from(_pustuTable).delete().eq('id', unitId);
       return true;
     } catch (e) {
       print('Error deleting pustu/ponkesdes: $e');
@@ -3598,7 +3797,10 @@ class SupabaseService {
     }
   }
 
-  Future<bool> togglePustuPonkesdesStatus(String unitId, String newStatus) async {
+  Future<bool> togglePustuPonkesdesStatus(
+    String unitId,
+    String newStatus,
+  ) async {
     try {
       await client
           .from(_pustuTable)

@@ -174,12 +174,41 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
     }
   }
 
+  String _formatApotekTime(String rawDate, String? rawCreatedAt) {
+    DateTime? dt;
+    try {
+      if (rawCreatedAt != null && rawCreatedAt.isNotEmpty) {
+        dt = DateTime.parse(rawCreatedAt).toLocal();
+      } else if (rawDate.isNotEmpty) {
+        dt = DateTime.parse(rawDate).toLocal();
+      }
+    } catch (_) {}
+
+    if (dt == null) return '';
+
+    final now = DateTime.now();
+    final isToday = dt.year == now.year && dt.month == now.month && dt.day == now.day;
+    final isYesterday = dt.year == now.year && dt.month == now.month && dt.day == (now.day - 1);
+
+    final h = dt.hour.toString().padLeft(2, '0');
+    final m = dt.minute.toString().padLeft(2, '0');
+    final timeFormatted = (dt.hour == 0 && dt.minute == 0) ? '' : '$h:$m WIB';
+
+    if (isToday) {
+      return timeFormatted.isNotEmpty ? 'Hari ini • $timeFormatted' : 'Hari ini';
+    } else if (isYesterday) {
+      return timeFormatted.isNotEmpty ? 'Kemarin • $timeFormatted' : 'Kemarin';
+    } else {
+      return timeFormatted;
+    }
+  }
+
   Future<void> _loadHistoryFromDatabase() async {
     final user = ref.read(landingPageProvider).loggedInUser;
     setState(() => _isLoading = true);
     
-    final String patientName = user?['name'] ?? 'Pasien';
-    final String userId = user?['id'] ?? '';
+    final String patientName = user?['name']?.toString().trim() ?? '';
+    final String userId = user?['id']?.toString().trim() ?? '';
     List<RiwayatApotekEntry> loadedApotek = [];
     List<RiwayatDokterEntry> loadedDokter = [];
 
@@ -187,14 +216,32 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
     try {
       final rawTxs = await _db.fetchFinancialTransactions();
       for (final tx in rawTxs) {
-        final buyer = tx['buyer_name']?.toString() ?? 'Umum';
-        if (buyer.toLowerCase().contains(patientName.toLowerCase()) || patientName.toLowerCase().contains(buyer.toLowerCase()) || buyer == 'Umum') {
+        final buyer = (tx['buyer_name']?.toString() ?? '').trim();
+        final txUserId = (tx['id_user']?.toString() ?? '').trim();
+        
+        bool isMatch = false;
+        if (userId.isNotEmpty && txUserId.isNotEmpty && txUserId == userId) {
+          isMatch = true;
+        } else if (patientName.isNotEmpty && buyer.isNotEmpty) {
+          final pLow = patientName.toLowerCase();
+          final bLow = buyer.toLowerCase();
+          if (bLow == pLow || bLow.contains(pLow) || pLow.contains(bLow)) {
+            isMatch = true;
+          }
+        }
+
+        if (isMatch) {
           final id = tx['id']?.toString() ?? '';
+          final idSource = tx['id_source']?.toString() ?? '';
           final dateRaw = tx['transaction_date']?.toString() ?? '';
+          final createdAtRaw = tx['created_at']?.toString();
           final amount = double.tryParse(tx['amount']?.toString() ?? '0') ?? 0.0;
           final method = tx['payment_method']?.toString() ?? 'Tunai';
           final dateFormatted = _formatDate(dateRaw);
-          final receipt = id.length > 8 ? 'TX-${id.substring(0, 8).toUpperCase()}' : 'TX-$id';
+          final timeFormatted = _formatApotekTime(dateRaw, createdAtRaw);
+          final receipt = idSource.isNotEmpty
+              ? idSource
+              : (id.length > 8 ? 'TX-${id.substring(0, 8).toUpperCase()}' : 'TX-$id');
 
           final txItems = await _db.fetchTransactionItems(id);
           final List<ItemPembelian> loadedItems = [];
@@ -203,10 +250,10 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
             final price = double.tryParse(item['unit_price']?.toString() ?? '0') ?? 0.0;
             final subtotalVal = double.tryParse(item['total_amount']?.toString() ?? '0') ?? (qty * price);
             final batch = item['medicine_batches'];
-            String medName = 'Obat';
-            if (batch != null) {
+            String medName = item['notes']?.toString() ?? 'Obat';
+            if (batch is Map) {
               final med = batch['medicines'];
-              if (med != null) {
+              if (med is Map) {
                 medName = med['medicine_name'] ?? 'Obat';
               } else {
                 medName = batch['batch_number'] ?? 'Obat';
@@ -220,19 +267,20 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
           }
 
           if (loadedItems.isEmpty) {
-            loadedItems.add(const ItemPembelian(
-              nama: 'Paracetamol 500mg',
-              qty: '10 Strip x Rp 1.500',
-              subtotal: 'Rp 15.000',
+            final desc = tx['description']?.toString() ?? 'Pembelian Obat Kasir POS';
+            loadedItems.add(ItemPembelian(
+              nama: desc,
+              qty: '1 Transaksi',
+              subtotal: 'Rp ${_formatPrice(amount)}',
             ));
           }
 
           loadedApotek.add(RiwayatApotekEntry(
             id: id,
             date: dateFormatted,
-            time: '08:00',
-            apotekName: 'MAPOTECH KASIR APOTEK',
-            address: 'Jl. Raya Bondowoso, Jawa Timur',
+            time: timeFormatted,
+            apotekName: 'Apotek MAPOTECH',
+            address: 'Jl. Kalimantan No. 45, Jember',
             noStruk: receipt,
             metodeBayar: method,
             total: 'Rp ${_formatPrice(amount)}',
@@ -241,39 +289,6 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
         }
       }
     } catch (_) {}
-
-    if (loadedApotek.isEmpty) {
-      loadedApotek = [
-        const RiwayatApotekEntry(
-          id: 'ra-001',
-          date: '18 Agu 2026',
-          time: '14:30',
-          apotekName: 'Apotek MAPOTECH',
-          address: 'Jl. Kalimantan No. 45, Jember',
-          noStruk: 'TX-20260818-0021',
-          metodeBayar: 'QRIS / BPJS',
-          total: 'Rp 45.000',
-          items: [
-            ItemPembelian(nama: 'Paracetamol 500mg', qty: '1 Strip (10 Tablet)', subtotal: 'Rp 4.500'),
-            ItemPembelian(nama: 'Amoxicillin Trihydrate 500mg', qty: '2 Strip (20 Kapsul)', subtotal: 'Rp 19.000'),
-            ItemPembelian(nama: 'Vitamin C 500mg IPI', qty: '1 Botol (45 Tablet)', subtotal: 'Rp 11.000'),
-          ],
-        ),
-        const RiwayatApotekEntry(
-          id: 'ra-002',
-          date: '02 Agu 2026',
-          time: '09:15',
-          apotekName: 'Apotek Mandiri',
-          address: 'Kel. Kejayan, Pujer, Bondowoso',
-          noStruk: 'TX-20260802-0104',
-          metodeBayar: 'Tunai',
-          total: 'Rp 24.000',
-          items: [
-            ItemPembelian(nama: 'OBH Tropica Plus Anak 60ml', qty: '1 Botol', subtotal: 'Rp 24.000'),
-          ],
-        ),
-      ];
-    }
 
     // 2. Load Doctor Clinical Encounters
     if (userId.isNotEmpty) {
@@ -522,6 +537,13 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                   ),
                 ),
               ),
+              const SizedBox(width: 4),
+              IconButton(
+                icon: Icon(Icons.refresh_rounded, size: 18, color: subtitleColor),
+                tooltip: 'Segarkan Riwayat',
+                onPressed: _loadHistoryFromDatabase,
+                splashRadius: 20,
+              ),
             ],
           ),
         ),
@@ -713,7 +735,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '${ra.date} • ${ra.time}',
+                          ra.time.isNotEmpty ? '${ra.date} • ${ra.time}' : ra.date,
                           style: GoogleFonts.outfit(fontSize: 9, color: subtitle),
                         ),
                       ],
@@ -1152,7 +1174,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                               style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w900, color: Colors.white),
                             ),
                             Text(
-                              '${ra.date} • ${ra.time}',
+                              ra.time.isNotEmpty ? '${ra.date} • ${ra.time}' : ra.date,
                               style: GoogleFonts.outfit(fontSize: 10, color: Colors.white.withOpacity(0.8)),
                             ),
                           ],

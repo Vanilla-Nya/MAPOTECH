@@ -433,7 +433,14 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
 
     setState(() {
       _selectedBuyer = rx.patientName;
+      _connectedPatient = {
+        'name': rx.patientName,
+        'nik': '-',
+        'bpjs_number': 'Aktif',
+      };
     });
+
+    ref.read(connectedPosPatientProvider.notifier).state = _connectedPatient;
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -1084,8 +1091,9 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
     final messenger = ScaffoldMessenger.of(context);
     setState(() => _isLoading = true);
     final cartCopy = List<CartItem>.from(_cart);
-    final buyer = _selectedBuyer.isEmpty ? 'Umum / Walk-in' : _selectedBuyer;
-    final userId = ref.read(landingPageProvider).loggedInUser?['id']?.toString();
+    final buyer = _connectedPatient?['name']?.toString() ?? (_selectedBuyer.isEmpty ? 'Umum / Walk-in' : _selectedBuyer);
+    final patientId = _connectedPatient?['id']?.toString() ?? _connectedPatient?['id_user']?.toString();
+    final userId = patientId ?? ref.read(landingPageProvider).loggedInUser?['id']?.toString();
 
     String receiptNo = 'STR-${DateTime.now().year}${DateTime.now().month.toString().padLeft(2, '0')}${DateTime.now().day.toString().padLeft(2, '0')}-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
 
@@ -2175,7 +2183,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                     itemCount: pendingPrescriptions.length,
                     itemBuilder: (context, index) {
                       final rx = pendingPrescriptions[index];
-                      final isRxReady = rx.status == 'ready';
+                      final isRxReady = rx.status == 'ready' || rx.status == 'pending_checkout';
 
                       return Container(
                         width: 270,

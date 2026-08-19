@@ -117,37 +117,30 @@ class _ApotekLaporanState extends ConsumerState<ApotekLaporan> {
       final state = ref.read(landingPageProvider);
       final List<Map<String, dynamic>> allTx = [];
 
-      // 1. Fetch from pharmacy.financial_transactions
+      // 1. Fetch from v_pharmacy_financial_transactions
       try {
-        final resPharmacy = await client
-            .schema('pharmacy')
-            .from('financial_transactions')
+        final res = await client
+            .from('v_pharmacy_financial_transactions')
             .select('*')
             .order('transaction_date', ascending: false);
-        for (final item in resPharmacy) {
+        for (final item in res) {
           allTx.add(Map<String, dynamic>.from(item));
         }
       } catch (e) {
-        debugPrint('Note fetching pharmacy schema: $e');
-      }
-
-      // 2. Fetch from public.financial_transactions
-      try {
-        final resPublic = await client
-            .from('financial_transactions')
-            .select('*')
-            .order('transaction_date', ascending: false);
-        for (final item in resPublic) {
-          final map = Map<String, dynamic>.from(item);
-          if (!allTx.any((x) => x['id'] == map['id'] || (x['id_source'] != null && x['id_source'] == map['id_source']))) {
-            allTx.add(map);
+        debugPrint('Note fetching v_pharmacy_financial_transactions: $e');
+        try {
+          final resPharmacy = await client
+              .schema('pharmacy')
+              .from('financial_transactions')
+              .select('*')
+              .order('transaction_date', ascending: false);
+          for (final item in resPharmacy) {
+            allTx.add(Map<String, dynamic>.from(item));
           }
-        }
-      } catch (e) {
-        debugPrint('Note fetching public schema: $e');
+        } catch (_) {}
       }
 
-      // 3. Fallback via helper if empty
+      // 2. Fallback via helper if empty
       if (allTx.isEmpty) {
         final db = SupabaseService();
         final helperTx = await db.fetchFinancialTransactions();
@@ -592,24 +585,12 @@ class _ApotekLaporanState extends ConsumerState<ApotekLaporan> {
                           try {
                             final txTypeStr = selectedType == TransactionType.expense ? 'expense' : 'income';
                             final catStr = selectedCategory.name;
-
-                            final txPayload = {
-                              if (apotekId != null && apotekId.isNotEmpty) 'id_user': apotekId,
-                              'transaction_type': txTypeStr,
-                              'source_type': 'manual',
-                              'category': catStr,
-                              'amount': amt.toString(),
-                              'status': 'Sukses',
-                              'transaction_date': selectedDate.toIso8601String(),
-                              'description': desc,
-                              'buyer_name': state.loggedInName ?? 'CyrenElysia~♪',
-                            };
+                            final isValidUserUuid = apotekId != null && RegExp(r'^[0-9a-fA-F\-]{36}$').hasMatch(apotekId);
 
                             if (existing != null) {
                               try {
                                 await SupabaseService.client
-                                    .schema('pharmacy')
-                                    .from('financial_transactions')
+                                    .from('v_pharmacy_financial_transactions')
                                     .update({
                                       'transaction_type': txTypeStr,
                                       'category': catStr,
@@ -620,6 +601,7 @@ class _ApotekLaporanState extends ConsumerState<ApotekLaporan> {
                                     .eq('id', existing.id);
                               } catch (_) {
                                 await SupabaseService.client
+                                    .schema('pharmacy')
                                     .from('financial_transactions')
                                     .update({
                                       'transaction_type': txTypeStr,
@@ -632,18 +614,21 @@ class _ApotekLaporanState extends ConsumerState<ApotekLaporan> {
                               }
                             } else {
                               try {
-                                await SupabaseService.client
-                                    .schema('pharmacy')
-                                    .from('financial_transactions')
-                                    .insert(txPayload);
-                              } catch (_) {
-                                try {
-                                  await SupabaseService.client
-                                      .from('financial_transactions')
-                                      .insert(txPayload);
-                                } catch (e2) {
-                                  debugPrint('Note on insert manual transaction: $e2');
-                                }
+                                await SupabaseService.client.rpc('rpc_insert_pharmacy_transaction', params: {
+                                  'p_transaction_type': txTypeStr,
+                                  'p_source_type': 'manual',
+                                  'p_id_source': 'MAN-${DateTime.now().millisecondsSinceEpoch}',
+                                  'p_description': desc,
+                                  'p_amount': amt,
+                                  'p_category': catStr,
+                                  'p_status': 'Sukses',
+                                  'p_transaction_date': selectedDate.toIso8601String(),
+                                  'p_payment_method': 'Tunai',
+                                  'p_buyer_name': state.loggedInName ?? 'CyrenElysia~♪',
+                                  'p_id_user': isValidUserUuid ? apotekId : null,
+                                });
+                              } catch (e2) {
+                                debugPrint('Note on insert manual transaction: $e2');
                               }
                             }
 

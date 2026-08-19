@@ -19,6 +19,7 @@ import 'package:mapotech/features/pasien/dashboard/frontend/pasien_prescription.
 import 'package:mapotech/features/pasien/dashboard/frontend/pasien_profile.dart';
 import 'package:mapotech/features/pasien/dashboard/frontend/pasien_settings.dart';
 import 'package:mapotech/features/pasien/dashboard/frontend/pasien_qr_scanner_page.dart';
+import 'package:mapotech/features/pasien/dashboard/frontend/ai_assistant/presentation/pasien_ai_assistant_view.dart';
 import 'package:mapotech/features/dokter/dashboard/frontend/dokter_dashboard.dart';
 import 'package:mapotech/features/dokter/dashboard/frontend/dokter_pasien.dart';
 import 'package:mapotech/features/dokter/dashboard/frontend/dokter_obat.dart';
@@ -67,7 +68,11 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   bool _hasShownSubNotice = false;
 
   bool _shouldUseShellScroll(String menu) {
-    if (menu == 'doctors' || menu == 'pharmacies' || menu == 'pasien') {
+    if (menu == 'doctors' ||
+        menu == 'pharmacies' ||
+        menu == 'pasien' ||
+        menu == 'ai_assistant' ||
+        menu == 'penjualan') {
       return false;
     }
     return true;
@@ -425,7 +430,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
 
                     // Inner Scrollable Panel
                     Expanded(
-                      child: (_activeMenu == 'penjualan' && (state.loggedInRole == 'apotek'))
+                      child: (!_shouldUseShellScroll(_activeMenu))
                           ? AnimatedPortalSwitcher(
                               switcherKey: _activeMenu,
                               child: _buildRoleDashboardBody(
@@ -870,6 +875,14 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     } else {
       // Pasien role: route by active menu
       switch (_activeMenu) {
+        case 'ai_assistant':
+          return PasienAiAssistantView(
+            onNavigate: (menu) {
+              setState(() {
+                _activeMenu = menu;
+              });
+            },
+          );
         case 'qr_scanner':
           return PasienQrScannerPage(
             onNavigate: (menu) {

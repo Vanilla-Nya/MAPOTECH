@@ -423,6 +423,23 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
 
               const SizedBox(height: 20),
 
+              // AI Helper Quick Card
+              AnimatedEntrance(
+                delay: const Duration(milliseconds: 50),
+                type: EntranceAnimationType.slideUp,
+                child: _buildAiAssistantQuickCard(
+                  cardBgColor: cardBgColor,
+                  borderColor: borderColor,
+                  themeAccent: themeAccent,
+                  textColor: textColor,
+                  subtitleColor: subtitleColor,
+                  isDark: isDark,
+                  onTap: () => widget.onNavigate?.call('ai_assistant'),
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
               // Main booking cards (Booking Dokter, Scan QR Dokter / Apotek, Prescription QR card)
               AnimatedEntrance(
                 delay: const Duration(milliseconds: 100),
@@ -1308,6 +1325,161 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                 ),
               ),
               Icon(Icons.chevron_right_rounded, color: themeAccent),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAiAssistantQuickCard({
+    required Color cardBgColor,
+    required Color borderColor,
+    required Color themeAccent,
+    required Color textColor,
+    required Color subtitleColor,
+    required bool isDark,
+    required VoidCallback onTap,
+  }) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: isDark
+                  ? [
+                      themeAccent.withOpacity(0.18),
+                      cardBgColor,
+                      const Color(0xFF48C9B0).withOpacity(0.12),
+                    ]
+                  : [
+                      themeAccent.withOpacity(0.12),
+                      cardBgColor,
+                      const Color(0xFF48C9B0).withOpacity(0.06),
+                    ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: themeAccent.withOpacity(0.35),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: themeAccent.withOpacity(isDark ? 0.15 : 0.06),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      themeAccent,
+                      themeAccent.withOpacity(0.8),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: themeAccent.withOpacity(0.4),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.smart_toy_rounded,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'MAPOTECH AI HELPER',
+                          style: GoogleFonts.outfit(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.8,
+                            color: themeAccent,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0F9D58).withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'Gemini 2.5',
+                            style: GoogleFonts.outfit(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFF0F9D58),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Tanya gejala medis, panduan menu, rekomendasi dokter & resep obat',
+                      style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: subtitleColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: themeAccent,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Buka AI',
+                      style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(
+                      Icons.arrow_forward_rounded,
+                      color: Colors.white,
+                      size: 14,
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),

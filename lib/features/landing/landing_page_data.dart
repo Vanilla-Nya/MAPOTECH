@@ -144,6 +144,8 @@ class LandingPageState {
     this.isSubscribed = true,
     this.favoriteMenuItems = const {
       'dashboard',
+      'ai_assistant',
+      'qr_scanner',
       'pasien',
       'obat',
       'antrian',

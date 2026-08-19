@@ -246,12 +246,15 @@ class ApotekInventoryNotifier extends StateNotifier<List<ApotekInventoryItem>> {
 
       for (final b in medItem.batches) {
         // Find if this batch was sold
-        final soldItem = items.firstWhere(
-          (it) => it['batchId'] == b.id,
-          orElse: () => {},
-        );
+        Map<String, dynamic>? soldItem;
+        for (final it in items) {
+          if (it['batchId'] == b.id) {
+            soldItem = it;
+            break;
+          }
+        }
 
-        if (soldItem.isNotEmpty) {
+        if (soldItem != null && soldItem.isNotEmpty) {
           final int soldQty = int.tryParse(soldItem['qty']?.toString() ?? '0') ?? 0;
           final int newBatchStock = max(0, b.stock - soldQty);
           medDeductionTotal += soldQty;
@@ -263,7 +266,7 @@ class ApotekInventoryNotifier extends StateNotifier<List<ApotekInventoryItem>> {
             try {
               _db.adjustBatchStock(b.id, newBatchStock);
             } catch (e) {
-              debugPrint('Warning syncing batch stock deduction to DB: $e');
+              debugPrint('Notice syncing batch stock deduction to DB: $e');
             }
           }
         } else {
@@ -273,12 +276,15 @@ class ApotekInventoryNotifier extends StateNotifier<List<ApotekInventoryItem>> {
 
       // Check if medicine was matched by medicine ID directly (when no batchId provided)
       if (medDeductionTotal == 0) {
-        final soldByMed = items.firstWhere(
-          (it) => (it['medicineId'] == medItem.id || it['batchId'] == medItem.id),
-          orElse: () => {},
-        );
+        Map<String, dynamic>? soldByMed;
+        for (final it in items) {
+          if (it['medicineId'] == medItem.id || it['batchId'] == medItem.id) {
+            soldByMed = it;
+            break;
+          }
+        }
 
-        if (soldByMed.isNotEmpty) {
+        if (soldByMed != null && soldByMed.isNotEmpty) {
           final int soldQty = int.tryParse(soldByMed['qty']?.toString() ?? '0') ?? 0;
           medDeductionTotal = soldQty;
 
@@ -287,6 +293,13 @@ class ApotekInventoryNotifier extends StateNotifier<List<ApotekInventoryItem>> {
             final firstBatch = updatedBatches.first;
             final newBStock = max(0, firstBatch.stock - soldQty);
             updatedBatches[0] = firstBatch.copyWith(stock: newBStock);
+            if (!firstBatch.id.startsWith('b-') && firstBatch.id.length > 10) {
+              try {
+                _db.adjustBatchStock(firstBatch.id, newBStock);
+              } catch (e) {
+                debugPrint('Notice syncing batch stock deduction to DB: $e');
+              }
+            }
           }
         }
       }

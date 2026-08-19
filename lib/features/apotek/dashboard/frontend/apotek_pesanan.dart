@@ -230,6 +230,7 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
       // Update status in database and provider
       await _db.updatePrescriptionStatus(order.id, dbStatus);
       await ref.read(apotekPrescriptionProvider.notifier).updateStatus(order.id, order.status == 'pending' ? 'compounding' : 'ready');
+      await ref.read(apotekPrescriptionProvider.notifier).loadPrescriptions();
       await _loadOrdersFromDatabase();
 
       if (mounted) {
@@ -285,6 +286,7 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
             apotekId: apotekId,
           );
 
+          await ref.read(apotekPrescriptionProvider.notifier).loadPrescriptions();
           await _loadOrdersFromDatabase();
 
           setState(() {

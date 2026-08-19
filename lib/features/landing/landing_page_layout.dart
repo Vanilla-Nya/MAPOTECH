@@ -32,6 +32,7 @@ class LandingPageLayout extends ConsumerStatefulWidget {
 }
 
 class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final ScrollController _scrollController = ScrollController();
   bool _isScrolled = false;
   bool _isFirstTimeLoading = true;
@@ -120,6 +121,7 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
       curve: Curves.easeInOut,
       color: backgroundColor,
       child: Scaffold(
+        key: _scaffoldKey,
         backgroundColor: Colors.transparent,
         drawer: _buildMobileDrawer(state, notifier),
         body: Stack(
@@ -236,8 +238,14 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
     LandingPageState state,
     LandingPageNotifier notifier,
   ) {
+    final isDark = state.appearance == 'dark';
+    final drawerBg = isDark ? const Color(0xFF161616) : Colors.white;
+    final itemBg = isDark ? const Color(0xFF222222) : Colors.grey[50]!;
+    final textColor = isDark ? Colors.white : Colors.grey[700]!;
+    final closeIconColor = isDark ? Colors.white : Colors.black87;
+
     return Drawer(
-      backgroundColor: Colors.white,
+      backgroundColor: drawerBg,
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
@@ -249,7 +257,7 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
                 children: [
                   _buildBrandLogo(),
                   IconButton(
-                    icon: const Icon(Icons.close_rounded, size: 28),
+                    icon: Icon(Icons.close_rounded, size: 28, color: closeIconColor),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
@@ -281,13 +289,13 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
                             color: isSelected
-                                ? const Color(0xFF48C9B0).withOpacity(0.1)
-                                : Colors.grey[50]!,
+                                ? const Color(0xFF48C9B0).withOpacity(0.15)
+                                : itemBg,
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
                               color: isSelected
-                                  ? const Color(0xFF48C9B0).withOpacity(0.3)
-                                  : Colors.transparent,
+                                  ? const Color(0xFF48C9B0).withOpacity(0.4)
+                                  : (isDark ? const Color(0xFF2C2C2C) : Colors.transparent),
                             ),
                           ),
                           child: Row(
@@ -295,8 +303,8 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
                               Icon(
                                 entity.icon,
                                 color: isSelected
-                                    ? const Color(0xFF1B4F42)
-                                    : Colors.grey[600],
+                                    ? (isDark ? const Color(0xFF48C9B0) : const Color(0xFF1B4F42))
+                                    : (isDark ? Colors.grey[400] : Colors.grey[600]),
                               ),
                               const SizedBox(width: 16),
                               Expanded(
@@ -306,8 +314,8 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
                                     fontWeight: FontWeight.w800,
                                     fontSize: 13,
                                     color: isSelected
-                                        ? const Color(0xFF1B4F42)
-                                        : Colors.grey[700],
+                                        ? (isDark ? const Color(0xFF48C9B0) : const Color(0xFF1B4F42))
+                                        : textColor,
                                   ),
                                 ),
                               ),
@@ -328,7 +336,7 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
                                     style: GoogleFonts.outfit(
                                       fontSize: 8,
                                       fontWeight: FontWeight.w900,
-                                      color: const Color(0xFF1B4F42),
+                                      color: isDark ? const Color(0xFF7BE5D3) : const Color(0xFF1B4F42),
                                     ),
                                   ),
                                 ),
@@ -340,7 +348,7 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
                   }).toList(),
                 ),
               ),
-              const Divider(),
+              Divider(color: isDark ? const Color(0xFF2C2C2C) : Colors.grey[200]),
               const SizedBox(height: 16),
               if (state.isLoggedIn) ...[
                 // ─── Logged-in user card ───────────────────────────────────
@@ -474,6 +482,8 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
                 CustomButton(
                   text: notifier.t('login'),
                   isSecondary: true,
+                  borderColor: isDark ? const Color(0xFF333333) : null,
+                  textColor: isDark ? Colors.white : null,
                   onPressed: () {
                     Navigator.pop(context); // Close drawer
                     showLoginModal(context, ref);
@@ -482,6 +492,8 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
                 const SizedBox(height: 12),
                 CustomButton(
                   text: notifier.t('register'),
+                  primaryColor: notifier.getPrimaryColor(),
+                  textColor: isDark ? Colors.black : Colors.white,
                   onPressed: () {
                     Navigator.pop(context); // Close drawer
                     showRegisterModal(context, ref);
@@ -622,7 +634,7 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
                     : const Color(0xFF1B4F42),
               ),
               onPressed: () {
-                Scaffold.of(context).openDrawer();
+                _scaffoldKey.currentState?.openDrawer();
               },
             ),
         ],
