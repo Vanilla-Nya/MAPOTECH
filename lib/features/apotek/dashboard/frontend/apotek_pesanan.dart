@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/shared/widgets/skeleton_loading.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/supabase_service.dart';
+import 'package:mapotech/features/apotek/dashboard/backend/prescription_provider.dart';
 import 'widgets/web_qr_scanner.dart';
 
 class IncomingPrescription {
@@ -183,6 +184,38 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
   }
 
   Future<void> _advanceOrderStatus(IncomingPrescription order) async {
+    if (order.status == 'ready') {
+      final rxOrder = ApotekPrescriptionOrder(
+        id: order.id,
+        sessionNumber: order.sessionNumber,
+        patientName: order.patientName,
+        doctorName: order.doctorName,
+        date: order.date,
+        status: 'ready',
+        items: order.items.map((it) => ApotekRxItem(
+          name: it.name,
+          dosage: it.dosage,
+          qty: it.qty,
+          unit: it.unit,
+          kfaCode: it.kfaCode,
+        )).toList(),
+      );
+
+      ref.read(activePosPrescriptionProvider.notifier).state = rxOrder;
+      ref.read(landingPageProvider.notifier).setActiveTab('penjualan');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Resep ${order.patientName} dialihkan ke Kasir (POS). Silakan selesaikan pembayaran.', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600)),
+            backgroundColor: const Color(0xFF27AE60),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
       String dbStatus = 'pending';
@@ -192,21 +225,24 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
       } else if (order.status == 'compounding') {
         dbStatus = 'pending_checkout';
         _activeTab = 'ready';
-      } else if (order.status == 'ready') {
-        dbStatus = 'checked_out';
-        _activeTab = 'completed';
       }
 
-      // Update status row in database
+      // Update status in database and provider
       await _db.updatePrescriptionStatus(order.id, dbStatus);
+      await ref.read(apotekPrescriptionProvider.notifier).updateStatus(order.id, order.status == 'pending' ? 'compounding' : 'ready');
       await _loadOrdersFromDatabase();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Status resep ${order.patientName} berhasil diperbarui.', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600)),
+            content: Text(
+              order.status == 'pending'
+                  ? 'Resep ${order.patientName} mulai diracik.'
+                  : 'Resep ${order.patientName} selesai diracik dan siap diproses di Kasir!',
+              style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600),
+            ),
             backgroundColor: const Color(0xFF48C9B0),
-            duration: const Duration(seconds: 1),
+            duration: const Duration(seconds: 2),
           ),
         );
       }
@@ -442,10 +478,10 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
                       actionLabel = 'SELESAIKAN RACIKAN';
                       actionIcon = Icons.check_circle_outline_rounded;
                     } else if (rx.status == 'ready') {
-                      statusColor = themeAccent;
-                      statusLabel = 'Siap Diambil / Checkout';
-                      actionLabel = 'SELESAIKAN TRANSAKSI';
-                      actionIcon = Icons.shopping_bag_rounded;
+                      statusColor = const Color(0xFF27AE60);
+                      statusLabel = 'Siap Diambil / Kasir';
+                      actionLabel = 'PROSES DI KASIR (POS)';
+                      actionIcon = Icons.point_of_sale_rounded;
                     } else if (rx.status == 'completed') {
                       statusColor = const Color(0xFF6F6A8A);
                       statusLabel = 'Selesai';

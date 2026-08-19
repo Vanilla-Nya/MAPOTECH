@@ -4,74 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/supabase_service.dart';
-
-class ApotekBatchModel {
-  final String id;
-  String batchNo;
-  String expDate;
-  int stock;
-  double buyPrice;
-  double sellPrice;
-  String? rackLocation;
-  String? supplier;
-
-  ApotekBatchModel({
-    required this.id,
-    required this.batchNo,
-    required this.expDate,
-    required this.stock,
-    required this.buyPrice,
-    required this.sellPrice,
-    this.rackLocation,
-    this.supplier,
-  });
-}
-
-class ApotekInventoryItem {
-  final String id;
-  String name;
-  String sku;
-  String brandName;
-  String genericName;
-  String form; // 'Tablet', 'Kaplet', 'Kapsul', 'Sirup', 'Salep', 'Injeksi', 'Drop'
-  int stock;
-  String unit; // 'Strip', 'Botol', 'Box', 'Tube', 'Ampul'
-  double buyPrice;
-  double sellPrice;
-  String rackName;
-  String? kfaCode;
-  String? manufacturer;
-  String? description;
-  String? imageUrl;
-  bool isArchived;
-  List<ApotekBatchModel> batches;
-
-  ApotekInventoryItem({
-    required this.id,
-    required this.name,
-    required this.sku,
-    required this.brandName,
-    required this.genericName,
-    required this.form,
-    required this.stock,
-    required this.unit,
-    required this.buyPrice,
-    required this.sellPrice,
-    required this.rackName,
-    this.kfaCode,
-    this.manufacturer,
-    this.description,
-    this.imageUrl,
-    this.isArchived = false,
-    this.batches = const [],
-  });
-
-  String get status {
-    if (stock == 0) return 'habis';
-    if (stock < 20) return 'menipis';
-    return 'aman';
-  }
-}
+import 'package:mapotech/features/apotek/dashboard/backend/inventory_provider.dart';
 
 class ApotekInventori extends ConsumerStatefulWidget {
   const ApotekInventori({super.key});
@@ -82,9 +15,6 @@ class ApotekInventori extends ConsumerStatefulWidget {
 
 class _ApotekInventoriState extends ConsumerState<ApotekInventori> {
   final SupabaseService _db = SupabaseService();
-  bool _isLoading = true;
-
-  List<ApotekInventoryItem> _items = [];
   String _searchQuery = '';
   String _activeFilter = 'semua'; // 'semua', 'aman', 'menipis', 'habis', 'kadaluarsa'
   bool _isGridView = false;
@@ -92,7 +22,6 @@ class _ApotekInventoriState extends ConsumerState<ApotekInventori> {
   @override
   void initState() {
     super.initState();
-    _loadInventoryFromDatabase();
   }
 
   String _generateBatchCode() {
@@ -106,225 +35,7 @@ class _ApotekInventoriState extends ConsumerState<ApotekInventori> {
   }
 
   Future<void> _loadInventoryFromDatabase() async {
-    setState(() => _isLoading = true);
-    try {
-      final List<ApotekInventoryItem> loaded = [];
-      final rawMedicines = await _db.fetchMedicinesWithBatches();
-
-      for (final m in rawMedicines) {
-        final String id = m['id'] ?? '';
-        final String name = m['medicine_name'] ?? 'Obat';
-        final String brand = m['brand_name'] ?? name;
-        final String generic = m['generic_name'] ?? '-';
-        final String form = m['medicine_form'] ?? 'Tablet';
-        final String sku = m['sku'] ?? 'SKU-${id.substring(0, id.length > 6 ? 6 : id.length).toUpperCase()}';
-        final String rack = m['rack_name'] ?? 'RAK A-01';
-        final String? kfa = m['kfa_code'];
-        final String? mfg = m['manufacturer'] ?? 'Kimia Farma';
-        final String? desc = m['description'] ?? 'Catatan dosis, efek samping, dll...';
-        final String? img = m['image_url'];
-
-        final batchesRaw = m['medicine_batches'] as List<dynamic>? ?? [];
-        final List<ApotekBatchModel> parsedBatches = [];
-        int totalStock = 0;
-        double buyP = 3500;
-        double sellP = 5000;
-
-        for (final b in batchesRaw) {
-          final int bStock = int.tryParse(b['quantity_in_stock']?.toString() ?? '0') ?? 0;
-          final double bBuy = double.tryParse(b['purchase_price']?.toString() ?? '3500') ?? 3500;
-          final double bSell = double.tryParse(b['selling_price']?.toString() ?? '5000') ?? 5000;
-          totalStock += bStock;
-          buyP = bBuy;
-          sellP = bSell;
-
-          parsedBatches.add(ApotekBatchModel(
-            id: b['id'] ?? '',
-            batchNo: b['batch_number'] ?? _generateBatchCode(),
-            expDate: b['expiration_date']?.toString().split('T').first ?? '2028-12-31',
-            stock: bStock,
-            buyPrice: bBuy,
-            sellPrice: bSell,
-            rackLocation: b['rack_location'] ?? rack,
-            supplier: b['supplier_name'] ?? 'PBF Enseval Putera',
-          ));
-        }
-
-        loaded.add(ApotekInventoryItem(
-          id: id,
-          name: name,
-          sku: sku,
-          brandName: brand,
-          genericName: generic,
-          form: form,
-          stock: totalStock,
-          unit: 'Strip',
-          buyPrice: buyP,
-          sellPrice: sellP,
-          rackName: rack,
-          kfaCode: kfa,
-          manufacturer: mfg,
-          description: desc,
-          imageUrl: img,
-          batches: parsedBatches,
-        ));
-      }
-
-      if (loaded.isEmpty) {
-        loaded.addAll(_getSampleMockData());
-      }
-
-      setState(() {
-        _items = loaded;
-        _isLoading = false;
-      });
-    } catch (_) {
-      setState(() {
-        _items = _getSampleMockData();
-        _isLoading = false;
-      });
-    }
-  }
-
-  List<ApotekInventoryItem> _getSampleMockData() {
-    return [
-      ApotekInventoryItem(
-        id: 'med-001',
-        name: 'Paracetamol',
-        sku: 'SKU-PCT-500',
-        brandName: 'Paracetamol',
-        genericName: 'Paracetamol',
-        form: 'Tablet',
-        stock: 9950,
-        unit: 'Tablet',
-        buyPrice: 100,
-        sellPrice: 500,
-        rackName: 'RAK A-02',
-        kfaCode: '93001030',
-        manufacturer: 'Kimia Farma',
-        description: 'Catatan dosis, efek samping, dll...',
-        batches: [
-          ApotekBatchModel(
-            id: 'b-pct-1',
-            batchNo: 'BT-20260512-NMEH7',
-            expDate: '2030-05-31',
-            stock: 9950,
-            buyPrice: 100,
-            sellPrice: 500,
-            rackLocation: 'RAK A-02',
-            supplier: 'Kimia Farma Trading',
-          ),
-        ],
-      ),
-      ApotekInventoryItem(
-        id: 'med-002',
-        name: 'Amoxicillin Trihydrate 500mg',
-        sku: 'SKU-AMX-500',
-        brandName: 'Amoxicillin',
-        genericName: 'Amoxicillin 500mg',
-        form: 'Kaplet',
-        stock: 65,
-        unit: 'Strip',
-        buyPrice: 6500,
-        sellPrice: 9500,
-        rackName: 'RAK A-01 (Antibiotik)',
-        kfaCode: '93001029',
-        manufacturer: 'Sanbe Farma',
-        description: 'Antibiotik broad spectrum untuk infeksi bakteri.',
-        batches: [
-          ApotekBatchModel(id: 'b-1', batchNo: 'BT-20260815-99AMX', expDate: '2027-08-15', stock: 45, buyPrice: 6500, sellPrice: 9500, rackLocation: 'RAK A-01', supplier: 'PBF Enseval Putera'),
-          ApotekBatchModel(id: 'b-2', batchNo: 'BT-20260420-11AMX', expDate: '2026-11-20', stock: 20, buyPrice: 6500, sellPrice: 9500, rackLocation: 'RAK A-01', supplier: 'PBF Mensa Bina'),
-        ],
-      ),
-      ApotekInventoryItem(
-        id: 'med-003',
-        name: 'Cetirizine HCl 10mg',
-        sku: 'SKU-CTZ-010',
-        brandName: 'Cetirizine',
-        genericName: 'Cetirizine Hydrochloride',
-        form: 'Tablet',
-        stock: 14,
-        unit: 'Strip',
-        buyPrice: 4500,
-        sellPrice: 7000,
-        rackName: 'RAK B-01 (Antihistamin)',
-        kfaCode: '93001045',
-        manufacturer: 'Dexa Medica',
-        batches: [
-          ApotekBatchModel(id: 'b-4', batchNo: 'BT-20260312-CTZ88', expDate: '2026-09-12', stock: 14, buyPrice: 4500, sellPrice: 7000, rackLocation: 'RAK B-01', supplier: 'PBF Anugrah'),
-        ],
-      ),
-      ApotekInventoryItem(
-        id: 'med-004',
-        name: 'Metformin HCl 500mg',
-        sku: 'SKU-MTF-500',
-        brandName: 'Metformin',
-        genericName: 'Metformin Hydrochloride',
-        form: 'Tablet',
-        stock: 8,
-        unit: 'Strip',
-        buyPrice: 3200,
-        sellPrice: 5000,
-        rackName: 'RAK B-03 (Diabetes)',
-        kfaCode: '93001052',
-        manufacturer: 'Hexpharm Jaya',
-        batches: [
-          ApotekBatchModel(id: 'b-5', batchNo: 'BT-20251130-MTF05', expDate: '2026-06-30', stock: 8, buyPrice: 3200, sellPrice: 5000, rackLocation: 'RAK B-03', supplier: 'PBF Mensa Bina'),
-        ],
-      ),
-      ApotekInventoryItem(
-        id: 'med-005',
-        name: 'Amlodipine Besylate 10mg',
-        sku: 'SKU-AML-010',
-        brandName: 'Amlodipine',
-        genericName: 'Amlodipine 10mg',
-        form: 'Tablet',
-        stock: 0,
-        unit: 'Strip',
-        buyPrice: 3800,
-        sellPrice: 6000,
-        rackName: 'RAK B-02 (Hipertensi)',
-        kfaCode: '93001061',
-        manufacturer: 'Kalbe Farma',
-        batches: [],
-      ),
-      ApotekInventoryItem(
-        id: 'med-006',
-        name: 'OBH Tropica Plus Anak 60ml',
-        sku: 'SKU-OBH-060',
-        brandName: 'OBH Tropica',
-        genericName: 'Succus Liquiritiae + Paracetamol',
-        form: 'Sirup',
-        stock: 28,
-        unit: 'Botol',
-        buyPrice: 18000,
-        sellPrice: 24000,
-        rackName: 'RAK C-01 (Sirup & Cairan)',
-        kfaCode: '93001088',
-        manufacturer: 'Tropica Mas Pharma',
-        batches: [
-          ApotekBatchModel(id: 'b-6', batchNo: 'BT-20260518-OBH22', expDate: '2027-04-18', stock: 28, buyPrice: 18000, sellPrice: 24000, rackLocation: 'RAK C-01', supplier: 'PBF Enseval Putera'),
-        ],
-      ),
-      ApotekInventoryItem(
-        id: 'med-007',
-        name: 'Vitamin C 500mg IPI',
-        sku: 'SKU-VTC-500',
-        brandName: 'Vitamin C IPI',
-        genericName: 'Ascorbic Acid 500mg',
-        form: 'Tablet',
-        stock: 85,
-        unit: 'Botol',
-        buyPrice: 7500,
-        sellPrice: 11000,
-        rackName: 'RAK D-01 (Vitamin & Suplemen)',
-        kfaCode: '93001031',
-        manufacturer: 'Supra Ferbindo Farma',
-        batches: [
-          ApotekBatchModel(id: 'b-7', batchNo: 'BT-20260930-VTC99', expDate: '2028-06-30', stock: 85, buyPrice: 7500, sellPrice: 11000, rackLocation: 'RAK D-01', supplier: 'PBF Enseval Putera'),
-        ],
-      ),
-    ];
+    await ref.read(apotekInventoryProvider.notifier).loadInventory();
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -722,10 +433,8 @@ class _ApotekInventoriState extends ConsumerState<ApotekInventori> {
             OutlinedButton.icon(
               onPressed: () async {
                 Navigator.pop(ctx);
-                setState(() {
-                  item.isArchived = true;
-                  _items.removeWhere((i) => i.id == item.id);
-                });
+                item.isArchived = true;
+                ref.read(apotekInventoryProvider.notifier).deleteMedicine(item.id);
                 try {
                   await _db.deleteMedicine(item.id);
                   if (mounted) {
@@ -2032,15 +1741,18 @@ class _ApotekInventoriState extends ConsumerState<ApotekInventori> {
     final subtitleColor = isDark ? Colors.grey[400]! : const Color(0xFF6F6A8A);
     final borderColor = isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2);
 
+    final items = ref.watch(apotekInventoryProvider);
+    final isLoading = ref.watch(apotekInventoryProvider.notifier).isLoading;
+
     // KPI Aggregations
-    final totalCatalog = _items.length;
-    final totalAssets = _items.fold(0.0, (sum, i) => sum + (i.sellPrice * i.stock));
-    final amanCount = _items.where((i) => i.status == 'aman').length;
-    final menipisCount = _items.where((i) => i.status == 'menipis').length;
-    final habisCount = _items.where((i) => i.status == 'habis').length;
+    final totalCatalog = items.length;
+    final totalAssets = items.fold(0.0, (sum, i) => sum + (i.sellPrice * i.stock));
+    final amanCount = items.where((i) => i.status == 'aman').length;
+    final menipisCount = items.where((i) => i.status == 'menipis').length;
+    final habisCount = items.where((i) => i.status == 'habis').length;
 
     // Filter and search
-    final filtered = _items.where((item) {
+    final filtered = items.where((item) {
       final q = _searchQuery.toLowerCase();
       final matchQ = item.name.toLowerCase().contains(q) ||
           item.genericName.toLowerCase().contains(q) ||
@@ -2058,7 +1770,7 @@ class _ApotekInventoriState extends ConsumerState<ApotekInventori> {
       return true;
     }).toList();
 
-    if (_isLoading) {
+    if (isLoading && items.isEmpty) {
       return Container(
         height: 300,
         alignment: Alignment.center,
@@ -2120,7 +1832,7 @@ class _ApotekInventoriState extends ConsumerState<ApotekInventori> {
                     rackName: 'RAK A-01',
                     batches: [],
                   );
-                  setState(() => _items.insert(0, newItem));
+                  ref.read(apotekInventoryProvider.notifier).addMedicine(newItem);
                   _showMedicineDetailModal(context, newItem, isDark, themeAccent, textColor, subtitleColor, cardBgColor, borderColor);
                 },
                 icon: const Icon(Icons.add_rounded, size: 18, color: Colors.white),

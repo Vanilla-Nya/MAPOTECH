@@ -251,6 +251,7 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
               dokter: doctor,
               isDark: isDark,
               initialTabIndex: 1,
+              autoSelectNow: true,
             ),
           );
         },

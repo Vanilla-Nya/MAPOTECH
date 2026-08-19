@@ -139,6 +139,7 @@ class _PasienQrScannerPageState extends ConsumerState<PasienQrScannerPage> {
                   dokter: doctor,
                   isDark: isDark,
                   initialTabIndex: 1,
+                  autoSelectNow: true,
                 ),
               );
             },

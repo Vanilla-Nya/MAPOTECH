@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/widgets/ui.dart';
 import 'package:mapotech/features/dokter/dashboard/frontend/dokter_pasien.dart';
@@ -17,6 +19,8 @@ class DokterDashboard extends ConsumerStatefulWidget {
 
 class _DokterDashboardState extends ConsumerState<DokterDashboard> {
   List<Map<String, dynamic>> _rawTransactions = [];
+  String _qrToken = '';
+  String _namaFaskes = '';
 
   @override
   void initState() {
@@ -60,6 +64,22 @@ class _DokterDashboardState extends ConsumerState<DokterDashboard> {
       }
     } catch (e) {
       debugPrint('Error fetching dashboard transactions: $e');
+    }
+
+    try {
+      final detail = await SupabaseService.client
+          .from('user_detail_doctor')
+          .select('qr_token, nama_faskes')
+          .eq('id', doctorId)
+          .maybeSingle();
+      if (mounted && detail != null) {
+        setState(() {
+          _qrToken = detail['qr_token']?.toString() ?? '';
+          _namaFaskes = detail['nama_faskes']?.toString() ?? '';
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching doctor qr detail: $e');
     }
   }
 
@@ -357,6 +377,96 @@ class _DokterDashboardState extends ConsumerState<DokterDashboard> {
                     ],
                   ),
                 ),
+                // QR Code Quick Access Card
+                if (_qrToken.isNotEmpty) ...[
+                  const SizedBox(width: 16),
+                  InkWell(
+                    onTap: () => _showZoomQrDialog(
+                      context,
+                      themeAccent,
+                      textColor,
+                      subtitleColor,
+                      cardBgColor,
+                      borderColor,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? const Color(0xFF1E1E22)
+                            : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: borderColor),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.04),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: borderColor),
+                            ),
+                            child: QrImageView(
+                              data: _qrToken,
+                              version: QrVersions.auto,
+                              size: 44,
+                              backgroundColor: Colors.white,
+                              errorCorrectionLevel: QrErrorCorrectLevel.M,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'QR Antrean',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800,
+                                      color: textColor,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Icon(
+                                    Icons.zoom_in_rounded,
+                                    size: 14,
+                                    color: themeAccent,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Klik untuk perbesar',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: subtitleColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -760,6 +870,254 @@ class _DokterDashboardState extends ConsumerState<DokterDashboard> {
         const SizedBox(height: 8),
         Text(day, style: TextStyle(color: subtitleColor, fontSize: 9)),
       ],
+    );
+  }
+
+  void _showZoomQrDialog(
+    BuildContext context,
+    Color themeAccent,
+    Color textColor,
+    Color subtitleColor,
+    Color cardBgColor,
+    Color borderColor,
+  ) {
+    final state = ref.read(landingPageProvider);
+    final isDark = state.appearance == 'dark';
+    final doctorName = state.loggedInName ?? 'dr. Agoes Soetanto';
+    final clinicName = _namaFaskes.isNotEmpty
+        ? _namaFaskes
+        : 'Dokter Praktek Mandiri $doctorName';
+
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.65),
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          child: Container(
+            width: 440,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: cardBgColor,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: borderColor),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.35),
+                  blurRadius: 25,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header: Title & Close Button
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: themeAccent.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(
+                            Icons.qr_code_2_rounded,
+                            color: themeAccent,
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'QR Code Antrean Praktek',
+                              style: GoogleFonts.outfit(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                color: textColor,
+                              ),
+                            ),
+                            Text(
+                              'Praktek Mandiri Terdaftar',
+                              style: GoogleFonts.outfit(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: subtitleColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      icon: const Icon(Icons.close_rounded),
+                      color: subtitleColor,
+                      splashRadius: 18,
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 18),
+
+                // Doctor Info Box
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: themeAccent.withValues(alpha: isDark ? 0.15 : 0.07),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: themeAccent.withValues(alpha: 0.25)),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        doctorName,
+                        style: GoogleFonts.outfit(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: textColor,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        clinicName,
+                        style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: subtitleColor,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 18),
+
+                // Big Zoomed QR Box
+                Center(
+                  child: Container(
+                    width: 250,
+                    height: 250,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: borderColor, width: 2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.08),
+                          blurRadius: 16,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: QrImageView(
+                      data: _qrToken,
+                      version: QrVersions.auto,
+                      size: 218,
+                      backgroundColor: Colors.white,
+                      errorCorrectionLevel: QrErrorCorrectLevel.H,
+                      eyeStyle: const QrEyeStyle(
+                        eyeShape: QrEyeShape.square,
+                        color: Color(0xFF1B0C3C),
+                      ),
+                      dataModuleStyle: const QrDataModuleStyle(
+                        dataModuleShape: QrDataModuleShape.square,
+                        color: Color(0xFF1B0C3C),
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 14),
+
+                // Instruction / Subtitle
+                Text(
+                  'Pasien dapat memindai QR Code ini menggunakan Portal Pasien Mapotech untuk langsung mendaftar antrean saat ini.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.outfit(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w500,
+                    color: subtitleColor,
+                    height: 1.4,
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                // Action Buttons: Download & Print
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final uri = Uri.parse(
+                            'https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=$_qrToken',
+                          );
+                          if (await canLaunchUrl(uri)) {
+                            await launchUrl(uri, mode: LaunchMode.externalApplication);
+                          }
+                        },
+                        icon: const Icon(Icons.download_rounded, size: 16),
+                        label: const Text('Download'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: textColor,
+                          side: BorderSide(color: borderColor),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          textStyle: GoogleFonts.outfit(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          final uri = Uri.parse(
+                            'https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=$_qrToken',
+                          );
+                          if (await canLaunchUrl(uri)) {
+                            await launchUrl(uri, mode: LaunchMode.externalApplication);
+                          }
+                        },
+                        icon: const Icon(Icons.print_rounded, size: 16, color: Colors.white),
+                        label: const Text('Cetak Standee'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: themeAccent,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          textStyle: GoogleFonts.outfit(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

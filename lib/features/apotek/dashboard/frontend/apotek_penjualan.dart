@@ -1,9 +1,10 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/supabase_service.dart';
+import 'package:mapotech/features/apotek/dashboard/backend/inventory_provider.dart';
+import 'package:mapotech/features/apotek/dashboard/backend/prescription_provider.dart';
 
 class PosMedicine {
   final String id;
@@ -45,44 +46,6 @@ class CartItem {
   });
 }
 
-class PendingPrescription {
-  final String externalPrescriptionId;
-  final int sessionNumber;
-  final String patientName;
-  final String doctorName;
-  final String status; // 'ready' or 'pending'
-  final List<RxItem> items;
-
-  const PendingPrescription({
-    required this.externalPrescriptionId,
-    required this.sessionNumber,
-    required this.patientName,
-    required this.doctorName,
-    required this.status,
-    required this.items,
-  });
-}
-
-class RxItem {
-  final String id;
-  final String name;
-  final String dosage;
-  final int qty;
-  final String unit;
-  final double price;
-  final PosMedicine medicine;
-
-  const RxItem({
-    required this.id,
-    required this.name,
-    required this.dosage,
-    required this.qty,
-    required this.unit,
-    required this.price,
-    required this.medicine,
-  });
-}
-
 class ApotekPenjualan extends ConsumerStatefulWidget {
   const ApotekPenjualan({super.key});
 
@@ -92,13 +55,7 @@ class ApotekPenjualan extends ConsumerStatefulWidget {
 
 class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
   final SupabaseService _db = SupabaseService();
-  bool _isLoading = true;
-
-  // Medicine Catalog loaded from Database
-  List<PosMedicine> _medicines = [];
-
-  // Prescription Queues loaded from Database
-  List<PendingPrescription> _pendingPrescriptions = [];
+  bool _isLoading = false;
 
   // Shopping Cart & POS States
   final List<CartItem> _cart = [];
@@ -106,236 +63,62 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
   String _selectedForm = 'all';
   String _selectedBuyer = '';
   bool _isGridView = true;
+  bool _hasLoadedActiveRx = false;
 
   @override
   void initState() {
     super.initState();
-    _loadDataFromDatabase();
+    // Preload inventory if empty
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndLoadActiveRx();
+    });
   }
 
-  Future<void> _loadDataFromDatabase() async {
-    setState(() => _isLoading = true);
-    try {
-      final List<PosMedicine> loadedMedicines = [];
-      final rawMedicines = await _db.fetchMedicinesWithBatches();
-
-      for (final m in rawMedicines) {
-        final String id = m['id'] ?? '';
-        final String name = m['medicine_name'] ?? 'Obat';
-        final String generic = m['generic_name'] ?? 'Generic';
-        final String form = m['medicine_form'] ?? 'Tablet';
-        final String desc = m['deskription'] ?? 'Deskripsi obat.';
-        final batches = m['medicine_batches'] as List<dynamic>? ?? [];
-
-        if (batches.isEmpty) {
-          loadedMedicines.add(PosMedicine(
-            id: id,
-            batchId: '',
-            name: name,
-            genericName: generic,
-            form: form,
-            sku: 'SKU-TEMP',
-            sellPrice: 5000,
-            stock: 0,
-            sellUnit: 'Strip',
-            description: desc,
-          ));
-        } else {
-          for (final b in batches) {
-            loadedMedicines.add(PosMedicine(
-              id: id,
-              batchId: b['id'] ?? '',
-              name: name,
-              genericName: generic,
-              form: form,
-              sku: b['batch_number'] ?? 'BATCH-00',
-              sellPrice: double.tryParse(b['selling_price']?.toString() ?? '5000') ?? 5000,
-              stock: int.tryParse(b['quantity_in_stock']?.toString() ?? '0') ?? 0,
-              sellUnit: 'Strip',
-              description: desc,
-            ));
-          }
-        }
-      }
-
-      if (loadedMedicines.isEmpty) {
-        loadedMedicines.addAll(_getDefaultMedicines());
-      }
-
-      final List<PendingPrescription> loadedRx = [];
-      final rawRx = await _db.fetchPendingPrescriptions();
-
-      for (final rx in rawRx) {
-        final String id = rx['id'] ?? '';
-        final String status = rx['status'] ?? 'pending';
-        final notes = rx['notes'] ?? '';
-        String patient = 'Umum / Walk-in';
-        String doctor = 'Resep Manual';
-        try {
-          if (notes.startsWith('{')) {
-            final decoded = jsonDecode(notes);
-            patient = decoded['patientName'] ?? patient;
-            doctor = decoded['doctorName'] ?? doctor;
-          } else if (notes.contains('|')) {
-            patient = notes.split('|').first.trim();
-          } else {
-            patient = notes;
-          }
-        } catch (_) {}
-
-        if (loadedMedicines.isNotEmpty) {
-          loadedRx.add(PendingPrescription(
-            externalPrescriptionId: id,
-            sessionNumber: loadedRx.length + 1,
-            patientName: patient,
-            doctorName: doctor,
-            status: status == 'pending_checkout' ? 'ready' : 'pending',
-            items: [
-              RxItem(
-                id: 'rx_${loadedRx.length}',
-                name: loadedMedicines.first.name,
-                dosage: '3x1 Sehari',
-                qty: 2,
-                unit: loadedMedicines.first.sellUnit,
-                price: loadedMedicines.first.sellPrice,
-                medicine: loadedMedicines.first,
-              ),
-            ],
-          ));
-        }
-      }
-
-      if (loadedRx.isEmpty) {
-        loadedRx.addAll([
-          PendingPrescription(
-            externalPrescriptionId: 'RX-8827',
-            sessionNumber: 12,
-            patientName: 'Ahmad Fauzi',
-            doctorName: 'dr. Agoes Soetanto, Sp.PD',
-            status: 'ready',
-            items: [
-              RxItem(
-                id: 'rx_1',
-                name: loadedMedicines.isNotEmpty ? loadedMedicines.first.name : 'Amoxicillin 500mg',
-                dosage: '3x1 Sehari (Habiskan)',
-                qty: 2,
-                unit: 'Strip',
-                price: 9500,
-                medicine: loadedMedicines.isNotEmpty ? loadedMedicines.first : _getDefaultMedicines().first,
-              ),
-            ],
-          ),
-        ]);
-      }
-
-      setState(() {
-        _medicines = loadedMedicines;
-        _pendingPrescriptions = loadedRx;
-        _isLoading = false;
-      });
-    } catch (_) {
-      setState(() {
-        _medicines = _getDefaultMedicines();
-        _pendingPrescriptions = [
-          PendingPrescription(
-            externalPrescriptionId: 'RX-8827',
-            sessionNumber: 12,
-            patientName: 'Ahmad Fauzi',
-            doctorName: 'dr. Agoes Soetanto, Sp.PD',
-            status: 'ready',
-            items: [
-              RxItem(
-                id: 'rx_1',
-                name: 'Amoxicillin Trihydrate 500mg',
-                dosage: '3x1 Sehari (Habiskan)',
-                qty: 2,
-                unit: 'Strip',
-                price: 9500,
-                medicine: _getDefaultMedicines().first,
-              ),
-            ],
-          ),
-        ];
-        _isLoading = false;
-      });
+  void _checkAndLoadActiveRx() {
+    final activeRx = ref.read(activePosPrescriptionProvider);
+    if (activeRx != null && !_hasLoadedActiveRx) {
+      _hasLoadedActiveRx = true;
+      final inventory = ref.read(apotekInventoryProvider);
+      final meds = _buildPosMedicines(inventory);
+      _loadPrescriptionToCart(activeRx, meds);
+      ref.read(activePosPrescriptionProvider.notifier).state = null;
     }
   }
 
-  List<PosMedicine> _getDefaultMedicines() {
-    return const [
-      PosMedicine(
-        id: 'med-1',
-        batchId: 'BCH-001',
-        name: 'Amoxicillin Trihydrate 500mg',
-        genericName: 'Amoxicillin',
-        form: 'Kaplet',
-        sku: 'SKU-AMX-500',
-        sellPrice: 9500,
-        stock: 65,
-        sellUnit: 'Strip',
-        description: 'Antibiotik spektrum luas.',
-      ),
-      PosMedicine(
-        id: 'med-2',
-        batchId: 'BCH-002',
-        name: 'Paracetamol 500mg',
-        genericName: 'Acetaminophen',
-        form: 'Tablet',
-        sku: 'SKU-PCT-500',
-        sellPrice: 4500,
-        stock: 140,
-        sellUnit: 'Strip',
-        description: 'Pereda demam dan nyeri ringan.',
-      ),
-      PosMedicine(
-        id: 'med-3',
-        batchId: 'BCH-003',
-        name: 'Cetirizine HCl 10mg',
-        genericName: 'Cetirizine',
-        form: 'Tablet',
-        sku: 'SKU-CTZ-010',
-        sellPrice: 7000,
-        stock: 24,
-        sellUnit: 'Strip',
-        description: 'Antihistamin pereda alergi dan gatal.',
-      ),
-      PosMedicine(
-        id: 'med-4',
-        batchId: 'BCH-004',
-        name: 'OBH Tropica Plus Anak 60ml',
-        genericName: 'Succus Liquiritiae',
-        form: 'Sirup',
-        sku: 'SKU-OBH-060',
-        sellPrice: 24000,
-        stock: 28,
-        sellUnit: 'Botol',
-        description: 'Sirup obat batuk dan flu anak.',
-      ),
-      PosMedicine(
-        id: 'med-5',
-        batchId: 'BCH-005',
-        name: 'Vitamin C 500mg IPI',
-        genericName: 'Ascorbic Acid',
-        form: 'Tablet',
-        sku: 'SKU-VTC-500',
-        sellPrice: 11000,
-        stock: 85,
-        sellUnit: 'Botol',
-        description: 'Suplemen vitamin C harian daya tahan tubuh.',
-      ),
-      PosMedicine(
-        id: 'med-6',
-        batchId: 'BCH-006',
-        name: 'Metformin HCl 500mg',
-        genericName: 'Metformin',
-        form: 'Tablet',
-        sku: 'SKU-MTF-500',
-        sellPrice: 5000,
-        stock: 18,
-        sellUnit: 'Strip',
-        description: 'Obat antidiabetes oral.',
-      ),
-    ];
+  List<PosMedicine> _buildPosMedicines(List<ApotekInventoryItem> items) {
+    final List<PosMedicine> loadedMedicines = [];
+    for (final item in items) {
+      if (item.batches.isEmpty) {
+        loadedMedicines.add(PosMedicine(
+          id: item.id,
+          batchId: item.id,
+          name: item.name,
+          genericName: item.genericName,
+          form: item.form,
+          sku: item.sku,
+          sellPrice: item.sellPrice,
+          stock: item.stock,
+          sellUnit: item.unit,
+          description: item.description ?? '',
+        ));
+      } else {
+        for (final b in item.batches) {
+          loadedMedicines.add(PosMedicine(
+            id: item.id,
+            batchId: b.id,
+            name: item.name,
+            genericName: item.genericName,
+            form: item.form,
+            sku: b.batchNo,
+            sellPrice: b.sellPrice,
+            stock: b.stock,
+            sellUnit: item.unit,
+            description: item.description ?? '',
+          ));
+        }
+      }
+    }
+    return loadedMedicines;
   }
 
   void _addToCart(PosMedicine medicine, {int qty = 1, String? rxId}) {
@@ -377,18 +160,45 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
     );
   }
 
-  void _loadPrescriptionToCart(PendingPrescription rx) {
-    if (rx.status != 'ready') return;
-    for (final item in rx.items) {
-      _addToCart(item.medicine, qty: item.qty, rxId: rx.externalPrescriptionId);
+  void _loadPrescriptionToCart(ApotekPrescriptionOrder rx, List<PosMedicine> availableMeds) {
+    if (rx.status != 'ready' && rx.status != 'pending_checkout') {
+      // If it's loaded directly from Pesanan, proceed
     }
+
+    for (final item in rx.items) {
+      final matchedMed = availableMeds.firstWhere(
+        (m) => m.name.toLowerCase() == item.name.toLowerCase() ||
+               m.name.toLowerCase().contains(item.name.toLowerCase()) ||
+               item.name.toLowerCase().contains(m.name.toLowerCase()),
+        orElse: () => availableMeds.firstWhere(
+          (m) => m.stock > 0,
+          orElse: () => availableMeds.isNotEmpty
+              ? availableMeds.first
+              : PosMedicine(
+                  id: 'rx-med-${rx.id}',
+                  batchId: 'rx-batch-${rx.id}',
+                  name: item.name,
+                  genericName: item.name,
+                  form: 'Tablet',
+                  sku: 'SKU-RX',
+                  sellPrice: item.price,
+                  stock: item.qty,
+                  sellUnit: item.unit,
+                  description: item.dosage,
+                ),
+        ),
+      );
+
+      _addToCart(matchedMed, qty: item.qty, rxId: rx.id);
+    }
+
     setState(() {
       _selectedBuyer = rx.patientName;
-      _pendingPrescriptions.removeWhere((p) => p.externalPrescriptionId == rx.externalPrescriptionId);
     });
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Resep ${rx.patientName} berhasil dimuat ke keranjang kasir!', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600)),
+        content: Text('Resep ${rx.patientName} (${rx.items.length} item) berhasil dimuat ke kasir!', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600)),
         backgroundColor: const Color(0xFF27AE60),
       ),
     );
@@ -1042,6 +852,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
 
     try {
       final List<Map<String, dynamic>> itemsList = cartCopy.map((c) => {
+        'medicineId': c.medicine.id,
         'batchId': c.medicine.batchId,
         'qty': c.qty,
         'price': c.medicine.sellPrice,
@@ -1061,24 +872,28 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
         receiptNo = res['receipt_number'];
       }
 
+      // Automatically deduct from unified inventory provider (instant sync to Inventory tab)
+      await ref.read(apotekInventoryProvider.notifier).deductStockAfterSale(itemsList);
+
       for (final item in cartCopy) {
         if (item.externalPrescriptionId != null) {
+          await ref.read(apotekPrescriptionProvider.notifier).markCompleted(item.externalPrescriptionId!);
           await _db.updatePrescriptionStatus(item.externalPrescriptionId!, 'checked_out');
         }
       }
 
-      await _loadDataFromDatabase();
-
       if (mounted) {
         messenger.showSnackBar(
           SnackBar(
-            content: Text('Transaksi POS $receiptNo berhasil disimpan ke database & stok diperbarui!'),
+            content: Text('Transaksi POS $receiptNo berhasil! Stok di Inventori otomatis terpotong & sinkron.'),
             backgroundColor: const Color(0xFF27AE60),
+            duration: const Duration(seconds: 2),
           ),
         );
       }
     } catch (e) {
       debugPrint('Error during checkout: $e');
+    } finally {
       setState(() => _isLoading = false);
     }
 
@@ -1257,13 +1072,19 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
     final subtitleColor = isDark ? Colors.grey[400]! : const Color(0xFF6F6A8A);
     final borderColor = isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2);
 
-    final filteredMedicines = _medicines.where((med) {
+    final inventoryList = ref.watch(apotekInventoryProvider);
+    final prescriptionList = ref.watch(apotekPrescriptionProvider);
+    final allMeds = _buildPosMedicines(inventoryList);
+
+    final filteredMedicines = allMeds.where((med) {
       final matchesSearch = med.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           med.genericName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           med.sku.toLowerCase().contains(_searchQuery.toLowerCase());
       final matchesForm = _selectedForm == 'all' || med.form.toLowerCase() == _selectedForm.toLowerCase();
       return matchesSearch && matchesForm;
     }).toList();
+
+    final pendingPrescriptions = prescriptionList.where((p) => p.status == 'ready' || p.status == 'compounding' || p.status == 'pending').toList();
 
     final isMobile = MediaQuery.of(context).size.width < 768;
 
@@ -1352,7 +1173,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
               const SizedBox(height: 14),
 
               // ─── 2. PENDING RX QUEUE SECTION ─────────────────
-              if (_pendingPrescriptions.isNotEmpty) ...[
+              if (pendingPrescriptions.isNotEmpty) ...[
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -1370,7 +1191,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(color: themeAccent, borderRadius: BorderRadius.circular(100)),
                       child: Text(
-                        '${_pendingPrescriptions.length} RESEP',
+                        '${pendingPrescriptions.length} RESEP',
                         style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.white),
                       ),
                     ),
@@ -1381,9 +1202,9 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                   height: 105,
                   child: ListView.builder(
                     scrollDirection: Axis.horizontal,
-                    itemCount: _pendingPrescriptions.length,
+                    itemCount: pendingPrescriptions.length,
                     itemBuilder: (context, index) {
-                      final rx = _pendingPrescriptions[index];
+                      final rx = pendingPrescriptions[index];
                       final isRxReady = rx.status == 'ready';
 
                       return Container(
@@ -1419,7 +1240,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                                     borderRadius: BorderRadius.circular(100),
                                   ),
                                   child: Text(
-                                    isRxReady ? 'SIAP CHECKOUT' : 'SEDANG DIRACIK',
+                                    isRxReady ? 'SIAP CHECKOUT' : (rx.status == 'compounding' ? 'SEDANG DIRACIK' : 'ANTRIAN'),
                                     style: GoogleFonts.outfit(
                                       fontSize: 7.5,
                                       fontWeight: FontWeight.w900,
@@ -1438,7 +1259,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                                   style: GoogleFonts.outfit(fontSize: 9, color: subtitleColor),
                                 ),
                                 ElevatedButton(
-                                  onPressed: isRxReady ? () => _loadPrescriptionToCart(rx) : null,
+                                  onPressed: isRxReady ? () => _loadPrescriptionToCart(rx, allMeds) : null,
                                   style: ElevatedButton.styleFrom(
                                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                     minimumSize: Size.zero,

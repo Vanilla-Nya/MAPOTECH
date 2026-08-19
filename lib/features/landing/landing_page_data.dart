@@ -597,6 +597,19 @@ class LandingPageNotifier extends StateNotifier<LandingPageState> {
             'https://drive.google.com/file/d/1OXRAVNAVlxDPreVEWFRI7IcamIfrb2bu/view?usp=drive_link',
         icon: Icons.workspace_premium_rounded,
       ),
+      AchievementItem(
+        id: '3',
+        title: lang == 'id'
+            ? 'Juara 1 Pengembangan Sistem Terintegrasi'
+            : '1st Winner Integrated Healthcare Platform',
+        description: lang == 'id'
+            ? 'Penghargaan atas keunggulan inovasi platform ekosistem kesehatan digital terpadu pada Semester 4.'
+            : 'Award for excellence in integrated digital health ecosystem platform development in Semester 4.',
+        image: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?q=80&w=600',
+        link:
+            'https://drive.google.com/file/d/1pRlRavbSIAJ_EqMwYRSWX4Cs2KqrFvbM/view?usp=drive_link',
+        icon: Icons.military_tech_rounded,
+      ),
     ];
   }
 

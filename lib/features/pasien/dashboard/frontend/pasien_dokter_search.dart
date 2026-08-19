@@ -851,12 +851,14 @@ class DoctorDetailDialog extends ConsumerStatefulWidget {
   final bool isDark;
   final bool isPreview;
   final int initialTabIndex;
+  final bool autoSelectNow;
 
   const DoctorDetailDialog({
     required this.dokter,
     required this.isDark,
     this.isPreview = false,
     this.initialTabIndex = 0,
+    this.autoSelectNow = false,
   });
 
   @override
@@ -1205,6 +1207,11 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
           _schedules = scheds;
           _loadingSchedules = false;
         });
+        if (widget.autoSelectNow) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _setBookingToNow();
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -1824,6 +1831,80 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
     }
   }
 
+  void _setBookingToNow() {
+    final today = DateTime.now();
+    final todayDate = DateTime(today.year, today.month, today.day);
+    final openWeekdays = _getOpenWeekdays();
+
+    if (openWeekdays.isEmpty) return;
+
+    DateTime targetDate = todayDate;
+    if (!openWeekdays.contains(today.weekday)) {
+      // Find first upcoming open date
+      for (int i = 0; i <= 27; i++) {
+        final d = todayDate.add(Duration(days: i));
+        if (openWeekdays.contains(d.weekday)) {
+          targetDate = d;
+          break;
+        }
+      }
+    }
+
+    final sched = _scheduleForDate(targetDate);
+    if (sched == null) return;
+
+    final openStr = (sched['open_time']?.toString() ?? '08:00').substring(0, 5);
+    final closeStr = (sched['close_time']?.toString() ?? '20:00').substring(0, 5);
+    final openParts = openStr.split(':');
+    final closeParts = closeStr.split(':');
+    final openH = int.tryParse(openParts[0]) ?? 8;
+    final openM = int.tryParse(openParts[1]) ?? 0;
+    final closeH = int.tryParse(closeParts[0]) ?? 20;
+    final closeM = int.tryParse(closeParts[1]) ?? 0;
+
+    final openTotalMin = openH * 60 + openM;
+    final closeTotalMin = closeH * 60 + closeM;
+    final nowTotalMin = today.hour * 60 + today.minute;
+
+    int chosenH = today.hour;
+    int chosenM = today.minute;
+
+    if (targetDate.year == todayDate.year &&
+        targetDate.month == todayDate.month &&
+        targetDate.day == todayDate.day) {
+      if (nowTotalMin < openTotalMin) {
+        // Before open time -> default to open time
+        chosenH = openH;
+        chosenM = openM;
+      } else if (nowTotalMin > closeTotalMin) {
+        // After close time -> default to close time
+        chosenH = closeH;
+        chosenM = closeM;
+      } else {
+        // Current open hours -> exact current hour and minute
+        chosenH = today.hour;
+        chosenM = today.minute;
+      }
+    } else {
+      chosenH = openH;
+      chosenM = openM;
+    }
+
+    final timeSlots = _buildTimeSlots(openStr, closeStr);
+
+    setState(() {
+      _selectedDate = targetDate;
+      _clockOpenSlots = timeSlots;
+      _clockHour = chosenH;
+      _clockMinute = chosenM;
+      _pickingHour = false;
+      _hourController.text = chosenH.toString().padLeft(2, '0');
+      _minuteController.text = chosenM.toString().padLeft(2, '0');
+      _selectedTimeSlot =
+          '${chosenH.toString().padLeft(2, '0')}:${chosenM.toString().padLeft(2, '0')}';
+    });
+  }
+
   Widget _buildBookingTab(
     Color textColor,
     Color subtitleColor,
@@ -2003,6 +2084,99 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
             ),
           ),
         ],
+        // ── Quick Set "Sekarang / Hari Ini" Action Banner ──
+        Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: _setBookingToNow,
+              borderRadius: BorderRadius.circular(14),
+              child: Ink(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      themeAccent.withOpacity(isDark ? 0.22 : 0.12),
+                      themeAccent.withOpacity(isDark ? 0.10 : 0.04),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: themeAccent.withOpacity(isDark ? 0.45 : 0.35),
+                    width: 1.5,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: themeAccent,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.bolt_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'PILIH HARI INI & JAM SEKARANG',
+                            style: GoogleFonts.outfit(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.5,
+                              color: themeAccent,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Otomatis atur tanggal ke hari ini & waktu ke saat ini',
+                            style: GoogleFonts.outfit(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: subtitleColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: themeAccent,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.flash_on, size: 13, color: Colors.white),
+                          const SizedBox(width: 3),
+                          Text(
+                            'Set Sekarang',
+                            style: GoogleFonts.outfit(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+
         // Date picker
         _buildSectionHeader('Pilih Tanggal', Icons.calendar_today_rounded, themeAccent, textColor),
         const SizedBox(height: 10),
