@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/supabase_service.dart';
 import 'package:mapotech/features/apotek/dashboard/backend/inventory_provider.dart';
@@ -62,16 +63,204 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
   String _searchQuery = '';
   String _selectedForm = 'all';
   String _selectedBuyer = '';
+  Map<String, dynamic>? _connectedPatient;
+  bool _isSearchOpen = false;
+  final TextEditingController _patientSearchCtrl = TextEditingController();
+  List<Map<String, dynamic>> _patientSearchResults = [];
+  bool _isSearchingPatients = false;
+  late final String _posSessionId;
   bool _isGridView = true;
   bool _hasLoadedActiveRx = false;
+
+  final List<Map<String, dynamic>> _registeredPatients = [
+    {
+      'id': 'pat-001',
+      'name': 'Ahmad Fauzi',
+      'nik': '3509012304950002',
+      'bpjs_number': '0001928472910',
+      'gender': 'Laki-laki',
+      'phone': '0856-7890-1234',
+      'address': 'Jl. Mastrip Timur No. 12, Jember',
+      'has_prescription': true,
+    },
+    {
+      'id': 'pat-002',
+      'name': 'Budi Santoso',
+      'nik': '3509011405880001',
+      'bpjs_number': '0001827364521',
+      'gender': 'Laki-laki',
+      'phone': '0812-3456-7890',
+      'address': 'Jl. Kalimantan No. 45, Jember',
+      'has_prescription': true,
+    },
+    {
+      'id': 'pat-003',
+      'name': 'Siti Aminah',
+      'nik': '3509015509920003',
+      'bpjs_number': '0002019283746',
+      'gender': 'Perempuan',
+      'phone': '0813-9876-5432',
+      'address': 'Jl. Jawa No. 8, Jember',
+      'has_prescription': false,
+    },
+    {
+      'id': 'pat-004',
+      'name': 'Dewi Lestari',
+      'nik': '3509016102900004',
+      'bpjs_number': '0002138475920',
+      'gender': 'Perempuan',
+      'phone': '0878-1234-5678',
+      'address': 'Jl. Riau No. 19, Jember',
+      'has_prescription': false,
+    },
+    {
+      'id': 'pat-005',
+      'name': 'Hendra Wijaya',
+      'nik': '3509010811850005',
+      'bpjs_number': '0001748291038',
+      'gender': 'Laki-laki',
+      'phone': '0821-4567-8901',
+      'address': 'Jl. Gajah Mada No. 102, Jember',
+      'has_prescription': false,
+    },
+    {
+      'id': 'pat-006',
+      'name': 'Rina Kartika',
+      'nik': '3509014703970006',
+      'bpjs_number': '0002248591024',
+      'gender': 'Perempuan',
+      'phone': '0896-2345-6789',
+      'address': 'Jl. Trunojoyo No. 33, Jember',
+      'has_prescription': false,
+    },
+  ];
 
   @override
   void initState() {
     super.initState();
+    _posSessionId = 'POS-${DateTime.now().millisecondsSinceEpoch.toRadixString(36).toUpperCase()}';
+    _patientSearchResults = List.from(_registeredPatients);
     // Preload inventory if empty
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAndLoadActiveRx();
     });
+  }
+
+  @override
+  void dispose() {
+    _patientSearchCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _performPatientSearch(String query) async {
+    final clean = query.trim().toLowerCase();
+    setState(() => _isSearchingPatients = true);
+
+    try {
+      final List<Map<String, dynamic>> results = _registeredPatients.where((p) {
+        if (clean.isEmpty) return true;
+        final name = (p['name'] ?? '').toString().toLowerCase();
+        final nik = (p['nik'] ?? '').toString().toLowerCase();
+        final bpjs = (p['bpjs_number'] ?? '').toString().toLowerCase();
+        final phone = (p['phone'] ?? '').toString().toLowerCase();
+        return name.contains(clean) || nik.contains(clean) || bpjs.contains(clean) || phone.contains(clean);
+      }).toList();
+
+      // Query database patients
+      try {
+        final dbPatients = await _db.fetchAllPatients();
+        for (final p in dbPatients) {
+          final pName = p['name'] ?? '';
+          final pNik = p['nik'] ?? '';
+          if (clean.isEmpty || pName.toLowerCase().contains(clean) || pNik.toLowerCase().contains(clean)) {
+            if (!results.any((r) => r['nik'] == pNik || r['name'] == pName)) {
+              results.add({
+                'id': p['id'] ?? 'db-${results.length}',
+                'name': pName,
+                'nik': pNik.isNotEmpty ? pNik : '350901${results.length}0000',
+                'bpjs_number': '000199${pNik.length >= 6 ? pNik.substring(0, 6) : "827364"}',
+                'gender': p['gender'] ?? 'Laki-laki',
+                'phone': p['phone_number'] ?? p['phone'] ?? '-',
+                'address': p['address'] ?? '-',
+                'has_prescription': false,
+              });
+            }
+          }
+        }
+      } catch (_) {}
+
+      if (mounted) {
+        setState(() {
+          _patientSearchResults = results;
+          _isSearchingPatients = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isSearchingPatients = false);
+    }
+  }
+
+  void _connectPatient(
+    Map<String, dynamic> patient,
+    List<ApotekPrescriptionOrder> pendingPrescriptions,
+    List<PosMedicine> availableMeds,
+  ) {
+    setState(() {
+      _connectedPatient = patient;
+      _selectedBuyer = patient['name'] ?? 'Pasien Terhubung';
+      _isSearchOpen = false;
+    });
+
+    final patientName = (patient['name'] ?? '').toString().toLowerCase();
+    final matchingRx = pendingPrescriptions.where((rx) =>
+      rx.patientName.toLowerCase().contains(patientName) ||
+      patientName.contains(rx.patientName.toLowerCase())
+    ).toList();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.verified_rounded, color: Colors.white, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Pasien ${patient['name']} berhasil terhubung ke POS!',
+                style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: const Color(0xFF1B4F42),
+        duration: const Duration(seconds: 3),
+        action: matchingRx.isNotEmpty
+            ? SnackBarAction(
+                label: 'MUAT RESEP',
+                textColor: const Color(0xFF48C9B0),
+                onPressed: () {
+                  _loadPrescriptionToCart(matchingRx.first, availableMeds);
+                },
+              )
+            : null,
+      ),
+    );
+  }
+
+  void _disconnectPatient() {
+    setState(() {
+      _connectedPatient = null;
+      _selectedBuyer = '';
+      _isSearchOpen = false;
+      _patientSearchCtrl.clear();
+      _patientSearchResults = List.from(_registeredPatients);
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Koneksi pasien diputuskan. Mode pembeli umum (walk-in).', style: GoogleFonts.outfit(fontSize: 12)),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   void _checkAndLoadActiveRx() {
@@ -1053,6 +1242,217 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
     );
   }
 
+  void _showPosQrModal({
+    required BuildContext context,
+    required Color themeAccent,
+    required bool isDark,
+    required Color textColor,
+    required Color subtitleColor,
+    required Color cardBgColor,
+    required Color borderColor,
+    required List<ApotekPrescriptionOrder> pendingPrescriptions,
+    required List<PosMedicine> allMeds,
+  }) {
+    final user = ref.read(landingPageProvider).loggedInUser;
+    final pharmacyId = user?['id'] ?? 'apotek-01';
+    final pharmacyName = user?['name'] ?? 'Apotek MAPOTECH';
+
+    final qrPayload =
+        'https://mapotek.relvastudio.com/pos-apotek/$pharmacyId?pos_session=$_posSessionId&pharmacy_name=${Uri.encodeComponent(pharmacyName)}&role=apotek';
+
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.65),
+      builder: (dCtx) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 480),
+            decoration: BoxDecoration(
+              color: cardBgColor,
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: borderColor),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.3),
+                  blurRadius: 30,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Modal Header
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: themeAccent.withValues(alpha: 0.12),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.qr_code_scanner_rounded,
+                            color: themeAccent,
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'QR Code Kasir POS',
+                              style: GoogleFonts.outfit(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                color: textColor,
+                              ),
+                            ),
+                            Text(
+                              'Pindai dari Aplikasi Pasien MAPOTECH',
+                              style: GoogleFonts.outfit(
+                                fontSize: 11,
+                                color: subtitleColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, size: 20),
+                      onPressed: () => Navigator.pop(dCtx),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+
+                // QR Code Container
+                Center(
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: themeAccent.withValues(alpha: 0.4),
+                        width: 2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: themeAccent.withValues(alpha: 0.15),
+                          blurRadius: 20,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: QrImageView(
+                      data: qrPayload,
+                      version: QrVersions.auto,
+                      size: 210.0,
+                      backgroundColor: Colors.white,
+                      eyeStyle: const QrEyeStyle(
+                        eyeShape: QrEyeShape.square,
+                        color: Color(0xFF1B4F42),
+                      ),
+                      dataModuleStyle: const QrDataModuleStyle(
+                        dataModuleShape: QrDataModuleShape.square,
+                        color: Color(0xFF1B4F42),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Live waiting indicator
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF27AE60).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(100),
+                    border: Border.all(
+                      color: const Color(0xFF27AE60).withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF27AE60),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Sesi: $_posSessionId • Menunggu Scan Pasien...',
+                        style: GoogleFonts.outfit(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF27AE60),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Demo Simulation Quick Connect
+                Text(
+                  'Simulasikan Scan Pasien (Demo Mode):',
+                  style: GoogleFonts.outfit(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: subtitleColor,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final p in _registeredPatients.take(3))
+                      ActionChip(
+                        avatar: const Icon(
+                          Icons.phone_android_rounded,
+                          size: 14,
+                          color: Color(0xFF48C9B0),
+                        ),
+                        label: Text(
+                          p['name'] + (p['has_prescription'] == true ? ' (Ada Resep)' : ''),
+                          style: GoogleFonts.outfit(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        backgroundColor: isDark
+                            ? const Color(0xFF252528)
+                            : const Color(0xFFF1F5F9),
+                        onPressed: () {
+                          Navigator.pop(dCtx);
+                          _connectPatient(p, pendingPrescriptions, allMeds);
+                        },
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   String _formatPrice(double value) {
     return value.toStringAsFixed(0).replaceAllMapped(
           RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
@@ -1096,6 +1496,19 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
       );
     }
 
+    // Check if connected patient has pending prescriptions ready
+    ApotekPrescriptionOrder? connectedPatientRx;
+    if (_connectedPatient != null) {
+      final pName = (_connectedPatient!['name'] ?? '').toString().toLowerCase();
+      final matches = pendingPrescriptions.where((rx) =>
+        rx.patientName.toLowerCase().contains(pName) ||
+        pName.contains(rx.patientName.toLowerCase())
+      ).toList();
+      if (matches.isNotEmpty) {
+        connectedPatientRx = matches.first;
+      }
+    }
+
     return Stack(
       children: [
         // Scrollable content area
@@ -1111,61 +1524,505 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
             children: [
               // ─── 1. BUYER SEARCH & LINK PANEL ─────────────────
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
                 decoration: BoxDecoration(
                   color: cardBgColor,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: borderColor),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        color: themeAccent.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      alignment: Alignment.center,
-                      child: Icon(Icons.person_search_rounded, color: themeAccent, size: 20),
+                  border: Border.all(
+                    color: _connectedPatient != null
+                        ? const Color(0xFF27AE60).withValues(alpha: 0.5)
+                        : borderColor,
+                    width: _connectedPatient != null ? 1.5 : 1.0,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _connectedPatient != null
+                          ? const Color(0xFF27AE60).withValues(alpha: 0.06)
+                          : Colors.black.withValues(alpha: 0.02),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                  ],
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Main Patient Identity Row
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                      child: Row(
                         children: [
-                          Text(
-                            'Identitas Pembeli / Pasien',
-                            style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w900, color: textColor),
+                          Container(
+                            width: 42,
+                            height: 42,
+                            decoration: BoxDecoration(
+                              color: _connectedPatient != null
+                                  ? const Color(0xFF27AE60).withValues(alpha: 0.15)
+                                  : themeAccent.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            alignment: Alignment.center,
+                            child: Icon(
+                              _connectedPatient != null
+                                  ? Icons.verified_user_rounded
+                                  : Icons.person_search_rounded,
+                              color: _connectedPatient != null
+                                  ? const Color(0xFF27AE60)
+                                  : themeAccent,
+                              size: 22,
+                            ),
                           ),
-                          Text(
-                            _selectedBuyer.isEmpty ? 'Pembeli Umum (Walk-in) • Hubungkan dengan Pasien BPJS' : 'Terhubung: $_selectedBuyer',
-                            style: GoogleFonts.outfit(fontSize: 9.5, color: subtitleColor),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      _connectedPatient != null
+                                          ? _connectedPatient!['name']
+                                          : 'Identitas Pembeli / Pasien',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 13.5,
+                                        fontWeight: FontWeight.w900,
+                                        color: textColor,
+                                      ),
+                                    ),
+                                    if (_connectedPatient != null) ...[
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF27AE60).withValues(alpha: 0.15),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          'TERHUBUNG',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 8,
+                                            fontWeight: FontWeight.w900,
+                                            color: const Color(0xFF27AE60),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  _connectedPatient != null
+                                      ? 'NIK: ${_connectedPatient!['nik'] ?? '-'} • BPJS: ${_connectedPatient!['bpjs_number'] ?? 'Aktif'} • Telp: ${_connectedPatient!['phone'] ?? _connectedPatient!['phone_number'] ?? '-'}'
+                                      : 'Pembeli Umum (Walk-in) • Hubungkan dengan Pasien Terdaftar / BPJS',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 10,
+                                    color: subtitleColor,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
+                          const SizedBox(width: 8),
+                          if (_connectedPatient == null) ...[
+                            // Search Patient Button
+                            OutlinedButton.icon(
+                              onPressed: () {
+                                setState(() {
+                                  _isSearchOpen = !_isSearchOpen;
+                                  if (_isSearchOpen) {
+                                    _patientSearchResults = List.from(_registeredPatients);
+                                  }
+                                });
+                              },
+                              icon: Icon(
+                                _isSearchOpen
+                                    ? Icons.keyboard_arrow_up_rounded
+                                    : Icons.search_rounded,
+                                size: 15,
+                                color: themeAccent,
+                              ),
+                              label: Text(
+                                _isSearchOpen ? 'Tutup' : 'Cari Pasien',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: themeAccent,
+                                ),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(
+                                  color: themeAccent.withValues(alpha: 0.4),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+
+                            // QR Scan Connect Button
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                _showPosQrModal(
+                                  context: context,
+                                  themeAccent: themeAccent,
+                                  isDark: isDark,
+                                  textColor: textColor,
+                                  subtitleColor: subtitleColor,
+                                  cardBgColor: cardBgColor,
+                                  borderColor: borderColor,
+                                  pendingPrescriptions: pendingPrescriptions,
+                                  allMeds: allMeds,
+                                );
+                              },
+                              icon: const Icon(
+                                Icons.qr_code_2_rounded,
+                                size: 16,
+                                color: Colors.white,
+                              ),
+                              label: Text(
+                                'QR Kasir',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: themeAccent,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                elevation: 0,
+                              ),
+                            ),
+                          ] else ...[
+                            // Disconnect Patient Button
+                            TextButton.icon(
+                              onPressed: _disconnectPatient,
+                              icon: const Icon(
+                                Icons.link_off_rounded,
+                                size: 16,
+                                color: Colors.redAccent,
+                              ),
+                              label: Text(
+                                'Putus',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.redAccent,
+                                ),
+                              ),
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
-                    if (_selectedBuyer.isEmpty)
-                      ElevatedButton.icon(
-                        onPressed: () {
-                          setState(() {
-                            _selectedBuyer = 'Budi Santoso (BPJS Aktif)';
-                          });
-                        },
-                        icon: const Icon(Icons.qr_code_scanner_rounded, size: 14, color: Colors.white),
-                        label: Text('Link Pasien', style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.white)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: themeAccent,
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          elevation: 0,
+
+                    // Active prescription banner for connected patient
+                    if (connectedPatientRx != null) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF27AE60).withValues(alpha: 0.1),
+                          border: Border(
+                            top: BorderSide(
+                              color: const Color(0xFF27AE60).withValues(alpha: 0.2),
+                            ),
+                          ),
                         ),
-                      )
-                    else
-                      IconButton(
-                        icon: const Icon(Icons.close_rounded, size: 16),
-                        onPressed: () => setState(() => _selectedBuyer = ''),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.receipt_long_rounded,
+                              size: 16,
+                              color: Color(0xFF27AE60),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Pasien memiliki resep digital siap checkout (${connectedPatientRx.items.length} obat)',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: const Color(0xFF27AE60),
+                                ),
+                              ),
+                            ),
+                            ElevatedButton(
+                              onPressed: () => _loadPrescriptionToCart(connectedPatientRx!, allMeds),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF27AE60),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                elevation: 0,
+                              ),
+                              child: Text(
+                                'Muat ke Kasir',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
+                    ],
+
+                    // Search Bar Dropdown Panel
+                    if (_isSearchOpen && _connectedPatient == null) ...[
+                      Container(
+                        padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
+                        decoration: BoxDecoration(
+                          border: Border(
+                            top: BorderSide(color: borderColor),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const SizedBox(height: 14),
+
+                            // Search TextField
+                            Container(
+                              height: 42,
+                              decoration: BoxDecoration(
+                                color: isDark
+                                    ? const Color(0xFF1E1E22)
+                                    : const Color(0xFFF6F8FB),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: borderColor),
+                              ),
+                              child: TextField(
+                                controller: _patientSearchCtrl,
+                                autofocus: true,
+                                style: GoogleFonts.outfit(
+                                  fontSize: 12.5,
+                                  color: textColor,
+                                ),
+                                decoration: InputDecoration(
+                                  hintText: 'Cari nama pasien, NIK (16 digit), atau No. BPJS...',
+                                  hintStyle: GoogleFonts.outfit(
+                                    fontSize: 11.5,
+                                    color: subtitleColor.withValues(alpha: 0.7),
+                                  ),
+                                  prefixIcon: Icon(
+                                    Icons.search_rounded,
+                                    size: 18,
+                                    color: themeAccent,
+                                  ),
+                                  suffixIcon: _patientSearchCtrl.text.isNotEmpty
+                                      ? IconButton(
+                                          icon: const Icon(
+                                            Icons.clear_rounded,
+                                            size: 16,
+                                          ),
+                                          onPressed: () {
+                                            _patientSearchCtrl.clear();
+                                            _performPatientSearch('');
+                                          },
+                                        )
+                                      : null,
+                                  border: InputBorder.none,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    vertical: 11,
+                                    horizontal: 8,
+                                  ),
+                                ),
+                                onChanged: (val) => _performPatientSearch(val),
+                              ),
+                            ),
+
+                            const SizedBox(height: 10),
+
+                            // Patient Search Results List
+                            if (_isSearchingPatients)
+                              Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: themeAccent,
+                                    ),
+                                  ),
+                                ),
+                              )
+                            else if (_patientSearchResults.isEmpty)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                child: Text(
+                                  'Pasien tidak ditemukan dengan kata kunci "${_patientSearchCtrl.text}".',
+                                  textAlign: TextAlign.center,
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 11,
+                                    color: subtitleColor,
+                                  ),
+                                ),
+                              )
+                            else ...[
+                              Text(
+                                'Pilih Pasien Terdaftar (${_patientSearchResults.length} hasil):',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: subtitleColor,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              ConstrainedBox(
+                                constraints: const BoxConstraints(maxHeight: 180),
+                                child: ListView.separated(
+                                  shrinkWrap: true,
+                                  itemCount: _patientSearchResults.length,
+                                  separatorBuilder: (ctx, i) =>
+                                      Divider(color: borderColor, height: 8),
+                                  itemBuilder: (ctx, i) {
+                                    final p = _patientSearchResults[i];
+                                    final hasRx = p['has_prescription'] == true;
+
+                                    return InkWell(
+                                      onTap: () => _connectPatient(
+                                        p,
+                                        pendingPrescriptions,
+                                        allMeds,
+                                      ),
+                                      borderRadius: BorderRadius.circular(10),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 6,
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            CircleAvatar(
+                                              radius: 16,
+                                              backgroundColor: themeAccent.withValues(alpha: 0.15),
+                                              child: Text(
+                                                (p['name'] as String).substring(0, 1).toUpperCase(),
+                                                style: GoogleFonts.outfit(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w900,
+                                                  color: themeAccent,
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 10),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Row(
+                                                    children: [
+                                                      Text(
+                                                        p['name'],
+                                                        style: GoogleFonts.outfit(
+                                                          fontSize: 12,
+                                                          fontWeight: FontWeight.bold,
+                                                          color: textColor,
+                                                        ),
+                                                      ),
+                                                      if (hasRx) ...[
+                                                        const SizedBox(width: 6),
+                                                        Container(
+                                                          padding: const EdgeInsets.symmetric(
+                                                            horizontal: 5,
+                                                            vertical: 1,
+                                                          ),
+                                                          decoration: BoxDecoration(
+                                                            color: const Color(0xFF27AE60).withValues(alpha: 0.12),
+                                                            borderRadius: BorderRadius.circular(4),
+                                                          ),
+                                                          child: Text(
+                                                            'Ada Resep',
+                                                            style: GoogleFonts.outfit(
+                                                              fontSize: 7.5,
+                                                              fontWeight: FontWeight.bold,
+                                                              color: const Color(0xFF27AE60),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ],
+                                                  ),
+                                                  Text(
+                                                    'NIK: ${p['nik']} • BPJS: ${p['bpjs_number']} • ${p['phone']}',
+                                                    style: GoogleFonts.outfit(
+                                                      fontSize: 9.5,
+                                                      color: subtitleColor,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            ElevatedButton(
+                                              onPressed: () => _connectPatient(
+                                                p,
+                                                pendingPrescriptions,
+                                                allMeds,
+                                              ),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: themeAccent,
+                                                padding: const EdgeInsets.symmetric(
+                                                  horizontal: 10,
+                                                  vertical: 4,
+                                                ),
+                                                minimumSize: Size.zero,
+                                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius: BorderRadius.circular(8),
+                                                ),
+                                                elevation: 0,
+                                              ),
+                                              child: Text(
+                                                'Hubungkan',
+                                                style: GoogleFonts.outfit(
+                                                  fontSize: 9.5,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
