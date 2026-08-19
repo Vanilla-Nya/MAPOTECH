@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/supabase_service.dart';
 import 'package:mapotech/features/apotek/dashboard/backend/prescription_provider.dart';
@@ -50,7 +51,7 @@ class _PasienApotekPosDialogState extends ConsumerState<PasienApotekPosDialog> {
     _loadPatientPrescriptions();
   }
 
-  void _connectPatientToPos({bool showFeedback = true}) {
+  Future<void> _connectPatientToPos({bool showFeedback = true}) async {
     final user = ref.read(landingPageProvider).loggedInUser;
     final patientData = {
       'id': user?['id'] ?? 'pat-001',
@@ -64,6 +65,24 @@ class _PasienApotekPosDialogState extends ConsumerState<PasienApotekPosDialog> {
     };
 
     ref.read(connectedPosPatientProvider.notifier).state = patientData;
+
+    try {
+      final channel = Supabase.instance.client.channel('pos_apotek_sync');
+      channel.subscribe((status, error) async {
+        if (status == RealtimeSubscribeStatus.subscribed) {
+          await channel.sendBroadcastMessage(
+            event: 'patient_connected',
+            payload: patientData,
+          );
+        }
+      });
+      await channel.sendBroadcastMessage(
+        event: 'patient_connected',
+        payload: patientData,
+      );
+    } catch (e) {
+      debugPrint('Realtime patient broadcast error: $e');
+    }
 
     setState(() {
       _isConnectedToPos = true;
@@ -92,17 +111,27 @@ class _PasienApotekPosDialogState extends ConsumerState<PasienApotekPosDialog> {
     }
   }
 
-  void _disconnectFromPos() {
+  Future<void> _disconnectFromPos() async {
     ref.read(connectedPosPatientProvider.notifier).state = null;
-    setState(() {
-      _isConnectedToPos = false;
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Koneksi ke POS kasir diputuskan.', style: GoogleFonts.outfit(fontSize: 12)),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    try {
+      final channel = Supabase.instance.client.channel('pos_apotek_sync');
+      await channel.sendBroadcastMessage(
+        event: 'patient_disconnected',
+        payload: {},
+      );
+    } catch (_) {}
+
+    if (mounted) {
+      setState(() {
+        _isConnectedToPos = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Koneksi ke POS kasir diputuskan.', style: GoogleFonts.outfit(fontSize: 12)),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   Future<void> _loadPatientPrescriptions() async {

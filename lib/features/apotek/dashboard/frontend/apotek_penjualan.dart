@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/supabase_service.dart';
 import 'package:mapotech/features/apotek/dashboard/backend/inventory_provider.dart';
@@ -70,6 +71,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
   bool _isSearchingPatients = false;
   late final String _posSessionId;
   BuildContext? _activeQrDialogCtx;
+  RealtimeChannel? _posChannel;
   bool _isGridView = true;
   bool _hasLoadedActiveRx = false;
 
@@ -141,15 +143,58 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
     super.initState();
     _posSessionId = 'POS-${DateTime.now().millisecondsSinceEpoch.toRadixString(36).toUpperCase()}';
     _patientSearchResults = List.from(_registeredPatients);
+    _initRealtimePosChannel();
+
     // Preload inventory if empty
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAndLoadActiveRx();
     });
   }
 
+  void _initRealtimePosChannel() {
+    try {
+      _posChannel = Supabase.instance.client.channel('pos_apotek_sync');
+      _posChannel?.onBroadcast(
+        event: 'patient_connected',
+        callback: (payload) {
+          debugPrint('Realtime POS broadcast received: $payload');
+          final patient = Map<String, dynamic>.from(payload);
+          if (mounted) {
+            final inventoryList = ref.read(apotekInventoryProvider);
+            final prescriptionList = ref.read(apotekPrescriptionProvider);
+            final allMeds = _buildPosMedicines(inventoryList);
+            final pendingPrescriptions = prescriptionList.where((p) => p.status == 'ready' || p.status == 'compounding' || p.status == 'pending').toList();
+
+            _connectPatient(patient, pendingPrescriptions, allMeds);
+
+            if (_activeQrDialogCtx != null) {
+              try {
+                Navigator.of(_activeQrDialogCtx!).pop();
+              } catch (_) {}
+              _activeQrDialogCtx = null;
+            }
+          }
+        },
+      ).onBroadcast(
+        event: 'patient_disconnected',
+        callback: (payload) {
+          if (mounted) {
+            _disconnectPatient();
+          }
+        },
+      );
+      _posChannel?.subscribe();
+    } catch (e) {
+      debugPrint('Realtime channel init error: $e');
+    }
+  }
+
   @override
   void dispose() {
     _patientSearchCtrl.dispose();
+    try {
+      _posChannel?.unsubscribe();
+    } catch (_) {}
     super.dispose();
   }
 
