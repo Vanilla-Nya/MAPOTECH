@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/supabase_service.dart';
+import 'package:mapotech/features/apotek/dashboard/backend/prescription_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// Modal dialog connecting patient directly to an Apotek POS system
@@ -30,11 +31,78 @@ class _PasienApotekPosDialogState extends ConsumerState<PasienApotekPosDialog> {
   bool _isRedeeming = false;
   bool _redeemSuccess = false;
   String _successMessage = '';
+  bool _isConnectedToPos = false;
+  String _connectedPatientName = '';
 
   @override
   void initState() {
     super.initState();
+    final activeConnected = ref.read(connectedPosPatientProvider);
+    if (activeConnected != null) {
+      _isConnectedToPos = true;
+      _connectedPatientName = activeConnected['name'] ?? '';
+    } else {
+      // Automatically establish POS link upon scanning
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _connectPatientToPos(showFeedback: false);
+      });
+    }
     _loadPatientPrescriptions();
+  }
+
+  void _connectPatientToPos({bool showFeedback = true}) {
+    final user = ref.read(landingPageProvider).loggedInUser;
+    final patientData = {
+      'id': user?['id'] ?? 'pat-001',
+      'name': user?['name'] ?? 'Ahmad Fauzi',
+      'nik': user?['nik'] ?? '3509012304950002',
+      'bpjs_number': user?['bpjs_number'] ?? '0001928472910',
+      'gender': user?['gender'] ?? 'Laki-laki',
+      'phone': user?['phone_number'] ?? user?['phone'] ?? '0856-7890-1234',
+      'address': user?['address'] ?? 'Jl. Mastrip Timur No. 12, Jember',
+      'has_prescription': _patientPrescriptions.isNotEmpty,
+    };
+
+    ref.read(connectedPosPatientProvider.notifier).state = patientData;
+
+    setState(() {
+      _isConnectedToPos = true;
+      _connectedPatientName = patientData['name'] as String;
+    });
+
+    if (showFeedback && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Profil $_connectedPatientName berhasil tersambung ke Kasir POS!',
+                  style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFF27AE60),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
+  void _disconnectFromPos() {
+    ref.read(connectedPosPatientProvider.notifier).state = null;
+    setState(() {
+      _isConnectedToPos = false;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Koneksi ke POS kasir diputuskan.', style: GoogleFonts.outfit(fontSize: 12)),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   Future<void> _loadPatientPrescriptions() async {
@@ -372,6 +440,233 @@ class _PasienApotekPosDialogState extends ConsumerState<PasienApotekPosDialog> {
                           ],
                         ),
                       ),
+
+                    // ── Card 0: Connect Patient Profile to POS ─────────────────
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: _isConnectedToPos
+                            ? green.withValues(alpha: 0.08)
+                            : sectionBg,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: _isConnectedToPos
+                              ? green.withValues(alpha: 0.4)
+                              : themeAccent.withValues(alpha: 0.25),
+                          width: _isConnectedToPos ? 1.5 : 1,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: _isConnectedToPos
+                                      ? green.withValues(alpha: 0.15)
+                                      : themeAccent.withValues(alpha: 0.12),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  _isConnectedToPos
+                                      ? Icons.check_circle_rounded
+                                      : Icons.account_circle_rounded,
+                                  color: _isConnectedToPos ? green : themeAccent,
+                                  size: 18,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Identitas Pasien di Kasir POS',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w900,
+                                        color: textColor,
+                                      ),
+                                    ),
+                                    Text(
+                                      _isConnectedToPos
+                                          ? 'Profil Anda tersambung otomatis ke layar kasir $faskes'
+                                          : 'Sambungkan profil akun Anda agar kasir dapat memproses transaksi & BPJS',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 10.5,
+                                        color: subtitleColor,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: _isConnectedToPos
+                                      ? green.withValues(alpha: 0.15)
+                                      : Colors.orange.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  _isConnectedToPos ? 'TERHUBUNG' : 'SIAP KONEK',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 8.5,
+                                    fontWeight: FontWeight.w900,
+                                    color: _isConnectedToPos
+                                        ? green
+                                        : Colors.orange[800],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+
+                          // Patient info row
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: cardBg,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: borderColor),
+                            ),
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 14,
+                                  backgroundColor: (_isConnectedToPos ? green : themeAccent).withValues(alpha: 0.15),
+                                  child: Text(
+                                    (_connectedPatientName.isNotEmpty
+                                            ? _connectedPatientName
+                                            : 'A')
+                                        .substring(0, 1)
+                                        .toUpperCase(),
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: _isConnectedToPos ? green : themeAccent,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        _connectedPatientName.isNotEmpty
+                                            ? _connectedPatientName
+                                            : 'Ahmad Fauzi',
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w900,
+                                          color: textColor,
+                                        ),
+                                      ),
+                                      Text(
+                                        'NIK: 3509012304950002 • BPJS: 0001928472910',
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 9.5,
+                                          color: subtitleColor,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (_isConnectedToPos)
+                                  TextButton(
+                                    onPressed: _disconnectFromPos,
+                                    style: TextButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      minimumSize: Size.zero,
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                    child: Text(
+                                      'Putus',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.redAccent,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Connect Button
+                          if (!_isConnectedToPos)
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: () => _connectPatientToPos(showFeedback: true),
+                                icon: const Icon(
+                                  Icons.link_rounded,
+                                  size: 16,
+                                  color: Colors.white,
+                                ),
+                                label: Text(
+                                  'Hubungkan Profil Pasien ke Kasir POS Ini',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: green,
+                                  padding: const EdgeInsets.symmetric(vertical: 11),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  elevation: 0,
+                                ),
+                              ),
+                            )
+                          else
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: green.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(
+                                    Icons.check_circle_rounded,
+                                    color: green,
+                                    size: 16,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Profil Tersambung di Layar Kasir Apotek',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: green,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
 
                     // ── Card 1: Tebus Resep Digital Section ───────────────────
                     Container(

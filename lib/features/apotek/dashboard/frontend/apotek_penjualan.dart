@@ -69,6 +69,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
   List<Map<String, dynamic>> _patientSearchResults = [];
   bool _isSearchingPatients = false;
   late final String _posSessionId;
+  BuildContext? _activeQrDialogCtx;
   bool _isGridView = true;
   bool _hasLoadedActiveRx = false;
 
@@ -205,6 +206,8 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
     List<ApotekPrescriptionOrder> pendingPrescriptions,
     List<PosMedicine> availableMeds,
   ) {
+    ref.read(connectedPosPatientProvider.notifier).state = patient;
+
     setState(() {
       _connectedPatient = patient;
       _selectedBuyer = patient['name'] ?? 'Pasien Terhubung';
@@ -247,6 +250,8 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
   }
 
   void _disconnectPatient() {
+    ref.read(connectedPosPatientProvider.notifier).state = null;
+
     setState(() {
       _connectedPatient = null;
       _selectedBuyer = '';
@@ -1264,6 +1269,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
       context: context,
       barrierColor: Colors.black.withValues(alpha: 0.65),
       builder: (dCtx) {
+        _activeQrDialogCtx = dCtx;
         return Dialog(
           backgroundColor: Colors.transparent,
           insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
@@ -1450,7 +1456,11 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
           ),
         );
       },
-    );
+    ).then((_) {
+      if (_activeQrDialogCtx == context) {
+        _activeQrDialogCtx = null;
+      }
+    });
   }
 
   String _formatPrice(double value) {
@@ -1485,6 +1495,64 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
     }).toList();
 
     final pendingPrescriptions = prescriptionList.where((p) => p.status == 'ready' || p.status == 'compounding' || p.status == 'pending').toList();
+
+    // Listen to real-time connected patient updates from patient app QR scan
+    ref.listen<Map<String, dynamic>?>(connectedPosPatientProvider, (prev, next) {
+      if (next != null && next != _connectedPatient) {
+        setState(() {
+          _connectedPatient = next;
+          _selectedBuyer = next['name'] ?? 'Pasien Terhubung';
+          _isSearchOpen = false;
+        });
+
+        // Close POS QR modal if it is currently open
+        if (_activeQrDialogCtx != null) {
+          try {
+            Navigator.of(_activeQrDialogCtx!).pop();
+          } catch (_) {}
+          _activeQrDialogCtx = null;
+        }
+
+        final pName = (next['name'] ?? '').toString().toLowerCase();
+        final matchingRx = pendingPrescriptions.where((rx) =>
+          rx.patientName.toLowerCase().contains(pName) ||
+          pName.contains(rx.patientName.toLowerCase())
+        ).toList();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.verified_rounded, color: Colors.white, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Pasien ${next['name']} berhasil terhubung ke POS via QR Scan!',
+                    style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: const Color(0xFF1B4F42),
+            duration: const Duration(seconds: 4),
+            action: matchingRx.isNotEmpty
+                ? SnackBarAction(
+                    label: 'MUAT RESEP',
+                    textColor: const Color(0xFF48C9B0),
+                    onPressed: () {
+                      _loadPrescriptionToCart(matchingRx.first, allMeds);
+                    },
+                  )
+                : null,
+          ),
+        );
+      } else if (next == null && _connectedPatient != null) {
+        setState(() {
+          _connectedPatient = null;
+          _selectedBuyer = '';
+        });
+      }
+    });
 
     final isMobile = MediaQuery.of(context).size.width < 768;
 

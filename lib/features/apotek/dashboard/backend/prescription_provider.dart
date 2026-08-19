@@ -220,3 +220,6 @@ final apotekPrescriptionProvider =
 
 // Holds the currently active prescription to automatically load into POS cart when navigating
 final activePosPrescriptionProvider = StateProvider<ApotekPrescriptionOrder?>((ref) => null);
+
+// Holds the currently connected patient for the active Apotek POS session
+final connectedPosPatientProvider = StateProvider<Map<String, dynamic>?>((ref) => null);
