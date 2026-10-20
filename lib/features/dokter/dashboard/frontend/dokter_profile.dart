@@ -3,7 +3,7 @@ import 'dart:math';
 import 'dart:ui';
 import 'dart:typed_data';
 import 'dart:io' as io;
-import 'dart:html' as html;
+import 'package:mapotech/shared/web_helpers.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -2839,26 +2839,23 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
     required String userId,
     required String packageType,
   }) {
-    if (kIsWeb) {
-      html.window.localStorage[_kPendingOrderId] = orderId;
-      html.window.localStorage[_kPendingPaymentUrl] = paymentUrl;
-      html.window.localStorage[_kPendingQrString] = qrString;
-      html.window.localStorage[_kPendingAmount] = amount.toString();
-      html.window.localStorage[_kPendingUserId] = userId;
-      html.window.localStorage[_kPendingPackageType] = packageType;
-    }
+    WebStorageHelper.setItem(_kPendingOrderId, orderId);
+    WebStorageHelper.setItem(_kPendingPaymentUrl, paymentUrl);
+    WebStorageHelper.setItem(_kPendingQrString, qrString);
+    WebStorageHelper.setItem(_kPendingAmount, amount.toString());
+    WebStorageHelper.setItem(_kPendingUserId, userId);
+    WebStorageHelper.setItem(_kPendingPackageType, packageType);
   }
 
   /// Load pending payment from localStorage (returns null if none for this user)
   Map<String, String>? _loadPendingPayment(String userId) {
-    if (!kIsWeb) return null;
-    final orderId = html.window.localStorage[_kPendingOrderId];
-    final paymentUrl = html.window.localStorage[_kPendingPaymentUrl];
-    final qrString = html.window.localStorage[_kPendingQrString] ?? '';
-    final amount = html.window.localStorage[_kPendingAmount];
-    final savedUserId = html.window.localStorage[_kPendingUserId];
+    final orderId = WebStorageHelper.getItem(_kPendingOrderId);
+    final paymentUrl = WebStorageHelper.getItem(_kPendingPaymentUrl);
+    final qrString = WebStorageHelper.getItem(_kPendingQrString) ?? '';
+    final amount = WebStorageHelper.getItem(_kPendingAmount);
+    final savedUserId = WebStorageHelper.getItem(_kPendingUserId);
     final packageType =
-        html.window.localStorage[_kPendingPackageType] ?? 'subscription_30';
+        WebStorageHelper.getItem(_kPendingPackageType) ?? 'subscription_30';
     if (orderId == null || paymentUrl == null || amount == null) return null;
     if (savedUserId != null && savedUserId != userId) return null;
     return {
@@ -2872,14 +2869,12 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
 
   /// Clear pending payment from localStorage
   void _clearPendingPayment() {
-    if (kIsWeb) {
-      html.window.localStorage.remove(_kPendingOrderId);
-      html.window.localStorage.remove(_kPendingPaymentUrl);
-      html.window.localStorage.remove(_kPendingQrString);
-      html.window.localStorage.remove(_kPendingAmount);
-      html.window.localStorage.remove(_kPendingUserId);
-      html.window.localStorage.remove(_kPendingPackageType);
-    }
+    WebStorageHelper.removeItem(_kPendingOrderId);
+    WebStorageHelper.removeItem(_kPendingPaymentUrl);
+    WebStorageHelper.removeItem(_kPendingQrString);
+    WebStorageHelper.removeItem(_kPendingAmount);
+    WebStorageHelper.removeItem(_kPendingUserId);
+    WebStorageHelper.removeItem(_kPendingPackageType);
   }
 
   /// Apply the correct package benefits after a successful Duitku QRIS payment.
@@ -8364,21 +8359,16 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
         throw Exception('HTTP ${response.statusCode}');
       }
 
-      // Build a temporary blob URL
-      final blob = html.Blob([response.bodyBytes], mimeType);
-      final blobUrl = html.Url.createObjectUrlFromBlob(blob);
-
-      // Open the blob URL — address bar shows blob:http://... instead
-      html.window.open(blobUrl, '_blank');
-
-      // Revoke the object URL after 60 s to free browser memory
-      Future.delayed(const Duration(seconds: 60), () {
-        html.Url.revokeObjectUrl(blobUrl);
-      });
+      if (kIsWeb) {
+        await WebStorageHelper.openBlobUrl(url, response.bodyBytes, mimeType);
+      } else {
+        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      }
     } catch (e) {
-      // If the fetch/blob creation fails, fall back gracefully
       debugPrint('_openAsBlobUrl failed: $e — falling back to direct URL');
-      html.window.open(url, '_blank');
+      try {
+        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      } catch (_) {}
     }
   }
 
