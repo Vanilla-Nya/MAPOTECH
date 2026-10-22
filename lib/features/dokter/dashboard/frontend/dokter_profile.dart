@@ -1486,11 +1486,17 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                       padding: const EdgeInsets.symmetric(vertical: 4),
                       child: LayoutBuilder(
                         builder: (context, constraints) {
+                          final syncUnits = (_subDaysRemaining / 30).ceil();
+                          final syncCalculatedDays = syncUnits * 30;
+                          final syncAmount = syncUnits * 15000;
+                          final syncPriceStr =
+                              'Rp ${syncAmount.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}';
+
                           final List<Widget> cards = [
                             _buildPlanCardProfile(
                               title: 'Standard Subscription (30 Days)',
                               description: 'Akses penuh ke semua fitur dashboard praktik mandiri & booking pasien selama 30 hari.',
-                              price: 'Rp 1.000',
+                              price: 'Rp 150.000',
                               priceSuffix: '/ 30 Hari',
                               isPopular: false,
                               accentColor: const Color(0xFF00BFA6),
@@ -1506,13 +1512,13 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                               ],
                               onTap: () {
                                 Navigator.of(ctx).pop();
-                                _buySubscriptionWithDuitku('subscription_30');
+                                _buySubscriptionWithDuitku('subscription_30', 150000);
                               },
                             ),
                             _buildPlanCardProfile(
                               title: 'Premium Customizer (30 Days)',
                               description: 'Buka kustomisasi desain profil lengkap (font nama, tagline, blur level, vignette, custom gradients) selama 30 hari.',
-                              price: 'Rp 1.000',
+                              price: 'Rp 20.000',
                               priceSuffix: '/ 30 Hari',
                               isPopular: false,
                               accentColor: const Color(0xFFFFB300),
@@ -1528,14 +1534,14 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                               ],
                               onTap: () {
                                 Navigator.of(ctx).pop();
-                                _renewPackageProfile('premium_30', 1000);
+                                _renewPackageProfile('premium_30', 20000);
                               },
                             ),
                             if (_subDaysRemaining > 0)
                               _buildPlanCardProfile(
                                 title: 'Premium Customizer (Sync $_subDaysRemaining Days)',
-                                description: 'Sesuaikan durasi Premium Customizer Anda dengan sisa durasi Langganan Praktik Anda saat ini.',
-                                price: 'Rp 1.000',
+                                description: 'Sesuaikan durasi Premium Customizer dengan sisa langganan ($_subDaysRemaining hari, dihitung $syncCalculatedDays hari @ Rp 15.000/30 hari).',
+                                price: syncPriceStr,
                                 priceSuffix: '/ $_subDaysRemaining Hari',
                                 isPopular: false,
                                 accentColor: const Color(0xFFFFB300),
@@ -1550,13 +1556,13 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                                 ],
                                 onTap: () {
                                   Navigator.of(ctx).pop();
-                                  _renewPackageProfile('premium_sync', 1000);
+                                  _renewPackageProfile('premium_sync', syncAmount);
                                 },
                               ),
                             _buildPlanCardProfile(
                               title: 'Premium Customizer (Lifetime)',
                               description: 'Buka kustomisasi desain profil premium. Aktif selama langganan Anda aktif. (Kehilangan status jika langganan dibiarkan kedaluwarsa).',
-                              price: 'Rp 1.000',
+                              price: 'Rp 100.000',
                               priceSuffix: '/ Selamanya',
                               isPopular: true,
                               accentColor: const Color(0xFFFFB300),
@@ -1572,13 +1578,13 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                               ],
                               onTap: () {
                                 Navigator.of(ctx).pop();
-                                _renewPackageProfile('premium_lifetime', 1000);
+                                _renewPackageProfile('premium_lifetime', 100000);
                               },
                             ),
                             _buildPlanCardProfile(
                               title: 'Mega Bundle (30 Days)',
                               description: 'Gabungan akses Layanan Praktik & Kustomisasi Profil Premium selama 30 hari.',
-                              price: 'Rp 1.000',
+                              price: 'Rp 160.000',
                               priceSuffix: '/ 30 Hari',
                               isPopular: false,
                               accentColor: const Color(0xFFCB8FFF),
@@ -1594,7 +1600,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                               ],
                               onTap: () {
                                 Navigator.of(ctx).pop();
-                                _buySubscriptionWithDuitku('bundle_30');
+                                _buySubscriptionWithDuitku('bundle_30', 160000);
                               },
                             ),
                           ];
@@ -2966,7 +2972,11 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
 
   Future<void> _buySubscriptionWithDuitku([
     String packageType = 'subscription_30',
+    int? targetAmount,
   ]) async {
+    final int defaultAmount = packageType == 'bundle_30' ? 160000 : 150000;
+    final int packagePrice = targetAmount ?? defaultAmount;
+
     if (_isAssistant) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -2988,7 +2998,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
       final savedOrderId = pending['orderId']!;
       final savedPaymentUrl = pending['paymentUrl']!;
       final savedQrString = pending['qrString'] ?? '';
-      final savedAmount = int.tryParse(pending['amount'] ?? '1000') ?? 1000;
+      final savedAmount = int.tryParse(pending['amount'] ?? '') ?? packagePrice;
       final savedPkg = pending['packageType'] ?? packageType;
       // Re-open QRIS dialog with the saved order (no new API call)
       _showQrisPaymentDialog(
@@ -3018,6 +3028,8 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
         'create-duitku-payment',
         body: {
           'packageType': packageType,
+          'amount': packagePrice,
+          'paymentAmount': packagePrice,
           'customerEmail': email,
           'customerName': name,
           'merchantCode': merchantCode,
@@ -3035,7 +3047,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
         final orderId = data['orderId']?.toString() ?? '';
         final paymentUrl = data['paymentUrl']?.toString() ?? '';
         final qrString = data['qrString']?.toString() ?? '';
-        final amount = (data['amount'] as num?)?.toInt() ?? 1000;
+        final amount = (data['amount'] as num?)?.toInt() ?? packagePrice;
 
         _savePendingPayment(
           orderId: orderId,

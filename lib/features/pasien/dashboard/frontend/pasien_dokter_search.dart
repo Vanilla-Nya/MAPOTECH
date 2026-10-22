@@ -3555,11 +3555,17 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
                       padding: const EdgeInsets.symmetric(vertical: 4),
                       child: LayoutBuilder(
                         builder: (context, constraints) {
+                          final syncUnits = (subDaysRemaining / 30).ceil();
+                          final syncCalculatedDays = syncUnits * 30;
+                          final syncAmount = syncUnits * 15000;
+                          final syncPriceStr =
+                              'Rp ${syncAmount.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}';
+
                           final List<Widget> cards = [
                             _buildPlanCard(
                               title: 'Standard Subscription (30 Days)',
                               description: 'Akses penuh ke semua fitur dashboard praktik mandiri & booking pasien selama 30 hari.',
-                              price: 'Rp 1.000',
+                              price: 'Rp 150.000',
                               priceSuffix: '/ 30 Hari',
                               isPopular: false,
                               accentColor: const Color(0xFF00BFA6),
@@ -3575,13 +3581,13 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
                               ],
                               onTap: () {
                                 Navigator.of(ctx).pop();
-                                _renewPackage('subscription_30', 1000);
+                                _renewPackage('subscription_30', 150000);
                               },
                             ),
                             _buildPlanCard(
                               title: 'Premium Customizer (30 Days)',
                               description: 'Buka kustomisasi desain profil lengkap (font nama, tagline, blur level, vignette, custom gradients) selama 30 hari.',
-                              price: 'Rp 1.000',
+                              price: 'Rp 20.000',
                               priceSuffix: '/ 30 Hari',
                               isPopular: false,
                               accentColor: const Color(0xFFFFB300),
@@ -3597,14 +3603,14 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
                               ],
                               onTap: () {
                                 Navigator.of(ctx).pop();
-                                _renewPackage('premium_30', 1000);
+                                _renewPackage('premium_30', 20000);
                               },
                             ),
                             if (subDaysRemaining > 0)
                               _buildPlanCard(
                                 title: 'Premium Customizer (Sync $subDaysRemaining Days)',
-                                description: 'Sesuaikan durasi Premium Customizer Anda dengan sisa durasi Langganan Praktik Anda saat ini.',
-                                price: 'Rp 1.000',
+                                description: 'Sesuaikan durasi Premium Customizer dengan sisa langganan ($subDaysRemaining hari, dihitung $syncCalculatedDays hari @ Rp 15.000/30 hari).',
+                                price: syncPriceStr,
                                 priceSuffix: '/ $subDaysRemaining Hari',
                                 isPopular: false,
                                 accentColor: const Color(0xFFFFB300),
@@ -3619,13 +3625,13 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
                                 ],
                                 onTap: () {
                                   Navigator.of(ctx).pop();
-                                  _renewPackage('premium_sync', 1000);
+                                  _renewPackage('premium_sync', syncAmount);
                                 },
                               ),
                             _buildPlanCard(
                               title: 'Premium Customizer (Lifetime)',
                               description: 'Buka kustomisasi desain profil premium. Aktif selama langganan Anda aktif. (Kehilangan status jika langganan dibiarkan kedaluwarsa).',
-                              price: 'Rp 1.000',
+                              price: 'Rp 100.000',
                               priceSuffix: '/ Selamanya',
                               isPopular: true,
                               accentColor: const Color(0xFFFFB300),
@@ -3641,13 +3647,13 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
                               ],
                               onTap: () {
                                 Navigator.of(ctx).pop();
-                                _renewPackage('premium_lifetime', 1000);
+                                _renewPackage('premium_lifetime', 100000);
                               },
                             ),
                             _buildPlanCard(
                               title: 'Mega Bundle (30 Days)',
                               description: 'Gabungan akses Layanan Praktik & Kustomisasi Profil Premium selama 30 hari.',
-                              price: 'Rp 1.000',
+                              price: 'Rp 160.000',
                               priceSuffix: '/ 30 Hari',
                               isPopular: false,
                               accentColor: const Color(0xFFCB8FFF),
@@ -3663,7 +3669,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
                               ],
                               onTap: () {
                                 Navigator.of(ctx).pop();
-                                _renewPackage('bundle_30', 1000);
+                                _renewPackage('bundle_30', 160000);
                               },
                             ),
                           ];
@@ -3944,6 +3950,9 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
           final newExpiry = currentPremExpiry.add(const Duration(days: 30));
           settings['premium_expired_at'] = newExpiry.toIso8601String();
         }
+      } else if (packageType == 'premium_sync') {
+        settings['is_premium'] = true;
+        settings['premium_expired_at'] = newSubExpiryStr;
       } else if (packageType == 'premium_lifetime') {
         settings['is_premium'] = true;
         settings['premium_expired_at'] = 'lifetime';
@@ -3978,6 +3987,34 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
             'header_bg_settings': settings,
           })
           .eq('id', userId);
+
+      // Record financial expense
+      String packageDesc = 'Pembelian Paket Layanan';
+      if (packageType == 'subscription_30') packageDesc = 'Perpanjangan Langganan Praktik Mandiri 30 Hari';
+      if (packageType == 'subscription_lifetime') packageDesc = 'Langganan Praktik Mandiri Lifetime';
+      if (packageType == 'premium_30') packageDesc = 'Pembelian Kustomisasi Profil Premium 30 Hari';
+      if (packageType == 'premium_sync') packageDesc = 'Pembelian Premium Customizer (Sinkronisasi Durasi)';
+      if (packageType == 'premium_lifetime') packageDesc = 'Pembelian Kustomisasi Profil Premium Lifetime';
+      if (packageType == 'bundle_30') packageDesc = 'Pembelian Paket Mega Bundle 30 Hari';
+      if (packageType == 'bundle_lifetime') packageDesc = 'Pembelian Paket Mega Bundle Lifetime';
+
+      try {
+        final txData = {
+          'id_user': userId,
+          'transaction_type': 'expense',
+          'source_type': 'manual',
+          'amount': amount.toDouble(),
+          'description': packageDesc,
+          'category': 'Operasional',
+          'status': 'active',
+        };
+        await client
+            .schema('private_doctor')
+            .from('financial_transactions')
+            .insert(txData);
+      } catch (dbErr) {
+        debugPrint('Failed to auto-record package expense: $dbErr');
+      }
 
       // 4. Update local state
       setState(() {
@@ -4043,6 +4080,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
         if (packageType == 'subscription_30') packageName = 'Standard Subscription (30 Hari)';
         if (packageType == 'subscription_lifetime') packageName = 'Standard Subscription (Lifetime)';
         if (packageType == 'premium_30') packageName = 'Premium Customizer (30 Hari)';
+        if (packageType == 'premium_sync') packageName = 'Premium Customizer (Sync Durasi)';
         if (packageType == 'premium_lifetime') packageName = 'Premium Customizer (Lifetime)';
         if (packageType == 'bundle_30') packageName = 'Mega Bundle (30 Hari)';
         if (packageType == 'bundle_lifetime') packageName = 'Mega Bundle (Lifetime)';

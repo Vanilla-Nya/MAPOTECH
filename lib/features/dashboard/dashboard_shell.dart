@@ -68,11 +68,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   bool _hasShownSubNotice = false;
 
   bool _shouldUseShellScroll(String menu) {
-    if (menu == 'doctors' ||
-        menu == 'pharmacies' ||
-        menu == 'pasien' ||
-        menu == 'ai_assistant' ||
-        menu == 'penjualan') {
+    if (menu == 'ai_assistant' || menu == 'penjualan') {
       return false;
     }
     return true;
