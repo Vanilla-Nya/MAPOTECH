@@ -18,9 +18,11 @@ import 'package:mapotech/features/dokter/dashboard/frontend/web_map_widget.dart'
 import 'package:mapotech/shared/widgets/animated_transitions.dart';
 import 'package:mapotech/shared/widgets/revgeo_wilayah_map_widget.dart';
 import 'package:image/image.dart' as img;
+import 'package:mapotech/features/puskesmas/dlc/vitascale/vitascale_dlc_gate.dart';
 
 class PuskesmasProfile extends ConsumerStatefulWidget {
-  const PuskesmasProfile({super.key});
+  final ValueChanged<String>? onNavigate;
+  const PuskesmasProfile({super.key, this.onNavigate});
 
   @override
   ConsumerState<PuskesmasProfile> createState() => _PuskesmasProfileState();
@@ -30,7 +32,7 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
   bool _isLoading = true;
   bool _isSaving = false;
   bool _isUploadingPhoto = false;
-  int _activeTab = 0; // 0 = Profile & Status, 1 = API & Integrasi
+  int _activeTab = 0; // 0 = Profile & Info, 1 = Praktik & Layanan, 2 = API & Integrasi, 3 = Modul DLC
   int _activeApiSubTab = 0; // 0 = SatuSehat, 1 = BPJS, 2 = Mobile JKN
 
   // Profile data state
@@ -1484,6 +1486,15 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                     isDark,
                   ),
                 ),
+                Expanded(
+                  child: _buildTabItem(
+                    3,
+                    isEn ? 'DLC Modules' : 'Modul DLC',
+                    Icons.extension_rounded,
+                    themeAccent,
+                    isDark,
+                  ),
+                ),
               ],
             ),
           ),
@@ -1517,11 +1528,22 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                   isEn,
                   isDark,
                 )
-              : _buildApiAndIntegrationTab(
+              : _activeTab == 2
+              ? _buildApiAndIntegrationTab(
                   cardBgColor,
                   textColor,
                   subtitleColor,
                   borderColor,
+                  themeAccent,
+                  isEn,
+                  isDark,
+                )
+              : _buildDlcModulesTab(
+                  cardBgColor,
+                  textColor,
+                  subtitleColor,
+                  borderColor,
+                  inputBg,
                   themeAccent,
                   isEn,
                   isDark,
@@ -2580,6 +2602,155 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
 
           const SizedBox(height: 16),
 
+          // ── DLC Add-on License & Unlock Section in Renew Card ──
+          Consumer(
+            builder: (context, ref, _) {
+              final isVitaScaleUnlocked = ref.watch(vitascaleDlcUnlockedProvider);
+              return Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isVitaScaleUnlocked
+                      ? const Color(0xFF1ABC9C).withOpacity(0.08)
+                      : Colors.orange.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: isVitaScaleUnlocked
+                        ? const Color(0xFF1ABC9C).withOpacity(0.3)
+                        : Colors.orange.withOpacity(0.3),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: isVitaScaleUnlocked
+                                ? const Color(0xFF1ABC9C).withOpacity(0.15)
+                                : Colors.orange.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.monitor_weight_rounded,
+                            size: 20,
+                            color: isVitaScaleUnlocked
+                                ? const Color(0xFF1ABC9C)
+                                : Colors.orange,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'DLC: VITASCALE By MAPOTECH',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: textColor,
+                                ),
+                              ),
+                              Text(
+                                'Skrining Antropometri IoT & CV (0–12 Thn)',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 11,
+                                  color: subtitleColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: isVitaScaleUnlocked
+                                ? const Color(0xFF27AE60).withOpacity(0.15)
+                                : Colors.orange.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            isVitaScaleUnlocked ? 'DLC AKTIF' : 'TERKUNCI',
+                            style: GoogleFonts.outfit(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              color: isVitaScaleUnlocked
+                                  ? const Color(0xFF27AE60)
+                                  : Colors.orange,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            isVitaScaleUnlocked
+                                ? 'Akses modul VitaScale telah aktif. Anda dapat langsung membuka skrining antropometri anak.'
+                                : 'Buka akses ekspansi DLC VitaScale untuk menghubungkan timbangan IoT dan Computer Vision.',
+                            style: GoogleFonts.outfit(
+                              fontSize: 11,
+                              color: subtitleColor,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            final nextState = !isVitaScaleUnlocked;
+                            ref.read(vitascaleDlcUnlockedProvider.notifier).state = nextState;
+                            if (nextState) {
+                              ref.read(landingPageProvider.notifier).addFavoriteMenuItem('dlc_vitascale_data_anak');
+                              ref.read(landingPageProvider.notifier).addFavoriteMenuItem('dlc_vitascale_screening');
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('DLC VITASCALE By MAPOTECH Berhasil Di-Unlock!'),
+                                  backgroundColor: Color(0xFF1ABC9C),
+                                ),
+                              );
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('DLC VITASCALE Dikunci Kembali.'),
+                                  backgroundColor: Colors.grey,
+                                ),
+                              );
+                            }
+                          },
+                          icon: Icon(
+                            isVitaScaleUnlocked
+                                ? Icons.lock_outline_rounded
+                                : Icons.lock_open_rounded,
+                            size: 14,
+                          ),
+                          label: Text(
+                            isVitaScaleUnlocked ? 'Kunci' : 'Unlock DLC',
+                            style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: isVitaScaleUnlocked
+                                ? (isDark ? const Color(0xFF2C2C30) : const Color(0xFFECEEF2))
+                                : const Color(0xFF1ABC9C),
+                            foregroundColor: isVitaScaleUnlocked ? textColor : Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+
+          const SizedBox(height: 16),
+
           ElevatedButton.icon(
             onPressed: _isSaving ? null : _renewSubscription,
             icon: Icon(
@@ -2714,6 +2885,11 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
           .eq('id', userId);
 
       await _loadProfileData();
+
+      // Pastikan DLC VitaScale juga diaktifkan saat perpanjangan berhasil
+      ref.read(vitascaleDlcUnlockedProvider.notifier).state = true;
+      ref.read(landingPageProvider.notifier).addFavoriteMenuItem('dlc_vitascale_data_anak');
+      ref.read(landingPageProvider.notifier).addFavoriteMenuItem('dlc_vitascale_screening');
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -3309,6 +3485,403 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
           _selectedKelurahan = vill;
         });
       },
+    );
+  }
+
+  // ── Tab 3: Manajemen Modul DLC (Add-Ons) ───────────────────────────────────
+
+  Widget _buildDlcModulesTab(
+    Color cardBgColor,
+    Color textColor,
+    Color subtitleColor,
+    Color borderColor,
+    Color inputBg,
+    Color themeAccent,
+    bool isEn,
+    bool isDark,
+  ) {
+    final isVitaScaleUnlocked = ref.watch(vitascaleDlcUnlockedProvider);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Header Banner
+        Container(
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            color: cardBgColor,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: borderColor),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1ABC9C).withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(
+                  Icons.extension_rounded,
+                  color: Color(0xFF1ABC9C),
+                  size: 26,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isEn ? 'DLC Modules Management (Add-Ons)' : 'Manajemen Modul DLC (Digital Laboratory & Clinic)',
+                      style: GoogleFonts.outfit(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: textColor,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      isEn
+                          ? 'Manage optional clinic add-ons, IoT hardware integrations, and clinical expansions.'
+                          : 'Kelola modul ekspansi faskes, integrasi perangkat keras IoT, dan computer vision skrining antropometri.',
+                      style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        color: subtitleColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 20),
+
+        // CARD 1: VITASCALE By MAPOTECH
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: cardBgColor,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isVitaScaleUnlocked
+                  ? const Color(0xFF1ABC9C).withOpacity(0.4)
+                  : borderColor,
+              width: isVitaScaleUnlocked ? 1.5 : 1.0,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1ABC9C).withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.monitor_weight_rounded,
+                      color: Color(0xFF1ABC9C),
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              'VITASCALE By MAPOTECH',
+                              style: GoogleFonts.outfit(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                color: textColor,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: isVitaScaleUnlocked
+                                    ? const Color(0xFF27AE60).withOpacity(0.15)
+                                    : Colors.orange.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: isVitaScaleUnlocked
+                                      ? const Color(0xFF27AE60).withOpacity(0.4)
+                                      : Colors.orange.withOpacity(0.4),
+                                ),
+                              ),
+                              child: Text(
+                                isVitaScaleUnlocked ? 'AKTIF / TERBUKA' : 'TERKUNCI (ADD-ON)',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  color: isVitaScaleUnlocked
+                                      ? const Color(0xFF27AE60)
+                                      : Colors.orange,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Modul Skrining Antropometri Anak & Bayi (0–12 Tahun) Berbasis IoT & Computer Vision Zero-Install',
+                          style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            color: subtitleColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Text(
+                'Fitur & Kemampuan Modul:',
+                style: GoogleFonts.outfit(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: textColor,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _buildDlcTag('4x Load Cell HX711 (Timbangan Digital)', Icons.scale_rounded, const Color(0xFF1ABC9C)),
+                  _buildDlcTag('AS5600 12-Bit Magnetik (Lingkar & Panjang)', Icons.straighten_rounded, const Color(0xFF3498DB)),
+                  _buildDlcTag('Homography OpenCV.js (Webcam Panjang/Tinggi)', Icons.camera_alt_rounded, const Color(0xFF9B59B6)),
+                  _buildDlcTag('Standar WHO & Kemenkes 2020 (<24 Bln vs ≥24 Bln)', Icons.health_and_safety_rounded, const Color(0xFFE67E22)),
+                ],
+              ),
+              const SizedBox(height: 20),
+              const Divider(height: 1),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 12,
+                runSpacing: 10,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      final next = !isVitaScaleUnlocked;
+                      ref.read(vitascaleDlcUnlockedProvider.notifier).state = next;
+                      if (next) {
+                        ref.read(landingPageProvider.notifier).addFavoriteMenuItem('dlc_vitascale_data_anak');
+                        ref.read(landingPageProvider.notifier).addFavoriteMenuItem('dlc_vitascale_screening');
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Modul DLC VitaScale Berhasil Diaktifkan!'),
+                            backgroundColor: Color(0xFF1ABC9C),
+                          ),
+                        );
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Modul DLC VitaScale Dikunci Kembali.'),
+                            backgroundColor: Colors.grey,
+                          ),
+                        );
+                      }
+                    },
+                    icon: Icon(
+                      isVitaScaleUnlocked ? Icons.lock_outline_rounded : Icons.lock_open_rounded,
+                      size: 16,
+                    ),
+                    label: Text(
+                      isVitaScaleUnlocked ? 'Kunci Kembali Modul' : 'Buka Kunci DLC VitaScale',
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isVitaScaleUnlocked
+                          ? (isDark ? const Color(0xFF2C2C30) : const Color(0xFFECEEF2))
+                          : const Color(0xFF1ABC9C),
+                      foregroundColor: isVitaScaleUnlocked ? textColor : Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      widget.onNavigate?.call('dlc_vitascale_data_anak');
+                    },
+                    icon: const Icon(Icons.child_care_rounded, size: 16),
+                    label: const Text('Buka Data Anak/Bayi'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF1ABC9C),
+                      side: const BorderSide(color: Color(0xFF1ABC9C)),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      widget.onNavigate?.call('dlc_vitascale_screening');
+                    },
+                    icon: const Icon(Icons.monitor_weight_rounded, size: 16),
+                    label: const Text('Mulai Screening Anak/Bayi'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF27AE60),
+                      side: const BorderSide(color: Color(0xFF27AE60)),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 18),
+
+        // CARD 2: DLC KIA (Kesehatan Ibu & Anak)
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: cardBgColor,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: borderColor),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE91E63).withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.pregnant_woman_rounded,
+                      color: Color(0xFFE91E63),
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              'DLC KIA (Kesehatan Ibu & Anak)',
+                              style: GoogleFonts.outfit(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                color: textColor,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF27AE60).withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'AKTIF',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  color: const Color(0xFF27AE60),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Pemantauan Kohort Ibu Hamil, Deteksi Risiko Tinggi, dan Form Pemeriksaan Standar Kemenkes',
+                          style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            color: subtitleColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 12,
+                runSpacing: 10,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      widget.onNavigate?.call('dlc_pantauan_ibu_hamil');
+                    },
+                    icon: const Icon(Icons.pregnant_woman_rounded, size: 16),
+                    label: const Text('Buka Pantauan Ibu Hamil'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFE91E63),
+                      side: const BorderSide(color: Color(0xFFE91E63)),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      widget.onNavigate?.call('dlc_form_ibu_hamil');
+                    },
+                    icon: const Icon(Icons.assignment_rounded, size: 16),
+                    label: const Text('Buka Form Pemeriksaan'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFEC407A),
+                      side: const BorderSide(color: Color(0xFFEC407A)),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDlcTag(String text, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: GoogleFonts.outfit(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

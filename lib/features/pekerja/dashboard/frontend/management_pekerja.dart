@@ -2505,8 +2505,10 @@ final Map<String, PuskesmasPermissionModel> kPuskesmasPermissionDict = {
   'RUJUKAN INTERNAL': const PuskesmasPermissionModel(id: 'RUJUKAN INTERNAL', name: 'RUJUKAN INTERNAL & POLI', badge: 'DLC MED 1', icon: Icons.alt_route_rounded, mainCluster: 'custom_menu', dlcSubCat: 'pelayanan_dlc', categoryLabel: 'DLC Pelayanan Medis'),
   'HOME CARE POSYANDU': const PuskesmasPermissionModel(id: 'HOME CARE POSYANDU', name: 'HOME CARE & POSYANDU', badge: 'DLC MED 2', icon: Icons.home_work_rounded, mainCluster: 'custom_menu', dlcSubCat: 'pelayanan_dlc', categoryLabel: 'DLC Pelayanan Medis'),
   'EPOSYANDU EWRS': const PuskesmasPermissionModel(id: 'EPOSYANDU EWRS', name: 'E-POSYANDU & EWRS RISK', badge: 'DLC MED 3', icon: Icons.warning_amber_rounded, mainCluster: 'custom_menu', dlcSubCat: 'pelayanan_dlc', categoryLabel: 'DLC Pelayanan Medis'),
-  'SATUSEHAT PRO': const PuskesmasPermissionModel(id: 'SATUSEHAT PRO', name: 'MODUL DLC SATUSEHAT PRO', badge: 'DLC SYS 1', icon: Icons.health_and_safety_rounded, mainCluster: 'custom_menu', dlcSubCat: 'sistem_dlc', categoryLabel: 'DLC Integrasi Sistem'),
-  'BPJS PCARE BRIDGING': const PuskesmasPermissionModel(id: 'BPJS PCARE BRIDGING', name: 'BPJS P-CARE BRIDGING', badge: 'DLC SYS 2', icon: Icons.cloud_sync_rounded, mainCluster: 'custom_menu', dlcSubCat: 'sistem_dlc', categoryLabel: 'DLC Integrasi Sistem'),
+  'DATA ANAK BAYI': const PuskesmasPermissionModel(id: 'DATA ANAK BAYI', name: 'DATA ANAK/BAYI (VITASCALE)', badge: 'DLC VTS 1', icon: Icons.child_care_rounded, mainCluster: 'custom_menu', dlcSubCat: 'sistem_dlc', categoryLabel: 'DLC VitaScale by MAPOTECH'),
+  'SCREENING ANAK BAYI': const PuskesmasPermissionModel(id: 'SCREENING ANAK BAYI', name: 'SCREENING ANAK/BAYI (VITASCALE)', badge: 'DLC VTS 2', icon: Icons.monitor_weight_rounded, mainCluster: 'custom_menu', dlcSubCat: 'sistem_dlc', categoryLabel: 'DLC VitaScale by MAPOTECH'),
+  'SATUSEHAT PRO': const PuskesmasPermissionModel(id: 'SATUSEHAT PRO', name: 'MODUL DLC SATUSEHAT PRO', badge: 'DLC SYS 1', icon: Icons.health_and_safety_rounded, mainCluster: 'custom_menu', dlcSubCat: 'pelayanan_dlc', categoryLabel: 'DLC Pelayanan Medis'),
+  'BPJS PCARE BRIDGING': const PuskesmasPermissionModel(id: 'BPJS PCARE BRIDGING', name: 'BPJS P-CARE BRIDGING', badge: 'DLC SYS 2', icon: Icons.cloud_sync_rounded, mainCluster: 'custom_menu', dlcSubCat: 'pelayanan_dlc', categoryLabel: 'DLC Pelayanan Medis'),
 };
 
 PuskesmasPermissionModel getPermissionModel(String permId) {
@@ -2514,14 +2516,16 @@ PuskesmasPermissionModel getPermissionModel(String permId) {
   final exact = kPuskesmasPermissionDict[upper];
   if (exact != null) return exact;
 
-  if (upper.contains('PANTAUAN') || upper.contains('FORM IBU') || upper.contains('KIA')) {
+  if (upper.contains('VITASCALE') || upper.contains('ANAK') || upper.contains('SCREENING') || upper.contains('BAYI')) {
+    return PuskesmasPermissionModel(id: permId, name: permId, badge: 'DLC VTS', icon: Icons.child_care_rounded, mainCluster: 'custom_menu', dlcSubCat: 'sistem_dlc', categoryLabel: 'DLC VitaScale by MAPOTECH');
+  } else if (upper.contains('PANTAUAN') || upper.contains('FORM IBU') || upper.contains('KIA')) {
     return PuskesmasPermissionModel(id: permId, name: permId, badge: 'DLC KIA', icon: Icons.pregnant_woman_rounded, mainCluster: 'custom_menu', dlcSubCat: 'kia_dlc', categoryLabel: 'DLC Kesehatan Ibu & Anak');
   } else if (upper.contains('PASIEN') || upper.contains('PEMERIKSAAN') || upper.contains('ANTRIAN')) {
     return PuskesmasPermissionModel(id: permId, name: permId, badge: 'CL-2 & 3', icon: Icons.personal_injury_rounded, mainCluster: 'cluster_2', categoryLabel: 'Cluster 2 & 3 (Pelayanan Klinis)');
   } else if (upper.contains('OBAT') || upper.contains('INVENTORI') || upper.contains('POS') || upper.contains('PESANAN')) {
     return PuskesmasPermissionModel(id: permId, name: permId, badge: 'LINTAS', icon: Icons.medication_rounded, mainCluster: 'lintas_cluster', categoryLabel: 'Cross Cluster (Farmasi)');
   } else if (upper.contains('SATUSEHAT') || upper.contains('PCARE') || upper.contains('BRIDGING')) {
-    return PuskesmasPermissionModel(id: permId, name: permId, badge: 'DLC SYS', icon: Icons.cloud_sync_rounded, mainCluster: 'custom_menu', dlcSubCat: 'sistem_dlc', categoryLabel: 'DLC Integrasi Sistem');
+    return PuskesmasPermissionModel(id: permId, name: permId, badge: 'DLC SYS', icon: Icons.cloud_sync_rounded, mainCluster: 'custom_menu', dlcSubCat: 'pelayanan_dlc', categoryLabel: 'DLC Pelayanan Medis');
   } else if (upper.contains('HOME') || upper.contains('POSYANDU') || upper.contains('RUJUKAN') || upper.contains('EWRS')) {
     return PuskesmasPermissionModel(id: permId, name: permId, badge: 'DLC MED', icon: Icons.medical_services_rounded, mainCluster: 'custom_menu', dlcSubCat: 'pelayanan_dlc', categoryLabel: 'DLC Pelayanan Medis');
   } else {

@@ -173,6 +173,8 @@ class LandingPageState {
       'dlc_skrining_stunting',
       'dlc_eposyandu',
       'dlc_pcare',
+      'dlc_vitascale_data_anak',
+      'dlc_vitascale_screening',
     },
   });
 
@@ -327,6 +329,25 @@ class LandingPageNotifier extends StateNotifier<LandingPageState> {
         userRole,
         currentFavorites.toList(),
       );
+    }
+  }
+
+  void addFavoriteMenuItem(String menuId) async {
+    final currentFavorites = Set<String>.from(state.favoriteMenuItems);
+    if (!currentFavorites.contains(menuId)) {
+      currentFavorites.add(menuId);
+      state = state.copyWith(favoriteMenuItems: currentFavorites);
+
+      final userId = state.loggedInUser?['id'];
+      final userRole = state.loggedInUser?['role']?.toString() ?? state.loggedInRole;
+      if (userId != null && userRole != null) {
+        final db = SupabaseService();
+        await db.saveFavoriteMenusToUserDetail(
+          userId,
+          userRole,
+          currentFavorites.toList(),
+        );
+      }
     }
   }
 

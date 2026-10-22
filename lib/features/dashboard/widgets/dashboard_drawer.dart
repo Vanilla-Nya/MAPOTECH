@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
+import 'package:mapotech/features/puskesmas/dlc/vitascale/vitascale_dlc_gate.dart';
 import 'dart:ui' as ui;
 
 bool _isCorsafeUrl(String url) {
@@ -218,6 +219,20 @@ List<DrawerMenuItem> getMenuItemsForRole(
         icon: Icons.assignment_rounded,
         clusters: const ['all', 'custom_menu', 'cluster_2'],
         badgeText: 'DLC KIA',
+      ),
+      DrawerMenuItem(
+        id: 'dlc_vitascale_data_anak',
+        label: isEn ? 'Child/Infant Data' : 'Data Anak/Bayi',
+        icon: Icons.child_care_rounded,
+        clusters: const ['all', 'custom_menu', 'cluster_2'],
+        badgeText: 'DLC VTS',
+      ),
+      DrawerMenuItem(
+        id: 'dlc_vitascale_screening',
+        label: isEn ? 'Child Screening' : 'Screening Anak/Bayi',
+        icon: Icons.monitor_weight_rounded,
+        clusters: const ['all', 'custom_menu', 'cluster_2'],
+        badgeText: 'DLC VTS',
       ),
       DrawerMenuItem(
         id: 'obat',
@@ -737,6 +752,13 @@ class DashboardDrawer extends ConsumerWidget {
                     if (item.id == 'dashboard' || item.id == 'ai_assistant') {
                       return true;
                     }
+                    // VitaScale DLC menus always visible once unlocked
+                    if (item.id == 'dlc_vitascale_data_anak' ||
+                        item.id == 'dlc_vitascale_screening') {
+                      if (ref.watch(vitascaleDlcUnlockedProvider)) {
+                        return true;
+                      }
+                    }
                     // Otherwise, only show if marked as favorite
                     return state.favoriteMenuItems.contains(item.id);
                   })
@@ -1228,12 +1250,36 @@ class _FullScreenDrawerOverlayState
           },
         },
         {
+          'title': 'Data Anak/Bayi',
+          'icon': Icons.child_care_rounded,
+          'id': 'dlc_vitascale_data_anak',
+          'color': const Color(0xFF1ABC9C),
+          'badge': 'DLC VTS 1',
+          'category': 'sistem_dlc',
+          'onTap': () {
+            widget.onMenuSelected('dlc_vitascale_data_anak');
+            notifier.setDrawerSize(1);
+          },
+        },
+        {
+          'title': 'Screening Anak/Bayi',
+          'icon': Icons.monitor_weight_rounded,
+          'id': 'dlc_vitascale_screening',
+          'color': const Color(0xFF16A085),
+          'badge': 'DLC VTS 2',
+          'category': 'sistem_dlc',
+          'onTap': () {
+            widget.onMenuSelected('dlc_vitascale_screening');
+            notifier.setDrawerSize(1);
+          },
+        },
+        {
           'title': 'Modul DLC SatuSehat Pro',
           'icon': Icons.health_and_safety_rounded,
           'id': 'dlc_satusehat',
           'color': const Color(0xFF1ABC9C),
           'badge': 'DLC SYS 1',
-          'category': 'sistem_dlc',
+          'category': 'pelayanan_dlc',
           'onTap': () {
             _showDlcInfoDialog(
               context,
@@ -1249,7 +1295,7 @@ class _FullScreenDrawerOverlayState
           'id': 'dlc_pcare',
           'color': const Color(0xFF00BCD4),
           'badge': 'DLC SYS 2',
-          'category': 'sistem_dlc',
+          'category': 'pelayanan_dlc',
           'onTap': () {
             _showDlcInfoDialog(
               context,
@@ -1828,8 +1874,8 @@ class _FullScreenDrawerOverlayState
                   const SizedBox(width: 8),
                   _buildDlcSubFilterChip(
                     'sistem_dlc',
-                    'Integrasi Sistem & SatuSehat',
-                    Icons.dns_rounded,
+                    'VITASCALE By MAPOTECH',
+                    Icons.monitor_weight_rounded,
                   ),
                 ],
               ),

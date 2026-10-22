@@ -44,6 +44,8 @@ import 'package:mapotech/features/puskesmas/dashboard/frontend/puskesmas_profile
 import 'package:mapotech/features/ponkesdes/dashboard/frontend/ponkesdes_profile.dart';
 import 'package:mapotech/features/pekerja/dashboard/frontend/management_pekerja.dart';
 import 'package:mapotech/features/puskesmas/dashboard/frontend/management_pustu_ponkesdes.dart';
+import 'package:mapotech/features/puskesmas/dlc/vitascale/pages/vitascale_data_anak_page.dart';
+import 'package:mapotech/features/puskesmas/dlc/vitascale/pages/vitascale_screening_page.dart';
 
 bool _isCorsafeUrl(String url) {
   if (url.isEmpty) return false;
@@ -371,7 +373,6 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     }
 
     final isDark = state.appearance == 'dark';
-    final isRev = state.appearance == 'rev';
     final bgColor = notifier.getBackgroundColor();
     final textColor = notifier.getTextColor();
     final borderColor = notifier.getBorderColor();
@@ -807,12 +808,28 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
           );
         case 'dlc_form_ibu_hamil':
           return const PuskesmasFormIbuHamil();
+        case 'dlc_vitascale_data_anak':
+          return VitaScaleDataAnakPage(
+            onNavigateToMenu: (menu) {
+              setState(() {
+                _activeMenu = menu;
+              });
+            },
+          );
+        case 'dlc_vitascale_screening':
+          return const VitaScaleScreeningPage();
         case 'management_pekerja':
           return const ManagementPekerjaWidget();
         case 'management_pustu_ponkesdes':
           return const ManagementPustuPonkesdesWidget();
         case 'profile':
-          return const PuskesmasProfile();
+          return PuskesmasProfile(
+            onNavigate: (menu) {
+              setState(() {
+                _activeMenu = menu;
+              });
+            },
+          );
         case 'settings':
           return const DokterSettings();
         case 'pemeriksaan':
