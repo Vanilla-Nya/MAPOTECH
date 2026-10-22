@@ -168,10 +168,42 @@ class _RevGeoWilayahMapWidgetState extends State<RevGeoWilayahMapWidget> {
   <div id="map"></div>
   <script>
     const map = L.map('map', { zoomControl: true }).setView([-7.96, 113.91], 13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    const isDark = ${isDark ? 'true' : 'false'};
+
+    const osmDeLayer = L.tileLayer('https://tile.openstreetmap.de/{z}/{x}/{y}.png', {
       maxZoom: 19,
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors'
+    });
+
+    const osmHotLayer = L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      subdomains: 'abc',
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors, Tiles &copy; <a href="https://www.hotosm.org/" target="_blank">HOT</a>'
+    });
+
+    const esriStreetLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 19,
+      attribution: 'Tiles &copy; <a href="https://www.esri.com/" target="_blank">Esri</a>'
+    });
+
+    const esriDarkLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 16,
+      attribution: 'Tiles &copy; <a href="https://www.esri.com/" target="_blank">Esri</a>'
+    });
+
+    if (isDark) {
+      esriDarkLayer.addTo(map);
+    } else {
+      osmDeLayer.addTo(map);
+    }
+
+    const baseMaps = {
+      "OpenStreetMap": osmDeLayer,
+      "Humanitarian (HOT)": osmHotLayer,
+      "Esri Street": esriStreetLayer,
+      "Dark Canvas": esriDarkLayer
+    };
+    L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
 
     let currentLayer = null;
 
