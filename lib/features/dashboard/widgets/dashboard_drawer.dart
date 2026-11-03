@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
-import 'package:mapotech/features/puskesmas/dlc/vitascale/vitascale_dlc_gate.dart';
 import 'dart:ui' as ui;
 
 bool _isCorsafeUrl(String url) {
@@ -207,6 +206,20 @@ List<DrawerMenuItem> getMenuItemsForRole(
         badgeText: 'CL-2 & 3',
       ),
       DrawerMenuItem(
+        id: 'dlc_vitascale_screening',
+        label: isEn ? 'Child Screening' : 'Screening Anak/Bayi',
+        icon: Icons.monitor_weight_rounded,
+        clusters: const ['all', 'custom_menu', 'cluster_2'],
+        badgeText: 'AI & MLP',
+      ),
+      DrawerMenuItem(
+        id: 'dlc_vitascale_data_anak',
+        label: isEn ? 'Child/Infant Data' : 'Data Anak/Bayi',
+        icon: Icons.child_care_rounded,
+        clusters: const ['all', 'custom_menu', 'cluster_2'],
+        badgeText: 'VITASCALE',
+      ),
+      DrawerMenuItem(
         id: 'dlc_pantauan_ibu_hamil',
         label: isEn ? 'Maternal Monitoring' : 'Pantauan Ibu Hamil',
         icon: Icons.pregnant_woman_rounded,
@@ -219,20 +232,6 @@ List<DrawerMenuItem> getMenuItemsForRole(
         icon: Icons.assignment_rounded,
         clusters: const ['all', 'custom_menu', 'cluster_2'],
         badgeText: 'DLC KIA',
-      ),
-      DrawerMenuItem(
-        id: 'dlc_vitascale_data_anak',
-        label: isEn ? 'Child/Infant Data' : 'Data Anak/Bayi',
-        icon: Icons.child_care_rounded,
-        clusters: const ['all', 'custom_menu', 'cluster_2'],
-        badgeText: 'DLC VTS',
-      ),
-      DrawerMenuItem(
-        id: 'dlc_vitascale_screening',
-        label: isEn ? 'Child Screening' : 'Screening Anak/Bayi',
-        icon: Icons.monitor_weight_rounded,
-        clusters: const ['all', 'custom_menu', 'cluster_2'],
-        badgeText: 'DLC VTS',
       ),
       DrawerMenuItem(
         id: 'obat',
@@ -752,12 +751,10 @@ class DashboardDrawer extends ConsumerWidget {
                     if (item.id == 'dashboard' || item.id == 'ai_assistant') {
                       return true;
                     }
-                    // VitaScale DLC menus always visible once unlocked
+                    // VitaScale DLC menus ALWAYS directly visible in sidebar
                     if (item.id == 'dlc_vitascale_data_anak' ||
                         item.id == 'dlc_vitascale_screening') {
-                      if (ref.watch(vitascaleDlcUnlockedProvider)) {
-                        return true;
-                      }
+                      return true;
                     }
                     // Otherwise, only show if marked as favorite
                     return state.favoriteMenuItems.contains(item.id);

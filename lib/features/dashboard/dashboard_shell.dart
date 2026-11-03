@@ -789,6 +789,10 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
           return const DokterSettings();
         case 'dashboard':
           return const DokterDashboard();
+        case 'dlc_vitascale_data_anak':
+          return VitaScaleDataAnakPage(onNavigateToMenu: (menu) => setState(() => _activeMenu = menu));
+        case 'dlc_vitascale_screening':
+          return const VitaScaleScreeningPage();
         default:
           return SegeraHadirMockup(portalPath: 'DOKTER/$_activeMenu');
       }
@@ -861,6 +865,10 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
         case 'management_pekerja':
           return const ManagementPekerjaWidget();
         case 'dashboard':
+        case 'dlc_vitascale_data_anak':
+          return VitaScaleDataAnakPage(onNavigateToMenu: (menu) => setState(() => _activeMenu = menu));
+        case 'dlc_vitascale_screening':
+          return const VitaScaleScreeningPage();
         default:
           return const DokterDashboard();
       }
