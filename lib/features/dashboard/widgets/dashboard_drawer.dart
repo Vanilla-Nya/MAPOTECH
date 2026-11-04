@@ -2027,31 +2027,77 @@ class _FullScreenDrawerOverlayState
 
     final Color borderCol = isSelected ? accentColor : Colors.transparent;
 
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap:
-            onTap ??
-            () {
-              widget.onMenuSelected(menuId);
-              notifier.setDrawerSize(1);
-            },
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          decoration: BoxDecoration(
-            color: cardBg,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: borderCol, width: 2),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
+    final VoidCallback handleCardTap = onTap ??
+        () {
+          widget.onMenuSelected(menuId);
+          notifier.setDrawerSize(1);
+        };
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: borderCol, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(24),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: handleCardTap,
+          borderRadius: BorderRadius.circular(24),
+          hoverColor: accentColor.withOpacity(0.08),
+          splashColor: accentColor.withOpacity(0.15),
+          highlightColor: accentColor.withOpacity(0.05),
           child: Stack(
             children: [
+              // 1. Center Content (Main body of the card)
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: iconBoxBg,
+                          shape: BoxShape.circle,
+                        ),
+                        alignment: Alignment.center,
+                        child: Icon(icon, color: iconColor, size: 24),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        label,
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                          color: isLogout
+                              ? Colors.redAccent
+                              : (isDark
+                                    ? Colors.white
+                                    : (isRev
+                                          ? const Color(0xFF5E1B8C)
+                                          : const Color(0xFF1B4F42))),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // 2. Favorite toggle button (Positioned at top-left, handles tap independently)
               if (showFavButton)
                 Positioned(
                   top: 10,
@@ -2097,67 +2143,35 @@ class _FullScreenDrawerOverlayState
                     ),
                   ),
                 ),
+
+              // 3. Cluster / Module badge (Positioned at top-right, IgnorePointer so card receives taps)
               if (badgeText != null && badgeText.isNotEmpty)
                 Positioned(
                   top: 12,
                   right: 12,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? accentColor
-                          : accentColor.withOpacity(0.18),
-                      borderRadius: BorderRadius.circular(100),
-                    ),
-                    child: Text(
-                      badgeText,
-                      style: GoogleFonts.outfit(
-                        fontSize: 8,
-                        fontWeight: FontWeight.w900,
-                        color: isSelected ? Colors.white : accentColor,
+                  child: IgnorePointer(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
                       ),
-                    ),
-                  ),
-                ),
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          color: iconBoxBg,
-                          shape: BoxShape.circle,
-                        ),
-                        alignment: Alignment.center,
-                        child: Icon(icon, color: iconColor, size: 24),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? accentColor
+                            : accentColor.withOpacity(0.18),
+                        borderRadius: BorderRadius.circular(100),
                       ),
-                      const SizedBox(height: 12),
-                      Text(
-                        label,
-                        textAlign: TextAlign.center,
+                      child: Text(
+                        badgeText,
                         style: GoogleFonts.outfit(
-                          fontSize: 11,
+                          fontSize: 8,
                           fontWeight: FontWeight.w900,
-                          color: isLogout
-                              ? Colors.redAccent
-                              : (isDark
-                                    ? Colors.white
-                                    : (isRev
-                                          ? const Color(0xFF5E1B8C)
-                                          : const Color(0xFF1B4F42))),
+                          color: isSelected ? Colors.white : accentColor,
                         ),
                       ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
         ),

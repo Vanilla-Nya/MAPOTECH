@@ -190,6 +190,26 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
           }
         } catch (_) {}
 
+        Map<String, String?> registeredPatientSsMap = {};
+        try {
+          final pIds = queues
+              .map((q) => q['id_patient']?.toString())
+              .where((id) => id != null && id.isNotEmpty)
+              .toSet()
+              .toList();
+          if (pIds.isNotEmpty) {
+            final uRes = await SupabaseService.client
+                .from('user')
+                .select('id, satusehat_id')
+                .inFilter('id', pIds);
+            for (final row in uRes) {
+              final id = row['id']?.toString();
+              final ssId = row['satusehat_id']?.toString();
+              if (id != null) registeredPatientSsMap[id] = ssId;
+            }
+          }
+        } catch (_) {}
+
         final List<Map<String, dynamic>> list = [];
         for (final ce in encounters) {
           final qId = ce['id_queue']?.toString() ?? '';
@@ -205,11 +225,14 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
 
           String? satusehatId;
           if (patientId != null) {
-            try {
-              final patients = ref.read(dokterPasienListProvider);
-              final match = patients.firstWhere((p) => p.id == patientId);
-              satusehatId = match.satusehatId;
-            } catch (_) {}
+            satusehatId = registeredPatientSsMap[patientId];
+            if (satusehatId == null) {
+              try {
+                final patients = ref.read(dokterPasienListProvider);
+                final match = patients.firstWhere((p) => p.id == patientId);
+                satusehatId = match.satusehatId;
+              } catch (_) {}
+            }
           } else if (guestId != null) {
             satusehatId = guestSatuSehatMap[guestId];
           }
@@ -3424,10 +3447,11 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              // If failed and missing SatuSehat ID, display error box and patient registration
-                              if (!hasSatuSehatId) ...[
+                              // Always display last sync error clearly if failed
+                              if (enc['sync_status'] == 'failed' && lastError.isNotEmpty) ...[
                                 Container(
                                   padding: const EdgeInsets.all(12),
+                                  margin: const EdgeInsets.only(bottom: 14),
                                   decoration: BoxDecoration(
                                     color: Colors.red.shade50.withOpacity(0.6),
                                     borderRadius: BorderRadius.circular(12),
@@ -3460,9 +3484,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                                             ),
                                             const SizedBox(height: 2),
                                             Text(
-                                              lastError.isNotEmpty
-                                                  ? lastError
-                                                  : 'Missing Patient SatuSehat ID',
+                                              lastError,
                                               style: GoogleFonts.outfit(
                                                 fontSize: 9.5,
                                                 fontWeight: FontWeight.bold,
@@ -3475,7 +3497,10 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                                     ],
                                   ),
                                 ),
-                                const SizedBox(height: 14),
+                              ],
+
+                              // If missing SatuSehat ID, display patient registration banner
+                              if (!hasSatuSehatId) ...[
                                 Container(
                                   padding: const EdgeInsets.all(14),
                                   decoration: BoxDecoration(

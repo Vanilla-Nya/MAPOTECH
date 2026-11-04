@@ -62,12 +62,448 @@ class _LoginModalContentState extends State<_LoginModalContent> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  String? _errorMessage;
+  bool _isSubmitting = false;
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleLogin() async {
+    if (_isSubmitting) return;
+
+    final state = widget.ref.read(landingPageProvider);
+    final notifier = widget.ref.read(landingPageProvider.notifier);
+
+    final isRev = state.appearance == 'rev';
+    final accentPurple = isRev
+        ? const Color(0xFFB577F2)
+        : const Color(0xFF48C9B0);
+
+    final username = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (username.isEmpty || password.isEmpty) {
+      final msg = state.language == 'id'
+          ? 'Email/Username dan kata sandi tidak boleh kosong!'
+          : 'Email/Username and password cannot be empty!';
+      setState(() {
+        _errorMessage = msg;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          content: Text(
+            msg,
+            style: GoogleFonts.outfit(
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _errorMessage = null;
+      _isSubmitting = true;
+    });
+
+    // 1. Offline/Static Fallback check first (instant bypass for demo accounts)
+    // Note: Case-insensitive check (e.g. "Pasien" or "ALVIN" matches)
+    final lowerUser = username.toLowerCase();
+    bool isStaticValid = false;
+    String staticRole = 'pasien';
+    String staticName = 'Alvin';
+
+    if (lowerUser == 'pasien' && password == '123') {
+      isStaticValid = true;
+      staticRole = 'pasien';
+      staticName = 'Alvin';
+    } else if (lowerUser == 'dokter' && password == '123') {
+      isStaticValid = true;
+      staticRole = 'dokter';
+      staticName = 'dr. Agoes Soetanto';
+    } else if (lowerUser == 'apotek' && password == '123') {
+      isStaticValid = true;
+      staticRole = 'apotek';
+      staticName = 'CyrenElysia~♪';
+    } else if (lowerUser == 'puskesmas' && password == '123') {
+      isStaticValid = true;
+      staticRole = 'puskesmas';
+      staticName = 'Puskesmas Sumbersari';
+    } else if (lowerUser == 'ponkesdes' && password == '123') {
+      isStaticValid = true;
+      staticRole = 'ponkesdes';
+      staticName = 'Ponkesdes Sukowono';
+    }
+
+    if (isStaticValid) {
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.pop(context); // Close login modal ONLY on SUCCESS!
+      }
+      String? staticAvatarUrl;
+      if (staticRole == 'pasien') {
+        staticAvatarUrl =
+            'https://media.tenor.com/I-jCAV1wUCEAAAAM/luna-kindred-smile.gif';
+      } else if (staticRole == 'dokter') {
+        staticAvatarUrl =
+            'https://pkm-sumberwringin.bondowosokab.go.id/uploads/pkm-sumberwringin.bondowosokab.go.id/kegiatan/Foto%20Kappus.jpg';
+      } else if (staticRole == 'apotek') {
+        staticAvatarUrl =
+            'https://media1.tenor.com/m/vXcb3pS1xs8AAAAd/elysia-honkai-impact-3rd.gif';
+      } else if (staticRole == 'puskesmas') {
+        staticAvatarUrl =
+            'https://pkm-sumberwringin.bondowosokab.go.id/uploads/pkm-sumberwringin.bondowosokab.go.id/kegiatan/Foto%20Kappus.jpg';
+      } else if (staticRole == 'ponkesdes') {
+        staticAvatarUrl =
+            'https://media1.tenor.com/m/vXcb3pS1xs8AAAAd/elysia-honkai-impact-3rd.gif';
+      }
+
+      final mockUser = {
+        'id': 'mock-id-1234567890',
+        'name': staticName,
+        'email': '$staticRole@company.com',
+        'nik': '3511081208000003',
+        'phone_number': '08XXXXXXXXXX',
+        'birth_date': '2000-12-08',
+        'gender': 'male',
+        'role': staticRole,
+        'province': 'JAWA TIMUR',
+        'district': 'KABUPATEN BONDOWOSO',
+        'sub_district': 'PUER',
+        'village': 'KEJAYAN',
+        'address':
+            'Kel. KEJAYAN, Kec. PUER, KABUPATEN BONDOWOSO, Prov. JAWA TIMUR',
+        'subscription_status': 'inactive',
+        'subscription_expires_at': null,
+        'avatar_url': staticAvatarUrl,
+      };
+      notifier.login(
+        staticRole,
+        user: mockUser,
+        blurProfileEffectEnabled: true,
+        defaultServiceFee: staticRole == 'dokter' ? 50000.0 : 0.0,
+        satusehatAutoSync: true,
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: accentPurple,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          content: Text(
+            state.language == 'id'
+                ? 'Selamat Datang! Login berhasil (Offline/Demo Mode).'
+                : 'Welcome! Login successful (Offline/Demo Mode).',
+            style: GoogleFonts.outfit(
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      );
+      return;
+    }
+
+    // 2. Online Database Authentication
+    final progressNotifier = ValueNotifier<double>(0.0);
+    Timer? loadingTimer;
+    BuildContext? loadingDialogContext;
+    bool isLoadingDialogOpen = true;
+
+    loadingTimer = Timer.periodic(const Duration(milliseconds: 20), (timer) {
+      final current = progressNotifier.value;
+      if (current < 0.90) {
+        progressNotifier.value = current + 0.015;
+      } else {
+        timer.cancel();
+      }
+    });
+
+    void dismissLoadingDialog() {
+      loadingTimer?.cancel();
+      if (isLoadingDialogOpen) {
+        isLoadingDialogOpen = false;
+        if (loadingDialogContext != null && Navigator.canPop(loadingDialogContext!)) {
+          Navigator.pop(loadingDialogContext!);
+        }
+      }
+    }
+
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withOpacity(0.5),
+      transitionDuration: const Duration(milliseconds: 250),
+      pageBuilder: (dialogCtx, anim1, anim2) {
+        loadingDialogContext = dialogCtx;
+        return FadeTransition(
+          opacity: anim1,
+          child: MapotechLoadingScreen(
+            progressNotifier: progressNotifier,
+          ),
+        );
+      },
+    );
+
+    bool dbSuccess = false;
+    String mappedRole = 'pasien';
+    String? displayName;
+    String? failureReason;
+    Map<String, dynamic>? user;
+
+    try {
+      final SupabaseService db = SupabaseService();
+      // Case-insensitive user lookup by email or username
+      user = await db.fetchUserByEmailOrUsername(username);
+
+      if (user == null) {
+        failureReason = state.language == 'id'
+            ? 'Email atau username tidak ditemukan!'
+            : 'Email or username not found!';
+      } else {
+        final String? dbHash = user['password'];
+        if (dbHash == null || dbHash.isEmpty) {
+          failureReason = state.language == 'id'
+              ? 'Akun tidak memiliki kata sandi yang valid!'
+              : 'Account does not have a valid password!';
+        } else {
+          // PHP Bcrypt compatibility: Replace prefix $2y$ with $2a$ for package compatibility
+          final compatibleHash = dbHash.replaceFirst(
+            '\$2y\$',
+            '\$2a\$',
+          );
+
+          // Run standard Bcrypt comparison
+          bool passwordMatches = false;
+          try {
+            passwordMatches = BCrypt.checkpw(password, compatibleHash);
+          } catch (err) {
+            debugPrint('Bcrypt check error: $err');
+          }
+
+          if (passwordMatches) {
+            dbSuccess = true;
+            displayName = user['name'];
+
+            final String dbRole = user['role'] ?? 'pasien';
+            if (dbRole == 'pasien' || dbRole == 'patient') {
+              mappedRole = 'pasien';
+            } else if (dbRole == 'dokter' ||
+                dbRole == 'praktikmandiri' ||
+                dbRole == 'asisten_dokter') {
+              mappedRole = 'dokter';
+            } else if (dbRole == 'apotek' ||
+                dbRole == 'asisten_apotek') {
+              mappedRole = 'apotek';
+            } else if (dbRole == 'puskesmas') {
+              mappedRole = 'puskesmas';
+            } else if (dbRole == 'ponkesdes') {
+              mappedRole = 'ponkesdes';
+            } else {
+              mappedRole = 'pasien'; // default fallback
+            }
+          } else {
+            failureReason = state.language == 'id'
+                ? 'Kata sandi salah! Silakan periksa kembali.'
+                : 'Incorrect password! Please check and try again.';
+          }
+        }
+      }
+
+      if (dbSuccess) {
+        // Fast-forward progress to 100% and close the loading page
+        loadingTimer.cancel();
+        double currentVal = progressNotifier.value;
+        while (currentVal < 1.0) {
+          currentVal = (currentVal + 0.05).clamp(0.0, 1.0);
+          progressNotifier.value = currentVal;
+          await Future.delayed(const Duration(milliseconds: 15));
+        }
+        await Future.delayed(const Duration(milliseconds: 150));
+
+        dismissLoadingDialog();
+        try {
+          progressNotifier.dispose();
+        } catch (_) {}
+
+        final blurProfile =
+            user?['is_blur_enabled'] as bool? ?? true;
+        final savedLanguage =
+            user?['language'] as String? ?? state.language;
+        double defaultFee = 0.0;
+        bool ssAutoSync = true;
+
+        // Fetch assistant details if role is asisten_dokter
+        if (user != null && user['role'] == 'asisten_dokter') {
+          try {
+            final asisData = await SupabaseService.client
+                .from('user_detail_doctor_assistant')
+                .select('doctor_id, permissions')
+                .eq('id', user['id'])
+                .maybeSingle();
+            if (asisData != null) {
+              user['doctor_id'] = asisData['doctor_id'];
+              user['permissions'] = asisData['permissions'];
+            }
+          } catch (e) {
+            debugPrint('Error fetching assistant details: $e');
+          }
+        }
+
+        // Fetch assistant details if role is asisten_apotek
+        if (user != null && user['role'] == 'asisten_apotek') {
+          try {
+            final asisData = await SupabaseService.client
+                .from('user_detail_pharmacist_staff')
+                .select('apotek_id')
+                .eq('id', user['id'])
+                .maybeSingle();
+            if (asisData != null) {
+              user['apotek_id'] = asisData['apotek_id'];
+            }
+          } catch (e) {
+            debugPrint('Error fetching pharmacist assistant details: $e');
+          }
+        }
+
+        if (mappedRole == 'dokter') {
+          try {
+            final targetDoctorId =
+                (user?['role'] == 'asisten_dokter')
+                ? (user?['doctor_id'])
+                : (user?['id']);
+            if (targetDoctorId != null) {
+              final docDetail = await SupabaseService.client
+                  .from('user_detail_doctor')
+                  .select(
+                    'default_service_fee, satusehat_auto_sync',
+                  )
+                  .eq('id', targetDoctorId)
+                  .maybeSingle();
+              if (docDetail != null) {
+                defaultFee =
+                    double.tryParse(
+                      docDetail['default_service_fee']
+                              ?.toString() ??
+                          '',
+                    ) ??
+                    0.0;
+                ssAutoSync =
+                    docDetail['satusehat_auto_sync'] as bool? ??
+                    true;
+              }
+            }
+          } catch (e) {
+            debugPrint(
+              'Error loading doctor settings from DB: $e',
+            );
+          }
+        }
+
+        Set<String>? dbFavorites;
+        if (user != null && user['id'] != null) {
+          try {
+            final userId = user['id'];
+            final userRole = user['role']?.toString() ?? mappedRole;
+            dbFavorites = await db.fetchFavoriteMenusFromUserDetail(userId, userRole);
+          } catch (e) {
+            debugPrint('Error fetching favorite_menus during login: $e');
+          }
+        }
+
+        if (mounted) {
+          setState(() => _isSubmitting = false);
+          if (Navigator.canPop(context)) {
+            Navigator.pop(context); // Close the login modal ONLY on SUCCESS!
+          }
+        }
+
+        notifier.login(
+          mappedRole,
+          user: user,
+          blurProfileEffectEnabled: blurProfile,
+          defaultServiceFee: defaultFee,
+          satusehatAutoSync: ssAutoSync,
+          language: savedLanguage,
+          favoriteMenuItems: dbFavorites,
+        );
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: accentPurple,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              content: Text(
+                state.language == 'id'
+                    ? 'Selamat Datang, ${displayName ?? "Pengguna"}! Login berhasil.'
+                    : 'Welcome, ${displayName ?? "User"}! Login successful.',
+                style: GoogleFonts.outfit(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          );
+        }
+        return;
+      }
+    } catch (e) {
+      debugPrint('Login exception: $e');
+      failureReason ??= state.language == 'id'
+          ? 'Gagal terhubung ke database/server. Periksa koneksi Anda.'
+          : 'Failed to connect to database/server. Check your connection.';
+    } finally {
+      dismissLoadingDialog();
+      try {
+        progressNotifier.dispose();
+      } catch (_) {}
+    }
+
+    // Login failed: DO NOT POP THE LOGIN MODAL!
+    final errorMsg = failureReason ??
+        (state.language == 'id'
+            ? 'Email atau kata sandi tidak cocok!'
+            : 'Incorrect email or password!');
+
+    if (mounted) {
+      setState(() {
+        _isSubmitting = false;
+        _errorMessage = errorMsg;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          content: Row(
+            children: [
+              const Icon(Icons.error_outline_rounded, color: Colors.white, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  errorMsg,
+                  style: GoogleFonts.outfit(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
   }
 
   @override
@@ -161,7 +597,54 @@ class _LoginModalContentState extends State<_LoginModalContent> {
                   ),
                 ),
               ),
-              const SizedBox(height: 36),
+              const SizedBox(height: 20),
+
+              // Error notification banner if login fails or inputs are invalid
+              if (_errorMessage != null) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.redAccent.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.redAccent.withOpacity(0.4)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.error_outline_rounded,
+                        color: Colors.redAccent,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _errorMessage!,
+                          style: GoogleFonts.outfit(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.redAccent,
+                          ),
+                        ),
+                      ),
+                      InkWell(
+                        onTap: () => setState(() => _errorMessage = null),
+                        borderRadius: BorderRadius.circular(12),
+                        child: const Padding(
+                          padding: EdgeInsets.all(4),
+                          child: Icon(
+                            Icons.close_rounded,
+                            size: 16,
+                            color: Colors.redAccent,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ] else ...[
+                const SizedBox(height: 16),
+              ],
 
               // EMAIL FIELD
               Text(
@@ -205,7 +688,13 @@ class _LoginModalContentState extends State<_LoginModalContent> {
                             )
                           : TextField(
                               controller: _emailController,
-                              enabled: true,
+                              enabled: !_isSubmitting,
+                              textInputAction: TextInputAction.next,
+                              onChanged: (_) {
+                                if (_errorMessage != null) {
+                                  setState(() => _errorMessage = null);
+                                }
+                              },
                               style: GoogleFonts.outfit(
                                 fontSize: 13,
                                 fontWeight: FontWeight.bold,
@@ -269,7 +758,14 @@ class _LoginModalContentState extends State<_LoginModalContent> {
                           : TextField(
                               controller: _passwordController,
                               obscureText: _obscurePassword,
-                              enabled: true,
+                              enabled: !_isSubmitting,
+                              textInputAction: TextInputAction.done,
+                              onSubmitted: (_) => _handleLogin(),
+                              onChanged: (_) {
+                                if (_errorMessage != null) {
+                                  setState(() => _errorMessage = null);
+                                }
+                              },
                               style: GoogleFonts.outfit(
                                 fontSize: 13,
                                 fontWeight: FontWeight.bold,
@@ -334,347 +830,10 @@ class _LoginModalContentState extends State<_LoginModalContent> {
                   height: 48,
                   isGradient: true,
                   gradientColors: btnGradient,
-                  onPressed: () async {
-                    final username = _emailController.text.trim();
-                    final password = _passwordController.text;
-
-                    if (username.isEmpty || password.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          backgroundColor: Colors.redAccent,
-                          content: Text(
-                            state.language == 'id'
-                                ? 'Email/Username dan password tidak boleh kosong!'
-                                : 'Email/Username and password cannot be empty!',
-                            style: GoogleFonts.outfit(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      );
-                      return;
+                  onPressed: () {
+                    if (!_isSubmitting) {
+                      _handleLogin();
                     }
-
-                    // 1. Offline/Static Fallback check first (instant bypass for demo accounts)
-                    bool isStaticValid = false;
-                    String staticRole = 'pasien';
-                    String staticName = 'Alvin';
-
-                    if (username == 'pasien' && password == '123') {
-                      isStaticValid = true;
-                      staticRole = 'pasien';
-                      staticName = 'Alvin';
-                    } else if (username == 'dokter' && password == '123') {
-                      isStaticValid = true;
-                      staticRole = 'dokter';
-                      staticName = 'dr. Agoes Soetanto';
-                    } else if (username == 'apotek' && password == '123') {
-                      isStaticValid = true;
-                      staticRole = 'apotek';
-                      staticName = 'CyrenElysia~♪';
-                    } else if (username == 'puskesmas' && password == '123') {
-                      isStaticValid = true;
-                      staticRole = 'puskesmas';
-                      staticName = 'Puskesmas Sumbersari';
-                    } else if (username == 'ponkesdes' && password == '123') {
-                      isStaticValid = true;
-                      staticRole = 'ponkesdes';
-                      staticName = 'Ponkesdes Sukowono';
-                    }
-
-                    if (isStaticValid) {
-                      Navigator.pop(context); // Close login modal
-                      String? staticAvatarUrl;
-                      if (staticRole == 'pasien') {
-                        staticAvatarUrl =
-                            'https://media.tenor.com/I-jCAV1wUCEAAAAM/luna-kindred-smile.gif';
-                      } else if (staticRole == 'dokter') {
-                        staticAvatarUrl =
-                            'https://pkm-sumberwringin.bondowosokab.go.id/uploads/pkm-sumberwringin.bondowosokab.go.id/kegiatan/Foto%20Kappus.jpg';
-                      } else if (staticRole == 'apotek') {
-                        staticAvatarUrl =
-                            'https://media1.tenor.com/m/vXcb3pS1xs8AAAAd/elysia-honkai-impact-3rd.gif';
-                      } else if (staticRole == 'puskesmas') {
-                        staticAvatarUrl =
-                            'https://pkm-sumberwringin.bondowosokab.go.id/uploads/pkm-sumberwringin.bondowosokab.go.id/kegiatan/Foto%20Kappus.jpg';
-                      } else if (staticRole == 'ponkesdes') {
-                        staticAvatarUrl =
-                            'https://media1.tenor.com/m/vXcb3pS1xs8AAAAd/elysia-honkai-impact-3rd.gif';
-                      }
-
-                      final mockUser = {
-                        'id': 'mock-id-1234567890',
-                        'name': staticName,
-                        'email': '$staticRole@company.com',
-                        'nik': '3511081208000003',
-                        'phone_number': '08XXXXXXXXXX',
-                        'birth_date': '2000-12-08',
-                        'gender': 'male',
-                        'role': staticRole,
-                        'province': 'JAWA TIMUR',
-                        'district': 'KABUPATEN BONDOWOSO',
-                        'sub_district': 'PUER',
-                        'village': 'KEJAYAN',
-                        'address':
-                            'Kel. KEJAYAN, Kec. PUER, KABUPATEN BONDOWOSO, Prov. JAWA TIMUR',
-                        'subscription_status': 'inactive',
-                        'subscription_expires_at': null,
-                        'avatar_url': staticAvatarUrl,
-                      };
-                      notifier.login(
-                        staticRole,
-                        user: mockUser,
-                        blurProfileEffectEnabled: true,
-                        defaultServiceFee: staticRole == 'dokter'
-                            ? 50000.0
-                            : 0.0,
-                        satusehatAutoSync: true,
-                      );
-
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          backgroundColor: accentPurple,
-                          content: Text(
-                            state.language == 'id'
-                                ? 'Selamat Datang! Login berhasil (Offline/Demo Mode).'
-                                : 'Welcome! Login successful (Offline/Demo Mode).',
-                            style: GoogleFonts.outfit(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      );
-                      return;
-                    }
-
-                    // Show the premium full-screen loading page with progress and FAQ
-                    final progressNotifier = ValueNotifier<double>(0.0);
-                    Timer? loadingTimer;
-
-                    loadingTimer = Timer.periodic(const Duration(milliseconds: 20), (timer) {
-                      final current = progressNotifier.value;
-                      if (current < 0.90) {
-                        progressNotifier.value = current + 0.015;
-                      } else {
-                        timer.cancel();
-                      }
-                    });
-
-                    showGeneralDialog(
-                      context: context,
-                      barrierDismissible: false,
-                      barrierColor: Colors.black.withOpacity(0.5),
-                      transitionDuration: const Duration(milliseconds: 250),
-                      pageBuilder: (context, anim1, anim2) => FadeTransition(
-                        opacity: anim1,
-                        child: MapotechLoadingScreen(
-                          progressNotifier: progressNotifier,
-                        ),
-                      ),
-                    );
-
-                    try {
-                      final SupabaseService db = SupabaseService();
-                      final user = await db.fetchUserByEmailOrUsername(
-                        username,
-                      );
-
-                      bool dbSuccess = false;
-                      String mappedRole = 'pasien';
-                      String? displayName;
-
-                      if (user != null) {
-                        final String? dbHash = user['password'];
-                        if (dbHash != null && dbHash.isNotEmpty) {
-                          // PHP Bcrypt compatibility: Replace prefix $2y$ with $2a$ for package compatibility
-                          final compatibleHash = dbHash.replaceFirst(
-                            '\$2y\$',
-                            '\$2a\$',
-                          );
-
-                          // Run standard Bcrypt comparison
-                          try {
-                            if (BCrypt.checkpw(password, compatibleHash)) {
-                              dbSuccess = true;
-                              displayName = user['name'];
-
-                              final String dbRole = user['role'] ?? 'pasien';
-                              if (dbRole == 'pasien' || dbRole == 'patient') {
-                                mappedRole = 'pasien';
-                              } else if (dbRole == 'dokter' ||
-                                  dbRole == 'praktikmandiri' ||
-                                  dbRole == 'asisten_dokter') {
-                                mappedRole = 'dokter';
-                              } else if (dbRole == 'apotek' ||
-                                  dbRole == 'asisten_apotek') {
-                                mappedRole = 'apotek';
-                              } else if (dbRole == 'puskesmas') {
-                                mappedRole = 'puskesmas';
-                              } else if (dbRole == 'ponkesdes') {
-                                mappedRole = 'ponkesdes';
-                              } else {
-                                mappedRole = 'pasien'; // default fallback
-                              }
-                            }
-                          } catch (_) {}
-                        }
-                      }
-
-                      // Fast-forward progress to 100% and close the loading page
-                      loadingTimer?.cancel();
-                      double currentVal = progressNotifier.value;
-                      while (currentVal < 1.0) {
-                        currentVal = (currentVal + 0.05).clamp(0.0, 1.0);
-                        progressNotifier.value = currentVal;
-                        await Future.delayed(const Duration(milliseconds: 15));
-                      }
-                      await Future.delayed(const Duration(milliseconds: 150));
-
-                      if (Navigator.canPop(context)) {
-                        Navigator.pop(context);
-                      }
-                      progressNotifier.dispose();
-
-                      if (dbSuccess) {
-                        final blurProfile =
-                            user?['is_blur_enabled'] as bool? ?? true;
-                        final savedLanguage =
-                            user?['language'] as String? ?? state.language;
-                        double defaultFee = 0.0;
-                        bool ssAutoSync = true;
-
-                        // Fetch assistant details if role is asisten_dokter
-                        if (user != null && user['role'] == 'asisten_dokter') {
-                          try {
-                            final asisData = await SupabaseService.client
-                                .from('user_detail_doctor_assistant')
-                                .select('doctor_id, permissions')
-                                .eq('id', user['id'])
-                                .maybeSingle();
-                            if (asisData != null) {
-                              user['doctor_id'] = asisData['doctor_id'];
-                              user['permissions'] = asisData['permissions'];
-                            }
-                          } catch (e) {
-                            debugPrint('Error fetching assistant details: $e');
-                          }
-                        }
-
-                        // Fetch assistant details if role is asisten_apotek
-                        if (user != null && user['role'] == 'asisten_apotek') {
-                          try {
-                            final asisData = await SupabaseService.client
-                                .from('user_detail_pharmacist_staff')
-                                .select('apotek_id')
-                                .eq('id', user['id'])
-                                .maybeSingle();
-                            if (asisData != null) {
-                              user['apotek_id'] = asisData['apotek_id'];
-                            }
-                          } catch (e) {
-                            debugPrint('Error fetching pharmacist assistant details: $e');
-                          }
-                        }
-
-                        if (mappedRole == 'dokter') {
-                          try {
-                            final targetDoctorId =
-                                (user?['role'] == 'asisten_dokter')
-                                ? (user?['doctor_id'])
-                                : (user?['id']);
-                            if (targetDoctorId != null) {
-                              final docDetail = await SupabaseService.client
-                                  .from('user_detail_doctor')
-                                  .select(
-                                    'default_service_fee, satusehat_auto_sync',
-                                  )
-                                  .eq('id', targetDoctorId)
-                                  .maybeSingle();
-                              if (docDetail != null) {
-                                defaultFee =
-                                    double.tryParse(
-                                      docDetail['default_service_fee']
-                                              ?.toString() ??
-                                          '',
-                                    ) ??
-                                    0.0;
-                                ssAutoSync =
-                                    docDetail['satusehat_auto_sync'] as bool? ??
-                                    true;
-                              }
-                            }
-                          } catch (e) {
-                            debugPrint(
-                              'Error loading doctor settings from DB: $e',
-                            );
-                          }
-                        }
-
-                        Set<String>? dbFavorites;
-                        if (user != null && user['id'] != null) {
-                          try {
-                            final userId = user['id'];
-                            final userRole = user['role']?.toString() ?? mappedRole;
-                            dbFavorites = await db.fetchFavoriteMenusFromUserDetail(userId, userRole);
-                          } catch (e) {
-                            debugPrint('Error fetching favorite_menus during login: $e');
-                          }
-                        }
-
-                        Navigator.pop(context); // Close the login modal
-                        notifier.login(
-                          mappedRole,
-                          user: user,
-                          blurProfileEffectEnabled: blurProfile,
-                          defaultServiceFee: defaultFee,
-                          satusehatAutoSync: ssAutoSync,
-                          language: savedLanguage,
-                          favoriteMenuItems: dbFavorites,
-                        );
-
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            backgroundColor: accentPurple,
-                            content: Text(
-                              state.language == 'id'
-                                  ? 'Selamat Datang, $displayName! Login berhasil.'
-                                  : 'Welcome, $displayName! Login successful.',
-                              style: GoogleFonts.outfit(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        );
-                        return;
-                      }
-                    } catch (_) {
-                      // Silently proceed to failure feedback
-                    }
-
-                    // Try to close loading dialog if it's still open
-                    loadingTimer?.cancel();
-                    if (Navigator.canPop(context)) {
-                      Navigator.pop(context);
-                    }
-                    progressNotifier.dispose();
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        backgroundColor: Colors.redAccent,
-                        content: Text(
-                          state.language == 'id'
-                              ? 'Username atau password salah!'
-                              : 'Incorrect username or password!',
-                          style: GoogleFonts.outfit(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    );
                   },
                 ),
               const SizedBox(height: 24),

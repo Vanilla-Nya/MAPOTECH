@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:mapotech/shared/supabase_service.dart';
 
@@ -83,6 +84,75 @@ class SatuSehatService {
     }
   }
 
+  /// Universal FHIR caller that routes through Supabase Edge Function to avoid browser CORS issues
+  Future<Map<String, dynamic>> _callFhirProxy({
+    required String method,
+    required String endpoint,
+    required String token,
+    dynamic payload,
+  }) async {
+    final environment = (env ?? 'production').toLowerCase();
+
+    // 1. Try Supabase Edge Function proxy first (Bypasses browser CORS & Geo-blocking)
+    try {
+      final edgeResponse = await SupabaseService.client.functions.invoke(
+        'satusehat-proxy',
+        body: {
+          'method': method,
+          'endpoint': endpoint,
+          'token': token,
+          'env': environment,
+          'payload': ?payload,
+        },
+      );
+
+      final data = edgeResponse.data as Map<String, dynamic>?;
+      if (data != null && data['status'] == true) {
+        return {'status': true, 'data': data['data']};
+      } else if (data != null) {
+        return {
+          'status': false,
+          'message': data['message'] ?? 'Error dari proxy SatuSehat',
+          'statusCode': data['statusCode'],
+        };
+      }
+    } catch (e) {
+      debugPrint('SatuSehat proxy invoke fallback: $e');
+    }
+
+    // 2. Direct HTTP call (Fallback for Native Android / iOS / Desktop where CORS is not enforced)
+    try {
+      final clean = endpoint.startsWith('/') ? endpoint : '/$endpoint';
+      final uri = Uri.parse('$baseUrl$clean');
+      final headers = {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      };
+
+      http.Response response;
+      if (method.toUpperCase() == 'GET') {
+        response = await http.get(uri, headers: {'Authorization': 'Bearer $token'});
+      } else {
+        response = await http.post(
+          uri,
+          headers: headers,
+          body: payload != null ? jsonEncode(payload) : null,
+        );
+      }
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return {'status': true, 'data': jsonDecode(response.body)};
+      }
+      return {
+        'status': false,
+        'message': 'API Error ${response.statusCode}: ${response.body}',
+        'statusCode': response.statusCode,
+      };
+    } catch (e) {
+      return {'status': false, 'message': e.toString()};
+    }
+  }
+
   /// Search patient by NIK to get IHIS ID
   Future<Map<String, dynamic>> getPatientIdByNik(String nik) async {
     var token = await getToken();
@@ -90,42 +160,38 @@ class SatuSehatService {
       return {'status': false, 'message': 'Failed to obtain SatuSehat token'};
     }
 
-    try {
-      var response = await http.get(
-        Uri.parse('$baseUrl/Patient?identifier=https://fhir.kemkes.go.id/id/nik|$nik'),
-        headers: {
-          'Authorization': 'Bearer $token',
-        },
-      );
+    var res = await _callFhirProxy(
+      method: 'GET',
+      endpoint: '/Patient?identifier=https://fhir.kemkes.go.id/id/nik|$nik',
+      token: token,
+    );
 
-      // If token expired or invalid (401), clear token cache and retry once
-      if (response.statusCode == 401 || response.body.contains('invalid_token')) {
-        _token = null;
-        token = await getToken();
-        if (token != null) {
-          response = await http.get(
-            Uri.parse('$baseUrl/Patient?identifier=https://fhir.kemkes.go.id/id/nik|$nik'),
-            headers: {
-              'Authorization': 'Bearer $token',
-            },
-          );
-        }
+    // If token expired or invalid (401), clear token cache and retry once
+    if (res['status'] != true &&
+        (res['message']?.toString().contains('401') == true ||
+            res['message']?.toString().contains('invalid_token') == true)) {
+      _token = null;
+      token = await getToken();
+      if (token != null) {
+        res = await _callFhirProxy(
+          method: 'GET',
+          endpoint: '/Patient?identifier=https://fhir.kemkes.go.id/id/nik|$nik',
+          token: token,
+        );
       }
-
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        final data = jsonDecode(response.body);
-        if (data['entry'] != null && (data['entry'] as List).isNotEmpty) {
-          final patientId = data['entry'][0]['resource']?['id']?.toString();
-          if (patientId != null) {
-            return {'status': true, 'id': patientId};
-          }
-        }
-        return {'status': false, 'message': 'Pasien tidak ditemukan di SatuSehat'};
-      }
-      return {'status': false, 'message': 'Error API SatuSehat: ${response.body}'};
-    } catch (e) {
-      return {'status': false, 'message': e.toString()};
     }
+
+    if (res['status'] == true) {
+      final data = res['data'];
+      if (data != null && data['entry'] != null && (data['entry'] as List).isNotEmpty) {
+        final patientId = data['entry'][0]['resource']?['id']?.toString();
+        if (patientId != null) {
+          return {'status': true, 'id': patientId};
+        }
+      }
+      return {'status': false, 'message': 'Pasien tidak ditemukan di SatuSehat'};
+    }
+    return {'status': false, 'message': res['message'] ?? 'Gagal mencari pasien'};
   }
 
   /// Send Encounter, Condition, and MedicationRequest
@@ -328,20 +394,18 @@ class SatuSehatService {
       ]
     };
 
-    try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/Encounter'),
-        headers: headers,
-        body: jsonEncode(payload),
-      );
+    final token = _token ?? headers['Authorization']?.replaceAll('Bearer ', '').trim() ?? '';
+    final res = await _callFhirProxy(
+      method: 'POST',
+      endpoint: '/Encounter',
+      token: token,
+      payload: payload,
+    );
 
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        return {'status': true, 'data': jsonDecode(response.body)};
-      }
-      return {'status': false, 'message': 'Failed to create Encounter: ${response.body}'};
-    } catch (e) {
-      return {'status': false, 'message': e.toString()};
+    if (res['status'] == true) {
+      return {'status': true, 'data': res['data']};
     }
+    return {'status': false, 'message': 'Failed to create Encounter: ${res['message']}'};
   }
 
   Future<bool> createCondition({
@@ -392,16 +456,14 @@ class SatuSehatService {
       }
     };
 
-    try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/Condition'),
-        headers: headers,
-        body: jsonEncode(payload),
-      );
-      return response.statusCode >= 200 && response.statusCode < 300;
-    } catch (_) {
-      return false;
-    }
+    final token = _token ?? headers['Authorization']?.replaceAll('Bearer ', '').trim() ?? '';
+    final res = await _callFhirProxy(
+      method: 'POST',
+      endpoint: '/Condition',
+      token: token,
+      payload: payload,
+    );
+    return res['status'] == true;
   }
 
   Future<Map<String, dynamic>> createMedicationRequest({
@@ -483,20 +545,18 @@ class SatuSehatService {
     };
 
     String medicationId;
-    try {
-      final medResponse = await http.post(
-        Uri.parse('$baseUrl/Medication'),
-        headers: headers,
-        body: jsonEncode(medicationPayload),
-      );
+    final token = _token ?? headers['Authorization']?.replaceAll('Bearer ', '').trim() ?? '';
+    final medResponse = await _callFhirProxy(
+      method: 'POST',
+      endpoint: '/Medication',
+      token: token,
+      payload: medicationPayload,
+    );
 
-      if (medResponse.statusCode < 200 || medResponse.statusCode >= 300) {
-        return {'status': false, 'message': 'Gagal membuat Medication: ${medResponse.body}'};
-      }
-      medicationId = jsonDecode(medResponse.body)['id']?.toString() ?? '';
-    } catch (e) {
-      return {'status': false, 'message': 'Medication exception: $e'};
+    if (medResponse['status'] != true) {
+      return {'status': false, 'message': 'Gagal membuat Medication: ${medResponse['message']}'};
     }
+    medicationId = medResponse['data']?['id']?.toString() ?? '';
 
     final reqUuidBytes = List<int>.generate(16, (i) => random.nextInt(256));
     reqUuidBytes[6] = (reqUuidBytes[6] & 0x0f) | 0x40;
@@ -551,20 +611,17 @@ class SatuSehatService {
       }
     };
 
-    try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/MedicationRequest'),
-        headers: headers,
-        body: jsonEncode(requestPayload),
-      );
+    final response = await _callFhirProxy(
+      method: 'POST',
+      endpoint: '/MedicationRequest',
+      token: token,
+      payload: requestPayload,
+    );
 
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        return {'status': true, 'data': jsonDecode(response.body)};
-      }
-      return {'status': false, 'message': 'Gagal membuat MedicationRequest: ${response.body}'};
-    } catch (e) {
-      return {'status': false, 'message': 'MedicationRequest exception: $e'};
+    if (response['status'] == true) {
+      return {'status': true, 'data': response['data']};
     }
+    return {'status': false, 'message': 'Gagal membuat MedicationRequest: ${response['message']}'};
   }
 
   /// Search KFA products by keyword using SatuSehat KFA v2 API

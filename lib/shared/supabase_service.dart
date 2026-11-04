@@ -94,9 +94,10 @@ class SupabaseService {
   /// Checks if an email is already registered in the public.user table.
   /// Returns true if it exists, false otherwise.
   Future<bool> checkEmailExists(String email) async {
+    final cleanEmail = email.trim();
     try {
       final rows = await _get(
-        'user?email=eq.${Uri.encodeComponent(email)}&limit=1',
+        'user?email=ilike.${Uri.encodeComponent(cleanEmail)}&limit=1',
       );
       return rows.isNotEmpty;
     } catch (e) {
@@ -1097,29 +1098,62 @@ class SupabaseService {
     return results;
   }
 
-  // Query a user by email or username
+  // Query a user by email or username (case-insensitive)
   Future<Map<String, dynamic>?> fetchUserByEmailOrUsername(
     String identifier,
   ) async {
-    final safeId = Uri.encodeComponent(identifier);
+    final cleanId = identifier.trim();
+    if (cleanId.isEmpty) return null;
+    final safeId = Uri.encodeComponent(cleanId);
+
+    // 1. PostgREST REST API with case-insensitive ilike
     try {
+      final filters = <String>[
+        'email.ilike.$safeId',
+        'username.ilike.$safeId',
+      ];
+      if (!cleanId.contains('@')) {
+        filters.add('email.ilike.$safeId%25');
+      }
+      final orFilter = filters.join(',');
       final users = await _get(
-        'user?select=*&or=(email.eq.$safeId,username.eq.$safeId)',
+        'user?select=*&or=($orFilter)&limit=1',
         schema: 'public',
       );
       if (users.isNotEmpty) {
         return users.first as Map<String, dynamic>;
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Notice: PostgREST fetchUserByEmailOrUsername error: $e');
+    }
+
+    // 2. SupabaseClient SDK Fallback
+    try {
+      final sdkFilter = !cleanId.contains('@')
+          ? 'email.ilike.$cleanId,username.ilike.$cleanId,email.ilike.$cleanId%'
+          : 'email.ilike.$cleanId,username.ilike.$cleanId';
+      final res = await client
+          .from('user')
+          .select('*')
+          .or(sdkFilter)
+          .limit(1);
+      if (res.isNotEmpty) {
+        return Map<String, dynamic>.from(res.first);
+      }
+    } catch (e) {
+      debugPrint('Notice: SupabaseClient SDK fetch error: $e');
+    }
+
     return null;
   }
 
-  // Fetch patient profile and BPJS details by email
+  // Fetch patient profile and BPJS details by email (case-insensitive)
   Future<Map<String, dynamic>?> fetchPatientProfileByEmail(String email) async {
-    final safeEmail = Uri.encodeComponent(email);
+    final cleanEmail = email.trim();
+    final safeEmail = Uri.encodeComponent(cleanEmail);
     try {
       final users = await _get(
-        'user?select=*&email=eq.$safeEmail',
+        'user?select=*&email=ilike.$safeEmail',
         schema: 'public',
       );
       if (users.isNotEmpty) {
