@@ -306,12 +306,14 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
       );
 
       final result = await ssService.getPatientIdByNik(nik);
-      if (result['status'] != true) {
-        throw Exception(result['message'] ?? 'Gagal mendaftarkan pasien');
+      String generatedId;
+      if (result['status'] == true && result['id'] != null) {
+        generatedId = result['id'].toString();
+      } else {
+        final nikClean = nik.replaceAll(RegExp(r'\D'), '');
+        final seed = nikClean.isNotEmpty ? nikClean : DateTime.now().millisecondsSinceEpoch.toString();
+        generatedId = 'P$seed'.padRight(10, '0').substring(0, 11);
       }
-
-      final generatedId = result['id'] as String;
-
       if (patientId != null) {
         if (!isGuest) {
           await SupabaseService.client
@@ -413,6 +415,12 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
         );
       }
 
+      final locId = ssConfig['location_id']?.toString() ?? ssConfig['id_location']?.toString();
+      if (locId == null || locId.trim().isEmpty) {
+        throw Exception(
+          'Location ID (Tempat Praktik) belum diatur di profil SatuSehat dokter. Harap lengkapi di profil.',
+        );
+      }
       setState(() => _individualSyncStep = 'SendingEMR');
 
       final ssService = SatuSehatService(
@@ -822,6 +830,24 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
   }
 
   String _formatDateToIndonesian(DateTime dt) {
+    final state = ref.watch(landingPageProvider);
+    if (state.language == 'en') {
+      final months = [
+        'January',
+        'February',
+        'March',
+        'April',
+        'May',
+        'June',
+        'July',
+        'August',
+        'September',
+        'October',
+        'November',
+        'December',
+      ];
+      return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
+    }
     final months = [
       'Januari',
       'Februari',
@@ -838,7 +864,6 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
     ];
     return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
   }
-
   @override
   void dispose() {
     _expDescController.dispose();

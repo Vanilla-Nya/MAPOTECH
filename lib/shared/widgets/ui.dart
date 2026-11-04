@@ -25,3 +25,4 @@ export 'viewport_overlay.dart';
 export 'location_selector_widget.dart';
 export 'revgeo_wilayah_map_widget.dart';
 export 'selection_modal.dart';
+export 'custom_qris_dialog.dart';

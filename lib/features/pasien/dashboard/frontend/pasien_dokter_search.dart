@@ -13,6 +13,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:mapotech/features/dokter/dashboard/frontend/web_map_widget.dart';
 import 'package:mapotech/features/pasien/dashboard/frontend/widgets/pasien_qr_scanner_dialog.dart';
 import 'package:mapotech/features/pasien/dashboard/frontend/widgets/pasien_apotek_pos_dialog.dart';
+import 'package:mapotech/shared/duitku_payment_service.dart';
+import 'package:mapotech/shared/widgets/custom_dialog.dart';
 
 /// Cari Praktik Mandiri, Puskesmas & Pustu/Ponkesdes - Pasien Dashboard Page
 class PasienDokterSearch extends ConsumerStatefulWidget {
@@ -3447,7 +3449,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
               onPressed: _showUpgradePlansModal,
               icon: const Icon(Icons.flash_on_rounded, size: 14, color: Colors.white),
               label: Text(
-                'Unlock Premium (Rp 1.000)',
+                'Pilih Paket Layanan',
                 style: GoogleFonts.outfit(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
@@ -3581,7 +3583,9 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
                               ],
                               onTap: () {
                                 Navigator.of(ctx).pop();
-                                _renewPackage('subscription_30', 150000);
+                                Future.delayed(const Duration(milliseconds: 150), () {
+                                  if (mounted) _buyPackageWithQris('subscription_30', 150000, 'Standard Subscription (30 Hari)');
+                                });
                               },
                             ),
                             _buildPlanCard(
@@ -3603,7 +3607,9 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
                               ],
                               onTap: () {
                                 Navigator.of(ctx).pop();
-                                _renewPackage('premium_30', 20000);
+                                Future.delayed(const Duration(milliseconds: 150), () {
+                                  if (mounted) _buyPackageWithQris('premium_30', 20000, 'Premium Customizer (30 Hari)');
+                                });
                               },
                             ),
                             if (subDaysRemaining > 0)
@@ -3625,7 +3631,9 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
                                 ],
                                 onTap: () {
                                   Navigator.of(ctx).pop();
-                                  _renewPackage('premium_sync', syncAmount);
+                                  Future.delayed(const Duration(milliseconds: 150), () {
+                                    if (mounted) _buyPackageWithQris('premium_sync', syncAmount, 'Premium Customizer (Sync $subDaysRemaining Hari)');
+                                  });
                                 },
                               ),
                             _buildPlanCard(
@@ -3647,7 +3655,9 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
                               ],
                               onTap: () {
                                 Navigator.of(ctx).pop();
-                                _renewPackage('premium_lifetime', 100000);
+                                Future.delayed(const Duration(milliseconds: 150), () {
+                                  if (mounted) _buyPackageWithQris('premium_lifetime', 100000, 'Premium Customizer (Lifetime)');
+                                });
                               },
                             ),
                             _buildPlanCard(
@@ -3669,7 +3679,9 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
                               ],
                               onTap: () {
                                 Navigator.of(ctx).pop();
-                                _renewPackage('bundle_30', 160000);
+                                Future.delayed(const Duration(milliseconds: 150), () {
+                                  if (mounted) _buyPackageWithQris('bundle_30', 160000, 'Mega Bundle (30 Hari)');
+                                });
                               },
                             ),
                           ];
@@ -3881,6 +3893,223 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
         ),
       ),
     );
+  }
+
+  Future<void> _buyPackageWithQris(String packageType, int amount, String packageTitle) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(
+        child: CircularProgressIndicator(color: Color(0xFF00BFA6)),
+      ),
+    );
+
+    try {
+      final userState = ref.read(landingPageProvider).loggedInUser;
+      final email = userState?['email'] ?? 'customer@mapotech.app';
+      final name = userState?['name'] ?? userState?['full_name'] ?? 'Pengguna';
+      final doctorId = widget.dokter['id'] as String;
+
+      Map<String, dynamic> res;
+      try {
+        res = await DuitkuPaymentService.createPayment(
+          packageType: packageType,
+          amount: amount,
+          customerEmail: email,
+          customerName: name,
+        );
+      } finally {
+        if (mounted) Navigator.of(context, rootNavigator: true).pop(); // Dismiss loading
+      }
+
+      final orderId = res['orderId']?.toString() ?? '';
+      final paymentUrl = res['paymentUrl']?.toString() ?? '';
+      final qrString = res['qrString']?.toString() ?? '';
+      final qrisAmount = (res['amount'] as num?)?.toInt() ?? amount;
+
+      await Future.delayed(const Duration(milliseconds: 120));
+
+      if (mounted) {
+        CustomQrisDialog.show(
+          context: context,
+          orderId: orderId,
+          paymentUrl: paymentUrl,
+          qrString: qrString,
+          amount: qrisAmount,
+          packageType: packageType,
+          packageTitle: packageTitle,
+          userId: doctorId,
+          isResume: false,
+          onPaymentSuccess: () {
+            _applyPackageSuccess(packageType, qrisAmount);
+          },
+          onResetPayment: () {
+            DuitkuPaymentService.clearPendingPayment();
+          },
+        );
+      }
+    } catch (e) {
+      if (mounted) Navigator.of(context).pop();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal memulai pembayaran: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _applyPackageSuccess(String packageType, int amount) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(
+        child: CircularProgressIndicator(color: Color(0xFF00BFA6)),
+      ),
+    );
+
+    try {
+      final client = SupabaseService.client;
+      final userId = widget.dokter['id'] as String;
+
+      final res = await client
+          .from('user_detail_doctor')
+          .select('subscription_expired_at, subscription_status, header_bg_settings')
+          .eq('id', userId)
+          .maybeSingle();
+
+      DateTime currentSubExpiry = DateTime.now();
+      if (res != null && res['subscription_expired_at'] != null) {
+        try {
+          final parsed = DateTime.parse(res['subscription_expired_at'].toString());
+          if (parsed.isAfter(DateTime.now())) {
+            currentSubExpiry = parsed;
+          }
+        } catch (_) {}
+      }
+
+      final bgSettings = res?['header_bg_settings'];
+      final Map<String, dynamic> settings = bgSettings is Map
+          ? Map<String, dynamic>.from(bgSettings)
+          : <String, dynamic>{};
+
+      DateTime currentPremExpiry = DateTime.now();
+      if (settings['is_premium'] == true && settings['premium_expired_at'] != 'lifetime' && settings['premium_expired_at'] != null) {
+        try {
+          final parsed = DateTime.parse(settings['premium_expired_at'].toString());
+          if (parsed.isAfter(DateTime.now())) {
+            currentPremExpiry = parsed;
+          }
+        } catch (_) {}
+      }
+
+      String newSubExpiryStr = res?['subscription_expired_at']?.toString() ?? '';
+      String newSubStatus = res?['subscription_status']?.toString() ?? 'inactive';
+
+      if (packageType == 'subscription_30') {
+        final newExpiry = currentSubExpiry.add(const Duration(days: 30));
+        newSubExpiryStr = newExpiry.toIso8601String();
+        newSubStatus = 'active';
+      } else if (packageType == 'premium_30') {
+        settings['is_premium'] = true;
+        if (settings['premium_expired_at'] == 'lifetime') {
+          // Keep lifetime
+        } else {
+          final newExpiry = currentPremExpiry.add(const Duration(days: 30));
+          settings['premium_expired_at'] = newExpiry.toIso8601String();
+        }
+      } else if (packageType == 'premium_sync') {
+        settings['is_premium'] = true;
+        settings['premium_expired_at'] = newSubExpiryStr;
+      } else if (packageType == 'premium_lifetime') {
+        settings['is_premium'] = true;
+        settings['premium_expired_at'] = 'lifetime';
+      } else if (packageType == 'bundle_30') {
+        final newSubExpiry = currentSubExpiry.add(const Duration(days: 30));
+        newSubExpiryStr = newSubExpiry.toIso8601String();
+        newSubStatus = 'active';
+        settings['is_premium'] = true;
+        if (settings['premium_expired_at'] == 'lifetime') {
+          // Keep lifetime
+        } else {
+          final newPremExpiry = currentPremExpiry.add(const Duration(days: 30));
+          settings['premium_expired_at'] = newPremExpiry.toIso8601String();
+        }
+      }
+
+      await client
+          .from('user_detail_doctor')
+          .update({
+            'subscription_status': newSubStatus,
+            'subscription_expired_at': newSubExpiryStr,
+            'header_bg_settings': settings,
+          })
+          .eq('id', userId);
+
+      String packageDesc = 'Pembelian Paket Layanan';
+      if (packageType == 'subscription_30') packageDesc = 'Perpanjangan Langganan Praktik Mandiri 30 Hari';
+      if (packageType == 'premium_30') packageDesc = 'Pembelian Kustomisasi Profil Premium 30 Hari';
+      if (packageType == 'premium_sync') packageDesc = 'Pembelian Premium Customizer (Sinkronisasi Durasi)';
+      if (packageType == 'premium_lifetime') packageDesc = 'Pembelian Kustomisasi Profil Premium Lifetime';
+      if (packageType == 'bundle_30') packageDesc = 'Pembelian Paket Mega Bundle 30 Hari';
+
+      try {
+        final txData = {
+          'id_user': userId,
+          'transaction_type': 'expense',
+          'source_type': 'manual',
+          'amount': amount.toDouble(),
+          'description': packageDesc,
+          'category': 'Operasional',
+          'status': 'active',
+        };
+        await client
+            .schema('private_doctor')
+            .from('financial_transactions')
+            .insert(txData);
+      } catch (dbErr) {
+        debugPrint('Failed to auto-record package expense: $dbErr');
+      }
+
+      setState(() {
+        _isSubscribed = newSubStatus == 'active';
+        _subscriptionExpiredAt = newSubExpiryStr;
+
+        final isPremiumField = settings['is_premium'] == true;
+        final expAt = settings['premium_expired_at'];
+        if (isPremiumField) {
+          if (expAt == 'lifetime') {
+            _isPremium = true;
+          } else if (expAt != null) {
+            try {
+              final expDate = DateTime.parse(expAt.toString());
+              _isPremium = expDate.isAfter(DateTime.now());
+            } catch (_) {
+              _isPremium = false;
+            }
+          } else {
+            _isPremium = true;
+          }
+        } else {
+          _isPremium = false;
+        }
+      });
+
+      if (mounted) Navigator.of(context).pop();
+      _showPurchaseSuccessDialog(packageType);
+    } catch (e) {
+      if (mounted) Navigator.of(context).pop();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Pembelian gagal: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _renewPackage(String packageType, int amount) async {

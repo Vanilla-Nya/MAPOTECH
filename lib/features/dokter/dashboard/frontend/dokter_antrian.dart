@@ -11,6 +11,7 @@ import 'package:mapotech/shared/widgets/custom_button.dart';
 import 'package:mapotech/shared/supabase_service.dart';
 import 'package:mapotech/shared/widgets/common_pagination.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:mapotech/shared/satusehat_service.dart';
 import 'package:mapotech/shared/thousands_formatter.dart';
 import 'package:flutter/services.dart';
 import 'invoice_printer.dart';
@@ -277,9 +278,49 @@ class DokterAntrianListNotifier extends StateNotifier<List<AntrianModel>> {
     }
   }
 
-  Future<void> registerPatientSatuSehat(AntrianModel queue) async {
-    final generatedId = 'P00994497528';
+  Future<String> registerPatientSatuSehat(AntrianModel queue) async {
     try {
+      final userState = ref.read(landingPageProvider);
+      final doctorId = userState.activeDoctorId ?? this.doctorId;
+
+      final docDetail = await SupabaseService.client
+          .from('user_detail_doctor')
+          .select('satu_sehat_api, id_satusehat')
+          .eq('id', doctorId)
+          .maybeSingle();
+
+      final ssConfig = docDetail?['satu_sehat_api'] as Map<String, dynamic>?;
+      String generatedId = '';
+
+      if (ssConfig != null &&
+          ssConfig['client_id'] != null &&
+          queue.nik.isNotEmpty &&
+          queue.nik != '-') {
+        try {
+          final ssService = SatuSehatService(
+            clientId: ssConfig['client_id']?.toString(),
+            clientSecret: ssConfig['client_secret']?.toString(),
+            organizationId: ssConfig['organization_id']?.toString(),
+            locationId: ssConfig['location_id']?.toString() ??
+                docDetail?['id_satusehat']?.toString(),
+            env: ssConfig['env']?.toString(),
+          );
+          final res = await ssService.getPatientIdByNik(queue.nik);
+          if (res['status'] == true && res['id'] != null) {
+            generatedId = res['id'].toString();
+          }
+        } catch (_) {}
+      }
+
+      if (generatedId.isEmpty) {
+        final nikClean = queue.nik.replaceAll(RegExp(r'\D'), '');
+        final seed = nikClean.isNotEmpty
+            ? nikClean
+            : DateTime.now().millisecondsSinceEpoch.toString();
+        generatedId = 'P$seed'.padRight(10, '0').substring(0, 11);
+      }
+
+      // Update regular patient in user table
       if (queue.patientId != null) {
         await SupabaseService.client
             .from('user')
@@ -288,20 +329,46 @@ class DokterAntrianListNotifier extends StateNotifier<List<AntrianModel>> {
         try {
           ref.read(dokterPasienListProvider.notifier).loadPatients();
         } catch (_) {}
-      } else if (queue.guestPatientId != null) {
+      }
+
+      // Update guest patient in guest_patients table
+      if (queue.guestPatientId != null) {
         await SupabaseService.client
             .schema('private_doctor')
             .from('guest_patients')
             .update({'satusehat_id': generatedId})
             .eq('id', queue.guestPatientId!);
+      } else if (queue.nik.isNotEmpty && queue.nik != '-') {
+        try {
+          await SupabaseService.client
+              .schema('private_doctor')
+              .from('guest_patients')
+              .update({'satusehat_id': generatedId})
+              .eq('id_doctor', doctorId)
+              .eq('nik', queue.nik);
+        } catch (_) {}
       }
-      await loadQueues();
+
+      // Update in-memory state immediately so UI updates reactively
+      state = [
+        for (final item in state)
+          if (item.id == queue.id)
+            item.copyWith(satusehatId: generatedId)
+          else
+            item,
+      ];
+
+      // Refresh in background
+      try {
+        await loadQueues();
+      } catch (_) {}
+
+      return generatedId;
     } catch (e) {
       debugPrint('Error registering SatuSehat: $e');
       rethrow;
     }
   }
-
   Future<void> updateQueuePatientType(
     String queueId,
     String patientType,
@@ -355,7 +422,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
   }
 
   String _formatDateToIndonesian(DateTime dt) {
-    final state = ref.read(landingPageProvider);
+    final state = ref.watch(landingPageProvider);
     if (state.language == 'en') {
       final months = [
         'January',
@@ -3663,6 +3730,7 @@ class _CashierPaymentDialogState extends ConsumerState<CashierPaymentDialog> {
   String _paymentMethod = 'CASH'; // 'CASH' or 'QRIS'
   String? _encounterId;
   String? _electronicPrescriptionId;
+  String? _doctorQrisPath;
   final TextEditingController _receivedController = TextEditingController(
     text: '0',
   );

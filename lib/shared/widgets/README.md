@@ -154,3 +154,21 @@ CustomSnackbar.warning(context, 'Stok obat tersisa 3 butir.');
 ### 11. `RevGeoWilayahMapWidget` & `LocationSelectorWidget`
 * **File**: `revgeo_wilayah_map_widget.dart`, `location_selector_widget.dart`
 * **Fungsi**: Visualisasi peta poligon batas administratif via **RevGeo API** (`https://revgeo.relvastudio.com/`) dan pemilih bertingkat Provinsi/Kabupaten/Kecamatan/Desa.
+
+### 12. `CustomQrisDialog`
+* **File**: `custom_qris_dialog.dart`
+* **Fungsi**: Dialog pembayaran QRIS dinamis mandiri untuk paket langganan faskes & pasien dengan tampilan real harga, render QR code otomatis, tautan checkout, dan cek status instan.
+* **Contoh**:
+```dart
+CustomQrisDialog.show(
+  context: context,
+  orderId: orderId,
+  paymentUrl: paymentUrl,
+  qrString: qrString,
+  amount: 150000,
+  packageType: 'subscription_30',
+  packageTitle: 'Standard Subscription (30 Hari)',
+  userId: userId,
+  onPaymentSuccess: () => _applyPackage(),
+);
+```

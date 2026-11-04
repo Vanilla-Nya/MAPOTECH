@@ -2853,11 +2853,16 @@ class _DokterObatState extends ConsumerState<DokterObat> {
 
               final searchData = searchRes['data'];
               List<dynamic> dataList = [];
-              if (searchData is Map && searchData['items'] is Map) {
-                final items = searchData['items'];
-                if (items['data'] is List) dataList = items['data'] as List;
-              } else if (searchData is Map && searchData['items'] is List) {
-                dataList = searchData['items'] as List;
+              if (searchData is Map) {
+                if (searchData['items'] is Map && searchData['items']['data'] is List) {
+                  dataList = searchData['items']['data'] as List;
+                } else if (searchData['items'] is List) {
+                  dataList = searchData['items'] as List;
+                } else if (searchData['data'] is List) {
+                  dataList = searchData['data'] as List;
+                }
+              } else if (searchData is List) {
+                dataList = searchData;
               }
 
               final mapped = dataList.map<Map<String, dynamic>>((e) => {

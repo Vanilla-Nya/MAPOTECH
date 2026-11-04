@@ -20,6 +20,8 @@ import 'package:mapotech/shared/widgets/location_selector_widget.dart';
 import 'package:mapotech/shared/location_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:mapotech/shared/duitku_payment_service.dart';
+import 'package:mapotech/shared/widgets/custom_dialog.dart';
 import 'web_map_widget.dart';
 import 'package:image/image.dart' as img;
 
@@ -1512,7 +1514,9 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                               ],
                               onTap: () {
                                 Navigator.of(ctx).pop();
-                                _buySubscriptionWithDuitku('subscription_30', 150000);
+                                Future.delayed(const Duration(milliseconds: 150), () {
+                                  if (mounted) _buySubscriptionWithDuitku('subscription_30', 150000);
+                                });
                               },
                             ),
                             _buildPlanCardProfile(
@@ -1534,7 +1538,9 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                               ],
                               onTap: () {
                                 Navigator.of(ctx).pop();
-                                _renewPackageProfile('premium_30', 20000);
+                                Future.delayed(const Duration(milliseconds: 150), () {
+                                  if (mounted) _buySubscriptionWithDuitku('premium_30', 20000);
+                                });
                               },
                             ),
                             if (_subDaysRemaining > 0)
@@ -1556,7 +1562,9 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                                 ],
                                 onTap: () {
                                   Navigator.of(ctx).pop();
-                                  _renewPackageProfile('premium_sync', syncAmount);
+                                  Future.delayed(const Duration(milliseconds: 150), () {
+                                    if (mounted) _buySubscriptionWithDuitku('premium_sync', syncAmount);
+                                  });
                                 },
                               ),
                             _buildPlanCardProfile(
@@ -1578,7 +1586,9 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                               ],
                               onTap: () {
                                 Navigator.of(ctx).pop();
-                                _renewPackageProfile('premium_lifetime', 100000);
+                                Future.delayed(const Duration(milliseconds: 150), () {
+                                  if (mounted) _buySubscriptionWithDuitku('premium_lifetime', 100000);
+                                });
                               },
                             ),
                             _buildPlanCardProfile(
@@ -1600,7 +1610,9 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                               ],
                               onTap: () {
                                 Navigator.of(ctx).pop();
-                                _buySubscriptionWithDuitku('bundle_30', 160000);
+                                Future.delayed(const Duration(milliseconds: 150), () {
+                                  if (mounted) _buySubscriptionWithDuitku('bundle_30', 160000);
+                                });
                               },
                             ),
                           ];
@@ -2890,7 +2902,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
 
     final res = await client
         .from('user_detail_doctor')
-        .select('subscription_expired_at, header_bg_settings')
+        .select('subscription_expired_at, subscription_status, header_bg_settings')
         .eq('id', userId)
         .maybeSingle();
 
@@ -2909,41 +2921,69 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
         ? Map<String, dynamic>.from(bgSettings)
         : <String, dynamic>{};
 
-    final newSubExpiry = currentSubExpiry.add(const Duration(days: 30));
-    final newSubExpiryStr = newSubExpiry.toIso8601String();
-
-    String packageDesc = 'Perpanjangan Langganan Praktik Mandiri 30 Hari';
-
-    if (packageType == 'bundle_30') {
-      // Apply both subscription +30 days AND premium +30 days
-      DateTime currentPremExpiry = DateTime.now();
-      if (settings['is_premium'] == true &&
-          settings['premium_expired_at'] != 'lifetime' &&
-          settings['premium_expired_at'] != null) {
-        try {
-          final parsed = DateTime.parse(
-            settings['premium_expired_at'].toString(),
-          );
-          if (parsed.isAfter(DateTime.now())) currentPremExpiry = parsed;
-        } catch (_) {}
-      }
-      settings['is_premium'] = true;
-      if (settings['premium_expired_at'] != 'lifetime') {
-        settings['premium_expired_at'] = currentPremExpiry
-            .add(const Duration(days: 30))
-            .toIso8601String();
-      }
-      packageDesc =
-          'Pembelian Paket Mega Bundle 30 Hari (Subscription + Premium)';
+    DateTime currentPremExpiry = DateTime.now();
+    if (settings['is_premium'] == true &&
+        settings['premium_expired_at'] != 'lifetime' &&
+        settings['premium_expired_at'] != null) {
+      try {
+        final parsed = DateTime.parse(
+          settings['premium_expired_at'].toString(),
+        );
+        if (parsed.isAfter(DateTime.now())) currentPremExpiry = parsed;
+      } catch (_) {}
     }
 
-    // Always extend subscription for both subscription_30 and bundle_30
+    String newSubExpiryStr =
+        res?['subscription_expired_at']?.toString() ?? '';
+    String newSubStatus =
+        res?['subscription_status']?.toString() ?? 'inactive';
+    String packageDesc = 'Pembelian Paket Layanan';
+
+    if (packageType == 'subscription_30') {
+      final newExpiry = currentSubExpiry.add(const Duration(days: 30));
+      newSubExpiryStr = newExpiry.toIso8601String();
+      newSubStatus = 'active';
+      packageDesc = 'Perpanjangan Langganan Praktik Mandiri 30 Hari';
+    } else if (packageType == 'premium_30') {
+      settings['is_premium'] = true;
+      if (settings['premium_expired_at'] == 'lifetime') {
+        // keep lifetime
+      } else {
+        final newExpiry = currentPremExpiry.add(const Duration(days: 30));
+        settings['premium_expired_at'] = newExpiry.toIso8601String();
+      }
+      packageDesc = 'Pembelian Kustomisasi Profil Premium 30 Hari';
+    } else if (packageType == 'premium_sync') {
+      settings['is_premium'] = true;
+      settings['premium_expired_at'] = newSubExpiryStr;
+      packageDesc = 'Pembelian Premium Customizer (Sinkronisasi Durasi)';
+    } else if (packageType == 'premium_lifetime') {
+      settings['is_premium'] = true;
+      settings['premium_expired_at'] = 'lifetime';
+      packageDesc = 'Pembelian Kustomisasi Profil Premium Lifetime';
+    } else if (packageType == 'bundle_30') {
+      final newSubExpiry = currentSubExpiry.add(const Duration(days: 30));
+      newSubExpiryStr = newSubExpiry.toIso8601String();
+      newSubStatus = 'active';
+      settings['is_premium'] = true;
+      if (settings['premium_expired_at'] == 'lifetime') {
+        // keep lifetime
+      } else {
+        final newPremExpiry = currentPremExpiry.add(const Duration(days: 30));
+        settings['premium_expired_at'] = newPremExpiry.toIso8601String();
+      }
+      packageDesc = 'Pembelian Paket Mega Bundle 30 Hari';
+    }
+
     await client
         .from('user_detail_doctor')
         .update({
-          'subscription_status': 'active',
-          'subscription_expired_at': newSubExpiryStr,
-          if (packageType == 'bundle_30') 'header_bg_settings': settings,
+          if (packageType == 'subscription_30' || packageType == 'bundle_30')
+            'subscription_status': newSubStatus,
+          if (packageType == 'subscription_30' || packageType == 'bundle_30')
+            'subscription_expired_at': newSubExpiryStr,
+          if (packageType != 'subscription_30')
+            'header_bg_settings': settings,
         })
         .eq('id', userId);
 
@@ -2968,129 +3008,177 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
 
     await _fetchDbData();
     if (mounted) setState(() {});
+    _showPurchaseSuccessDialogProfile(packageType);
   }
 
   Future<void> _buySubscriptionWithDuitku([
     String packageType = 'subscription_30',
     int? targetAmount,
   ]) async {
-    final int defaultAmount = packageType == 'bundle_30' ? 160000 : 150000;
+    final int defaultAmount = packageType == 'bundle_30'
+        ? 160000
+        : (packageType == 'premium_30'
+            ? 20000
+            : (packageType == 'premium_lifetime' ? 100000 : 150000));
     final int packagePrice = targetAmount ?? defaultAmount;
 
     if (_isAssistant) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Hanya Dokter (Pemilik) yang dapat memperpanjang langganan.',
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Hanya Dokter (Pemilik) yang dapat memperpanjang langganan.',
+            ),
+            backgroundColor: Colors.redAccent,
           ),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+        );
+      }
       return;
     }
-    final userId = _effectiveUserId;
-    final userState = ref.read(landingPageProvider).loggedInUser;
-    final email = userState?['email'] ?? 'agoes.soetanto@gmail.com';
-
-    // ── Check if there is already a saved pending payment for this user ──
-    final pending = _loadPendingPayment(userId);
-    if (pending != null) {
-      final savedOrderId = pending['orderId']!;
-      final savedPaymentUrl = pending['paymentUrl']!;
-      final savedQrString = pending['qrString'] ?? '';
-      final savedAmount = int.tryParse(pending['amount'] ?? '') ?? packagePrice;
-      final savedPkg = pending['packageType'] ?? packageType;
-      // Re-open QRIS dialog with the saved order (no new API call)
-      _showQrisPaymentDialog(
-        orderId: savedOrderId,
-        paymentUrl: savedPaymentUrl,
-        qrString: savedQrString,
-        amount: savedAmount,
-        userId: userId,
-        isResume: true,
-        packageType: savedPkg,
-      );
-      return;
-    }
-
-    setState(() => _isSaving = true);
 
     try {
-      // ── Call Supabase Edge Function via client.functions.invoke (auto JWT) ──
+      final userId = _effectiveUserId;
       final userState = ref.read(landingPageProvider).loggedInUser;
-      final email = userState?['email'] ?? '';
+      final email = userState?['email'] ?? 'agoes.soetanto@gmail.com';
       final name = userState?['name'] ?? userState?['full_name'] ?? 'Dokter';
-      final merchantCode = dotenv.env['DUITKU_MERCHANT_CODE'] ?? '';
-      final merchantKey = dotenv.env['DUITKU_MERCHANT_KEY'] ?? '';
-      final paymentMethod = dotenv.env['DUITKU_PAYMENT_METHOD'] ?? 'NQ';
 
-      final fnResponse = await SupabaseService.client.functions.invoke(
-        'create-duitku-payment',
-        body: {
-          'packageType': packageType,
-          'amount': packagePrice,
-          'paymentAmount': packagePrice,
-          'customerEmail': email,
-          'customerName': name,
-          'merchantCode': merchantCode,
-          'merchantKey': merchantKey,
-          'paymentMethod': paymentMethod,
-        },
+      String packageTitle = 'Langganan Mapotech';
+      if (packageType == 'subscription_30') {
+        packageTitle = 'Standard Subscription (30 Hari)';
+      } else if (packageType == 'premium_30') {
+        packageTitle = 'Premium Customizer (30 Hari)';
+      } else if (packageType == 'premium_sync') {
+        packageTitle = 'Premium Customizer (Sync Durasi)';
+      } else if (packageType == 'premium_lifetime') {
+        packageTitle = 'Premium Customizer (Lifetime)';
+      } else if (packageType == 'bundle_30') {
+        packageTitle = 'Mega Bundle (30 Hari)';
+      }
+
+      // ── Check if there is already a matching saved pending payment for this user ──
+      final pending = DuitkuPaymentService.loadPendingPayment(
+        userId: userId,
+        expectedPackageType: packageType,
+        expectedAmount: packagePrice,
       );
+      if (pending != null) {
+        final savedOrderId = pending['orderId']!;
+        final savedPaymentUrl = pending['paymentUrl']!;
+        final savedQrString = pending['qrString'] ?? '';
+        final savedAmount = int.tryParse(pending['amount'] ?? '') ?? packagePrice;
+        final savedPkg = pending['packageType'] ?? packageType;
 
-      final data = fnResponse.data as Map<String, dynamic>? ?? {};
-      debugPrint(
-        'create-duitku-payment response: $data  status=${fnResponse.status}',
+        if (mounted) {
+          CustomQrisDialog.show(
+            context: context,
+            orderId: savedOrderId,
+            paymentUrl: savedPaymentUrl,
+            qrString: savedQrString,
+            amount: savedAmount,
+            packageType: savedPkg,
+            packageTitle: packageTitle,
+            userId: userId,
+            isResume: true,
+            onPaymentSuccess: () => _applyDuitkuPackage(savedPkg, savedAmount),
+            onResetPayment: () {
+              DuitkuPaymentService.clearPendingPayment();
+              if (mounted) setState(() {});
+            },
+          );
+        }
+        return;
+      }
+
+      // Show loading dialog
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (loadingCtx) => Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E1E24),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircularProgressIndicator(color: Color(0xFF00BFA6)),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Menyiapkan tagihan QRIS...',
+                    style: GoogleFonts.outfit(color: Colors.white, fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
+
+      setState(() => _isSaving = true);
+
+      Map<String, dynamic> res;
+      try {
+        res = await DuitkuPaymentService.createPayment(
+          packageType: packageType,
+          amount: packagePrice,
+          customerEmail: email,
+          customerName: name,
+        );
+      } finally {
+        if (mounted) {
+          Navigator.of(context, rootNavigator: true).pop(); // dismiss loading dialog
+          setState(() => _isSaving = false);
+        }
+      }
+
+      final orderId = res['orderId']?.toString() ?? '';
+      final paymentUrl = res['paymentUrl']?.toString() ?? '';
+      final qrString = res['qrString']?.toString() ?? '';
+      final amount = (res['amount'] as num?)?.toInt() ?? packagePrice;
+
+      DuitkuPaymentService.savePendingPayment(
+        orderId: orderId,
+        paymentUrl: paymentUrl,
+        qrString: qrString,
+        amount: amount,
+        userId: userId,
+        packageType: packageType,
       );
+      if (mounted) setState(() {}); // refresh UI to show "Continue" button
 
-      if (fnResponse.status == 200 && data['statusCode']?.toString() == '00') {
-        final orderId = data['orderId']?.toString() ?? '';
-        final paymentUrl = data['paymentUrl']?.toString() ?? '';
-        final qrString = data['qrString']?.toString() ?? '';
-        final amount = (data['amount'] as num?)?.toInt() ?? packagePrice;
+      await Future.delayed(const Duration(milliseconds: 120));
 
-        _savePendingPayment(
+      if (mounted) {
+        CustomQrisDialog.show(
+          context: context,
           orderId: orderId,
           paymentUrl: paymentUrl,
           qrString: qrString,
           amount: amount,
-          userId: userId,
           packageType: packageType,
+          packageTitle: packageTitle,
+          userId: userId,
+          isResume: false,
+          onPaymentSuccess: () => _applyDuitkuPackage(packageType, amount),
+          onResetPayment: () {
+            DuitkuPaymentService.clearPendingPayment();
+            if (mounted) setState(() {});
+          },
         );
-        if (mounted) setState(() {}); // refresh UI to show "Continue" button
-
-        if (mounted) {
-          _showQrisPaymentDialog(
-            orderId: orderId,
-            paymentUrl: paymentUrl,
-            qrString: qrString,
-            amount: amount,
-            userId: userId,
-            isResume: false,
-            packageType: packageType,
-          );
-        }
-      } else {
-        final errMsg =
-            data['error']?.toString() ??
-            data['statusMessage']?.toString() ??
-            'Terjadi kesalahan pada server.';
-        throw Exception(errMsg);
       }
     } catch (e) {
       debugPrint('Duitku API error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Pembayaran gagal dimulai: $e'),
+            content: Text('Pembayaran gagal: $e'),
             backgroundColor: Colors.redAccent,
-            duration: const Duration(seconds: 5),
+            duration: const Duration(seconds: 4),
           ),
         );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isSaving = false);
       }
     }
   }

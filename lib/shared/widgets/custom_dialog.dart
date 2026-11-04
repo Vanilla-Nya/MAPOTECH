@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:mapotech/shared/duitku_payment_service.dart';
 import 'custom_button.dart';
 
 /// Standard custom modal dialog for MAPOTECH applications.
@@ -227,5 +231,499 @@ class CustomConfirmDialog {
       ],
     );
     return result ?? false;
+  }
+}
+
+/// Standard custom QRIS payment dialog for MAPOTECH applications.
+/// Displays high-resolution QR code, payment URL, real dynamic amount, and live status verification.
+class CustomQrisDialog extends StatefulWidget {
+  final String orderId;
+  final String paymentUrl;
+  final String qrString;
+  final int amount;
+  final String packageType;
+  final String packageTitle;
+  final String userId;
+  final bool isResume;
+  final VoidCallback onPaymentSuccess;
+  final VoidCallback? onResetPayment;
+
+  const CustomQrisDialog({
+    super.key,
+    required this.orderId,
+    required this.paymentUrl,
+    required this.qrString,
+    required this.amount,
+    required this.packageType,
+    required this.packageTitle,
+    required this.userId,
+    this.isResume = false,
+    required this.onPaymentSuccess,
+    this.onResetPayment,
+  });
+
+  static Future<void> show({
+    required BuildContext context,
+    required String orderId,
+    required String paymentUrl,
+    required String qrString,
+    required int amount,
+    required String packageType,
+    required String packageTitle,
+    required String userId,
+    bool isResume = false,
+    required VoidCallback onPaymentSuccess,
+    VoidCallback? onResetPayment,
+  }) {
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => CustomQrisDialog(
+        orderId: orderId,
+        paymentUrl: paymentUrl,
+        qrString: qrString,
+        amount: amount,
+        packageType: packageType,
+        packageTitle: packageTitle,
+        userId: userId,
+        isResume: isResume,
+        onPaymentSuccess: onPaymentSuccess,
+        onResetPayment: onResetPayment,
+      ),
+    );
+  }
+
+  @override
+  State<CustomQrisDialog> createState() => _CustomQrisDialogState();
+}
+
+class _CustomQrisDialogState extends State<CustomQrisDialog> {
+  bool _isChecking = false;
+  String? _statusMessage;
+  bool _isError = false;
+
+  String _formatCurrency(int val) {
+    return 'Rp ${val.toString().replaceAllMapped(RegExp(r"(\d)(?=(\d{3})+(?!\d))"), (m) => "${m[1]}.")}';
+  }
+
+  Future<void> _checkStatus() async {
+    if (_isChecking) return;
+
+    setState(() {
+      _isChecking = true;
+      _statusMessage = null;
+      _isError = false;
+    });
+
+    try {
+      final isPaid = await DuitkuPaymentService.checkPaymentStatus(widget.orderId);
+
+      if (!mounted) return;
+
+      if (isPaid) {
+        DuitkuPaymentService.clearPendingPayment();
+        Navigator.of(context).pop();
+        widget.onPaymentSuccess();
+      } else {
+        setState(() {
+          _isChecking = false;
+          _isError = false;
+          _statusMessage = 'Pembayaran belum terdeteksi. Silakan selesaikan scan QRIS lalu tekan cek lagi.';
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isChecking = false;
+        _isError = true;
+        _statusMessage = 'Gagal memeriksa status: $e';
+      });
+    }
+  }
+
+  Future<void> _launchPaymentUrl() async {
+    final uri = Uri.tryParse(widget.paymentUrl);
+    if (uri != null) {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(uri);
+      }
+    }
+  }
+
+  void _copyPaymentUrl() {
+    Clipboard.setData(ClipboardData(text: widget.paymentUrl));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Tautan pembayaran berhasil disalin!'),
+        backgroundColor: Color(0xFF00A67E),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  Future<void> _handleReset() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E24),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 22),
+            const SizedBox(width: 8),
+            Text(
+              'Reset Pembayaran?',
+              style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+          ],
+        ),
+        content: Text(
+          'Batalkan QRIS saat ini dan buat transaksi baru?',
+          style: GoogleFonts.outfit(color: Colors.grey[300], fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text('Kembali', style: GoogleFonts.outfit(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: Text('Ya, Reset', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      DuitkuPaymentService.clearPendingPayment();
+      if (mounted) Navigator.of(context).pop();
+      widget.onResetPayment?.call();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    final bg = isDark ? const Color(0xFF1E1E24) : Colors.white;
+    final textCol = isDark ? Colors.white : const Color(0xFF1A1A24);
+    final subCol = isDark ? Colors.white70 : const Color(0xFF6B7280);
+    final borderCol = isDark ? const Color(0xFF2E2E38) : const Color(0xFFECEEF2);
+
+    const tealAccent = Color(0xFF00A67E);
+    final formattedPrice = _formatCurrency(widget.amount);
+    final hasQr = widget.qrString.isNotEmpty;
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Container(
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: borderCol, width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.6 : 0.15),
+                blurRadius: 28,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.all(24),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Top Header Row
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: tealAccent.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.qr_code_scanner_rounded, color: tealAccent, size: 24),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.isResume ? 'Lanjutkan Pembayaran QRIS' : 'Scan & Bayar via QRIS',
+                            style: GoogleFonts.outfit(
+                              fontWeight: FontWeight.w900,
+                              color: textCol,
+                              fontSize: 16,
+                            ),
+                          ),
+                          Text(
+                            widget.packageTitle,
+                            style: GoogleFonts.outfit(
+                              color: subCol,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.close_rounded, color: subCol, size: 22),
+                      onPressed: () => Navigator.of(context).pop(),
+                      tooltip: 'Tutup',
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+
+                // Real Price Badge Card
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: tealAccent.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: tealAccent.withValues(alpha: 0.25)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Total Pembayaran',
+                            style: GoogleFonts.outfit(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: subCol,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            formattedPrice,
+                            style: GoogleFonts.outfit(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                              color: tealAccent,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: tealAccent,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          'REAL HARGA',
+                          style: GoogleFonts.outfit(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // QR Code Display
+                if (hasQr)
+                  Center(
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        boxShadow: [
+                          BoxShadow(
+                            color: tealAccent.withValues(alpha: 0.2),
+                            blurRadius: 20,
+                            spreadRadius: 2,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: QrImageView(
+                        data: widget.qrString,
+                        version: QrVersions.auto,
+                        size: 210,
+                        backgroundColor: Colors.white,
+                        errorCorrectionLevel: QrErrorCorrectLevel.M,
+                      ),
+                    ),
+                  )
+                else
+                  Container(
+                    height: 180,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: borderCol.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.link_rounded, size: 40, color: tealAccent),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Gunakan tombol tautan untuk membayar',
+                          style: GoogleFonts.outfit(fontSize: 12, color: subCol),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                const SizedBox(height: 12),
+
+                // Notice & Expiry
+                Center(
+                  child: Text(
+                    'Bisa di-scan dengan ShopeePay, BCA, Mandiri, GoPay, OVO, Dana\nBerlaku 60 menit • Order ID: ${widget.orderId}',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.outfit(
+                      fontSize: 11,
+                      color: subCol,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+
+                if (_statusMessage != null) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: (_isError ? Colors.redAccent : Colors.amber).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: (_isError ? Colors.redAccent : Colors.amber).withValues(alpha: 0.35),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _isError ? Icons.error_outline_rounded : Icons.info_outline_rounded,
+                          color: _isError ? Colors.redAccent : Colors.amber,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _statusMessage!,
+                            style: GoogleFonts.outfit(
+                              color: _isError ? Colors.redAccent : Colors.amber,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                const SizedBox(height: 16),
+
+                // Primary Action: Cek Status Pembayaran
+                SizedBox(
+                  height: 46,
+                  child: ElevatedButton.icon(
+                    onPressed: _isChecking ? null : _checkStatus,
+                    icon: _isChecking
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.refresh_rounded, size: 18, color: Colors.white),
+                    label: Text(
+                      _isChecking ? 'Memeriksa Pembayaran...' : 'Saya Sudah Bayar (Cek Status)',
+                      style: GoogleFonts.outfit(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: Colors.white,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: tealAccent,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 0,
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 8),
+
+                // Secondary Action: Buka Link & Salin Link
+                Row(
+                  children: [
+                    if (widget.paymentUrl.isNotEmpty) ...[
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _launchPaymentUrl,
+                          icon: const Icon(Icons.open_in_new_rounded, size: 14),
+                          label: const Text('Buka Tautan'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: tealAccent,
+                            side: BorderSide(color: tealAccent.withValues(alpha: 0.5)),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            textStyle: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      OutlinedButton(
+                        onPressed: _copyPaymentUrl,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: subCol,
+                          side: BorderSide(color: borderCol),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        child: const Icon(Icons.copy_rounded, size: 16),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    OutlinedButton(
+                      onPressed: _handleReset,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.redAccent,
+                        side: BorderSide(color: Colors.redAccent.withValues(alpha: 0.4)),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      child: const Icon(Icons.delete_outline_rounded, size: 16),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
