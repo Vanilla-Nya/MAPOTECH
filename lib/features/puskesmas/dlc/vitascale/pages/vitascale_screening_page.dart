@@ -51,14 +51,6 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
   final TextEditingController _waistController = TextEditingController(text: '46.0');
   final TextEditingController _lilaController = TextEditingController(text: '14.5');
 
-  // Input Longitudinal (2 Bulan)
-  bool _useLongitudinal = false;
-  final TextEditingController _prevWeightController = TextEditingController(text: '11.0');
-  final TextEditingController _prevHeightController = TextEditingController(text: '83.5');
-  final TextEditingController _prevZsTbuController = TextEditingController(text: '-0.8');
-  final TextEditingController _prevZsBbtbController = TextEditingController(text: '-0.4');
-  String _naikBbCurr = 'Ya';
-
   int _selectedGender = 0; // 0 = Laki-laki, 1 = Perempuan
   double _ageMonths = 24.0;
 
@@ -69,7 +61,6 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
   // Prediction & Reasoning State
   bool _isLoadingClassification = false;
   HasilSmartGrowthBalita? _smartGrowthResult;
-  HasilPrediksiLongitudinal? _longitudinalResult;
 
   bool _isLoadingReasoning = false;
   VitaScaleReasoningResult? _reasoningResult;
@@ -149,10 +140,6 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
     _heightController.dispose();
     _waistController.dispose();
     _lilaController.dispose();
-    _prevWeightController.dispose();
-    _prevHeightController.dispose();
-    _prevZsTbuController.dispose();
-    _prevZsBbtbController.dispose();
     super.dispose();
   }
 
@@ -194,71 +181,25 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
     setState(() {
       _isLoadingClassification = true;
       _smartGrowthResult = null;
-      _longitudinalResult = null;
       _reasoningResult = null;
     });
 
     try {
-      if (_useLongitudinal) {
-        // Model Longitudinal (2 Bulan)
-        final prevBb = double.tryParse(_prevWeightController.text.trim()) ?? (bb - 0.3);
-        final prevTb = double.tryParse(_prevHeightController.text.trim()) ?? (tb - 1.0);
-        final prevZsTbu = double.tryParse(_prevZsTbuController.text.trim()) ?? -1.0;
-        final prevZsBbtb = double.tryParse(_prevZsBbtbController.text.trim()) ?? -0.5;
-        final lila = double.tryParse(_lilaController.text.trim()) ?? 14.0;
+      // Model Smart Growth (4 Fitur Antropometri Utama)
+      final inputSG = InputSmartGrowthBalita(
+        jk: _selectedGender,
+        usiaBulan: _ageMonths,
+        berat: bb,
+        tinggi: tb,
+      );
 
-        final inputLong = InputPrediksiLongitudinal(
-          beratPrev: prevBb,
-          tinggiPrev: prevTb,
-          zsTbuPrev: prevZsTbu,
-          zsBbtbPrev: prevZsBbtb,
-          jk: _selectedGender == 0 ? 'L' : 'P',
-          usiaBulanCurr: _ageMonths,
-          beratCurr: bb,
-          tinggiCurr: tb,
-          lilaCurr: lila,
-          zsTbuCurr: prevZsTbu + 0.1,
-          zsBbtbCurr: prevZsBbtb + 0.1,
-          naikBbCurr: _naikBbCurr,
-        );
+      final result = await VitaScaleApiService.prediksiSmartGrowth(inputSG);
+      setState(() {
+        _smartGrowthResult = result;
+        _isLoadingClassification = false;
+      });
 
-        final result = await VitaScaleApiService.prediksiLongitudinal(inputLong);
-        setState(() {
-          _longitudinalResult = result;
-          _isLoadingClassification = false;
-        });
-
-        // Buat dummy SmartGrowth adapter untuk reasoning
-        final adapter = HasilSmartGrowthBalita(
-          kategoriGiziBbtb: result.statusGizi,
-          kategoriStuntingTbu: result.statusStunting,
-          confidenceBbtb: result.confidenceGizi,
-          confidenceTbu: result.confidenceStunting,
-          probabilitasBbtb: {'Gizi Buruk/Kurang': result.probabilitasGiziBuruk, 'Gizi Normal': 1 - result.probabilitasGiziBuruk},
-          probabilitasTbu: {'Stunting': result.probabilitasStunting, 'Normal': 1 - result.probabilitasStunting},
-          isStunting: result.risikoStunting,
-          isGiziBurukAtauKurang: result.risikoGiziBuruk,
-          inputDiproses: result.inputDiproses,
-        );
-
-        _runReasoning(adapter, bb, tb);
-      } else {
-        // Model Smart Growth (4 Fitur Antropometri Utama)
-        final inputSG = InputSmartGrowthBalita(
-          jk: _selectedGender,
-          usiaBulan: _ageMonths,
-          berat: bb,
-          tinggi: tb,
-        );
-
-        final result = await VitaScaleApiService.prediksiSmartGrowth(inputSG);
-        setState(() {
-          _smartGrowthResult = result;
-          _isLoadingClassification = false;
-        });
-
-        _runReasoning(result, bb, tb);
-      }
+      _runReasoning(result, bb, tb);
 
       if (mounted) {
         CustomSnackbar.success(
@@ -448,7 +389,7 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
   }
 
   void _copyReportToClipboard() {
-    if (_smartGrowthResult == null && _longitudinalResult == null) return;
+    if (_smartGrowthResult == null) return;
 
     final bb = _weightController.text;
     final tb = _heightController.text;
@@ -456,10 +397,10 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
     final age = _ageMonths.toStringAsFixed(0);
     final gender = _selectedGender == 0 ? 'Laki-laki' : 'Perempuan';
 
-    final gizi = _smartGrowthResult?.kategoriGiziBbtb ?? _longitudinalResult?.statusGizi ?? '-';
-    final stunting = _smartGrowthResult?.kategoriStuntingTbu ?? _longitudinalResult?.statusStunting ?? '-';
-    final confGizi = _smartGrowthResult?.confidenceBbtb ?? _longitudinalResult?.confidenceGizi ?? 0.0;
-    final confStunt = _smartGrowthResult?.confidenceTbu ?? _longitudinalResult?.confidenceStunting ?? 0.0;
+    final gizi = _smartGrowthResult?.kategoriGiziBbtb ?? '-';
+    final stunting = _smartGrowthResult?.kategoriStuntingTbu ?? '-';
+    final confGizi = _smartGrowthResult?.confidenceBbtb ?? 0.0;
+    final confStunt = _smartGrowthResult?.confidenceTbu ?? 0.0;
 
     final reasoning = _reasoningResult;
 
@@ -669,7 +610,7 @@ Dicetak melalui MAPOTECH VitaScale System
               const SizedBox(height: 20),
 
               // Hasil Klasifikasi MLP
-              if (_smartGrowthResult != null || _longitudinalResult != null) ...[
+              if (_smartGrowthResult != null) ...[
                 _buildMlpClassificationResult(cardBgColor, borderColor, textColor, subtitleColor, isMobile),
                 const SizedBox(height: 20),
               ],
@@ -1288,119 +1229,6 @@ Dicetak melalui MAPOTECH VitaScale System
             ],
           ),
 
-          const SizedBox(height: 14),
-
-          // Toggle Mode Longitudinal
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: border.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: border),
-            ),
-            child: Row(
-              children: [
-                Checkbox(
-                  value: _useLongitudinal,
-                  activeColor: const Color(0xFF1ABC9C),
-                  onChanged: (val) => setState(() => _useLongitudinal = val ?? false),
-                ),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Uji Model Longitudinal (Data Riwayat Bulan Lalu)',
-                        style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: text),
-                      ),
-                      Text(
-                        'Aktifkan jika ingin menguji endpoint /prediksi dengan fitur 2 bulan berurutan (Prev & Curr).',
-                        style: GoogleFonts.outfit(fontSize: 9.5, color: sub),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Field Tambahan Longitudinal Jika Aktif
-          if (_useLongitudinal) ...[
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: const Color(0xFF3498DB).withOpacity(0.06),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF3498DB).withOpacity(0.3)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Data Pengukuran Bulan Sebelumnya (Prev)',
-                    style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF3498DB)),
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: CustomTextField(
-                          label: 'Berat Lalu (kg)',
-                          hintText: '11.0',
-                          controller: _prevWeightController,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: CustomTextField(
-                          label: 'Tinggi Lalu (cm)',
-                          hintText: '83.5',
-                          controller: _prevHeightController,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: CustomTextField(
-                          label: 'ZS TB/U Lalu',
-                          hintText: '-0.8',
-                          controller: _prevZsTbuController,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: CustomTextField(
-                          label: 'ZS BB/TB Lalu',
-                          hintText: '-0.4',
-                          controller: _prevZsBbtbController,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Naik BB?', style: GoogleFonts.outfit(fontSize: 10.5, color: sub)),
-                            const SizedBox(height: 4),
-                            DropdownButton<String>(
-                              value: _naikBbCurr,
-                              isExpanded: true,
-                              items: const [
-                                DropdownMenuItem(value: 'Ya', child: Text('Ya')),
-                                DropdownMenuItem(value: 'Tidak', child: Text('Tidak')),
-                              ],
-                              onChanged: (val) => setState(() => _naikBbCurr = val ?? 'Ya'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-
           const SizedBox(height: 20),
 
           // Tombol Jalankan Prediksi MLP
@@ -1498,15 +1326,14 @@ Dicetak melalui MAPOTECH VitaScale System
   // ===========================================================================
   Widget _buildMlpClassificationResult(Color cardBg, Color border, Color text, Color sub, bool isMobile) {
     final sg = _smartGrowthResult;
-    final lg = _longitudinalResult;
 
-    final kategoriGizi = sg?.kategoriGiziBbtb ?? lg?.statusGizi ?? 'Gizi Normal';
-    final kategoriStunting = sg?.kategoriStuntingTbu ?? lg?.statusStunting ?? 'Normal';
-    final confGizi = sg?.confidenceBbtb ?? lg?.confidenceGizi ?? 0.0;
-    final confStunt = sg?.confidenceTbu ?? lg?.confidenceStunting ?? 0.0;
+    final kategoriGizi = sg?.kategoriGiziBbtb ?? 'Gizi Normal';
+    final kategoriStunting = sg?.kategoriStuntingTbu ?? 'Normal';
+    final confGizi = sg?.confidenceBbtb ?? 0.0;
+    final confStunt = sg?.confidenceTbu ?? 0.0;
 
-    final isStunting = sg?.isStunting ?? lg?.risikoStunting ?? false;
-    final isGiziKurang = sg?.isGiziBurukAtauKurang ?? lg?.risikoGiziBuruk ?? false;
+    final isStunting = sg?.isStunting ?? false;
+    final isGiziKurang = sg?.isGiziBurukAtauKurang ?? false;
 
     // Warna status
     Color giziColor = const Color(0xFF27AE60);
