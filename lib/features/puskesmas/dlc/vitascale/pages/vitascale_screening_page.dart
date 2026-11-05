@@ -1051,9 +1051,15 @@ Dicetak melalui MAPOTECH VitaScale System
               const SizedBox(width: 14),
               Expanded(
                 child: CustomTextField(
-                  label: 'NIK (Opsional)',
+                  label: 'NIK (16 Digit - Opsional)',
                   hintText: '16 digit NIK',
                   controller: _nikController,
+                  keyboardType: TextInputType.number,
+                  maxLength: 16,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(16),
+                  ],
                 ),
               ),
             ],

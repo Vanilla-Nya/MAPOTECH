@@ -48,6 +48,7 @@ class SupabaseService {
     required String village,
     required String address,
     required String role, // 'pasien' | 'dokter' | 'apotek'
+    String? phone,
   }) async {
     try {
       final response = await client.auth.signUp(
@@ -64,6 +65,7 @@ class SupabaseService {
           'district': subDistrict,
           'village': village,
           'address': address,
+          if (phone != null && phone.isNotEmpty) 'phone_number': phone,
           'role': role,
         },
       );

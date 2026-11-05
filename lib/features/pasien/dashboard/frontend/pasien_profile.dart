@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -322,6 +323,28 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
   Future<void> _saveProfileChanges() async {
     final user = ref.read(landingPageProvider).loggedInUser;
     if (user == null) return;
+
+    final nikVal = _nikController.text.trim();
+    if (nikVal.isNotEmpty && (nikVal.length != 16 || !RegExp(r'^\d{16}$').hasMatch(nikVal))) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('NIK harus 16 digit angka numerik!'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
+    final phoneVal = _phoneController.text.trim();
+    if (phoneVal.isNotEmpty && (phoneVal.length < 11 || phoneVal.length > 13 || !RegExp(r'^\d{11,13}$').hasMatch(phoneVal))) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nomor telepon harus angka numerik antara 11 - 13 digit!'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
 
     setState(() => _isSaving = true);
     final updatedData = {
@@ -770,6 +793,12 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
                       borderColor,
                       inputBg,
                       hint: 'Contoh: 351108...',
+                      keyboardType: TextInputType.number,
+                      maxLength: 16,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(16),
+                      ],
                     ),
                     const SizedBox(height: 10),
                     Row(
@@ -949,6 +978,16 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
                         ),
                         onPressed: () async {
                           if (nameCtrl.text.trim().isEmpty) return;
+                          final nikVal = nikCtrl.text.trim();
+                          if (nikVal.isNotEmpty && (nikVal.length != 16 || !RegExp(r'^\d{16}$').hasMatch(nikVal))) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('NIK harus 16 digit angka numerik!'),
+                                backgroundColor: Colors.redAccent,
+                              ),
+                            );
+                            return;
+                          }
                           final user = ref
                               .read(landingPageProvider)
                               .loggedInUser;
@@ -1070,6 +1109,9 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
     Color borderColor,
     Color inputBg, {
     String? hint,
+    TextInputType? keyboardType,
+    int? maxLength,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1085,9 +1127,13 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
         const SizedBox(height: 4),
         TextField(
           controller: controller,
+          keyboardType: keyboardType,
+          maxLength: maxLength,
+          inputFormatters: inputFormatters,
           style: GoogleFonts.outfit(fontSize: 11, color: textColor),
           decoration: InputDecoration(
             isDense: true,
+            counterText: '',
             hintText: hint,
             hintStyle: GoogleFonts.outfit(
               fontSize: 10,
@@ -1395,12 +1441,18 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: _buildEditableField(
-                      'NIK',
+                      'NIK (16 Digit)',
                       _nikController,
                       inputBg,
                       textColor,
                       subtitleColor,
                       Icons.badge_outlined,
+                      keyboardType: TextInputType.number,
+                      maxLength: 16,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(16),
+                      ],
                     ),
                   ),
                 ],
@@ -1410,12 +1462,18 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
                 children: [
                   Expanded(
                     child: _buildEditableField(
-                      'Nomor Telepon',
+                      'Nomor Telepon (11-13 Digit)',
                       _phoneController,
                       inputBg,
                       textColor,
                       subtitleColor,
                       Icons.phone_outlined,
+                      keyboardType: TextInputType.phone,
+                      maxLength: 13,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(13),
+                      ],
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -1849,6 +1907,12 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
                           const SizedBox(height: 4),
                           TextField(
                             controller: _kkController,
+                            keyboardType: TextInputType.number,
+                            maxLength: 16,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(16),
+                            ],
                             style: GoogleFonts.outfit(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
@@ -1856,6 +1920,7 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
                             ),
                             decoration: InputDecoration(
                               isDense: true,
+                              counterText: '',
                               hintText: 'Masukkan 16 Digit No. KK...',
                               filled: true,
                               fillColor: inputBg,
@@ -2444,8 +2509,11 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
     Color bg,
     Color text,
     Color subtitle,
-    IconData icon,
-  ) {
+    IconData icon, {
+    TextInputType? keyboardType,
+    int? maxLength,
+    List<TextInputFormatter>? inputFormatters,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2473,6 +2541,9 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
               Expanded(
                 child: TextField(
                   controller: controller,
+                  keyboardType: keyboardType,
+                  maxLength: maxLength,
+                  inputFormatters: inputFormatters,
                   style: GoogleFonts.outfit(
                     fontSize: 12,
                     color: text,
@@ -2480,6 +2551,7 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
                   ),
                   decoration: const InputDecoration(
                     border: InputBorder.none,
+                    counterText: '',
                     isDense: true,
                   ),
                 ),

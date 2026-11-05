@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -285,6 +286,17 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
     final state = ref.read(landingPageProvider);
     final themeAccent = ref.read(landingPageProvider.notifier).getPrimaryColor();
     final isEn = state.language == 'en';
+
+    final nikVal = _nikController.text.trim();
+    if (nikVal.isNotEmpty && (nikVal.length != 16 || !RegExp(r'^\d{16}$').hasMatch(nikVal))) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('NIK Ibu Hamil harus 16 digit angka numerik!'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
@@ -1064,7 +1076,20 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
                   Row(
                     children: [
                       Expanded(
-                        child: _buildTextField('NIK Ibu Hamil', _nikController, textColor, subtitleColor, borderColor, cardBgColor),
+                        child: _buildTextField(
+                          'NIK Ibu Hamil (16 Digit)',
+                          _nikController,
+                          textColor,
+                          subtitleColor,
+                          borderColor,
+                          cardBgColor,
+                          keyboardType: TextInputType.number,
+                          maxLength: 16,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(16),
+                          ],
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -1280,6 +1305,9 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
     Color borderColor,
     Color bgColor, {
     int maxLines = 1,
+    TextInputType? keyboardType,
+    int? maxLength,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1289,9 +1317,13 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
         TextFormField(
           controller: controller,
           maxLines: maxLines,
+          keyboardType: keyboardType,
+          maxLength: maxLength,
+          inputFormatters: inputFormatters,
           style: GoogleFonts.outfit(fontSize: 12, color: textColor),
           decoration: InputDecoration(
             isDense: true,
+            counterText: '',
             filled: true,
             fillColor: bgColor,
             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),

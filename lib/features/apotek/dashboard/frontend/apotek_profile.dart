@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -108,6 +109,34 @@ class _ApotekProfileState extends ConsumerState<ApotekProfile> {
     setState(() => _isLoading = true);
 
     try {
+      final phoneVal = _phoneCtrl.text.trim();
+      if (phoneVal.isNotEmpty && (phoneVal.length < 11 || phoneVal.length > 13 || !RegExp(r'^\d{11,13}$').hasMatch(phoneVal))) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Nomor telepon harus angka numerik antara 11 - 13 digit!'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+        setState(() => _isSaving = false);
+        return;
+      }
+
+      final waVal = _waCtrl.text.trim();
+      if (waVal.isNotEmpty && (waVal.length < 11 || waVal.length > 13 || !RegExp(r'^\d{11,13}$').hasMatch(waVal))) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Nomor WhatsApp harus angka numerik antara 11 - 13 digit!'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+        setState(() => _isSaving = false);
+        return;
+      }
+
       final client = SupabaseService.client;
 
       // 1. Fetch from 'user' table
@@ -228,6 +257,34 @@ class _ApotekProfileState extends ConsumerState<ApotekProfile> {
     setState(() => _isSaving = true);
 
     try {
+      final phoneVal = _phoneCtrl.text.trim();
+      if (phoneVal.isNotEmpty && (phoneVal.length < 11 || phoneVal.length > 13 || !RegExp(r'^\d{11,13}$').hasMatch(phoneVal))) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Nomor telepon harus angka numerik antara 11 - 13 digit!'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+        setState(() => _isSaving = false);
+        return;
+      }
+
+      final waVal = _waCtrl.text.trim();
+      if (waVal.isNotEmpty && (waVal.length < 11 || waVal.length > 13 || !RegExp(r'^\d{11,13}$').hasMatch(waVal))) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Nomor WhatsApp harus angka numerik antara 11 - 13 digit!'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+        setState(() => _isSaving = false);
+        return;
+      }
+
       final client = SupabaseService.client;
       final mapsLink = _mapsLinkCtrl.text.trim();
       final latLng = SupabaseService.extractLatLngFromMapsLink(mapsLink);
@@ -1289,8 +1346,21 @@ class _ApotekProfileState extends ConsumerState<ApotekProfile> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildFieldLabel('Phone Number', textColor),
-                        _buildStyledInput(_phoneCtrl, isDark, border, textColor, subtitleColor),
+                        _buildFieldLabel('Phone Number (11-13 Digit)', textColor),
+                        _buildStyledInput(
+                          _phoneCtrl,
+                          isDark,
+                          border,
+                          textColor,
+                          subtitleColor,
+                          hint: '08xxxxxxxxxx',
+                          keyboardType: TextInputType.phone,
+                          maxLength: 13,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(13),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -1304,8 +1374,21 @@ class _ApotekProfileState extends ConsumerState<ApotekProfile> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildFieldLabel('WhatsApp Number', textColor),
-                        _buildStyledInput(_waCtrl, isDark, border, textColor, subtitleColor),
+                        _buildFieldLabel('WhatsApp Number (11-13 Digit)', textColor),
+                        _buildStyledInput(
+                          _waCtrl,
+                          isDark,
+                          border,
+                          textColor,
+                          subtitleColor,
+                          hint: '08xxxxxxxxxx',
+                          keyboardType: TextInputType.phone,
+                          maxLength: 13,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(13),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -2200,7 +2283,7 @@ class _ApotekProfileState extends ConsumerState<ApotekProfile> {
     );
   }
 
-  Widget _buildStyledInput(TextEditingController ctrl, bool isDark, Color border, Color textColor, Color subtitleColor, {String? hint, bool isPassword = false}) {
+  Widget _buildStyledInput(TextEditingController ctrl, bool isDark, Color border, Color textColor, Color subtitleColor, {String? hint, bool isPassword = false, TextInputType? keyboardType, int? maxLength, List<TextInputFormatter>? inputFormatters}) {
     return Container(
       height: 44,
       padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -2212,9 +2295,13 @@ class _ApotekProfileState extends ConsumerState<ApotekProfile> {
       child: TextField(
         controller: ctrl,
         obscureText: isPassword,
+        keyboardType: keyboardType,
+        maxLength: maxLength,
+        inputFormatters: inputFormatters,
         style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: textColor),
         decoration: InputDecoration(
           hintText: hint,
+          counterText: '',
           hintStyle: GoogleFonts.outfit(fontSize: 11, color: subtitleColor.withValues(alpha: 0.6)),
           border: InputBorder.none,
           isDense: true,

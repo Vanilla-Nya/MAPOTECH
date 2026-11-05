@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'dart:convert';
 import 'dart:math';
 import 'dart:ui';
@@ -923,6 +924,16 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
             'RFID must be a valid UUID format (e.g., 9f973085-8ca9-4d8b-b0a7-6d0113cce038)',
           );
         }
+      }
+
+      final nikVal = _nikController.text.trim();
+      if (nikVal.isNotEmpty && (nikVal.length != 16 || !RegExp(r'^\d{16}$').hasMatch(nikVal))) {
+        throw Exception('NIK harus 16 digit angka numerik!');
+      }
+
+      final phoneVal = _phoneController.text.trim();
+      if (phoneVal.isNotEmpty && (phoneVal.length < 11 || phoneVal.length > 13 || !RegExp(r'^\d{11,13}$').hasMatch(phoneVal))) {
+        throw Exception('Nomor telepon harus angka numerik antara 11 - 13 digit!');
       }
 
       final client = SupabaseService.client;
@@ -3832,7 +3843,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
     _nameController = TextEditingController(text: 'dr. Agoes Soetanto');
     _usernameController = TextEditingController(text: '');
     _phoneController = TextEditingController(text: '085259930755');
-    _nikController = TextEditingController(text: '351108208670001');
+    _nikController = TextEditingController(text: '3511082086700001');
     _rfidController = TextEditingController(
       text: '9f973085-8ca9-4d8b-b0a7-6d0113cce038',
     );
@@ -4616,11 +4627,18 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                       const SizedBox(width: 16),
                       Expanded(
                         child: _buildInputLabelAndField(
-                          'Phone Number',
+                          'Phone Number (11-13 Digit)',
                           _phoneController,
                           inputBg,
                           textColor,
                           subtitleColor,
+                          hintText: '08xxxxxxxxxx',
+                          keyboardType: TextInputType.phone,
+                          maxLength: 13,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(13),
+                          ],
                         ),
                       ),
                     ],
@@ -4814,11 +4832,18 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             _buildInputLabelAndField(
-                              'NIK',
+                              'NIK (16 Digit)',
                               _nikController,
                               inputBg,
                               textColor,
                               subtitleColor,
+                              hintText: '351108xxxxxxxxxx',
+                              keyboardType: TextInputType.number,
+                              maxLength: 16,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                                LengthLimitingTextInputFormatter(16),
+                              ],
                             ),
                             const SizedBox(height: 4),
                             Text(
@@ -7186,6 +7211,9 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
     Color subtitleColor, {
     String? hintText,
     bool enabled = true,
+    TextInputType? keyboardType,
+    int? maxLength,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -7209,6 +7237,9 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
           child: TextField(
             controller: controller,
             enabled: enabled,
+            keyboardType: keyboardType,
+            maxLength: maxLength,
+            inputFormatters: inputFormatters,
             style: GoogleFonts.outfit(
               fontSize: 12,
               fontWeight: FontWeight.bold,
@@ -7216,6 +7247,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
             ),
             decoration: InputDecoration(
               isDense: true,
+              counterText: '',
               border: InputBorder.none,
               hintText: hintText,
               hintStyle: GoogleFonts.outfit(

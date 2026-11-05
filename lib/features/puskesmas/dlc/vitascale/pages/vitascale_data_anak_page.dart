@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
@@ -80,6 +81,12 @@ class _VitaScaleDataAnakPageState extends ConsumerState<VitaScaleDataAnakPage> {
                         label: 'NIK Anak (16 Digit)',
                         hintText: '35110xxxxxxxxxxx',
                         controller: nikCtrl,
+                        keyboardType: TextInputType.number,
+                        maxLength: 16,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(16),
+                        ],
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -136,9 +143,15 @@ class _VitaScaleDataAnakPageState extends ConsumerState<VitaScaleDataAnakPage> {
                 ),
                 const SizedBox(height: 12),
                 CustomTextField(
-                  label: 'No. Telepon / WhatsApp Wali',
+                  label: 'No. Telepon / WhatsApp Wali (11-13 Digit)',
                   hintText: '08xxxxxxxxxx',
                   controller: phoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  maxLength: 13,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(13),
+                  ],
                 ),
               ],
             ),
@@ -159,6 +172,20 @@ class _VitaScaleDataAnakPageState extends ConsumerState<VitaScaleDataAnakPage> {
                   if (nameCtrl.text.trim().isEmpty) {
                     CustomSnackbar.error(context, 'Nama anak wajib diisi.');
                     return;
+                  }
+                  final nikVal = nikCtrl.text.trim();
+                  if (nikVal.isNotEmpty && nikVal != '-') {
+                    if (nikVal.length != 16 || !RegExp(r'^\d{16}$').hasMatch(nikVal)) {
+                      CustomSnackbar.error(context, 'NIK anak harus 16 digit angka numerik.');
+                      return;
+                    }
+                  }
+                  final phoneVal = phoneCtrl.text.trim();
+                  if (phoneVal.isNotEmpty) {
+                    if (phoneVal.length < 11 || phoneVal.length > 13 || !RegExp(r'^\d{11,13}$').hasMatch(phoneVal)) {
+                      CustomSnackbar.error(context, 'Nomor telepon harus angka numerik antara 11 - 13 digit.');
+                      return;
+                    }
                   }
                   final newChild = ChildProfile(
                     id: 'ANK-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',

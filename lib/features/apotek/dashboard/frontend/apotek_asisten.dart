@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -958,6 +959,11 @@ class _ApotekAsistenState extends ConsumerState<ApotekAsisten> {
                                   txtColor,
                                   subColor,
                                   keyboardType: TextInputType.number,
+                                  maxLength: 16,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                    LengthLimitingTextInputFormatter(16),
+                                  ],
                                 ),
                               ],
                             ),
@@ -1102,6 +1108,11 @@ class _ApotekAsistenState extends ConsumerState<ApotekAsisten> {
                                   txtColor,
                                   subColor,
                                   keyboardType: TextInputType.phone,
+                                  maxLength: 13,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                    LengthLimitingTextInputFormatter(13),
+                                  ],
                                 ),
                               ],
                             ),
@@ -1246,11 +1257,24 @@ class _ApotekAsistenState extends ConsumerState<ApotekAsisten> {
                                 return;
                               }
 
-                              if (nik.length < 16) {
+                              if (nik.length != 16 || !RegExp(r'^\d{16}$').hasMatch(nik)) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text(
-                                      'NIK harus 16 digit!',
+                                      'NIK harus 16 digit angka numerik!',
+                                      style: GoogleFonts.outfit(fontSize: 12),
+                                    ),
+                                    backgroundColor: Colors.redAccent,
+                                  ),
+                                );
+                                return;
+                              }
+
+                              if (phone.length < 11 || phone.length > 13 || !RegExp(r'^\d{11,13}$').hasMatch(phone)) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Nomor telepon harus angka numerik antara 11 - 13 digit!',
                                       style: GoogleFonts.outfit(fontSize: 12),
                                     ),
                                     backgroundColor: Colors.redAccent,
@@ -1367,6 +1391,8 @@ class _ApotekAsistenState extends ConsumerState<ApotekAsisten> {
     TextInputType keyboardType = TextInputType.text,
     bool enabled = true,
     bool obscureText = false,
+    int? maxLength,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return Container(
       height: 44,
@@ -1380,6 +1406,8 @@ class _ApotekAsistenState extends ConsumerState<ApotekAsisten> {
         keyboardType: keyboardType,
         enabled: enabled,
         obscureText: obscureText,
+        maxLength: maxLength,
+        inputFormatters: inputFormatters,
         style: GoogleFonts.outfit(
           fontSize: 12,
           color: enabled ? text : text.withOpacity(0.4),
@@ -1387,6 +1415,7 @@ class _ApotekAsistenState extends ConsumerState<ApotekAsisten> {
         ),
         decoration: InputDecoration(
           hintText: hint,
+          counterText: '',
           hintStyle: GoogleFonts.outfit(
             fontSize: 11,
             color: subtitle.withOpacity(0.5),

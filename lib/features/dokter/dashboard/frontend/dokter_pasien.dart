@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -930,9 +931,18 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                                         textColor,
                                         subtitleColor,
                                         keyboardType: TextInputType.number,
-                                        validator: (v) => v!.length != 16
-                                            ? 'NIK harus 16 digit'
-                                            : null,
+                                        maxLength: 16,
+                                        inputFormatters: [
+                                          FilteringTextInputFormatter.digitsOnly,
+                                          LengthLimitingTextInputFormatter(16),
+                                        ],
+                                        validator: (v) {
+                                          final val = v?.trim() ?? '';
+                                          if (val.length != 16 || !RegExp(r'^\d{16}$').hasMatch(val)) {
+                                            return 'NIK harus 16 digit angka numerik';
+                                          }
+                                          return null;
+                                        },
                                       ),
                                     ],
                                   ),
@@ -1157,6 +1167,23 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                                         textColor,
                                         subtitleColor,
                                         keyboardType: TextInputType.phone,
+                                        maxLength: 13,
+                                        inputFormatters: [
+                                          FilteringTextInputFormatter.digitsOnly,
+                                          LengthLimitingTextInputFormatter(13),
+                                        ],
+                                        validator: (v) {
+                                          final val = v?.trim() ?? '';
+                                          if (val.isNotEmpty) {
+                                            if (!RegExp(r'^\d+$').hasMatch(val)) {
+                                              return 'Nomor telepon harus angka numerik';
+                                            }
+                                            if (val.length < 11 || val.length > 13) {
+                                              return 'Nomor telepon harus antara 11 - 13 digit';
+                                            }
+                                          }
+                                          return null;
+                                        },
                                       ),
                                     ],
                                   ),
@@ -1353,6 +1380,8 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
     bool obscureText = false,
     TextInputType keyboardType = TextInputType.text,
     int maxLines = 1,
+    int? maxLength,
+    List<TextInputFormatter>? inputFormatters,
     String? Function(String?)? validator,
     Widget? suffixIcon,
   }) {
@@ -1361,6 +1390,8 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
       obscureText: obscureText,
       keyboardType: keyboardType,
       maxLines: maxLines,
+      maxLength: maxLength,
+      inputFormatters: inputFormatters,
       validator: validator,
       style: GoogleFonts.outfit(
         fontSize: 12,
@@ -1373,6 +1404,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
           fontSize: 11.5,
           color: subtitle.withOpacity(0.4),
         ),
+        counterText: '',
         prefixIcon: Icon(icon, size: 16, color: subtitle),
         suffixIcon: suffixIcon,
         filled: true,

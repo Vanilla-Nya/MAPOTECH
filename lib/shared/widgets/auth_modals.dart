@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
@@ -916,6 +917,7 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
   // Controllers
   final _namaController = TextEditingController();
   final _nikController = TextEditingController();
+  final _phoneController = TextEditingController();
   String _jenisKelamin = 'Laki-laki';
   final _tempatLahirController = TextEditingController();
   final _tanggalLahirController = TextEditingController();
@@ -954,6 +956,7 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
   void dispose() {
     _namaController.dispose();
     _nikController.dispose();
+    _phoneController.dispose();
     _tempatLahirController.dispose();
     _tanggalLahirController.dispose();
     _alamatDetailController.dispose();
@@ -1478,7 +1481,7 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'NIK',
+                    state.language == 'id' ? 'NIK (16 DIGIT)' : 'NIK (16 DIGITS)',
                     style: GoogleFonts.outfit(
                       fontSize: 9,
                       fontWeight: FontWeight.w900,
@@ -1500,6 +1503,12 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
                     padding: const EdgeInsets.symmetric(horizontal: 14),
                     child: TextField(
                       controller: _nikController,
+                      keyboardType: TextInputType.number,
+                      maxLength: 16,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(16),
+                      ],
                       style: GoogleFonts.outfit(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
@@ -1507,6 +1516,7 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
                       ),
                       decoration: InputDecoration(
                         hintText: '16 digit NIK',
+                        counterText: '',
                         hintStyle: GoogleFonts.outfit(
                           fontSize: 13,
                           color: subtitleColor.withOpacity(0.5),
@@ -1706,6 +1716,66 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
             ),
           ],
         ),
+        const SizedBox(height: 20),
+
+        // NOMOR TELEPON
+        Text(
+          state.language == 'id'
+              ? 'NOMOR TELEPON (11-13 DIGIT)'
+              : 'PHONE NUMBER (11-13 DIGITS)',
+          style: GoogleFonts.outfit(
+            fontSize: 9,
+            fontWeight: FontWeight.w900,
+            color: subtitleColor,
+            letterSpacing: 1.0,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          decoration: BoxDecoration(
+            color: fieldBg,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isDark ? const Color(0xFF2C2C2C) : Colors.grey[200]!,
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          child: Row(
+            children: [
+              Icon(
+                Icons.phone_android_rounded,
+                size: 18,
+                color: subtitleColor,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  controller: _phoneController,
+                  keyboardType: TextInputType.phone,
+                  maxLength: 13,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(13),
+                  ],
+                  style: GoogleFonts.outfit(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: textColor,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: '08xxxxxxxxxx',
+                    counterText: '',
+                    hintStyle: GoogleFonts.outfit(
+                      fontSize: 13,
+                      color: subtitleColor.withOpacity(0.5),
+                    ),
+                    border: InputBorder.none,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
         const SizedBox(height: 36),
 
         // Navigation Buttons: KEMBALI & LANJUT
@@ -1772,14 +1842,38 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
                           );
                           return;
                         }
-                        if (_nikController.text.trim().length != 16) {
+
+                        final nikVal = _nikController.text.trim();
+                        if (nikVal.length != 16 || !RegExp(r'^\d{16}$').hasMatch(nikVal)) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               backgroundColor: Colors.redAccent,
                               content: Text(
                                 state.language == 'id'
-                                    ? 'NIK harus 16 digit!'
-                                    : 'NIK must be 16 digits!',
+                                    ? 'NIK harus 16 digit angka numerik!'
+                                    : 'NIK must be 16 numeric digits!',
+                                style: GoogleFonts.outfit(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          );
+                          return;
+                        }
+
+                        final phoneVal = _phoneController.text.trim();
+                        if (phoneVal.isNotEmpty &&
+                            (phoneVal.length < 11 ||
+                                phoneVal.length > 13 ||
+                                !RegExp(r'^\d{11,13}$').hasMatch(phoneVal))) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              backgroundColor: Colors.redAccent,
+                              content: Text(
+                                state.language == 'id'
+                                    ? 'Nomor telepon harus angka numerik antara 11 - 13 digit!'
+                                    : 'Phone number must be numeric between 11 - 13 digits!',
                                 style: GoogleFonts.outfit(
                                   fontWeight: FontWeight.bold,
                                   color: Colors.white,
@@ -2681,6 +2775,7 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
                                 ? ''
                                 : _kelurahan,
                             address: _alamatDetailController.text.trim(),
+                            phone: _phoneController.text.trim(),
                             role: dbRole,
                           );
 

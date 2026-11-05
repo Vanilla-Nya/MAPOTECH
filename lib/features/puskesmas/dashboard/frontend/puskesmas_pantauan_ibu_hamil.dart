@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -2183,6 +2184,28 @@ class _AddPatientModalDialogState extends State<AddPatientModalDialog> {
       return;
     }
 
+    final nikVal = _nikController.text.trim();
+    if (nikVal.isNotEmpty && (nikVal.length != 16 || !RegExp(r'^\d{16}$').hasMatch(nikVal))) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('NIK Ibu Hamil harus 16 digit angka numerik!'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
+    final hpVal = _hpController.text.trim();
+    if (hpVal.isNotEmpty && (hpVal.length < 11 || hpVal.length > 13 || !RegExp(r'^\d{11,13}$').hasMatch(hpVal))) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nomor HP / WhatsApp harus angka numerik antara 11 - 13 digit!'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
     final newPatient = IbuHamilModel(
       id: 'KIA-00${DateTime.now().millisecondsSinceEpoch % 1000}',
       nama: _namaController.text.trim(),
@@ -2468,7 +2491,19 @@ class _AddPatientModalDialogState extends State<AddPatientModalDialog> {
       children: [
         Row(
           children: [
-            Expanded(child: _buildInput('NIK Ibu Hamil (16 Digit)', _nikController, hint: 'Contoh: 351108...')),
+            Expanded(
+              child: _buildInput(
+                'NIK Ibu Hamil (16 Digit)',
+                _nikController,
+                hint: 'Contoh: 351108...',
+                keyboardType: TextInputType.number,
+                maxLength: 16,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(16),
+                ],
+              ),
+            ),
             const SizedBox(width: 12),
             Expanded(child: _buildInput('Nama Lengkap Pasien *', _namaController, hint: 'Nama Lengkap')),
           ],
@@ -2484,7 +2519,19 @@ class _AddPatientModalDialogState extends State<AddPatientModalDialog> {
         const SizedBox(height: 12),
         Row(
           children: [
-            Expanded(child: _buildInput('Nomor HP / WhatsApp', _hpController, hint: '0812-3456-7890')),
+            Expanded(
+              child: _buildInput(
+                'Nomor HP / WhatsApp',
+                _hpController,
+                hint: '08xxxxxxxxxx',
+                keyboardType: TextInputType.phone,
+                maxLength: 13,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(13),
+                ],
+              ),
+            ),
             const SizedBox(width: 12),
             Expanded(child: _buildInput('Usia Kehamilan', _usiaKehamilanController, hint: '16 Minggu')),
           ],
@@ -2584,7 +2631,7 @@ class _AddPatientModalDialogState extends State<AddPatientModalDialog> {
     );
   }
 
-  Widget _buildInput(String label, TextEditingController ctrl, {String? hint}) {
+  Widget _buildInput(String label, TextEditingController ctrl, {String? hint, TextInputType? keyboardType, int? maxLength, List<TextInputFormatter>? inputFormatters}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2592,9 +2639,13 @@ class _AddPatientModalDialogState extends State<AddPatientModalDialog> {
         const SizedBox(height: 4),
         TextField(
           controller: ctrl,
+          keyboardType: keyboardType,
+          maxLength: maxLength,
+          inputFormatters: inputFormatters,
           style: GoogleFonts.outfit(fontSize: 11, color: widget.textColor),
           decoration: InputDecoration(
             isDense: true,
+            counterText: '',
             hintText: hint,
             hintStyle: GoogleFonts.outfit(fontSize: 10, color: widget.subtitleColor),
             filled: true,

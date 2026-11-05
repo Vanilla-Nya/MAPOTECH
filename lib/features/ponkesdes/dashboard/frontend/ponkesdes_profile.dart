@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'dart:io' as io;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -292,6 +293,22 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
     final notifier = ref.read(landingPageProvider.notifier);
     final userId = state.loggedInUser?['id'];
     if (userId == null) return;
+
+    final phoneVal = _phoneController.text.trim();
+    if (phoneVal.isNotEmpty && (phoneVal.length < 11 || phoneVal.length > 13 || !RegExp(r'^\d{11,13}$').hasMatch(phoneVal))) {
+      final isEn = state.language == 'en';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isEn
+                ? 'Phone number must be numeric between 11 - 13 digits!'
+                : 'Nomor telepon harus angka numerik antara 11 - 13 digit!',
+          ),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
 
     setState(() => _isSaving = true);
 
@@ -1210,7 +1227,22 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
                 children: [
                   Expanded(child: _buildInputLabelAndField('Clinic Name', _nameController, inputBg, textColor, subtitleColor)),
                   const SizedBox(width: 16),
-                  Expanded(child: _buildInputLabelAndField('Phone Number', _phoneController, inputBg, textColor, subtitleColor)),
+                  Expanded(
+                    child: _buildInputLabelAndField(
+                      'Phone Number (11-13 Digit)',
+                      _phoneController,
+                      inputBg,
+                      textColor,
+                      subtitleColor,
+                      hintText: '08xxxxxxxxxx',
+                      keyboardType: TextInputType.phone,
+                      maxLength: 13,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(13),
+                      ],
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
@@ -2165,6 +2197,10 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
     Color textColor,
     Color subtitleColor, {
     int maxLines = 1,
+    String? hintText,
+    TextInputType? keyboardType,
+    int? maxLength,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2182,8 +2218,17 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
           child: TextField(
             controller: controller,
             maxLines: maxLines,
+            keyboardType: keyboardType,
+            maxLength: maxLength,
+            inputFormatters: inputFormatters,
             style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: textColor),
-            decoration: const InputDecoration(border: InputBorder.none, isDense: true),
+            decoration: InputDecoration(
+              border: InputBorder.none,
+              isDense: true,
+              counterText: '',
+              hintText: hintText,
+              hintStyle: GoogleFonts.outfit(fontSize: 11, color: subtitleColor.withOpacity(0.5)),
+            ),
           ),
         ),
       ],

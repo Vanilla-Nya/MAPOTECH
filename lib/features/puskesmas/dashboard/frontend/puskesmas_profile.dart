@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'dart:convert';
 import 'dart:math';
 import 'dart:ui' show ImageFilter;
@@ -181,6 +182,20 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
     if (userId == null) return;
 
     try {
+      final phoneVal = _phoneController.text.trim();
+      if (phoneVal.isNotEmpty && (phoneVal.length < 11 || phoneVal.length > 13 || !RegExp(r'^\d{11,13}$').hasMatch(phoneVal))) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Nomor telepon harus angka numerik antara 11 - 13 digit!'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+        setState(() => _isSaving = false);
+        return;
+      }
+
       final db = SupabaseService();
       final detail = await db.fetchPuskesmasDetail(userId);
 
@@ -374,6 +389,20 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
     setState(() => _isSaving = true);
 
     try {
+      final phoneVal = _phoneController.text.trim();
+      if (phoneVal.isNotEmpty && (phoneVal.length < 11 || phoneVal.length > 13 || !RegExp(r'^\d{11,13}$').hasMatch(phoneVal))) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Nomor telepon harus angka numerik antara 11 - 13 digit!'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+        setState(() => _isSaving = false);
+        return;
+      }
+
       final db = SupabaseService();
 
       final detailData = {
@@ -1687,11 +1716,17 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                   const SizedBox(width: 16),
                   Expanded(
                     child: _buildInputLabelAndField(
-                      'Phone Number',
+                      'Phone Number (11-13 Digit)',
                       _phoneController,
                       inputBg,
                       textColor,
                       subtitleColor,
+                      keyboardType: TextInputType.phone,
+                      maxLength: 13,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(13),
+                      ],
                     ),
                   ),
                 ],
@@ -3299,6 +3334,9 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
     Color textColor,
     Color subtitleColor, {
     int maxLines = 1,
+    TextInputType? keyboardType,
+    int? maxLength,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -3326,6 +3364,9 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
           child: TextField(
             controller: controller,
             maxLines: maxLines,
+            keyboardType: keyboardType,
+            maxLength: maxLength,
+            inputFormatters: inputFormatters,
             style: GoogleFonts.outfit(
               fontSize: 12,
               fontWeight: FontWeight.bold,
@@ -3333,6 +3374,7 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
             ),
             decoration: const InputDecoration(
               border: InputBorder.none,
+              counterText: '',
               isDense: true,
             ),
           ),

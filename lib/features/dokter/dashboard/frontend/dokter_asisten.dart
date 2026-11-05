@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'dart:ui' show PathMetric;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -1640,6 +1641,11 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                                   txtColor,
                                   subColor,
                                   keyboardType: TextInputType.number,
+                                  maxLength: 16,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                    LengthLimitingTextInputFormatter(16),
+                                  ],
                                 ),
                               ],
                             ),
@@ -1727,6 +1733,11 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                                   txtColor,
                                   subColor,
                                   keyboardType: TextInputType.phone,
+                                  maxLength: 13,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                    LengthLimitingTextInputFormatter(13),
+                                  ],
                                 ),
                               ],
                             ),
@@ -1960,6 +1971,26 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                                     content: Text(
                                       'Nama, Username, NIK, dan Telepon wajib diisi!',
                                     ),
+                                    backgroundColor: Colors.redAccent,
+                                  ),
+                                );
+                                return;
+                              }
+
+                              if (nik.length != 16 || !RegExp(r'^\d{16}$').hasMatch(nik)) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('NIK harus 16 digit angka numerik!'),
+                                    backgroundColor: Colors.redAccent,
+                                  ),
+                                );
+                                return;
+                              }
+
+                              if (phone.length < 11 || phone.length > 13 || !RegExp(r'^\d{11,13}$').hasMatch(phone)) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Nomor telepon harus angka numerik antara 11 - 13 digit!'),
                                     backgroundColor: Colors.redAccent,
                                   ),
                                 );
@@ -2503,6 +2534,11 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                                               subColor,
                                               keyboardType:
                                                   TextInputType.number,
+                                              maxLength: 16,
+                                              inputFormatters: [
+                                                FilteringTextInputFormatter.digitsOnly,
+                                                LengthLimitingTextInputFormatter(16),
+                                              ],
                                             ),
                                           ],
                                         ),
@@ -2524,6 +2560,11 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                                               txtColor,
                                               subColor,
                                               keyboardType: TextInputType.phone,
+                                              maxLength: 13,
+                                              inputFormatters: [
+                                                FilteringTextInputFormatter.digitsOnly,
+                                                LengthLimitingTextInputFormatter(13),
+                                              ],
                                             ),
                                           ],
                                         ),
@@ -2990,10 +3031,20 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                                 return;
                               }
 
-                              if (nik.length < 16) {
+                              if (nik.length != 16 || !RegExp(r'^\d{16}$').hasMatch(nik)) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
-                                    content: Text('NIK harus 16 digit!'),
+                                    content: Text('NIK harus 16 digit angka numerik!'),
+                                    backgroundColor: Colors.redAccent,
+                                  ),
+                                );
+                                return;
+                              }
+
+                              if (phone.length < 11 || phone.length > 13 || !RegExp(r'^\d{11,13}$').hasMatch(phone)) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Nomor telepon harus angka numerik antara 11 - 13 digit!'),
                                     backgroundColor: Colors.redAccent,
                                   ),
                                 );
@@ -3211,6 +3262,8 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
     Color text,
     Color subtitle, {
     TextInputType keyboardType = TextInputType.text,
+    int? maxLength,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return Container(
       height: 44,
@@ -3222,6 +3275,8 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
       child: TextField(
         controller: controller,
         keyboardType: keyboardType,
+        maxLength: maxLength,
+        inputFormatters: inputFormatters,
         style: GoogleFonts.outfit(
           fontSize: 12,
           color: text,
@@ -3229,6 +3284,7 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
         ),
         decoration: InputDecoration(
           hintText: hint,
+          counterText: '',
           hintStyle: GoogleFonts.outfit(
             fontSize: 11,
             color: subtitle.withOpacity(0.5),

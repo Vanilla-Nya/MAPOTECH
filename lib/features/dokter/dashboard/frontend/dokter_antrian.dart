@@ -1688,7 +1688,12 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
           final bool step1CariValid = foundPatient != null;
           final bool step1SpesialValid =
               specNameController.text.isNotEmpty &&
-              specNikController.text.length == 16;
+              specNikController.text.length == 16 &&
+              RegExp(r'^\d{16}$').hasMatch(specNikController.text) &&
+              (specPhoneController.text.isEmpty ||
+                  (specPhoneController.text.length >= 11 &&
+                      specPhoneController.text.length <= 13 &&
+                      RegExp(r'^\d{11,13}$').hasMatch(specPhoneController.text)));
           final bool isStep1Valid = selectedTab == 'Cari'
               ? step1CariValid
               : step1SpesialValid;
@@ -2366,30 +2371,40 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
         ),
         const SizedBox(height: 14),
 
-        _buildFormFieldLabel('NIK (Wajib)'.tr(state), textCol),
+        _buildFormFieldLabel('NIK (Wajib - 16 Digit)'.tr(state), textCol),
         _buildTextInput(
           nikCtrl,
-          'Masukkan NIK'.tr(state),
+          'Masukkan 16 digit NIK'.tr(state),
           Icons.fingerprint_rounded,
           inputBg,
           borderCol,
           textCol,
           subCol,
           keyboardType: TextInputType.number,
+          maxLength: 16,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(16),
+          ],
           onChanged: (v) => setWizardState(() {}),
         ),
         const SizedBox(height: 14),
 
-        _buildFormFieldLabel('Nomor Telepon (Opsional)'.tr(state), textCol),
+        _buildFormFieldLabel('Nomor Telepon (Opsional, 11-13 Digit)'.tr(state), textCol),
         _buildTextInput(
           phoneCtrl,
-          '08...',
+          '08xxxxxxxxxx',
           Icons.phone_android_rounded,
           inputBg,
           borderCol,
           textCol,
           subCol,
           keyboardType: TextInputType.phone,
+          maxLength: 13,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(13),
+          ],
         ),
         const SizedBox(height: 14),
 
@@ -2496,7 +2511,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
             ),
           ),
           onPressed: () {
-            if (nikCtrl.text.length == 16) {
+            if (nikCtrl.text.length == 16 && RegExp(r'^\d{16}$').hasMatch(nikCtrl.text)) {
               setWizardState(() {
                 onVerifiedChanged(true);
               });
@@ -2915,6 +2930,8 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
     bool obscureText = false,
     TextInputType keyboardType = TextInputType.text,
     int maxLines = 1,
+    int? maxLength,
+    List<TextInputFormatter>? inputFormatters,
     String? Function(String?)? validator,
     Function(String)? onChanged,
   }) {
@@ -2923,6 +2940,8 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
       obscureText: obscureText,
       keyboardType: keyboardType,
       maxLines: maxLines,
+      maxLength: maxLength,
+      inputFormatters: inputFormatters,
       validator: validator,
       onChanged: onChanged,
       style: GoogleFonts.outfit(
@@ -2937,6 +2956,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
           color: subtitle.withOpacity(0.4),
         ),
         prefixIcon: Icon(icon, size: 16, color: subtitle),
+        counterText: '',
         filled: true,
         fillColor: bg,
         isDense: true,

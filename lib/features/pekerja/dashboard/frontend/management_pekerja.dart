@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'dart:ui' show PathMetric;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -1881,7 +1882,7 @@ class _ManagementPekerjaWidgetState
           child: Text(text, style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: subColor)),
         );
 
-        Widget inputField(TextEditingController ctrl, String hint, {TextInputType? type, bool readOnly = false}) {
+        Widget inputField(TextEditingController ctrl, String hint, {TextInputType? type, bool readOnly = false, int? maxLength, List<TextInputFormatter>? formatters}) {
           return Container(
             height: 44,
             decoration: BoxDecoration(color: inputBg, borderRadius: BorderRadius.circular(10)),
@@ -1890,9 +1891,12 @@ class _ManagementPekerjaWidgetState
               controller: ctrl,
               readOnly: readOnly,
               keyboardType: type,
+              maxLength: maxLength,
+              inputFormatters: formatters,
               style: GoogleFonts.outfit(fontSize: 12, color: txtColor, fontWeight: FontWeight.w700),
               decoration: InputDecoration(
                 hintText: hint,
+                counterText: '',
                 hintStyle: GoogleFonts.outfit(fontSize: 11, color: subColor.withAlpha(130)),
                 border: InputBorder.none,
                 isDense: true,
@@ -2076,12 +2080,30 @@ class _ManagementPekerjaWidgetState
                               Row(children: [
                                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                                   inputLabel('NIK (16 Digit)'),
-                                  inputField(nikCtrl, 'e.g. 3515081504900001', type: TextInputType.number),
+                                  inputField(
+                                    nikCtrl,
+                                    'e.g. 3515081504900001',
+                                    type: TextInputType.number,
+                                    maxLength: 16,
+                                    formatters: [
+                                      FilteringTextInputFormatter.digitsOnly,
+                                      LengthLimitingTextInputFormatter(16),
+                                    ],
+                                  ),
                                 ])),
                                 const SizedBox(width: 14),
                                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                  inputLabel('No. Telepon / WhatsApp'),
-                                  inputField(phoneCtrl, '+62 8...', type: TextInputType.phone),
+                                  inputLabel('No. Telepon / WhatsApp (11-13 Digit)'),
+                                  inputField(
+                                    phoneCtrl,
+                                    '08xxxxxxxxxx',
+                                    type: TextInputType.phone,
+                                    maxLength: 13,
+                                    formatters: [
+                                      FilteringTextInputFormatter.digitsOnly,
+                                      LengthLimitingTextInputFormatter(13),
+                                    ],
+                                  ),
                                 ])),
                               ]),
                               const SizedBox(height: 12),
@@ -2290,6 +2312,22 @@ class _ManagementPekerjaWidgetState
                               if (nama.isEmpty) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(content: Text('Nama wajib diisi!')),
+                                );
+                                return;
+                              }
+
+                              final nikVal = nikCtrl.text.trim();
+                              if (nikVal.isNotEmpty && (nikVal.length != 16 || !RegExp(r'^\d{16}$').hasMatch(nikVal))) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('NIK harus 16 digit angka numerik!')),
+                                );
+                                return;
+                              }
+
+                              final phoneVal = phoneCtrl.text.trim();
+                              if (phoneVal.isNotEmpty && (phoneVal.length < 11 || phoneVal.length > 13 || !RegExp(r'^\d{11,13}$').hasMatch(phoneVal))) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Nomor telepon harus angka numerik antara 11 - 13 digit!')),
                                 );
                                 return;
                               }

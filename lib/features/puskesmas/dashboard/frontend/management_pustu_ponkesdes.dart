@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -1193,7 +1194,21 @@ class _ManagementPustuPonkesdesWidgetState
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: _buildTextField('NIK PENANGGUNG JAWAB', nikCtrl, '16 Digit NIK', textColor, subtitleColor, cardBg, borderColor),
+                      child: _buildTextField(
+                        'NIK PENANGGUNG JAWAB',
+                        nikCtrl,
+                        '16 Digit NIK',
+                        textColor,
+                        subtitleColor,
+                        cardBg,
+                        borderColor,
+                        keyboardType: TextInputType.number,
+                        maxLength: 16,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(16),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -1204,7 +1219,21 @@ class _ManagementPustuPonkesdesWidgetState
                 Row(
                   children: [
                     Expanded(
-                      child: _buildTextField('NO TELEPON / KONTAK', telpCtrl, '081234567890', textColor, subtitleColor, cardBg, borderColor),
+                      child: _buildTextField(
+                        'NO TELEPON / KONTAK',
+                        telpCtrl,
+                        '081234567890',
+                        textColor,
+                        subtitleColor,
+                        cardBg,
+                        borderColor,
+                        keyboardType: TextInputType.phone,
+                        maxLength: 13,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(13),
+                        ],
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -1784,6 +1813,20 @@ class _ManagementPustuPonkesdesWidgetState
                           return;
                         }
 
+                        if (nik.isNotEmpty && (nik.length != 16 || !RegExp(r'^\d{16}$').hasMatch(nik))) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('NIK Penanggung Jawab harus 16 digit angka numerik!')),
+                          );
+                          return;
+                        }
+
+                        if (telp.isNotEmpty && (telp.length < 11 || telp.length > 13 || !RegExp(r'^\d{11,13}$').hasMatch(telp))) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Nomor telepon harus angka numerik antara 11 - 13 digit!')),
+                          );
+                          return;
+                        }
+
                         setModalState(() => isSaving = true);
 
                         if (isEdit) {
@@ -1852,8 +1895,11 @@ class _ManagementPustuPonkesdesWidgetState
     Color textColor,
     Color subtitleColor,
     Color cardBg,
-    Color borderColor,
-  ) {
+    Color borderColor, {
+    TextInputType? keyboardType,
+    int? maxLength,
+    List<TextInputFormatter>? inputFormatters,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1861,9 +1907,13 @@ class _ManagementPustuPonkesdesWidgetState
         const SizedBox(height: 6),
         TextField(
           controller: controller,
+          keyboardType: keyboardType,
+          maxLength: maxLength,
+          inputFormatters: inputFormatters,
           style: GoogleFonts.outfit(fontSize: 12, color: textColor),
           decoration: InputDecoration(
             hintText: hint,
+            counterText: '',
             filled: true,
             fillColor: cardBg,
             isDense: true,
