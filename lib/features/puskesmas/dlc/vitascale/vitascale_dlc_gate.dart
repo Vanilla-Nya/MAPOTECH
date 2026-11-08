@@ -17,6 +17,9 @@ class VitaScaleDlcGate extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return child;
+    return Material(
+      type: MaterialType.transparency,
+      child: child,
+    );
   }
 }

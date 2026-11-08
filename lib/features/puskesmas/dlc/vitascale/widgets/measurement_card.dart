@@ -36,8 +36,8 @@ class MeasurementCard extends StatelessWidget {
     final hasVal = item.value != null;
     final displayValue = hasVal
         ? (type == MeasurementType.weight
-            ? item.value!.toStringAsFixed(2)
-            : item.value!.toStringAsFixed(1))
+              ? item.value!.toStringAsFixed(2)
+              : item.value!.toStringAsFixed(1))
         : '—';
 
     return CustomCard(
@@ -45,9 +45,9 @@ class MeasurementCard extends StatelessWidget {
       borderColor: item.status == MeasurementStatus.failed
           ? const Color(0xFFE74C3C)
           : (item.status == MeasurementStatus.stable
-              ? const Color(0xFF27AE60).withOpacity(0.5)
-              : borderColor),
-      padding: const EdgeInsets.all(18),
+                ? const Color(0xFF27AE60).withOpacity(0.5)
+                : borderColor),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -58,21 +58,21 @@ class MeasurementCard extends StatelessWidget {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(7),
                     decoration: BoxDecoration(
                       color: themeAccent.withOpacity(0.12),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(icon, size: 18, color: themeAccent),
+                    child: Icon(icon, size: 16, color: themeAccent),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 8),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         type.label.toUpperCase(),
                         style: GoogleFonts.outfit(
-                          fontSize: 11,
+                          fontSize: 10.5,
                           fontWeight: FontWeight.w900,
                           color: textColor,
                           letterSpacing: 0.5,
@@ -80,7 +80,10 @@ class MeasurementCard extends StatelessWidget {
                       ),
                       Text(
                         'Satuan: ${type.unit}',
-                        style: GoogleFonts.outfit(fontSize: 9.5, color: subtitleColor),
+                        style: GoogleFonts.outfit(
+                          fontSize: 9,
+                          color: subtitleColor,
+                        ),
                       ),
                     ],
                   ),
@@ -89,12 +92,12 @@ class MeasurementCard extends StatelessWidget {
               StatusBadge(
                 label: item.status.label,
                 color: item.status.color,
-                fontSize: 9,
+                fontSize: 8.5,
               ),
             ],
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
 
           // Angka Besar Nilai Pengukuran
           Row(
@@ -108,9 +111,10 @@ class MeasurementCard extends StatelessWidget {
                   fontWeight: FontWeight.w900,
                   color: item.status == MeasurementStatus.failed
                       ? const Color(0xFFE74C3C)
-                      : (item.status == MeasurementStatus.stable || item.status == MeasurementStatus.verified
-                          ? const Color(0xFF27AE60)
-                          : textColor),
+                      : (item.status == MeasurementStatus.stable ||
+                                item.status == MeasurementStatus.verified
+                            ? const Color(0xFF27AE60)
+                            : textColor),
                 ),
               ),
               const SizedBox(width: 6),
@@ -136,7 +140,11 @@ class MeasurementCard extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.error_outline_rounded, size: 14, color: Color(0xFFE74C3C)),
+                  const Icon(
+                    Icons.error_outline_rounded,
+                    size: 14,
+                    color: Color(0xFFE74C3C),
+                  ),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
@@ -155,7 +163,7 @@ class MeasurementCard extends StatelessWidget {
           ],
 
           const Spacer(),
-          const Divider(height: 16),
+          const Divider(height: 12),
 
           // Action Buttons: Ukur Ulang & Simulator Trigger
           Row(
@@ -166,11 +174,16 @@ class MeasurementCard extends StatelessWidget {
                 icon: const Icon(Icons.refresh_rounded, size: 14),
                 label: Text(
                   'Ukur Ulang',
-                  style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.bold),
+                  style: GoogleFonts.outfit(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 style: TextButton.styleFrom(
                   visualDensity: VisualDensity.compact,
-                  foregroundColor: hasVal ? textColor : subtitleColor.withOpacity(0.4),
+                  foregroundColor: hasVal
+                      ? textColor
+                      : subtitleColor.withOpacity(0.4),
                 ),
               ),
               if (onSimulate != null)

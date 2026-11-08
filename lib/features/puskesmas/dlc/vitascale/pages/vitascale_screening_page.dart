@@ -18,10 +18,12 @@ import '../widgets/vitascale_status_bar.dart';
 
 class VitaScaleScreeningPage extends ConsumerStatefulWidget {
   final ChildProfile? selectedChild;
+  final ValueChanged<String>? onNavigateToMenu;
 
   const VitaScaleScreeningPage({
     super.key,
     this.selectedChild,
+    this.onNavigateToMenu,
   });
 
   @override
@@ -39,6 +41,10 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
 
   List<ChildProfile> _availableChildren = [];
   ChildProfile? _activeChild;
+
+  // Pencarian Pasien di Bagian Atas
+  final TextEditingController _topSearchController = TextEditingController();
+  String _topSearchQuery = '';
 
   // ===========================================================================
   // STATE INPUT MANUAL & API MLP & REASONING MODEL
@@ -77,6 +83,31 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
     _checkServer();
   }
 
+  @override
+  void didUpdateWidget(covariant VitaScaleScreeningPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.selectedChild != null && widget.selectedChild?.id != oldWidget.selectedChild?.id) {
+      _selectChild(widget.selectedChild!);
+    }
+  }
+
+  void _selectChild(ChildProfile child) {
+    setState(() {
+      _activeChild = child;
+      _topSearchController.clear();
+      _topSearchQuery = '';
+    });
+    _fillFormWithChild(child);
+
+    final state = ref.read(landingPageProvider);
+    final facilityId = state.activePuskesmasId ?? 'PUSKESMAS-001';
+    ref.read(screeningStateProvider.notifier).startSession(
+          child: child,
+          facilityId: facilityId,
+          isDemo: true,
+        );
+  }
+
   Future<void> _checkServer() async {
     setState(() => _isCheckingServer = true);
     final status = await VitaScaleApiService.checkHealth();
@@ -93,7 +124,7 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
     if (mounted) {
       setState(() {
         _availableChildren = list;
-        _activeChild = widget.selectedChild ?? (list.isNotEmpty ? list.first : null);
+        _activeChild = widget.selectedChild;
       });
 
       if (_activeChild != null) {
@@ -133,6 +164,7 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
   void dispose() {
     _simulator.dispose();
     _notesController.dispose();
+    _topSearchController.dispose();
     _nameController.dispose();
     _nikController.dispose();
     _ageController.dispose();
@@ -274,7 +306,7 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
             const SizedBox(height: 14),
             CustomTextField(
               label: 'Base URL API',
-              hintText: 'http://127.0.0.1:8000',
+              hintText: 'https://vitascalemapotech.vercel.app',
               controller: urlCtrl,
             ),
             const SizedBox(height: 12),
@@ -282,6 +314,7 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
               spacing: 8,
               runSpacing: 8,
               children: [
+                _buildQuickUrlChip('Vercel Cloud (Live)', 'https://vitascalemapotech.vercel.app', urlCtrl),
                 _buildQuickUrlChip('127.0.0.1:8000', 'http://127.0.0.1:8000', urlCtrl),
                 _buildQuickUrlChip('localhost:8000', 'http://localhost:8000', urlCtrl),
                 _buildQuickUrlChip('Emulator (10.0.2.2)', 'http://10.0.2.2:8000', urlCtrl),
@@ -368,16 +401,7 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                   fontSize: 8,
                 ),
                 onTap: () {
-                  setState(() => _activeChild = child);
-                  _fillFormWithChild(child);
-
-                  final state = ref.read(landingPageProvider);
-                  final facilityId = state.activePuskesmasId ?? 'PUSKESMAS-001';
-                  ref.read(screeningStateProvider.notifier).startSession(
-                        child: child,
-                        facilityId: facilityId,
-                        isDemo: true,
-                      );
+                  _selectChild(child);
                   Navigator.pop(ctx);
                 },
               );
@@ -466,11 +490,72 @@ Dicetak melalui MAPOTECH VitaScale System
 
     return VitaScaleDlcGate(
       menuTitle: 'Screening Anak & Bayi',
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+      child: Container(
+        color: notifier.getBackgroundColor(),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+            // =================================================================
+            // TOP BAR: TOMBOL KEMBALI & BREADCRUMB
+            // =================================================================
+            Row(
+              children: [
+                InkWell(
+                  onTap: () {
+                    if (widget.onNavigateToMenu != null) {
+                      widget.onNavigateToMenu!('dlc_vitascale_data_anak');
+                    } else {
+                      Navigator.of(context).maybePop();
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(14),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: cardBgColor,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: borderColor),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.arrow_back_rounded, size: 18, color: textColor),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Kembali ke Data Anak',
+                          style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: textColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Text(
+                  'Modul DLC VitaScale • Skrining AI & Antropometri',
+                  style: GoogleFonts.outfit(
+                    fontSize: 12,
+                    color: subtitleColor,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 16),
+
+            // =================================================================
+            // PENCARIAN & PEMILIHAN PASIEN BALITA DI BAGIAN ATAS
+            // =================================================================
+            _buildPatientSearchSection(cardBgColor, borderColor, textColor, subtitleColor, isMobile),
+
+            const SizedBox(height: 16),
+
             // =================================================================
             // BANNER TOP HEADER
             // =================================================================
@@ -715,7 +800,7 @@ Dicetak melalui MAPOTECH VitaScale System
                       child: Column(
                         children: [
                           SizedBox(
-                            height: 180,
+                            height: 184,
                             child: MeasurementCard(
                               type: MeasurementType.weight,
                               item: session.weight,
@@ -737,7 +822,7 @@ Dicetak melalui MAPOTECH VitaScale System
                           ),
                           const SizedBox(height: 12),
                           SizedBox(
-                            height: 180,
+                            height: 184,
                             child: MeasurementCard(
                               type: MeasurementType.waist,
                               item: session.waist,
@@ -766,6 +851,488 @@ Dicetak melalui MAPOTECH VitaScale System
             ],
           ],
         ),
+      ),
+    ),
+  );
+}
+
+  // ===========================================================================
+  // PENCARIAN & PEMILIHAN SASARAN BALITA (SEARCH AT THE TOP)
+  // ===========================================================================
+  Widget _buildPatientSearchSection(
+    Color cardBg,
+    Color border,
+    Color text,
+    Color sub,
+    bool isMobile,
+  ) {
+    final searchMatches = _topSearchQuery.isEmpty
+        ? <ChildProfile>[]
+        : _availableChildren.where((c) {
+            final q = _topSearchQuery.toLowerCase();
+            return c.name.toLowerCase().contains(q) ||
+                c.nik.toLowerCase().contains(q) ||
+                c.parentName.toLowerCase().contains(q);
+          }).toList();
+
+    return CustomCard(
+      color: cardBg,
+      borderColor: _activeChild == null ? const Color(0xFF1ABC9C).withOpacity(0.4) : border,
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Section Title Row
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1ABC9C).withOpacity(0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.person_search_rounded,
+                  size: 20,
+                  color: Color(0xFF1ABC9C),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'CARI & PILIH SASARAN BALITA',
+                          style: GoogleFonts.outfit(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                            color: text,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        StatusBadge(
+                          label: '${_availableChildren.length} Terdaftar',
+                          color: const Color(0xFF1ABC9C),
+                          fontSize: 9,
+                          showDot: false,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Cari nama anak atau NIK balita di bawah ini untuk memuat otomatis data KMS, usia, dan riwayat.',
+                      style: GoogleFonts.outfit(fontSize: 10.5, color: sub),
+                    ),
+                  ],
+                ),
+              ),
+              if (_activeChild != null)
+                CustomButton(
+                  text: 'Ganti Pasien',
+                  icon: Icons.swap_horiz_rounded,
+                  height: 32,
+                  isSecondary: true,
+                  onPressed: () {
+                    setState(() {
+                      _activeChild = null;
+                      _topSearchController.clear();
+                      _topSearchQuery = '';
+                    });
+                  },
+                ),
+            ],
+          ),
+
+          const SizedBox(height: 14),
+
+          // Search Field
+          Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? const Color(0xFF1A1D27)
+                  : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: _topSearchQuery.isNotEmpty
+                    ? const Color(0xFF1ABC9C)
+                    : border,
+                width: _topSearchQuery.isNotEmpty ? 1.5 : 1.0,
+              ),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.search_rounded,
+                  size: 20,
+                  color: Color(0xFF1ABC9C),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextField(
+                    controller: _topSearchController,
+                    style: GoogleFonts.outfit(fontSize: 13, color: text),
+                    decoration: InputDecoration(
+                      hintText: 'Cari Nama Balita, NIK (16-Digit), atau Nama Orang Tua...',
+                      hintStyle: GoogleFonts.outfit(
+                        fontSize: 11.5,
+                        color: sub.withOpacity(0.7),
+                      ),
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    onChanged: (v) {
+                      setState(() {
+                        _topSearchQuery = v.trim();
+                      });
+                    },
+                  ),
+                ),
+                if (_topSearchController.text.isNotEmpty)
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, size: 18),
+                    color: sub,
+                    tooltip: 'Hapus Pencarian',
+                    onPressed: () {
+                      _topSearchController.clear();
+                      setState(() {
+                        _topSearchQuery = '';
+                      });
+                    },
+                  ),
+                const SizedBox(width: 4),
+                CustomButton(
+                  text: 'Daftar Lengkap',
+                  icon: Icons.list_alt_rounded,
+                  height: 32,
+                  isSecondary: true,
+                  onPressed: _showPatientPickerModal,
+                ),
+              ],
+            ),
+          ),
+
+          // Search Result Dropdown / List (when query is entered)
+          if (_topSearchQuery.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Container(
+              constraints: const BoxConstraints(maxHeight: 220),
+              decoration: BoxDecoration(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? const Color(0xFF1E2130)
+                    : Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF1ABC9C).withOpacity(0.4)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.08),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: searchMatches.isEmpty
+                  ? Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline_rounded, size: 18, color: sub),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Tidak ada data balita yang cocok dengan "$_topSearchQuery".',
+                              style: GoogleFonts.outfit(fontSize: 11.5, color: sub),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.separated(
+                      shrinkWrap: true,
+                      padding: const EdgeInsets.all(8),
+                      itemCount: searchMatches.length,
+                      separatorBuilder: (_, __) => const Divider(height: 8),
+                      itemBuilder: (ctx, idx) {
+                        final child = searchMatches[idx];
+                        return InkWell(
+                          onTap: () => _selectChild(child),
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1ABC9C).withOpacity(0.06),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  child.isUnder24Months
+                                      ? Icons.child_friendly_rounded
+                                      : Icons.face_rounded,
+                                  size: 20,
+                                  color: const Color(0xFF1ABC9C),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Text(
+                                            child.name,
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.bold,
+                                              color: text,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          StatusBadge(
+                                            label: child.gender == 'L' ? 'L' : 'P',
+                                            color: child.gender == 'L'
+                                                ? const Color(0xFF3498DB)
+                                                : const Color(0xFFE91E63),
+                                            fontSize: 8,
+                                            showDot: false,
+                                          ),
+                                        ],
+                                      ),
+                                      Text(
+                                        'NIK: ${child.nik} • Usia: ${child.ageLabel} (${child.ageInMonths} Bln) • Wali: ${child.parentName}',
+                                        style: GoogleFonts.outfit(fontSize: 10, color: sub),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                CustomButton(
+                                  text: 'Pilih',
+                                  icon: Icons.check_circle_rounded,
+                                  height: 28,
+                                  primaryColor: const Color(0xFF1ABC9C),
+                                  onPressed: () => _selectChild(child),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+
+          // Active Child Banner or Quick Selection Prompt (when query is empty)
+          if (_topSearchQuery.isEmpty) ...[
+            const SizedBox(height: 12),
+            if (_activeChild != null)
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1ABC9C).withOpacity(0.09),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFF1ABC9C).withOpacity(0.35)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1ABC9C).withOpacity(0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      alignment: Alignment.center,
+                      child: Icon(
+                        _activeChild!.isUnder24Months
+                            ? Icons.child_friendly_rounded
+                            : Icons.face_rounded,
+                        size: 24,
+                        color: const Color(0xFF1ABC9C),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  'Sasaran Terpilih: ${_activeChild!.name}',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w900,
+                                    color: const Color(0xFF1ABC9C),
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              StatusBadge(
+                                label: _activeChild!.gender == 'L' ? 'L' : 'P',
+                                color: _activeChild!.gender == 'L'
+                                    ? const Color(0xFF3498DB)
+                                    : const Color(0xFFE91E63),
+                                fontSize: 8.5,
+                                showDot: false,
+                              ),
+                              const SizedBox(width: 6),
+                              if (_activeChild!.isBalita)
+                                Padding(
+                                  padding: const EdgeInsets.only(right: 6),
+                                  child: StatusBadge(
+                                    label: 'BALITA',
+                                    color: const Color(0xFF1ABC9C),
+                                    fontSize: 8.5,
+                                    showDot: false,
+                                  ),
+                                ),
+                              StatusBadge(
+                                label: _activeChild!.defaultMode.code,
+                                color: _activeChild!.isUnder24Months
+                                    ? const Color(0xFF3498DB)
+                                    : const Color(0xFFE67E22),
+                                fontSize: 8.5,
+                                showDot: false,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            'NIK: ${_activeChild!.nik} • Usia: ${_activeChild!.ageLabel} (${_activeChild!.ageInMonths} Bulan) • Wali: ${_activeChild!.parentName}',
+                            style: GoogleFonts.outfit(fontSize: 10.5, color: sub),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            'Alamat: ${_activeChild!.address} • Telp: ${_activeChild!.phone?.isNotEmpty == true ? _activeChild!.phone : "-"}',
+                            style: GoogleFonts.outfit(fontSize: 10, color: sub.withOpacity(0.8)),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    InkWell(
+                      onTap: () {
+                        setState(() {
+                          _activeChild = null;
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: cardBg,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: border),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.swap_horiz_rounded, size: 15, color: text),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Ganti Balita',
+                              style: GoogleFonts.outfit(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                                color: text,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else ...[
+              // Prompt to select patient
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.touch_app_rounded, size: 18, color: Colors.amber),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Pilih salah satu sasaran balita terdaftar di bawah ini untuk memulai skrining terarah:',
+                        style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: text,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _availableChildren.map((c) {
+                  return InkWell(
+                    onTap: () => _selectChild(c),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? const Color(0xFF1E2130)
+                            : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: border),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            c.isUnder24Months
+                                ? Icons.child_friendly_rounded
+                                : Icons.face_rounded,
+                            size: 16,
+                            color: const Color(0xFF1ABC9C),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            c.name,
+                            style: GoogleFonts.outfit(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.bold,
+                              color: text,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          StatusBadge(
+                            label: c.ageLabel,
+                            color: c.isUnder24Months
+                                ? const Color(0xFF3498DB)
+                                : const Color(0xFFE67E22),
+                            fontSize: 8.5,
+                            showDot: false,
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ],
+        ],
       ),
     );
   }
@@ -870,7 +1437,7 @@ Dicetak melalui MAPOTECH VitaScale System
                 Row(
                   children: [
                     Text(
-                      isOnline ? 'FastAPI VitaScale Backend: TERHUBUNG' : 'FastAPI VitaScale Backend: TIDAK TERHUBUNG',
+                      isOnline ? 'VitaScale Cloud Backend (Vercel): TERHUBUNG' : 'VitaScale Cloud Backend: TIDAK TERHUBUNG',
                       style: GoogleFonts.outfit(
                         fontSize: 11.5,
                         fontWeight: FontWeight.w800,
@@ -878,16 +1445,19 @@ Dicetak melalui MAPOTECH VitaScale System
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Text(
-                      '(${VitaScaleApiConfig.baseUrl})',
-                      style: GoogleFonts.outfit(fontSize: 10.5, color: sub),
+                    Flexible(
+                      child: Text(
+                        '(${VitaScaleApiConfig.baseUrl})',
+                        style: GoogleFonts.outfit(fontSize: 10.5, color: sub),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ],
                 ),
                 Text(
                   isOnline
-                      ? 'Model Keras MLP stunting, gizi buruk, & Smart Growth siap melakukan inferensi real-time.'
-                      : 'Jalankan server lokal dengan: python main.py di folder backend (Port 8000).',
+                      ? 'Model MLP stunting (TB/U), status gizi (BB/TB), & Smart Growth aktif di cloud Vercel.'
+                      : 'Periksa koneksi internet atau status hosting di ${VitaScaleApiConfig.baseUrl}.',
                   style: GoogleFonts.outfit(fontSize: 10, color: sub),
                 ),
               ],

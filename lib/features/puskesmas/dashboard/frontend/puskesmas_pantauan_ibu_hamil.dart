@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/widgets/ui.dart';
-import 'package:mapotech/shared/widgets/revgeo_wilayah_map_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class IbuHamilModel {
@@ -497,57 +496,85 @@ class _PuskesmasPantauanIbuHamilState extends ConsumerState<PuskesmasPantauanIbu
           ),
         ),
 
-        const SizedBox(height: 20),
+        const SizedBox(height: 18),
 
-        // Summary Metric Cards
-        GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: isMobile ? 2 : 4,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-          childAspectRatio: 1.6,
-          children: [
-            MetricCard(
-              icon: Icons.pregnant_woman_rounded,
-              label: 'TOTAL IBU HAMIL TERDATA',
-              count: '42 Pasien',
-              subtitleColor: subtitleColor,
-              countColor: textColor,
-              cardBgColor: cardBgColor,
-              borderColor: borderColor,
+        // Summary Metric Cards (Collapsible - Default Closed saat Page Awal Dibuka)
+        CustomCollapsibleCard(
+          title: 'Ringkasan Indikator Pantauan Ibu Hamil',
+          subtitle: '4 Metrik Sasaran: Total Pasien, Risiko Tinggi (KRT/KRST), HPL Bulan Ini, dan Capaian K6 ANC',
+          icon: Icons.analytics_rounded,
+          iconColor: themeAccent,
+          cardBgColor: cardBgColor,
+          borderColor: borderColor,
+          textColor: textColor,
+          subtitleColor: subtitleColor,
+          accentColor: themeAccent,
+          initiallyExpanded: false, // Default tertutup saat halaman pertama dibuka
+          previewBadge: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: themeAccent.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(100),
+              border: Border.all(color: themeAccent.withValues(alpha: 0.3)),
             ),
-            MetricCard(
-              icon: Icons.warning_rounded,
-              label: 'RISIKO TINGGI (KRT/KRST)',
-              count: '6 Pasien',
-              subtitleColor: subtitleColor,
-              countColor: const Color(0xFFE74C3C),
-              cardBgColor: cardBgColor,
-              borderColor: borderColor,
+            child: Text(
+              '42 Pasien • 4 Metrik',
+              style: GoogleFonts.outfit(
+                fontSize: 9.5,
+                fontWeight: FontWeight.bold,
+                color: themeAccent,
+              ),
             ),
-            MetricCard(
-              icon: Icons.calendar_month_rounded,
-              label: 'HPL BULAN INI',
-              count: '8 Persalinan',
-              subtitleColor: subtitleColor,
-              countColor: const Color(0xFF3498DB),
-              cardBgColor: cardBgColor,
-              borderColor: borderColor,
-            ),
-            MetricCard(
-              icon: Icons.verified_user_rounded,
-              label: 'CAPAIAN K6 ANC',
-              count: '94.2%',
-              subtitleColor: subtitleColor,
-              countColor: const Color(0xFF2ECC71),
-              cardBgColor: cardBgColor,
-              borderColor: borderColor,
-            ),
-          ],
+          ),
+          child: GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: isMobile ? 2 : 4,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 1.6,
+            children: [
+              MetricCard(
+                icon: Icons.pregnant_woman_rounded,
+                label: 'TOTAL IBU HAMIL TERDATA',
+                count: '42 Pasien',
+                subtitleColor: subtitleColor,
+                countColor: textColor,
+                cardBgColor: isDark ? const Color(0xFF1B1B26) : const Color(0xFFF8FAFC),
+                borderColor: borderColor,
+              ),
+              MetricCard(
+                icon: Icons.warning_rounded,
+                label: 'RISIKO TINGGI (KRT/KRST)',
+                count: '6 Pasien',
+                subtitleColor: subtitleColor,
+                countColor: const Color(0xFFE74C3C),
+                cardBgColor: isDark ? const Color(0xFF1B1B26) : const Color(0xFFF8FAFC),
+                borderColor: borderColor,
+              ),
+              MetricCard(
+                icon: Icons.calendar_month_rounded,
+                label: 'HPL BULAN INI',
+                count: '8 Persalinan',
+                subtitleColor: subtitleColor,
+                countColor: const Color(0xFF3498DB),
+                cardBgColor: isDark ? const Color(0xFF1B1B26) : const Color(0xFFF8FAFC),
+                borderColor: borderColor,
+              ),
+              MetricCard(
+                icon: Icons.verified_user_rounded,
+                label: 'CAPAIAN K6 ANC',
+                count: '94.2%',
+                subtitleColor: subtitleColor,
+                countColor: const Color(0xFF2ECC71),
+                cardBgColor: isDark ? const Color(0xFF1B1B26) : const Color(0xFFF8FAFC),
+                borderColor: borderColor,
+              ),
+            ],
+          ),
         ),
 
-        const SizedBox(height: 24),
+        const SizedBox(height: 20),
 
         // ==================== MAP SECTION WITH PATIENT PINS ====================
         Container(

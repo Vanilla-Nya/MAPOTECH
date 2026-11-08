@@ -46,6 +46,7 @@ import 'package:mapotech/features/pekerja/dashboard/frontend/management_pekerja.
 import 'package:mapotech/features/puskesmas/dashboard/frontend/management_pustu_ponkesdes.dart';
 import 'package:mapotech/features/puskesmas/dlc/vitascale/pages/vitascale_data_anak_page.dart';
 import 'package:mapotech/features/puskesmas/dlc/vitascale/pages/vitascale_screening_page.dart';
+import 'package:mapotech/features/puskesmas/dlc/vitascale/data/vitascale_models.dart';
 
 bool _isCorsafeUrl(String url) {
   if (url.isEmpty) return false;
@@ -68,9 +69,10 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
 
   String? _lastCheckedUserId;
   bool _hasShownSubNotice = false;
+  ChildProfile? _selectedVitascaleChild;
 
   bool _shouldUseShellScroll(String menu) {
-    if (menu == 'ai_assistant' || menu == 'penjualan') {
+    if (menu == 'ai_assistant' || menu == 'penjualan' || menu.startsWith('dlc_vitascale')) {
       return false;
     }
     return true;
@@ -790,9 +792,18 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
         case 'dashboard':
           return const DokterDashboard();
         case 'dlc_vitascale_data_anak':
-          return VitaScaleDataAnakPage(onNavigateToMenu: (menu) => setState(() => _activeMenu = menu));
+          return VitaScaleDataAnakPage(
+            onNavigateToMenu: (menu) => setState(() => _activeMenu = menu),
+            onNavigateWithChild: (menu, child) => setState(() {
+              _selectedVitascaleChild = child;
+              _activeMenu = menu;
+            }),
+          );
         case 'dlc_vitascale_screening':
-          return const VitaScaleScreeningPage();
+          return VitaScaleScreeningPage(
+            selectedChild: _selectedVitascaleChild,
+            onNavigateToMenu: (menu) => setState(() => _activeMenu = menu),
+          );
         default:
           return SegeraHadirMockup(portalPath: 'DOKTER/$_activeMenu');
       }
@@ -819,9 +830,22 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                 _activeMenu = menu;
               });
             },
+            onNavigateWithChild: (menu, child) {
+              setState(() {
+                _selectedVitascaleChild = child;
+                _activeMenu = menu;
+              });
+            },
           );
         case 'dlc_vitascale_screening':
-          return const VitaScaleScreeningPage();
+          return VitaScaleScreeningPage(
+            selectedChild: _selectedVitascaleChild,
+            onNavigateToMenu: (menu) {
+              setState(() {
+                _activeMenu = menu;
+              });
+            },
+          );
         case 'management_pekerja':
           return const ManagementPekerjaWidget();
         case 'management_pustu_ponkesdes':
@@ -866,9 +890,18 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
           return const ManagementPekerjaWidget();
         case 'dashboard':
         case 'dlc_vitascale_data_anak':
-          return VitaScaleDataAnakPage(onNavigateToMenu: (menu) => setState(() => _activeMenu = menu));
+          return VitaScaleDataAnakPage(
+            onNavigateToMenu: (menu) => setState(() => _activeMenu = menu),
+            onNavigateWithChild: (menu, child) => setState(() {
+              _selectedVitascaleChild = child;
+              _activeMenu = menu;
+            }),
+          );
         case 'dlc_vitascale_screening':
-          return const VitaScaleScreeningPage();
+          return VitaScaleScreeningPage(
+            selectedChild: _selectedVitascaleChild,
+            onNavigateToMenu: (menu) => setState(() => _activeMenu = menu),
+          );
         default:
           return const DokterDashboard();
       }

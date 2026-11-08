@@ -21,7 +21,8 @@ Modul Skrining Antropometri Berbasis IoT & Computer Vision Zero-Install untuk An
 - `widgets/`: Komponen UI standar faskes (kartu pengukuran, indikator kestabilan sensor, status bar koneksi ESP32).
 - `pages/`: 
   - `vitascale_data_anak_page.dart`: Menu Manajemen Data Anak/Bayi (0–12 tahun).
-  - `vitascale_screening_page.dart`: Menu Sesi Skrining & Pengukuran Aktif VitaScale.
+  - `vitascale_child_history_page.dart`: Halaman Rekam Pemeriksaan, Tabel Kunjungan Berkala & Detail Skrining AI per Bulan dengan Sticky Footer.
+  - `vitascale_screening_page.dart`: Menu Sesi Skrining & Pengukuran Aktif VitaScale dengan Klasifikasi MLP Keras & Clinical AI Reasoning.
 
 ## 3. Contoh Penggunaan
 

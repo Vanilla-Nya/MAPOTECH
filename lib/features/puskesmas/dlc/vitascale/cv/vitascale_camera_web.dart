@@ -105,7 +105,9 @@ class _VitaScaleCameraWidgetState extends State<VitaScaleCameraWidget> {
             return;
           }
           final promise = js_util.callMethod(vsCv, 'load', ['vitascale/opencv.js']);
-          await js_util.promiseToFuture(promise);
+          await js_util
+              .promiseToFuture(promise)
+              .timeout(const Duration(seconds: 6));
           if (mounted) {
             setState(() {
               _isOpenCvReady = true;
@@ -127,11 +129,21 @@ class _VitaScaleCameraWidgetState extends State<VitaScaleCameraWidget> {
   }
 
   Future<void> _initCamera() async {
-    await _enumerateDevices();
-    if (_selectedDeviceId != null && _selectedDeviceId!.isNotEmpty) {
-      await _startCamera(_selectedDeviceId);
-    } else {
-      await _startCamera();
+    try {
+      await _enumerateDevices().timeout(const Duration(seconds: 2), onTimeout: () {});
+      if (_selectedDeviceId != null && _selectedDeviceId!.isNotEmpty) {
+        await _startCamera(_selectedDeviceId);
+      } else {
+        await _startCamera();
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isInitializing = false;
+          _errorMessage = 'Tidak dapat mendeteksi webcam USB.';
+        });
+        widget.onStatusChanged(false, _errorMessage);
+      }
     }
   }
 
@@ -139,9 +151,11 @@ class _VitaScaleCameraWidgetState extends State<VitaScaleCameraWidget> {
     final mediaDevices = html.window.navigator.mediaDevices;
     if (mediaDevices == null) return;
     try {
-      final rawList = await js_util.promiseToFuture<dynamic>(
-        js_util.callMethod(mediaDevices, 'enumerateDevices', []),
-      );
+      final rawList = await js_util
+          .promiseToFuture<dynamic>(
+            js_util.callMethod(mediaDevices, 'enumerateDevices', []),
+          )
+          .timeout(const Duration(seconds: 2));
       if (rawList == null) return;
 
       final count = js_util.getProperty(rawList, 'length') as int? ?? 0;
@@ -212,7 +226,9 @@ class _VitaScaleCameraWidgetState extends State<VitaScaleCameraWidget> {
             'audio': false,
           });
           final promise = js_util.callMethod(mediaDevices, 'getUserMedia', [constraints]);
-          stream = await js_util.promiseToFuture<html.MediaStream>(promise);
+          stream = await js_util
+              .promiseToFuture<html.MediaStream>(promise)
+              .timeout(const Duration(seconds: 4));
         } catch (_) {
           try {
             final constraints = js_util.jsify({
@@ -220,7 +236,9 @@ class _VitaScaleCameraWidgetState extends State<VitaScaleCameraWidget> {
               'audio': false,
             });
             final promise = js_util.callMethod(mediaDevices, 'getUserMedia', [constraints]);
-            stream = await js_util.promiseToFuture<html.MediaStream>(promise);
+            stream = await js_util
+                .promiseToFuture<html.MediaStream>(promise)
+                .timeout(const Duration(seconds: 3));
           } catch (_) {}
         }
       }
@@ -231,14 +249,17 @@ class _VitaScaleCameraWidgetState extends State<VitaScaleCameraWidget> {
           'audio': false,
         });
         final promise = js_util.callMethod(mediaDevices, 'getUserMedia', [constraints]);
-        stream = await js_util.promiseToFuture<html.MediaStream>(promise);
+        stream = await js_util
+            .promiseToFuture<html.MediaStream>(promise)
+            .timeout(const Duration(seconds: 4));
       }
 
       _mediaStream = stream;
       _videoElement.srcObject = stream;
-      await _videoElement.play();
+      // Memulai pemutaran video secara asinkron tanpa memblokir thread
+      _videoElement.play().catchError((_) {});
 
-      await _enumerateDevices();
+      _enumerateDevices().timeout(const Duration(seconds: 2), onTimeout: () {});
 
       String activeLabel = 'Webcam USB';
       try {
@@ -256,6 +277,15 @@ class _VitaScaleCameraWidgetState extends State<VitaScaleCameraWidget> {
           _errorMessage = null;
         });
         widget.onStatusChanged(true, activeLabel);
+      }
+    } on TimeoutException {
+      if (mounted) {
+        setState(() {
+          _isInitializing = false;
+          _errorMessage =
+              'Waktu pencarian webcam habis (4 detik). Kamera fisik tidak terdeteksi atau izin browser belum diberikan.';
+        });
+        widget.onStatusChanged(false, _errorMessage);
       }
     } catch (e) {
       if (mounted) {
@@ -560,20 +590,49 @@ class _VitaScaleCameraWidgetState extends State<VitaScaleCameraWidget> {
           Positioned.fill(
             child: Container(
               color: const Color(0xFF0F141C),
+              padding: const EdgeInsets.all(20),
               child: Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     const SizedBox(
-                      width: 28,
-                      height: 28,
+                      width: 32,
+                      height: 32,
                       child: CircularProgressIndicator(strokeWidth: 2.5, color: Color(0xFF1ABC9C)),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
                     Text(
                       'Menghubungkan Webcam USB...',
-                      style: GoogleFonts.outfit(color: Colors.white70, fontSize: 11),
+                      style: GoogleFonts.outfit(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                     ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Mencari perangkat video input kamera pada browser...',
+                      style: GoogleFonts.outfit(color: Colors.white60, fontSize: 10),
+                    ),
+                    if (widget.onSimulateFixture != null) ...[
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          setState(() {
+                            _isInitializing = false;
+                            _errorMessage = null;
+                          });
+                          widget.onSimulateFixture!();
+                        },
+                        icon: const Icon(Icons.science_rounded, size: 14),
+                        label: Text(
+                          'Lewati & Gunakan Simulasi Fixture CV',
+                          style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1ABC9C),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

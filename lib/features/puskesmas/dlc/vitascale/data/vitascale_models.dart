@@ -60,6 +60,8 @@ class ChildProfile {
   final String? phone;
   final String address;
   final String? photoUrl;
+  final double latitude;
+  final double longitude;
 
   const ChildProfile({
     required this.id,
@@ -72,6 +74,8 @@ class ChildProfile {
     this.phone,
     required this.address,
     this.photoUrl,
+    this.latitude = -7.9582,
+    this.longitude = 113.9123,
   });
 
   /// Menghitung usia anak dalam bulan secara presisi
@@ -98,6 +102,9 @@ class ChildProfile {
   /// Apakah anak masuk kategori bayi di bawah 24 bulan (< 2 tahun)
   bool get isUnder24Months => ageInMonths < 24;
 
+  /// Apakah anak masuk kategori balita di bawah 5 tahun (< 60 bulan / 0-59 bulan)
+  bool get isBalita => ageInMonths < 60;
+
   /// Mode antropometri default berdasarkan usia WHO
   AnthropometryMode get defaultMode =>
       isUnder24Months ? AnthropometryMode.recumbentLength : AnthropometryMode.standingHeight;
@@ -113,6 +120,8 @@ class ChildProfile {
         'phone': phone,
         'address': address,
         'photo_url': photoUrl,
+        'latitude': latitude,
+        'longitude': longitude,
       };
 
   factory ChildProfile.fromJson(Map<String, dynamic> json) {
@@ -129,6 +138,8 @@ class ChildProfile {
       phone: json['phone']?.toString(),
       address: json['address']?.toString() ?? 'Puskesmas',
       photoUrl: json['photo_url']?.toString(),
+      latitude: double.tryParse(json['latitude']?.toString() ?? '') ?? -7.9582,
+      longitude: double.tryParse(json['longitude']?.toString() ?? '') ?? 113.9123,
     );
   }
 }

@@ -3,15 +3,17 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 /// ============================================================================
-/// KONFIGURASI SERVER FASTAPI VITASCALE
+/// KONFIGURASI SERVER FASTAPI & CLOUD VITASCALE
 /// ============================================================================
 class VitaScaleApiConfig {
-  /// Default base URL.
-  /// Web & Windows: 'http://127.0.0.1:8000'
-  /// Android Emulator: 'http://10.0.2.2:8000'
-  static String baseUrl = 'http://127.0.0.1:8000';
+  /// Default base URL mengarah ke hosting cloud Vercel aktif:
+  /// https://vitascalemapotech.vercel.app/
+  /// Cadangan / lokal: 'http://127.0.0.1:8000' atau 'http://10.0.2.2:8000'
+  static String baseUrl = 'https://vitascalemapotech.vercel.app';
 
   static const String smartGrowthEndpoint = '/prediksi/smart-growth';
+  static const String giziEndpoint = '/prediksi/gizi';
+  static const String stuntingEndpoint = '/prediksi/stunting';
   static const String longitudinalEndpoint = '/prediksi';
   static const String healthEndpoint = '/health';
 }
@@ -199,15 +201,21 @@ class VitaScaleApiService {
   static Future<Map<String, dynamic>> checkHealth() async {
     try {
       final uri = Uri.parse('${VitaScaleApiConfig.baseUrl}${VitaScaleApiConfig.healthEndpoint}');
-      final response = await _client.get(uri).timeout(const Duration(seconds: 4));
+      final response = await _client.get(uri).timeout(const Duration(seconds: 5));
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final isOnline = data['status'] == 'ok' || data['status'] == 'online';
+        final hasStunting = data['model_stunting'] == true ||
+            (data['model'] is List && (data['model'] as List).any((m) => m.toString().contains('Stunting')));
+        final hasGizi = data['model_gizi'] == true ||
+            (data['model'] is List && (data['model'] as List).any((m) => m.toString().contains('Gizi')));
+
         return {
-          'isOnline': data['status'] == 'ok',
-          'modelStunting': data['model_stunting'] == true,
-          'modelGizi': data['model_gizi'] == true,
-          'preprocessor': data['preprocessor'] == true,
-          'message': 'Server terhubung & model siap',
+          'isOnline': isOnline,
+          'modelStunting': hasStunting,
+          'modelGizi': hasGizi,
+          'engine': data['engine'] ?? 'MLP Inference Engine',
+          'message': 'Server cloud Vercel aktif & model inferensi siap',
         };
       }
       return {
@@ -218,7 +226,7 @@ class VitaScaleApiService {
       debugPrint('[VitaScaleApi] Health check error: $e');
       return {
         'isOnline': false,
-        'message': 'Gagal menghubungi server di ${VitaScaleApiConfig.baseUrl}. Pastikan python main.py aktif.',
+        'message': 'Gagal menghubungi server di ${VitaScaleApiConfig.baseUrl}. Pastikan koneksi internet aktif.',
       };
     }
   }
@@ -227,6 +235,82 @@ class VitaScaleApiService {
   static Future<HasilSmartGrowthBalita> prediksiSmartGrowth(
     InputSmartGrowthBalita input,
   ) async {
+    // 1. Coba endpoint split Vercel (/prediksi/gizi & /prediksi/stunting) secara paralel
+    try {
+      final giziUri = Uri.parse('${VitaScaleApiConfig.baseUrl}${VitaScaleApiConfig.giziEndpoint}');
+      final stuntingUri = Uri.parse('${VitaScaleApiConfig.baseUrl}${VitaScaleApiConfig.stuntingEndpoint}');
+
+      final responses = await Future.wait([
+        _client.post(
+          giziUri,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode(input.toJson()),
+        ).timeout(const Duration(seconds: 12)),
+        _client.post(
+          stuntingUri,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'JK': input.jk,
+            'Usia_Bulan': input.usiaBulan,
+            'Tinggi': input.tinggi,
+          }),
+        ).timeout(const Duration(seconds: 12)),
+      ]);
+
+      final giziRes = responses[0];
+      final stuntingRes = responses[1];
+
+      if (giziRes.statusCode == 200 && stuntingRes.statusCode == 200) {
+        final giziData = jsonDecode(giziRes.body) as Map<String, dynamic>;
+        final stuntingData = jsonDecode(stuntingRes.body) as Map<String, dynamic>;
+
+        final katGizi = giziData['prediksi']?.toString() ?? 'Normal';
+        final katStunting = stuntingData['prediksi']?.toString() ?? 'Normal';
+
+        final skorGizi = (giziData['skor_model'] as Map<String, dynamic>?)?.map(
+              (k, v) => MapEntry(k, (v as num).toDouble()),
+            ) ??
+            {};
+        final skorStunting = (stuntingData['skor_model'] as Map<String, dynamic>?)?.map(
+              (k, v) => MapEntry(k, (v as num).toDouble()),
+            ) ??
+            {};
+
+        double confGizi = 0.0;
+        if (skorGizi.containsKey(katGizi)) {
+          confGizi = (skorGizi[katGizi] ?? 0.0) * 100;
+        } else if (skorGizi.isNotEmpty) {
+          confGizi = skorGizi.values.reduce((a, b) => a > b ? a : b) * 100;
+        }
+
+        double confStunting = 0.0;
+        if (skorStunting.containsKey(katStunting)) {
+          confStunting = (skorStunting[katStunting] ?? 0.0) * 100;
+        } else if (skorStunting.isNotEmpty) {
+          confStunting = skorStunting.values.reduce((a, b) => a > b ? a : b) * 100;
+        }
+
+        final isStunting = katStunting.toLowerCase().contains('pendek');
+        final isGiziBuruk = katGizi.toLowerCase().contains('kurang') ||
+            katGizi.toLowerCase().contains('buruk');
+
+        return HasilSmartGrowthBalita(
+          kategoriGiziBbtb: katGizi,
+          kategoriStuntingTbu: katStunting,
+          confidenceBbtb: confGizi,
+          confidenceTbu: confStunting,
+          probabilitasBbtb: skorGizi,
+          probabilitasTbu: skorStunting,
+          isStunting: isStunting,
+          isGiziBurukAtauKurang: isGiziBuruk,
+          inputDiproses: input.toJson(),
+        );
+      }
+    } catch (e) {
+      debugPrint('[VitaScaleApi] Vercel split endpoints error: $e. Mencoba fallback ke unified endpoint...');
+    }
+
+    // 2. Fallback ke endpoint unified /prediksi/smart-growth bila server menggunakan single endpoint
     final uri = Uri.parse('${VitaScaleApiConfig.baseUrl}${VitaScaleApiConfig.smartGrowthEndpoint}');
 
     try {
@@ -243,10 +327,10 @@ class VitaScaleApiService {
         return HasilSmartGrowthBalita.fromJson(json);
       } else {
         final error = jsonDecode(response.body);
-        throw Exception(error['detail'] ?? 'Prediksi gagal dengan kode ${response.statusCode}');
+        throw Exception(error['detail'] ?? error['error'] ?? 'Prediksi gagal dengan kode ${response.statusCode}');
       }
     } catch (e) {
-      debugPrint('[VitaScaleApi] prediksiSmartGrowth error: $e');
+      debugPrint('[VitaScaleApi] prediksiSmartGrowth fallback error: $e');
       rethrow;
     }
   }

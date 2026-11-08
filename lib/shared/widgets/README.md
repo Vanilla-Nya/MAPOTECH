@@ -172,3 +172,18 @@ CustomQrisDialog.show(
   onPaymentSuccess: () => _applyPackage(),
 );
 ```
+
+### 13. `CustomCollapsibleCard`
+* **File**: `custom_collapsible_card.dart`
+* **Fungsi**: Wadah kartu lipat interaktif (*collapsible/expandable container*) dengan animasi halus, header berikon, indikator chevron rotasi, dan status awal yang dapat dikonfigurasi (misal tertutup secara default saat halaman dimuat).
+* **Contoh**:
+```dart
+CustomCollapsibleCard(
+  title: 'Ringkasan Statistik & Indikator Pasien',
+  subtitle: '4 Metrik Utama Sasaran',
+  icon: Icons.analytics_rounded,
+  initiallyExpanded: false, // Tertutup saat pertama dibuka
+  child: GridView.count(...),
+)
+```
+
