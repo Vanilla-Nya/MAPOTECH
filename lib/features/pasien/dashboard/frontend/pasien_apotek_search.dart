@@ -155,6 +155,7 @@ class _PasienApotekSearchState extends ConsumerState<PasienApotekSearch> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(landingPageProvider);
+    final isEn = state.language == 'en';
 
     final isDark = state.appearance == 'dark';
     final isRev = state.appearance == 'rev';
@@ -206,7 +207,7 @@ class _PasienApotekSearchState extends ConsumerState<PasienApotekSearch> {
               ),
               const SizedBox(height: 14),
               Text(
-                'Cari Apotek Terdekat',
+                isEn ? 'Find Nearby Pharmacies' : 'Cari Apotek Terdekat',
                 style: GoogleFonts.outfit(
                   fontSize: 22,
                   fontWeight: FontWeight.w900,
@@ -215,7 +216,9 @@ class _PasienApotekSearchState extends ConsumerState<PasienApotekSearch> {
               ),
               const SizedBox(height: 6),
               Text(
-                'Tebus resep digital Anda di apotek jejaring Mapotek',
+                isEn
+                    ? 'Redeem your digital prescriptions at Mapotech network pharmacies'
+                    : 'Tebus resep digital Anda di apotek jejaring Mapotek',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.outfit(fontSize: 12, color: subtitleColor),
               ),
@@ -224,7 +227,7 @@ class _PasienApotekSearchState extends ConsumerState<PasienApotekSearch> {
                 onPressed: () => _openQrScanner(context),
                 icon: const Icon(Icons.qr_code_scanner_rounded, size: 16),
                 label: Text(
-                  'Scan QR Apotek / POS',
+                  isEn ? 'Scan Pharmacy / POS QR' : 'Scan QR Apotek / POS',
                   style: GoogleFonts.outfit(
                     fontWeight: FontWeight.bold,
                     fontSize: 12,
@@ -282,7 +285,9 @@ class _PasienApotekSearchState extends ConsumerState<PasienApotekSearch> {
                     color: textColor,
                   ),
                   decoration: InputDecoration(
-                    hintText: 'Cari nama apotek, jalan, atau daerah...',
+                    hintText: isEn
+                        ? 'Search pharmacy name, street, or area...'
+                        : 'Cari nama apotek, jalan, atau daerah...',
                     hintStyle: GoogleFonts.outfit(
                       fontSize: 13,
                       color: subtitleColor.withOpacity(0.5),
@@ -323,8 +328,10 @@ class _PasienApotekSearchState extends ConsumerState<PasienApotekSearch> {
         if (_searchQuery.isNotEmpty && _filteredApotek.isEmpty)
           EmptyStateWidget(
             icon: Icons.local_pharmacy_outlined,
-            title: 'Apotek tidak ditemukan',
-            subtitle: 'Coba nama apotek atau kelurahan lain',
+            title: isEn ? 'Pharmacy Not Found' : 'Apotek tidak ditemukan',
+            subtitle: isEn
+                ? 'Try searching with another pharmacy name or district'
+                : 'Coba nama apotek atau kelurahan lain',
             cardBg: cardBgColor,
             border: borderColor,
             textColor: textColor,
@@ -335,7 +342,7 @@ class _PasienApotekSearchState extends ConsumerState<PasienApotekSearch> {
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Text(
-                'Hasil untuk "$_searchQuery"',
+                isEn ? 'Results for "$_searchQuery"' : 'Hasil untuk "$_searchQuery"',
                 style: GoogleFonts.outfit(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,

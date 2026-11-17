@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
+import 'package:mapotech/shared/l10n/app_translations.dart';
 import 'dart:ui' as ui;
 
 bool _isCorsafeUrl(String url) {
@@ -270,7 +271,9 @@ List<DrawerMenuItem> getMenuItemsForRole(
       ),
       DrawerMenuItem(
         id: 'management_pustu_ponkesdes',
-        label: isEn ? 'Pustu/Ponkesdes Management' : 'Management Pustu/Ponkesdes',
+        label: isEn
+            ? 'Pustu/Ponkesdes Management'
+            : 'Management Pustu/Ponkesdes',
         icon: Icons.home_work_rounded,
         clusters: const ['all', 'cluster_1'],
         badgeText: 'PUSTU',
@@ -289,10 +292,29 @@ List<DrawerMenuItem> getMenuItemsForRole(
         id: 'dashboard',
         label: 'Dashboard',
         icon: Icons.dashboard_rounded,
+        badgeText: 'PKD',
+      ),
+      DrawerMenuItem(
+        id: 'dlc_pantauan_ibu_hamil',
+        label: isEn ? 'Maternal Care Monitoring' : 'Pantauan Ibu Hamil',
+        icon: Icons.pregnant_woman_rounded,
+        badgeText: 'DLC BUMIL',
+      ),
+      DrawerMenuItem(
+        id: 'dlc_form_ibu_hamil',
+        label: isEn ? 'Maternal Exam Form' : 'Form Pemeriksaan Ibu Hamil',
+        icon: Icons.assignment_rounded,
+        badgeText: 'ANC 10T',
+      ),
+      DrawerMenuItem(
+        id: 'dlc_vitascale_data_anak',
+        label: isEn ? 'VitaScale Child Nutrition' : 'VitaScale Gizi Balita',
+        icon: Icons.child_care_rounded,
+        badgeText: 'DLC BALITA',
       ),
       DrawerMenuItem(
         id: 'pasien',
-        label: isEn ? 'Patients' : 'Pasien',
+        label: isEn ? 'Village Patients' : 'Pasien Binaan Desa',
         icon: Icons.people_rounded,
       ),
       DrawerMenuItem(
@@ -1097,6 +1119,7 @@ class _FullScreenDrawerOverlayState
   Widget build(BuildContext context) {
     final state = ref.watch(landingPageProvider);
     final notifier = ref.read(landingPageProvider.notifier);
+    final isEn = ref.watch(isEnglishProvider);
 
     final isDark = state.appearance == 'dark';
     final isRev = state.appearance == 'rev';
@@ -1159,7 +1182,7 @@ class _FullScreenDrawerOverlayState
         _selectedClusterFilter == 'custom_menu') {
       List<Map<String, dynamic>> allDlcItems = [
         {
-          'title': 'Pantauan Ibu Hamil',
+          'title': isEn ? 'Maternal Care Monitoring' : 'Pantauan Ibu Hamil',
           'icon': Icons.pregnant_woman_rounded,
           'id': 'dlc_pantauan_ibu_hamil',
           'color': const Color(0xFFE91E63),
@@ -1171,7 +1194,7 @@ class _FullScreenDrawerOverlayState
           },
         },
         {
-          'title': 'Form Pemeriksaan Ibu Hamil',
+          'title': isEn ? 'Maternal Exam Form' : 'Form Pemeriksaan Ibu Hamil',
           'icon': Icons.assignment_rounded,
           'id': 'dlc_form_ibu_hamil',
           'color': const Color(0xFFEC407A),
@@ -1183,7 +1206,9 @@ class _FullScreenDrawerOverlayState
           },
         },
         {
-          'title': 'Skrining Stunting & Balita',
+          'title': isEn
+              ? 'Stunting & Child Screening'
+              : 'Skrining Stunting & Balita',
           'icon': Icons.child_friendly_rounded,
           'id': 'dlc_skrining_stunting',
           'color': const Color(0xFFAB47BC),
@@ -1192,14 +1217,20 @@ class _FullScreenDrawerOverlayState
           'onTap': () {
             _showDlcInfoDialog(
               context,
-              'Modul DLC Skrining Stunting & Balita',
-              'Deteksi Dini Stunting & Pemantauan KMS Digital',
-              'Modul DLC inovasi untuk pencatatan Z-Score stunting balita, grafik tumbuh kembang KMS digital, dan distribusi Program Makanan Tambahan (PMT) Puskesmas.',
+              isEn
+                  ? 'Stunting & Child Screening DLC'
+                  : 'Modul DLC Skrining Stunting & Balita',
+              isEn
+                  ? 'Early Stunting Detection & Digital Growth Monitoring'
+                  : 'Deteksi Dini Stunting & Pemantauan KMS Digital',
+              isEn
+                  ? 'DLC module for recording child stunting Z-Scores, digital KMS growth charts, and Supplementary Feeding Program (PMT).'
+                  : 'Modul DLC inovasi untuk pencatatan Z-Score stunting balita, grafik tumbuh kembang KMS digital, dan distribusi Program Makanan Tambahan (PMT) Puskesmas.',
             );
           },
         },
         {
-          'title': 'Modul DLC Telemedis',
+          'title': isEn ? 'Telemedicine DLC Module' : 'Modul DLC Telemedis',
           'icon': Icons.video_call_rounded,
           'id': 'dlc_telemedis',
           'color': const Color(0xFF8E24AA),
@@ -1208,14 +1239,20 @@ class _FullScreenDrawerOverlayState
           'onTap': () {
             _showDlcInfoDialog(
               context,
-              'Modul DLC Telemedis Puskesmas',
-              'Konsultasi Jarak Jauh & e-Resep Puskesmas',
-              'Menyediakan fitur telekonsultasi, pengingat jadwal minum obat pasien, dan peresepan obat jarak jauh untuk kawasan terpencil.',
+              isEn
+                  ? 'Telemedicine DLC Module'
+                  : 'Modul DLC Telemedis Puskesmas',
+              isEn
+                  ? 'Remote Consultation & e-Prescription'
+                  : 'Konsultasi Jarak Jauh & e-Resep Puskesmas',
+              isEn
+                  ? 'Provides teleconsultation, patient medication reminders, and remote prescription services for remote areas.'
+                  : 'Menyediakan fitur telekonsultasi, pengingat jadwal minum obat pasien, dan peresepan obat jarak jauh untuk kawasan terpencil.',
             );
           },
         },
         {
-          'title': 'Modul DLC Home Care',
+          'title': isEn ? 'Home Care DLC Module' : 'Modul DLC Home Care',
           'icon': Icons.home_work_rounded,
           'id': 'dlc_homecare',
           'color': const Color(0xFF3498DB),
@@ -1224,14 +1261,22 @@ class _FullScreenDrawerOverlayState
           'onTap': () {
             _showDlcInfoDialog(
               context,
-              'Modul DLC Home Care & Posyandu',
-              'Kunjungan Rumah & Pembinaan Wilayah Puskesmas',
-              'Fitur kustomisasi DLC untuk pengelolaan kunjungan tim medis ke rumah pasien lansia/kronis serta pemantauan Posyandu di setiap wilayah kerja Puskesmas.',
+              isEn
+                  ? 'Home Care & Posyandu DLC Module'
+                  : 'Modul DLC Home Care & Posyandu',
+              isEn
+                  ? 'Home Visits & Community Health Guidance'
+                  : 'Kunjungan Rumah & Pembinaan Wilayah Puskesmas',
+              isEn
+                  ? 'DLC customization for medical team home visits to elderly/chronic patients and Posyandu monitoring in each Puskesmas region.'
+                  : 'Fitur kustomisasi DLC untuk pengelolaan kunjungan tim medis ke rumah pasien lansia/kronis serta pemantauan Posyandu di setiap wilayah kerja Puskesmas.',
             );
           },
         },
         {
-          'title': 'E-Posyandu & EWRS Risk',
+          'title': isEn
+              ? 'E-Posyandu & EWRS High-Risk'
+              : 'E-Posyandu & EWRS Risk',
           'icon': Icons.warning_amber_rounded,
           'id': 'dlc_eposyandu',
           'color': const Color(0xFFFF9800),
@@ -1240,14 +1285,20 @@ class _FullScreenDrawerOverlayState
           'onTap': () {
             _showDlcInfoDialog(
               context,
-              'Modul DLC E-Posyandu & EWRS High-Risk',
-              'Early Warning Risk System & Integrasi Posyandu',
-              'Sistem peringatan dini otomatis untuk pasien risiko tinggi kehamilan, hipertensi, TB paru, dan integrasi pelaporan data kader Posyandu.',
+              isEn
+                  ? 'E-Posyandu & EWRS High-Risk DLC'
+                  : 'Modul DLC E-Posyandu & EWRS High-Risk',
+              isEn
+                  ? 'Early Warning Risk System & Posyandu Integration'
+                  : 'Early Warning Risk System & Integrasi Posyandu',
+              isEn
+                  ? 'Automated early warning system for high-risk pregnancies, hypertension, pulmonary TB, and Posyandu cadre reporting integration.'
+                  : 'Sistem peringatan dini otomatis untuk pasien risiko tinggi kehamilan, hipertensi, TB paru, dan integrasi pelaporan data kader Posyandu.',
             );
           },
         },
         {
-          'title': 'Data Anak/Bayi',
+          'title': isEn ? 'Child/Infant Data' : 'Data Anak/Bayi',
           'icon': Icons.child_care_rounded,
           'id': 'dlc_vitascale_data_anak',
           'color': const Color(0xFF1ABC9C),
@@ -1259,7 +1310,7 @@ class _FullScreenDrawerOverlayState
           },
         },
         {
-          'title': 'Screening Anak/Bayi',
+          'title': isEn ? 'Child Screening' : 'Screening Anak/Bayi',
           'icon': Icons.monitor_weight_rounded,
           'id': 'dlc_vitascale_screening',
           'color': const Color(0xFF16A085),
@@ -1271,7 +1322,9 @@ class _FullScreenDrawerOverlayState
           },
         },
         {
-          'title': 'Modul DLC SatuSehat Pro',
+          'title': isEn
+              ? 'SatuSehat Pro DLC Module'
+              : 'Modul DLC SatuSehat Pro',
           'icon': Icons.health_and_safety_rounded,
           'id': 'dlc_satusehat',
           'color': const Color(0xFF1ABC9C),
@@ -1280,9 +1333,13 @@ class _FullScreenDrawerOverlayState
           'onTap': () {
             _showDlcInfoDialog(
               context,
-              'Modul DLC SatuSehat Pro',
-              'Integrasi RME & BPJS P-Care Terintegrasi',
-              'Modul tambahan DLC ini memperluas alur Rekam Medis Elektronik (RME) Puskesmas dengan otomatisasi validasi NIK SatuSehat dan sinkronisasi bridging P-Care BPJS tanpa jeda.',
+              isEn ? 'SatuSehat Pro DLC Module' : 'Modul DLC SatuSehat Pro',
+              isEn
+                  ? 'EMR & BPJS P-Care Bridging'
+                  : 'Integrasi RME & BPJS P-Care Terintegrasi',
+              isEn
+                  ? 'Expands Puskesmas EMR workflows with automated SatuSehat NIK validation and seamless BPJS P-Care bridging.'
+                  : 'Modul tambahan DLC ini memperluas alur Rekam Medis Elektronik (RME) Puskesmas dengan otomatisasi validasi NIK SatuSehat dan sinkronisasi bridging P-Care BPJS tanpa jeda.',
             );
           },
         },
@@ -1296,16 +1353,20 @@ class _FullScreenDrawerOverlayState
           'onTap': () {
             _showDlcInfoDialog(
               context,
-              'Modul DLC BPJS P-Care Automatic Bridging',
-              'Integrasi Klaim & Entri Data BPJS P-Care',
-              'Otomatisasi pengiriman data pendaftaran, diagnosa ICD-10, dan tindakan pasien ke server BPJS P-Care tanpa input ulang secara manual.',
+              isEn
+                  ? 'BPJS P-Care Automatic Bridging DLC'
+                  : 'Modul DLC BPJS P-Care Automatic Bridging',
+              isEn
+                  ? 'Claim Integration & BPJS Data Entry'
+                  : 'Integrasi Klaim & Entri Data BPJS P-Care',
+              isEn
+                  ? 'Automated submission of registration data, ICD-10 diagnoses, and patient interventions directly to BPJS P-Care servers.'
+                  : 'Otomatisasi pengiriman data pendaftaran, diagnosa ICD-10, dan tindakan pasien ke server BPJS P-Care tanpa input ulang secara manual.',
             );
           },
         },
         {
-          'title': state.language == 'en'
-              ? '+ Add Custom DLC Menu'
-              : '+ Tambah Custom Menu DLC',
+          'title': isEn ? '+ Add Custom DLC Menu' : '+ Tambah Custom Menu DLC',
           'icon': Icons.add_circle_outline_rounded,
           'id': 'dlc_add',
           'color': const Color(0xFFE67E22),
@@ -1314,9 +1375,13 @@ class _FullScreenDrawerOverlayState
           'onTap': () {
             _showDlcInfoDialog(
               context,
-              'Tambah Custom Menu (DLC)',
-              'Kustomisasi Modul Khusus Faskes Puskesmas',
-              'Anda dapat meminta modul custom DLC baru yang disesuaikan dengan kebutuhan alur operasional dan regulasi Puskesmas Anda.',
+              isEn ? 'Add Custom DLC Menu' : 'Tambah Custom Menu (DLC)',
+              isEn
+                  ? 'Customization for Healthcare Facilities'
+                  : 'Kustomisasi Modul Khusus Faskes Puskesmas',
+              isEn
+                  ? 'You can request new custom DLC modules tailored to your operational workflows and health facility regulations.'
+                  : 'Anda dapat meminta modul custom DLC baru yang disesuaikan dengan kebutuhan alur operasional dan regulasi Puskesmas Anda.',
             );
           },
         },
@@ -1551,12 +1616,15 @@ class _FullScreenDrawerOverlayState
                               children: [
                                 _buildTranslucentBadge(
                                   Icons.calendar_today_rounded,
-                                  'Selasa, 26 Mei 2026',
+                                  AppTranslations.formatDate(
+                                    DateTime.now(),
+                                    lang: state.language,
+                                  ),
                                 ),
                                 const SizedBox(width: 8),
                                 _buildTranslucentBadge(
                                   Icons.access_time_rounded,
-                                  '13.52',
+                                  '${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}',
                                 ),
                               ],
                             ),
@@ -1666,7 +1734,9 @@ class _FullScreenDrawerOverlayState
                         color: textColor,
                       ),
                       decoration: InputDecoration(
-                        hintText: 'Apa yang ingin Anda cari hari ini?',
+                        hintText: isEn
+                            ? 'What are you looking for today?'
+                            : 'Apa yang ingin Anda cari hari ini?',
                         hintStyle: GoogleFonts.outfit(
                           fontSize: 13,
                           color: subtitleColor.withOpacity(0.5),
@@ -1739,7 +1809,7 @@ class _FullScreenDrawerOverlayState
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 itemCount: puskesmasClusterList.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 10),
+                separatorBuilder: (context, index) => const SizedBox(width: 10),
                 itemBuilder: (context, index) {
                   final cluster = puskesmasClusterList[index];
                   final isSelected = _selectedClusterFilter == cluster.id;
@@ -1853,19 +1923,23 @@ class _FullScreenDrawerOverlayState
                 children: [
                   _buildDlcSubFilterChip(
                     'all_dlc',
-                    'Semua Inovasi DLC',
+                    isEn ? 'All DLC Innovations' : 'Semua Inovasi DLC',
                     Icons.auto_awesome_rounded,
                   ),
                   const SizedBox(width: 8),
                   _buildDlcSubFilterChip(
                     'kia_dlc',
-                    'Kesehatan Ibu & Anak (KIA)',
+                    isEn
+                        ? 'Maternal & Child (KIA)'
+                        : 'Kesehatan Ibu & Anak (KIA)',
                     Icons.pregnant_woman_rounded,
                   ),
                   const SizedBox(width: 8),
                   _buildDlcSubFilterChip(
                     'pelayanan_dlc',
-                    'Pelayanan Medis & Posyandu',
+                    isEn
+                        ? 'Medical Services & Posyandu'
+                        : 'Pelayanan Medis & Posyandu',
                     Icons.medical_services_rounded,
                   ),
                   const SizedBox(width: 8),
@@ -2027,7 +2101,8 @@ class _FullScreenDrawerOverlayState
 
     final Color borderCol = isSelected ? accentColor : Colors.transparent;
 
-    final VoidCallback handleCardTap = onTap ??
+    final VoidCallback handleCardTap =
+        onTap ??
         () {
           widget.onMenuSelected(menuId);
           notifier.setDrawerSize(1);

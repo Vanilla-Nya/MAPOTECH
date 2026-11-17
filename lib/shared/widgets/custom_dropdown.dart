@@ -111,7 +111,7 @@ class CustomDropdown<T> extends StatelessWidget {
               Expanded(
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<T>(
-                    value: value,
+                    value: (value != null && items.any((item) => item.value == value)) ? value : null,
                     isExpanded: true,
                     hint: Text(
                       hintText,

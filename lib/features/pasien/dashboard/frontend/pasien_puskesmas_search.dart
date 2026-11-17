@@ -99,6 +99,7 @@ class _PasienPuskesmasSearchState extends ConsumerState<PasienPuskesmasSearch> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(landingPageProvider);
+    final isEn = state.language == 'en';
 
     final isDark = state.appearance == 'dark';
     final notifier = ref.read(landingPageProvider.notifier);
@@ -126,7 +127,9 @@ class _PasienPuskesmasSearchState extends ConsumerState<PasienPuskesmasSearch> {
               // Search Field
               CustomSearchBar(
                 controller: _searchController,
-                hintText: 'Cari puskesmas, ponkesdes, atau pustu terdekat...',
+                hintText: isEn
+                    ? 'Search nearby health centers, ponkesdes, or pustu...'
+                    : 'Cari puskesmas, ponkesdes, atau pustu terdekat...',
                 backgroundColor: inputBg,
                 borderColor: borderColor,
                 textColor: textColor,
@@ -144,7 +147,7 @@ class _PasienPuskesmasSearchState extends ConsumerState<PasienPuskesmasSearch> {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   CustomFilterChip<String>(
-                    label: 'Semua',
+                    label: isEn ? 'All' : 'Semua',
                     value: 'semua',
                     selectedValue: _selectedFilter,
                     activeColor: themeAccent,
@@ -203,7 +206,9 @@ class _PasienPuskesmasSearchState extends ConsumerState<PasienPuskesmasSearch> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Fasilitas Pelayanan Kesehatan Masyarakat',
+                  isEn
+                      ? 'Community Healthcare Facilities'
+                      : 'Fasilitas Pelayanan Kesehatan Masyarakat',
                   style: GoogleFonts.outfit(
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
@@ -213,8 +218,10 @@ class _PasienPuskesmasSearchState extends ConsumerState<PasienPuskesmasSearch> {
                 const SizedBox(height: 2),
                 Text(
                   _searchQuery.isEmpty
-                      ? 'Puskesmas, Ponkesdes, dan Pustu jejaring pemerintah terdekat'
-                      : 'Hasil pencarian untuk "$_searchQuery"',
+                      ? (isEn
+                          ? 'Nearby government healthcare network'
+                          : 'Puskesmas, Ponkesdes, dan Pustu jejaring pemerintah terdekat')
+                      : (isEn ? 'Search results for "$_searchQuery"' : 'Hasil pencarian untuk "$_searchQuery"'),
                   style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor),
                 ),
               ],
@@ -228,7 +235,7 @@ class _PasienPuskesmasSearchState extends ConsumerState<PasienPuskesmasSearch> {
               child: Text(
                 _isLoading
                     ? '...'
-                    : '${_filteredPuskesmas.length} Hasil',
+                    : (isEn ? '${_filteredPuskesmas.length} Results' : '${_filteredPuskesmas.length} Hasil'),
                 style: GoogleFonts.outfit(
                   fontSize: 10,
                   fontWeight: FontWeight.w900,

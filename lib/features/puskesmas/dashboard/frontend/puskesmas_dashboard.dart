@@ -19,6 +19,8 @@ class _PuskesmasDashboardState extends ConsumerState<PuskesmasDashboard> {
 
   @override
   Widget build(BuildContext context) {
+    final state = ref.watch(landingPageProvider);
+    final isEn = state.language == 'en';
     final notifier = ref.read(landingPageProvider.notifier);
     final cardBgColor = notifier.getCardColor();
     final subtitleColor = notifier.getBodyTextColor();
@@ -62,7 +64,7 @@ class _PuskesmasDashboardState extends ConsumerState<PuskesmasDashboard> {
                           Icon(Icons.shield_rounded, size: 18, color: isOwnerMode ? Colors.white : subtitleColor),
                           const SizedBox(width: 8),
                           Text(
-                            '👑 DASHBOARD OWNER',
+                            isEn ? '👑 OWNER DASHBOARD' : '👑 DASHBOARD OWNER',
                             style: GoogleFonts.outfit(
                               fontSize: 11,
                               fontWeight: FontWeight.w900,
@@ -95,7 +97,7 @@ class _PuskesmasDashboardState extends ConsumerState<PuskesmasDashboard> {
                           Icon(Icons.badge_rounded, size: 18, color: !isOwnerMode ? Colors.white : subtitleColor),
                           const SizedBox(width: 8),
                           Text(
-                            '👷 DASHBOARD PEKERJA',
+                            isEn ? '👷 WORKER DASHBOARD' : '👷 DASHBOARD PEKERJA',
                             style: GoogleFonts.outfit(
                               fontSize: 11,
                               fontWeight: FontWeight.w900,

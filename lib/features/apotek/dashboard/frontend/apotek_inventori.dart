@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
+import 'package:mapotech/shared/widgets/ui.dart';
 import 'package:mapotech/shared/supabase_service.dart';
 import 'package:mapotech/features/apotek/dashboard/backend/inventory_provider.dart';
 
@@ -18,6 +19,7 @@ class _ApotekInventoriState extends ConsumerState<ApotekInventori> {
   String _searchQuery = '';
   String _activeFilter = 'semua'; // 'semua', 'aman', 'menipis', 'habis', 'kadaluarsa'
   bool _isGridView = false;
+  bool get isEn => ref.read(isEnglishProvider);
 
   @override
   void initState() {
@@ -1797,7 +1799,7 @@ class _ApotekInventoriState extends ConsumerState<ApotekInventori> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Inventori Obat & Farmasi',
+                      isEn ? 'Medicine & Pharmacy Inventory' : 'Inventori Obat & Farmasi',
                       style: GoogleFonts.outfit(
                         fontSize: 18,
                         fontWeight: FontWeight.w900,
@@ -1806,7 +1808,7 @@ class _ApotekInventoriState extends ConsumerState<ApotekInventori> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Kelola katalog obat, lacak stok rak, nomor batch, dan pantau tanggal kedaluwarsa',
+                      isEn ? 'Manage medicine catalog, track shelf stock, batch numbers, and monitor expiration dates' : 'Kelola katalog obat, lacak stok rak, nomor batch, dan pantau tanggal kedaluwarsa',
                       style: GoogleFonts.outfit(
                         fontSize: 11,
                         color: subtitleColor,
@@ -1837,7 +1839,7 @@ class _ApotekInventoriState extends ConsumerState<ApotekInventori> {
                 },
                 icon: const Icon(Icons.add_rounded, size: 18, color: Colors.white),
                 label: Text(
-                  'Tambah Obat Baru',
+                  isEn ? 'Add New Medicine' : 'Tambah Obat Baru',
                   style: GoogleFonts.outfit(
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
@@ -1860,13 +1862,13 @@ class _ApotekInventoriState extends ConsumerState<ApotekInventori> {
         // ─── KPI Summary Cards Bar ───────────────────────────
         Row(
           children: [
-            Expanded(child: _buildKpiCard('TOTAL KATALOG', '$totalCatalog Obat', Icons.medication_rounded, themeAccent, cardBgColor, borderColor, textColor, subtitleColor)),
+            Expanded(child: _buildKpiCard(isEn ? 'TOTAL CATALOG' : 'TOTAL KATALOG', isEn ? '$totalCatalog Meds' : '$totalCatalog Obat', Icons.medication_rounded, themeAccent, cardBgColor, borderColor, textColor, subtitleColor)),
             const SizedBox(width: 10),
-            Expanded(child: _buildKpiCard('VALUASI ASET', 'Rp ${_formatPrice(totalAssets)}', Icons.account_balance_wallet_rounded, const Color(0xFF27AE60), cardBgColor, borderColor, textColor, subtitleColor)),
+            Expanded(child: _buildKpiCard(isEn ? 'ASSET VALUATION' : 'VALUASI ASET', 'Rp ${_formatPrice(totalAssets)}', Icons.account_balance_wallet_rounded, const Color(0xFF27AE60), cardBgColor, borderColor, textColor, subtitleColor)),
             const SizedBox(width: 10),
-            Expanded(child: _buildKpiCard('STOK MENIPIS', '$menipisCount Obat', Icons.warning_amber_rounded, Colors.amber, cardBgColor, borderColor, textColor, subtitleColor)),
+            Expanded(child: _buildKpiCard(isEn ? 'LOW STOCK' : 'STOK MENIPIS', isEn ? '$menipisCount Meds' : '$menipisCount Obat', Icons.warning_amber_rounded, Colors.amber, cardBgColor, borderColor, textColor, subtitleColor)),
             const SizedBox(width: 10),
-            Expanded(child: _buildKpiCard('HABIS / KRITIS', '$habisCount Obat', Icons.cancel_outlined, Colors.redAccent, cardBgColor, borderColor, textColor, subtitleColor)),
+            Expanded(child: _buildKpiCard(isEn ? 'OUT OF STOCK' : 'HABIS / KRITIS', isEn ? '$habisCount Meds' : '$habisCount Obat', Icons.cancel_outlined, Colors.redAccent, cardBgColor, borderColor, textColor, subtitleColor)),
           ],
         ),
 
@@ -1903,7 +1905,7 @@ class _ApotekInventoriState extends ConsumerState<ApotekInventori> {
                               onChanged: (val) => setState(() => _searchQuery = val),
                               style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: textColor),
                               decoration: InputDecoration(
-                                hintText: 'Cari obat, formula zat aktif, SKU, atau lokasi rak...',
+                                hintText: isEn ? 'Search medicine, active formula, SKU, or rack location...' : 'Cari obat, formula zat aktif, SKU, atau lokasi rak...',
                                 hintStyle: GoogleFonts.outfit(fontSize: 11, color: subtitleColor.withValues(alpha: 0.6)),
                                 border: InputBorder.none,
                                 isDense: true,
@@ -1929,11 +1931,13 @@ class _ApotekInventoriState extends ConsumerState<ApotekInventori> {
                           icon: Icon(Icons.view_list_rounded, size: 18, color: !_isGridView ? const Color(0xFF27AE60) : subtitleColor),
                           onPressed: () => setState(() => _isGridView = false),
                           splashRadius: 18,
+                          tooltip: isEn ? 'List View' : 'Tampilan Daftar',
                         ),
                         IconButton(
                           icon: Icon(Icons.grid_view_rounded, size: 18, color: _isGridView ? const Color(0xFF27AE60) : subtitleColor),
                           onPressed: () => setState(() => _isGridView = true),
                           splashRadius: 18,
+                          tooltip: isEn ? 'Grid View' : 'Tampilan Grid',
                         ),
                       ],
                     ),
@@ -1945,15 +1949,15 @@ class _ApotekInventoriState extends ConsumerState<ApotekInventori> {
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
-                    _buildFilterChip('Semua ($totalCatalog)', 'semua', const Color(0xFF27AE60)),
+                    _buildFilterChip(isEn ? 'All ($totalCatalog)' : 'Semua ($totalCatalog)', 'semua', const Color(0xFF27AE60)),
                     const SizedBox(width: 8),
-                    _buildFilterChip('Stok Aman ($amanCount)', 'aman', const Color(0xFF27AE60)),
+                    _buildFilterChip(isEn ? 'Healthy Stock ($amanCount)' : 'Stok Aman ($amanCount)', 'aman', const Color(0xFF27AE60)),
                     const SizedBox(width: 8),
-                    _buildFilterChip('Stok Menipis ($menipisCount)', 'menipis', Colors.amber),
+                    _buildFilterChip(isEn ? 'Low Stock ($menipisCount)' : 'Stok Menipis ($menipisCount)', 'menipis', Colors.amber),
                     const SizedBox(width: 8),
-                    _buildFilterChip('Habis ($habisCount)', 'habis', Colors.redAccent),
+                    _buildFilterChip(isEn ? 'Out of Stock ($habisCount)' : 'Habis ($habisCount)', 'habis', Colors.redAccent),
                     const SizedBox(width: 8),
-                    _buildFilterChip('Hampir Kadaluarsa', 'kadaluarsa', Colors.orangeAccent),
+                    _buildFilterChip(isEn ? 'Expiring Soon' : 'Hampir Kadaluarsa', 'kadaluarsa', Colors.orangeAccent),
                   ],
                 ),
               ),
@@ -1972,9 +1976,9 @@ class _ApotekInventoriState extends ConsumerState<ApotekInventori> {
               children: [
                 Icon(Icons.inventory_2_outlined, size: 48, color: themeAccent.withValues(alpha: 0.3)),
                 const SizedBox(height: 12),
-                Text('Tidak Ada Obat Ditemukan', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w900, color: textColor)),
+                Text(isEn ? 'No Medicines Found' : 'Tidak Ada Obat Ditemukan', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w900, color: textColor)),
                 const SizedBox(height: 4),
-                Text('Ubah kata kunci pencarian atau tambahkan obat baru.', style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor)),
+                Text(isEn ? 'Try changing your search keywords or add a new medicine.' : 'Ubah kata kunci pencarian atau tambahkan obat baru.', style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor)),
               ],
             ),
           )
@@ -2071,13 +2075,13 @@ class _ApotekInventoriState extends ConsumerState<ApotekInventori> {
 
   Widget _buildListRow(ApotekInventoryItem item, bool isDark, Color themeAccent, Color textColor, Color subtitleColor, Color cardBg, Color border) {
     Color statusColor = const Color(0xFF27AE60);
-    String statusLabel = 'Tersedia';
+    String statusLabel = isEn ? 'In Stock' : 'Tersedia';
     if (item.status == 'habis') {
       statusColor = Colors.redAccent;
-      statusLabel = 'Habis';
+      statusLabel = isEn ? 'Out of Stock' : 'Habis';
     } else if (item.status == 'menipis') {
       statusColor = Colors.amber;
-      statusLabel = 'Stok Menipis';
+      statusLabel = isEn ? 'Low Stock' : 'Stok Menipis';
     }
 
     return Container(
@@ -2194,7 +2198,7 @@ class _ApotekInventoriState extends ConsumerState<ApotekInventori> {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text('Rp ${_formatPrice(item.sellPrice)}', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w900, color: textColor)),
-                      Text('Beli: Rp ${_formatPrice(item.buyPrice)}', style: GoogleFonts.outfit(fontSize: 9.5, color: subtitleColor)),
+                      Text('${isEn ? "Buy: " : "Beli: "}Rp ${_formatPrice(item.buyPrice)}', style: GoogleFonts.outfit(fontSize: 9.5, color: subtitleColor)),
                     ],
                   ),
                 ),
@@ -2206,7 +2210,7 @@ class _ApotekInventoriState extends ConsumerState<ApotekInventori> {
                   children: [
                     IconButton(
                       icon: const Icon(Icons.edit_outlined, size: 20, color: Color(0xFF27AE60)),
-                      tooltip: 'Edit & Batch',
+                      tooltip: isEn ? 'Edit & Batches' : 'Edit & Batch',
                       onPressed: () => _showMedicineDetailModal(context, item, isDark, themeAccent, textColor, subtitleColor, cardBg, border),
                     ),
                   ],
@@ -2221,13 +2225,13 @@ class _ApotekInventoriState extends ConsumerState<ApotekInventori> {
 
   Widget _buildGridCard(ApotekInventoryItem item, bool isDark, Color themeAccent, Color textColor, Color subtitleColor, Color cardBg, Color border) {
     Color statusColor = const Color(0xFF27AE60);
-    String statusLabel = 'Tersedia';
+    String statusLabel = isEn ? 'In Stock' : 'Tersedia';
     if (item.status == 'habis') {
       statusColor = Colors.redAccent;
-      statusLabel = 'Habis';
+      statusLabel = isEn ? 'Out of Stock' : 'Habis';
     } else if (item.status == 'menipis') {
       statusColor = Colors.amber;
-      statusLabel = 'Menipis';
+      statusLabel = isEn ? 'Low Stock' : 'Menipis';
     }
 
     return Container(
@@ -2273,14 +2277,14 @@ class _ApotekInventoriState extends ConsumerState<ApotekInventori> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('STOK', style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.bold, color: subtitleColor)),
+                        Text(isEn ? 'STOCK' : 'STOK', style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.bold, color: subtitleColor)),
                         Text('${_formatPrice(item.stock.toDouble())} ${item.unit}', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w900, color: statusColor)),
                       ],
                     ),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Text('HARGA JUAL', style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.bold, color: subtitleColor)),
+                        Text(isEn ? 'SELL PRICE' : 'HARGA JUAL', style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.bold, color: subtitleColor)),
                         Text('Rp ${_formatPrice(item.sellPrice)}', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w900, color: textColor)),
                       ],
                     ),

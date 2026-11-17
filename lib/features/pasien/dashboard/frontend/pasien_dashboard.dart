@@ -2,10 +2,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:mapotech/shared/widgets/skeleton_loading.dart';
+import 'package:mapotech/shared/widgets/ui.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
-import 'package:mapotech/shared/widgets/animated_transitions.dart';
-import 'package:mapotech/shared/widgets/custom_button.dart';
 import 'package:mapotech/shared/supabase_service.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -281,6 +279,7 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
     final subtitleColor = notifier.getBodyTextColor();
     final borderColor = notifier.getBorderColor();
     final themeAccent = notifier.getPrimaryColor();
+    final isEn = state.language == 'en';
 
     final isMobile = MediaQuery.of(context).size.width < 768;
 
@@ -386,7 +385,7 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                               onPressed: () => _openQrScanner(context),
                               icon: const Icon(Icons.qr_code_scanner_rounded, size: 16),
                               label: Text(
-                                'Scan QR',
+                                isEn ? 'Scan QR' : 'Scan QR',
                                 style: GoogleFonts.outfit(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 12,
@@ -407,7 +406,7 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                             ),
                             const SizedBox(width: 10),
                             CustomButton(
-                              text: 'Edit Profil',
+                              text: isEn ? 'Edit Profile' : 'Edit Profil',
                               icon: Icons.edit_rounded,
                               height: 38,
                               onPressed: () {
@@ -448,7 +447,7 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                     ? Column(
                         children: [
                           _buildBookingQuickCard(
-                            title: 'BOOKING LAGI',
+                            title: isEn ? 'RE-BOOK' : 'BOOKING LAGI',
                             subtitle: _doctorName.isNotEmpty
                                 ? _doctorName
                                 : 'dr. Agoes Soetanto',
@@ -493,7 +492,7 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                           // Left link: Booking Dokter
                           Expanded(
                             child: _buildBookingQuickCard(
-                              title: 'BOOKING LAGI',
+                              title: isEn ? 'RE-BOOK' : 'BOOKING LAGI',
                               subtitle: _doctorName.isNotEmpty
                                   ? _doctorName
                                   : 'dr. Agoes Soetanto',
@@ -640,7 +639,7 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                                             ),
                                             const SizedBox(height: 4),
                                             Text(
-                                              'Tanggal: ${_formatDate(_nextAppointment!['date_queue'] ?? '')}',
+                                              '${isEn ? "Date" : "Tanggal"}: ${_formatDate(_nextAppointment!['date_queue'] ?? '')}',
                                               style: GoogleFonts.outfit(
                                                 fontSize: 11,
                                                 color: subtitleColor,
@@ -668,7 +667,7 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                                           MainAxisAlignment.spaceBetween,
                                       children: [
                                         Text(
-                                          'NOMOR ANTRIAN',
+                                          isEn ? 'QUEUE NUMBER' : 'NOMOR ANTRIAN',
                                           style: GoogleFonts.outfit(
                                             fontSize: 9,
                                             fontWeight: FontWeight.bold,
@@ -691,7 +690,7 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                                   ),
                                   const SizedBox(height: 14),
                                   CustomButton(
-                                    text: 'Detail Janji Temu',
+                                    text: isEn ? 'Appointment Details' : 'Detail Janji Temu',
                                     height: 38,
                                     onPressed: () {
                                       widget.onNavigate?.call('history');
@@ -722,7 +721,7 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                                   ),
                                   const SizedBox(height: 20),
                                   CustomButton(
-                                    text: 'Buat Janji Temu',
+                                    text: isEn ? 'Book Appointment' : 'Buat Janji Temu',
                                     icon: Icons.add_rounded,
                                     height: 38,
                                     onPressed: () {
@@ -1200,7 +1199,7 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      'SCAN QR INSTAN',
+                      ref.watch(isEnglishProvider) ? 'INSTANT QR SCAN' : 'SCAN QR INSTAN',
                       style: GoogleFonts.outfit(
                         fontSize: 8.5,
                         fontWeight: FontWeight.bold,
@@ -1210,7 +1209,7 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Dokter & Apotek',
+                      ref.watch(isEnglishProvider) ? 'Doctor & Pharmacy' : 'Dokter & Apotek',
                       style: GoogleFonts.outfit(
                         fontSize: 15,
                         fontWeight: FontWeight.w900,
@@ -1219,7 +1218,9 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Auto Pendaftaran & POS Connect',
+                      ref.watch(isEnglishProvider)
+                          ? 'Auto Check-in & POS Connect'
+                          : 'Auto Pendaftaran & POS Connect',
                       style: GoogleFonts.outfit(
                         fontSize: 9.5,
                         fontWeight: FontWeight.w600,
@@ -1288,7 +1289,7 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      'QR RESEP DIGITAL',
+                      ref.watch(isEnglishProvider) ? 'DIGITAL RX QR' : 'QR RESEP DIGITAL',
                       style: GoogleFonts.outfit(
                         fontSize: 8.5,
                         color: subtitleColor,
@@ -1299,8 +1300,10 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                     const SizedBox(height: 2),
                     Text(
                       activePrescriptionsCount > 0
-                          ? '$activePrescriptionsCount Resep Aktif'
-                          : 'Tebus Obat Online',
+                          ? (ref.watch(isEnglishProvider)
+                              ? '$activePrescriptionsCount Active Prescriptions'
+                              : '$activePrescriptionsCount Resep Aktif')
+                          : (ref.watch(isEnglishProvider) ? 'Redeem Meds Online' : 'Tebus Obat Online'),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.outfit(
@@ -1312,8 +1315,8 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                     const SizedBox(height: 4),
                     Text(
                       activePrescriptionsCount > 0
-                          ? 'LIHAT RESEP >'
-                          : 'CARI DOKTER >',
+                          ? (ref.watch(isEnglishProvider) ? 'VIEW PRESCRIPTIONS >' : 'LIHAT RESEP >')
+                          : (ref.watch(isEnglishProvider) ? 'FIND DOCTOR >' : 'CARI DOKTER >'),
                       style: GoogleFonts.outfit(
                         fontSize: 9,
                         fontWeight: FontWeight.w900,
@@ -1442,7 +1445,9 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Tanya gejala medis, panduan menu, rekomendasi dokter & resep obat',
+                      ref.watch(isEnglishProvider)
+                          ? 'Ask medical symptoms, guidance, doctor recommendations & prescriptions'
+                          : 'Tanya gejala medis, panduan menu, rekomendasi dokter & resep obat',
                       style: GoogleFonts.outfit(
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
@@ -1463,7 +1468,7 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'Buka AI',
+                      ref.watch(isEnglishProvider) ? 'Open AI' : 'Buka AI',
                       style: GoogleFonts.outfit(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,

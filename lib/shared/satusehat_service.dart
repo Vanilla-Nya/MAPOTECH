@@ -466,6 +466,385 @@ class SatuSehatService {
     return res['status'] == true;
   }
 
+  /// Create Observation for vital-signs / antropometri (LOINC) in SatuSehat FHIR R4
+  Future<Map<String, dynamic>> createObservation({
+    required Map<String, String> headers,
+    required String patientId,
+    required String patientName,
+    required String encounterId,
+    required String loincCode,
+    required String loincDisplay,
+    required double value,
+    required String unit,
+    String? practitionerId,
+    String? practitionerName,
+  }) async {
+    final now = DateTime.now().toUtc().toIso8601String();
+    final payload = {
+      "resourceType": "Observation",
+      "status": "final",
+      "category": [
+        {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+              "code": "vital-signs",
+              "display": "Vital Signs"
+            }
+          ]
+        }
+      ],
+      "code": {
+        "coding": [
+          {
+            "system": "http://loinc.org",
+            "code": loincCode,
+            "display": loincDisplay
+          }
+        ]
+      },
+      "subject": {
+        "reference": "Patient/$patientId",
+        "display": patientName,
+      },
+      "encounter": {
+        "reference": "Encounter/$encounterId",
+        "display": "Pemeriksaan Antropometri Balita $patientName"
+      },
+      "effectiveDateTime": now,
+      "issued": now,
+      if (practitionerId != null)
+        "performer": [
+          {
+            "reference": "Practitioner/$practitionerId",
+            "display": practitionerName ?? "Petugas Kesehatan"
+          }
+        ],
+      "valueQuantity": {
+        "value": value,
+        "unit": unit,
+        "system": "http://unitsofmeasure.org",
+        "code": unit
+      }
+    };
+
+    final token = _token ?? headers['Authorization']?.replaceAll('Bearer ', '').trim() ?? '';
+    final res = await _callFhirProxy(
+      method: 'POST',
+      endpoint: '/Observation',
+      token: token,
+      payload: payload,
+    );
+
+    if (res['status'] == true) {
+      return {'status': true, 'id': res['data']?['id'], 'data': res['data']};
+    }
+    return {'status': false, 'message': res['message'] ?? 'Gagal membuat Observation'};
+  }
+
+  /// Helper untuk mengirim seluruh paket observasi antropometri (BB, PB/TB, LiLA, LK, LP) ke SatuSehat
+  Future<Map<String, dynamic>> sendAnthropometryData({
+    required String patientId,
+    required String patientName,
+    required String doctorId,
+    required String doctorName,
+    required String encounterId,
+    required double weightKg,
+    required double heightCm,
+    required bool isRecumbent,
+    double? headCircumferenceCm,
+    double? lilaCm,
+    double? waistCm,
+    String? diagnosisCode,
+    String? diagnosisDesc,
+  }) async {
+    final token = await getToken();
+    if (token == null) {
+      return {'status': false, 'message': 'Gagal mendapatkan token SatuSehat'};
+    }
+
+    final headers = {
+      'Authorization': 'Bearer $token',
+      'Content-Type': 'application/json',
+    };
+
+    final results = <String, dynamic>{
+      'status': true,
+      'observations': <Map<String, dynamic>>[],
+    };
+
+    // 1. Berat Badan (LOINC 29463-7)
+    final bbRes = await createObservation(
+      headers: headers,
+      patientId: patientId,
+      patientName: patientName,
+      encounterId: encounterId,
+      loincCode: '29463-7',
+      loincDisplay: 'Body weight',
+      value: weightKg,
+      unit: 'kg',
+      practitionerId: doctorId,
+      practitionerName: doctorName,
+    );
+    results['observations'].add({'name': 'Berat Badan', 'result': bbRes});
+
+    // 2. Panjang / Tinggi Badan (LOINC 8306-3 lying / 8302-2 standing)
+    final tbCode = isRecumbent ? '8306-3' : '8302-2';
+    final tbDisplay = isRecumbent ? 'Body height --lying' : 'Body height';
+    final tbRes = await createObservation(
+      headers: headers,
+      patientId: patientId,
+      patientName: patientName,
+      encounterId: encounterId,
+      loincCode: tbCode,
+      loincDisplay: tbDisplay,
+      value: heightCm,
+      unit: 'cm',
+      practitionerId: doctorId,
+      practitionerName: doctorName,
+    );
+    results['observations'].add({'name': 'Panjang/Tinggi Badan', 'result': tbRes});
+
+    // 3. Lingkar Kepala (LOINC 9843-4) jika ada
+    if (headCircumferenceCm != null && headCircumferenceCm > 0) {
+      final lkRes = await createObservation(
+        headers: headers,
+        patientId: patientId,
+        patientName: patientName,
+        encounterId: encounterId,
+        loincCode: '9843-4',
+        loincDisplay: 'Head Occipital-frontal circumference',
+        value: headCircumferenceCm,
+        unit: 'cm',
+        practitionerId: doctorId,
+        practitionerName: doctorName,
+      );
+      results['observations'].add({'name': 'Lingkar Kepala', 'result': lkRes});
+    }
+
+    // 4. LiLA (LOINC 56072-2) jika ada
+    if (lilaCm != null && lilaCm > 0) {
+      final lilaRes = await createObservation(
+        headers: headers,
+        patientId: patientId,
+        patientName: patientName,
+        encounterId: encounterId,
+        loincCode: '56072-2',
+        loincDisplay: 'Circumference Mid upper arm',
+        value: lilaCm,
+        unit: 'cm',
+        practitionerId: doctorId,
+        practitionerName: doctorName,
+      );
+      results['observations'].add({'name': 'LiLA', 'result': lilaRes});
+    }
+
+    // 5. Lingkar Perut (LOINC 8280-0) jika ada
+    if (waistCm != null && waistCm > 0) {
+      final lpRes = await createObservation(
+        headers: headers,
+        patientId: patientId,
+        patientName: patientName,
+        encounterId: encounterId,
+        loincCode: '8280-0',
+        loincDisplay: 'Waist Circumference at umbilicus',
+        value: waistCm,
+        unit: 'cm',
+        practitionerId: doctorId,
+        practitionerName: doctorName,
+      );
+      results['observations'].add({'name': 'Lingkar Perut', 'result': lpRes});
+    }
+
+    // 6. Condition Diagnosis ICD-10 (stunting/gizi kurang/sehat)
+    if (diagnosisCode != null && diagnosisCode.isNotEmpty) {
+      await createCondition(
+        headers: headers,
+        patientId: patientId,
+        patientName: patientName,
+        encounterId: encounterId,
+        diag: {
+          'code': diagnosisCode,
+          'description': diagnosisDesc ?? 'Status Pertumbuhan dan Gizi Balita',
+        },
+      );
+    }
+
+    return results;
+  }
+
+  /// Helper untuk mengirim paket data Antenatal Care (ANC 10T) ke SATUSEHAT RME
+  Future<Map<String, dynamic>> sendAntenatalCareData({
+    required String patientId,
+    required String patientName,
+    required String doctorId,
+    required String doctorName,
+    required String encounterId,
+    required double weightKg,
+    required double heightCm,
+    required double lilaCm,
+    required double sistoleMmHg,
+    required double diastoleMmHg,
+    double? tfuCm,
+    double? djjBpm,
+    double? hbGdl,
+    List<Map<String, String>>? diagnosisList,
+  }) async {
+    final token = await getToken();
+    if (token == null) {
+      return {'status': false, 'message': 'Gagal mendapatkan token SatuSehat'};
+    }
+
+    final headers = {
+      'Authorization': 'Bearer $token',
+      'Content-Type': 'application/json',
+    };
+
+    final results = <String, dynamic>{
+      'status': true,
+      'observations': <Map<String, dynamic>>[],
+    };
+
+    // 1. T1: Berat Badan (LOINC 29463-7) & Tinggi Badan (LOINC 8302-2)
+    final bbRes = await createObservation(
+      headers: headers,
+      patientId: patientId,
+      patientName: patientName,
+      encounterId: encounterId,
+      loincCode: '29463-7',
+      loincDisplay: 'Body weight',
+      value: weightKg,
+      unit: 'kg',
+      practitionerId: doctorId,
+      practitionerName: doctorName,
+    );
+    results['observations'].add({'name': 'Berat Badan', 'result': bbRes});
+
+    final tbRes = await createObservation(
+      headers: headers,
+      patientId: patientId,
+      patientName: patientName,
+      encounterId: encounterId,
+      loincCode: '8302-2',
+      loincDisplay: 'Body height',
+      value: heightCm,
+      unit: 'cm',
+      practitionerId: doctorId,
+      practitionerName: doctorName,
+    );
+    results['observations'].add({'name': 'Tinggi Badan', 'result': tbRes});
+
+    // 2. T2: Tekanan Darah (Sistole 8480-6 & Diastole 8462-4)
+    final sisRes = await createObservation(
+      headers: headers,
+      patientId: patientId,
+      patientName: patientName,
+      encounterId: encounterId,
+      loincCode: '8480-6',
+      loincDisplay: 'Systolic blood pressure',
+      value: sistoleMmHg,
+      unit: 'mm[Hg]',
+      practitionerId: doctorId,
+      practitionerName: doctorName,
+    );
+    results['observations'].add({'name': 'Sistole', 'result': sisRes});
+
+    final diaRes = await createObservation(
+      headers: headers,
+      patientId: patientId,
+      patientName: patientName,
+      encounterId: encounterId,
+      loincCode: '8462-4',
+      loincDisplay: 'Diastolic blood pressure',
+      value: diastoleMmHg,
+      unit: 'mm[Hg]',
+      practitionerId: doctorId,
+      practitionerName: doctorName,
+    );
+    results['observations'].add({'name': 'Diastole', 'result': diaRes});
+
+    // 3. T3: LiLA (LOINC 56072-2)
+    final lilaRes = await createObservation(
+      headers: headers,
+      patientId: patientId,
+      patientName: patientName,
+      encounterId: encounterId,
+      loincCode: '56072-2',
+      loincDisplay: 'Circumference Mid upper arm',
+      value: lilaCm,
+      unit: 'cm',
+      practitionerId: doctorId,
+      practitionerName: doctorName,
+    );
+    results['observations'].add({'name': 'LiLA Ibu Hamil', 'result': lilaRes});
+
+    // 4. T4: TFU (LOINC 11881-0) jika ada
+    if (tfuCm != null && tfuCm > 0) {
+      final tfuRes = await createObservation(
+        headers: headers,
+        patientId: patientId,
+        patientName: patientName,
+        encounterId: encounterId,
+        loincCode: '11881-0',
+        loincDisplay: 'Uterus Fundal height',
+        value: tfuCm,
+        unit: 'cm',
+        practitionerId: doctorId,
+        practitionerName: doctorName,
+      );
+      results['observations'].add({'name': 'Tinggi Fundus Uteri', 'result': tfuRes});
+    }
+
+    // 5. T5: DJJ (LOINC 55283-6) jika ada
+    if (djjBpm != null && djjBpm > 0) {
+      final djjRes = await createObservation(
+        headers: headers,
+        patientId: patientId,
+        patientName: patientName,
+        encounterId: encounterId,
+        loincCode: '55283-6',
+        loincDisplay: 'Fetal Heart rate',
+        value: djjBpm,
+        unit: '{beats}/min',
+        practitionerId: doctorId,
+        practitionerName: doctorName,
+      );
+      results['observations'].add({'name': 'Denyut Jantung Janin', 'result': djjRes});
+    }
+
+    // 6. T8: Hb (LOINC 718-7) jika ada
+    if (hbGdl != null && hbGdl > 0) {
+      final hbRes = await createObservation(
+        headers: headers,
+        patientId: patientId,
+        patientName: patientName,
+        encounterId: encounterId,
+        loincCode: '718-7',
+        loincDisplay: 'Hemoglobin [Mass/volume] in Blood',
+        value: hbGdl,
+        unit: 'g/dL',
+        practitionerId: doctorId,
+        practitionerName: doctorName,
+      );
+      results['observations'].add({'name': 'Kadar Hemoglobin', 'result': hbRes});
+    }
+
+    // 7. Conditions / Diagnosa Maternal
+    if (diagnosisList != null && diagnosisList.isNotEmpty) {
+      for (final diag in diagnosisList) {
+        await createCondition(
+          headers: headers,
+          patientId: patientId,
+          patientName: patientName,
+          encounterId: encounterId,
+          diag: diag,
+        );
+      }
+    }
+
+    return results;
+  }
+
   Future<Map<String, dynamic>> createMedicationRequest({
     required Map<String, String> headers,
     required String patientId,

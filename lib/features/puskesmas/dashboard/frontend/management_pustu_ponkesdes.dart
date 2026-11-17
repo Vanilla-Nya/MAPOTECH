@@ -508,8 +508,8 @@ class _ManagementPustuPonkesdesWidgetState
                       Wrap(
                         spacing: 8,
                         children: [
-                          StatusBadge(label: 'Total: $totalUnits Unit', color: themeAccent, showDot: false),
-                          StatusBadge(label: 'Aktif: $activeUnits Unit', color: const Color(0xFF2ECC71), showDot: false),
+                          StatusBadge(label: state.language == 'en' ? 'Total: $totalUnits Units' : 'Total: $totalUnits Unit', color: themeAccent, showDot: false),
+                          StatusBadge(label: state.language == 'en' ? 'Active: $activeUnits Units' : 'Aktif: $activeUnits Unit', color: const Color(0xFF2ECC71), showDot: false),
                           StatusBadge(label: 'Pustu: $pustuCount', color: const Color(0xFF3498DB), showDot: false),
                           StatusBadge(label: 'Ponkesdes: $ponkesdesCount', color: const Color(0xFF9B59B6), showDot: false),
                         ],
@@ -558,7 +558,9 @@ class _ManagementPustuPonkesdesWidgetState
                 SizedBox(
                   width: isMobile ? 200 : 320,
                   child: CustomSearchBar(
-                    hintText: 'Cari Pustu, Ponkesdes, kode, atau PJ...',
+                    hintText: state.language == 'en'
+                        ? 'Search Pustu, Ponkesdes, code, or leader...'
+                        : 'Cari Pustu, Ponkesdes, kode, atau PJ...',
                     height: 46,
                     backgroundColor: cardBgColor,
                     borderColor: borderColor,
@@ -1683,7 +1685,7 @@ class _ManagementPustuPonkesdesWidgetState
                           dropdownColor: cardBg,
                           themeAccent: themeAccent,
                           isDark: isDark,
-                          isEn: false,
+                          isEn: ref.read(landingPageProvider).language == 'en',
                           height: 250,
                           showOnlyMap: true,
                           onChanged: (prov, reg, dist, vill) {},

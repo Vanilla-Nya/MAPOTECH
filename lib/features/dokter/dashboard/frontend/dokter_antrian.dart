@@ -4,12 +4,10 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:mapotech/shared/widgets/skeleton_loading.dart';
+import 'package:mapotech/shared/widgets/ui.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/features/dokter/dashboard/frontend/dokter_pasien.dart'; // To access registered patients
-import 'package:mapotech/shared/widgets/custom_button.dart';
 import 'package:mapotech/shared/supabase_service.dart';
-import 'package:mapotech/shared/widgets/common_pagination.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:mapotech/shared/satusehat_service.dart';
 import 'package:mapotech/shared/thousands_formatter.dart';
@@ -421,42 +419,6 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
     if (mounted) setState(() => _isLoading = false);
   }
 
-  String _formatDateToIndonesian(DateTime dt) {
-    final state = ref.watch(landingPageProvider);
-    if (state.language == 'en') {
-      final months = [
-        'January',
-        'February',
-        'March',
-        'April',
-        'May',
-        'June',
-        'July',
-        'August',
-        'September',
-        'October',
-        'November',
-        'December',
-      ];
-      return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
-    }
-    final months = [
-      'Januari',
-      'Februari',
-      'Maret',
-      'April',
-      'Mei',
-      'Juni',
-      'Juli',
-      'Agustus',
-      'September',
-      'Oktober',
-      'November',
-      'Desember',
-    ];
-    return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
-  }
-
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(landingPageProvider);
@@ -554,7 +516,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Antrian Pasien'.tr(state),
+                    state.language == 'en' ? 'Patient Queues' : 'Antrian Pasien',
                     style: GoogleFonts.outfit(
                       fontSize: 22,
                       fontWeight: FontWeight.w900,
@@ -562,8 +524,8 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                     ),
                   ),
                   Text(
-                    'Data untuk tanggal: '.tr(state) +
-                        _formatDateToIndonesian(_selectedDate),
+                    (state.language == 'en' ? 'Data for date: ' : 'Data untuk tanggal: ') +
+                        AppTranslations.formatDate(_selectedDate, lang: state.language),
                     style: GoogleFonts.outfit(
                       fontSize: 11,
                       color: purpleAccent,
@@ -587,7 +549,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Antrian Pasien'.tr(state),
+                        state.language == 'en' ? 'Patient Queues' : 'Antrian Pasien',
                         style: GoogleFonts.outfit(
                           fontSize: 28,
                           fontWeight: FontWeight.w900,
@@ -603,9 +565,9 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                             fontWeight: FontWeight.w500,
                           ),
                           children: [
-                            TextSpan(text: 'Data untuk tanggal: '.tr(state)),
+                            TextSpan(text: state.language == 'en' ? 'Data for date: ' : 'Data untuk tanggal: '),
                             TextSpan(
-                              text: _formatDateToIndonesian(_selectedDate),
+                              text: AppTranslations.formatDate(_selectedDate, lang: state.language),
                               style: GoogleFonts.outfit(
                                 fontSize: 12,
                                 color: purpleAccent,
@@ -640,7 +602,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
           children: [
             // CARD 1: ANTRIAN AKTIF
             _buildMetricCard(
-              'ANTRIAN AKTIF',
+              state.language == 'en' ? 'ACTIVE QUEUE' : 'ANTRIAN AKTIF',
               activeQueue.nama,
               subtitleColor: subtitleColor,
               textColor: textColor,
@@ -660,29 +622,29 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
             ),
             // CARD 2: TOTAL HARI INI
             _buildMetricCard(
-              'TOTAL HARI INI',
+              state.language == 'en' ? "TODAY'S TOTAL" : 'TOTAL HARI INI',
               '$waitingCount',
               subtitleColor: subtitleColor,
               textColor: textColor,
               cardBg: cardBgColor,
               border: borderColor,
-              caption: 'Menunggu',
+              caption: state.language == 'en' ? 'Waiting' : 'Menunggu',
             ),
             // CARD 3: EST. TUNGGU
             _buildMetricCard(
-              'EST. TUNGGU',
+              state.language == 'en' ? 'EST. WAIT' : 'EST. TUNGGU',
               '$estimatedWait',
               subtitleColor: subtitleColor,
               textColor: textColor,
               cardBg: cardBgColor,
               border: borderColor,
-              unit: 'menit',
-              caption: '15 menit/pasien',
+              unit: state.language == 'en' ? 'mins' : 'menit',
+              caption: state.language == 'en' ? '15 mins/patient' : '15 menit/pasien',
               accentColor: Colors.amber[700]!,
             ),
             // CARD 4: SISA KUOTA
             _buildMetricCard(
-              'SISA KUOTA',
+              state.language == 'en' ? 'REMAINING QUOTA' : 'SISA KUOTA',
               '$remainingQuota',
               subtitleColor: subtitleColor,
               textColor: textColor,

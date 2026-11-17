@@ -149,6 +149,7 @@ class _ApotekDashboardState extends ConsumerState<ApotekDashboard> {
 
         series.add({
           'label': dayNames[d.weekday % 7],
+          'weekday': d.weekday,
           'date': dStr,
           'revenue': dayRev,
           'profit': dayRev * 0.35,
@@ -180,16 +181,14 @@ class _ApotekDashboardState extends ConsumerState<ApotekDashboard> {
         );
   }
 
-  String _getIndonesianFormattedDate() {
-    final now = DateTime.now();
-    const days = ['', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
-    const months = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-    return '${days[now.weekday]}, ${now.day} ${months[now.month]} ${now.year}';
+  String _getFormattedDate(String lang) {
+    return AppTranslations.formatDate(DateTime.now(), lang: lang);
   }
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(landingPageProvider);
+    final isEn = state.language == 'en';
 
     final isDark = state.appearance == 'dark';
     final isRev = state.appearance == 'rev';
@@ -201,7 +200,7 @@ class _ApotekDashboardState extends ConsumerState<ApotekDashboard> {
     final themeAccent = isRev ? const Color(0xFFB577F2) : const Color(0xFF00875A);
     final isMobile = MediaQuery.of(context).size.width < 768;
 
-    final userName = state.loggedInName ?? 'Apoteker';
+    final userName = state.loggedInName ?? (isEn ? 'Pharmacist' : 'Apoteker');
 
     if (_isLoading) {
       return Container(
@@ -238,12 +237,12 @@ class _ApotekDashboardState extends ConsumerState<ApotekDashboard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Selamat datang, $userName',
+                      isEn ? 'Welcome back, $userName' : 'Selamat datang, $userName',
                       style: GoogleFonts.outfit(fontSize: 19, fontWeight: FontWeight.w900, color: textColor),
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      _getIndonesianFormattedDate(),
+                      _getFormattedDate(state.language),
                       style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor),
                     ),
                   ],
@@ -252,7 +251,7 @@ class _ApotekDashboardState extends ConsumerState<ApotekDashboard> {
                   onPressed: _fetchDashboardData,
                   icon: const Icon(Icons.refresh_rounded, size: 20),
                   color: themeAccent,
-                  tooltip: 'Sinkronisasi Data Database',
+                  tooltip: isEn ? 'Sync Database Data' : 'Sinkronisasi Data Database',
                 ),
               ],
             ),
@@ -275,7 +274,7 @@ class _ApotekDashboardState extends ConsumerState<ApotekDashboard> {
             children: [
               MetricCard(
                 icon: Icons.monetization_on_rounded,
-                label: 'PENJUALAN HARI INI',
+                label: isEn ? 'TODAY SALES' : 'PENJUALAN HARI INI',
                 count: 'Rp ${_formatPrice(_todayRevenue)}',
                 subtitleColor: subtitleColor,
                 countColor: textColor,
@@ -284,8 +283,10 @@ class _ApotekDashboardState extends ConsumerState<ApotekDashboard> {
               ),
               MetricCard(
                 icon: Icons.receipt_long_rounded,
-                label: 'RESEP PENDING',
-                count: _pendingPrescriptionsCount > 0 ? '$_pendingPrescriptionsCount RESEP' : '0 RESEP',
+                label: isEn ? 'PENDING PRESCRIPTIONS' : 'RESEP PENDING',
+                count: _pendingPrescriptionsCount > 0
+                    ? '$_pendingPrescriptionsCount ${isEn ? "PRESCRIPTIONS" : "RESEP"}'
+                    : (isEn ? '0 PRESCRIPTION' : '0 RESEP'),
                 subtitleColor: subtitleColor,
                 countColor: _pendingPrescriptionsCount > 0 ? Colors.amber[800]! : themeAccent,
                 cardBgColor: cardBgColor,
@@ -293,8 +294,8 @@ class _ApotekDashboardState extends ConsumerState<ApotekDashboard> {
               ),
               MetricCard(
                 icon: Icons.warning_amber_rounded,
-                label: 'STOK MENIPIS',
-                count: '$_lowStockCount OBAT',
+                label: isEn ? 'LOW STOCK' : 'STOK MENIPIS',
+                count: isEn ? '$_lowStockCount MEDICINES' : '$_lowStockCount OBAT',
                 subtitleColor: subtitleColor,
                 countColor: Colors.amber,
                 cardBgColor: cardBgColor,
@@ -302,8 +303,8 @@ class _ApotekDashboardState extends ConsumerState<ApotekDashboard> {
               ),
               MetricCard(
                 icon: Icons.hourglass_empty_rounded,
-                label: 'HAMPIR EXPIRED',
-                count: '$_expiringCount BATCH',
+                label: isEn ? 'NEAR EXPIRY' : 'HAMPIR EXPIRED',
+                count: isEn ? '$_expiringCount BATCHES' : '$_expiringCount BATCH',
                 subtitleColor: subtitleColor,
                 countColor: Colors.redAccent,
                 cardBgColor: cardBgColor,
@@ -323,14 +324,14 @@ class _ApotekDashboardState extends ConsumerState<ApotekDashboard> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Aksi Cepat',
+                isEn ? 'Quick Actions' : 'Aksi Cepat',
                 style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w900, color: textColor),
               ),
               const SizedBox(height: 10),
               Row(
                 children: [
                   _buildQuickActionCard(
-                    'Kasir POS',
+                    isEn ? 'POS Cashier' : 'Kasir POS',
                     Icons.point_of_sale_rounded,
                     const Color(0xFF00875A),
                     cardBgColor,
@@ -340,7 +341,7 @@ class _ApotekDashboardState extends ConsumerState<ApotekDashboard> {
                   ),
                   const SizedBox(width: 12),
                   _buildQuickActionCard(
-                    'Resep Masuk',
+                    isEn ? 'Incoming Orders' : 'Resep Masuk',
                     Icons.receipt_long_rounded,
                     const Color(0xFF0052CC),
                     cardBgColor,
@@ -350,7 +351,7 @@ class _ApotekDashboardState extends ConsumerState<ApotekDashboard> {
                   ),
                   const SizedBox(width: 12),
                   _buildQuickActionCard(
-                    'Inventori Obat',
+                    isEn ? 'Medicine Inventory' : 'Inventori Obat',
                     Icons.inventory_2_outlined,
                     const Color(0xFF6554C0),
                     cardBgColor,
@@ -360,7 +361,7 @@ class _ApotekDashboardState extends ConsumerState<ApotekDashboard> {
                   ),
                   const SizedBox(width: 12),
                   _buildQuickActionCard(
-                    'Laporan Kas',
+                    isEn ? 'Cash Reports' : 'Laporan Kas',
                     Icons.assessment_outlined,
                     const Color(0xFFFF8B00),
                     cardBgColor,
@@ -400,7 +401,9 @@ class _ApotekDashboardState extends ConsumerState<ApotekDashboard> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            'Revenue vs Estimated Profit (7 Hari Terakhir)',
+                            isEn
+                                ? 'Revenue vs Estimated Profit (Last 7 Days)'
+                                : 'Revenue vs Estimated Profit (7 Hari Terakhir)',
                             style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w900, color: textColor),
                           ),
                           Container(
@@ -458,7 +461,9 @@ class _ApotekDashboardState extends ConsumerState<ApotekDashboard> {
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  s['label']?.toString() ?? '',
+                                  s['weekday'] != null
+                                      ? AppTranslations.getShortWeekday(s['weekday'] as int, lang: state.language)
+                                      : (s['label']?.toString() ?? ''),
                                   style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: subtitleColor),
                                 ),
                               ],
@@ -506,7 +511,7 @@ class _ApotekDashboardState extends ConsumerState<ApotekDashboard> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Peringatan Stok & Expired',
+                        isEn ? 'Stock & Expiry Alerts' : 'Peringatan Stok & Expired',
                         style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w900, color: textColor),
                       ),
                       const SizedBox(height: 14),
@@ -519,7 +524,12 @@ class _ApotekDashboardState extends ConsumerState<ApotekDashboard> {
                               children: [
                                 const Icon(Icons.check_circle_outline_rounded, color: Color(0xFF00875A), size: 32),
                                 const SizedBox(height: 6),
-                                Text('Semua stok & masa berlaku aman', style: GoogleFonts.outfit(fontSize: 11.5, color: subtitleColor)),
+                                Text(
+                                  isEn
+                                      ? 'All stock and expiry dates are healthy'
+                                      : 'Semua stok & masa berlaku aman',
+                                  style: GoogleFonts.outfit(fontSize: 11.5, color: subtitleColor),
+                                ),
                               ],
                             ),
                           ),
@@ -557,7 +567,9 @@ class _ApotekDashboardState extends ConsumerState<ApotekDashboard> {
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                       Text(
-                                        isLow ? 'Sisa Stok: ${a['stock']}' : 'Exp: ${a['expiry']}',
+                                        isLow
+                                            ? (isEn ? 'Remaining Stock: ${a['stock']}' : 'Sisa Stok: ${a['stock']}')
+                                            : 'Exp: ${a['expiry']}',
                                         style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
                                       ),
                                     ],

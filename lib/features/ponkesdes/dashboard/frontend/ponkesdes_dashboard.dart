@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
+import 'package:mapotech/features/puskesmas/dashboard/frontend/puskesmas_pantauan_ibu_hamil.dart';
 import 'package:mapotech/shared/widgets/ui.dart';
 import 'package:mapotech/features/dokter/dashboard/frontend/dokter_pasien.dart'; // We reuse patient list notifier
 
 class PonkesdesDashboard extends ConsumerStatefulWidget {
-  const PonkesdesDashboard({super.key});
+  final ValueChanged<String>? onNavigate;
+
+  const PonkesdesDashboard({super.key, this.onNavigate});
 
   @override
   ConsumerState<PonkesdesDashboard> createState() => _PonkesdesDashboardState();
@@ -43,6 +46,7 @@ class _PonkesdesDashboardState extends ConsumerState<PonkesdesDashboard> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(landingPageProvider);
+    final isEn = state.language == 'en';
     final notifier = ref.read(landingPageProvider.notifier);
 
     final cardBgColor = notifier.getCardColor();
@@ -54,6 +58,11 @@ class _PonkesdesDashboardState extends ConsumerState<PonkesdesDashboard> {
 
     final allPatients = ref.watch(dokterPasienListProvider);
     final totalPatients = allPatients.length;
+
+    final bumilList = ref.watch(ibuHamilListProvider);
+    final totalBumil = bumilList.length;
+    final totalKek = bumilList.where((b) => b.isKek).length;
+    final totalKrt = bumilList.where((b) => b.ksprStatus.contains('Tinggi')).length;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -95,8 +104,28 @@ class _PonkesdesDashboardState extends ConsumerState<PonkesdesDashboard> {
                               borderRadius: BorderRadius.circular(100),
                             ),
                             child: Text(
-                              'PONKESDES AKTIF',
-                              style: GoogleFonts.outfit(fontSize: 6.5, fontWeight: FontWeight.w900, color: Colors.green),
+                              isEn ? 'VILLAGE HEALTH POST ACTIVE' : 'PONKESDES SUMBER WRINGIN AKTIF',
+                              style: GoogleFonts.outfit(fontSize: 7.5, fontWeight: FontWeight.w900, color: Colors.green),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: themeAccent.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(100),
+                              border: Border.all(color: themeAccent.withOpacity(0.3)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.hub_rounded, size: 10, color: themeAccent),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'UPTD PUSKESMAS SUMBER WRINGIN',
+                                  style: GoogleFonts.outfit(fontSize: 7.5, fontWeight: FontWeight.bold, color: themeAccent),
+                                ),
+                              ],
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -108,11 +137,13 @@ class _PonkesdesDashboardState extends ConsumerState<PonkesdesDashboard> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        state.loggedInName ?? 'Ponkesdes Sukowono',
+                        state.loggedInName ?? (isEn ? 'Sumber Wringin Health Post' : 'Ponkesdes Sumber Wringin'),
                         style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w900, color: textColor),
                       ),
                       Text(
-                        'Pondok Kesehatan Desa - Pelayanan Kesehatan Tingkat Desa & RT/RW',
+                        isEn
+                            ? 'Village Health Post • Healthcare Services & Maternal Care in Sumber Wringin'
+                            : 'Pondok Kesehatan Desa • Pelayanan Kesehatan & Pemantauan Maternal Desa Sumber Wringin',
                         style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
                       ),
                     ],
@@ -122,7 +153,96 @@ class _PonkesdesDashboardState extends ConsumerState<PonkesdesDashboard> {
             ),
           ),
         ),
-        const SizedBox(height: 24),
+
+        const SizedBox(height: 16),
+
+        // Quick Actions Banner (DLC Bumil & Posyandu)
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF27AE60).withOpacity(0.08),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFF27AE60).withOpacity(0.25)),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.flash_on_rounded, size: 18, color: Color(0xFF27AE60)),
+                        const SizedBox(width: 6),
+                        Text(
+                          isEn ? 'QUICK ACTIONS: MATERNAL & PUSKESMAS DLC' : 'MENU CEPAT DLC BUMIL & PUSKESMAS',
+                          style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900, color: textColor),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      isEn
+                          ? 'Puskesmas directly tracks screening results & ANC 10T data you submit for this village.'
+                          : 'Puskesmas memantau langsung hasil skrining & ANC 10T yang Anda input di desa ini.',
+                      style: GoogleFonts.outfit(fontSize: 9.5, color: subtitleColor),
+                    ),
+                  ],
+                ),
+              ),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.pink,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    ),
+                    onPressed: () => widget.onNavigate?.call('dlc_pantauan_ibu_hamil'),
+                    icon: const Icon(Icons.pregnant_woman_rounded, size: 16),
+                    label: Text(
+                      isEn ? 'Maternal Care ($totalBumil)' : 'Pantauan Bumil ($totalBumil)',
+                      style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: themeAccent,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    ),
+                    onPressed: () => widget.onNavigate?.call('dlc_form_ibu_hamil'),
+                    icon: const Icon(Icons.edit_note_rounded, size: 16),
+                    label: Text(
+                      isEn ? '+ ANC 10T Form' : '+ Form ANC 10T',
+                      style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFF27AE60)),
+                      foregroundColor: const Color(0xFF27AE60),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                    onPressed: () => widget.onNavigate?.call('dlc_vitascale_data_anak'),
+                    icon: const Icon(Icons.child_care_rounded, size: 16),
+                    label: Text(
+                      isEn ? 'VitaScale Children' : 'VitaScale Balita',
+                      style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 20),
 
         // Key stats indicators
         AnimatedEntrance(
@@ -138,45 +258,57 @@ class _PonkesdesDashboardState extends ConsumerState<PonkesdesDashboard> {
             children: [
               MetricCard(
                 icon: Icons.people_rounded,
-                label: 'PASIEN DI WILAYAH BINAAN',
+                label: isEn ? 'VILLAGE REGISTERED PATIENTS' : 'PASIEN DI WILAYAH BINAAN',
                 count: '$totalPatients',
                 subtitleColor: subtitleColor,
                 countColor: textColor,
                 cardBgColor: cardBgColor,
                 borderColor: borderColor,
               ),
-              MetricCard(
-                icon: Icons.pregnant_woman_rounded,
-                label: 'IBU HAMIL DIPANTAU',
-                count: '3',
-                subtitleColor: subtitleColor,
-                countColor: Colors.pink,
-                cardBgColor: cardBgColor,
-                borderColor: borderColor,
+              InkWell(
+                onTap: () => widget.onNavigate?.call('dlc_pantauan_ibu_hamil'),
+                borderRadius: BorderRadius.circular(20),
+                child: MetricCard(
+                  icon: Icons.pregnant_woman_rounded,
+                  label: isEn ? 'MONITORED PREGNANCIES' : 'IBU HAMIL DIPANTAU (BINAAN)',
+                  count: isEn ? '$totalBumil Patients' : '$totalBumil Pasien',
+                  subtitleColor: subtitleColor,
+                  countColor: Colors.pink,
+                  cardBgColor: cardBgColor,
+                  borderColor: borderColor,
+                ),
               ),
-              MetricCard(
-                icon: Icons.child_care_rounded,
-                label: 'BALITA (POSYANDU)',
-                count: '15',
-                subtitleColor: subtitleColor,
-                countColor: Colors.orange,
-                cardBgColor: cardBgColor,
-                borderColor: borderColor,
+              InkWell(
+                onTap: () => widget.onNavigate?.call('dlc_vitascale_data_anak'),
+                borderRadius: BorderRadius.circular(20),
+                child: MetricCard(
+                  icon: Icons.child_care_rounded,
+                  label: isEn ? 'TODDLERS (POSYANDU)' : 'BALITA (POSYANDU)',
+                  count: isEn ? '15 Children' : '15 Anak',
+                  subtitleColor: subtitleColor,
+                  countColor: Colors.orange,
+                  cardBgColor: cardBgColor,
+                  borderColor: borderColor,
+                ),
               ),
-              MetricCard(
-                icon: Icons.home_rounded,
-                label: 'KUNJUNGAN RUMAH',
-                count: '8',
-                subtitleColor: subtitleColor,
-                countColor: themeAccent,
-                cardBgColor: cardBgColor,
-                borderColor: borderColor,
+              InkWell(
+                onTap: () => widget.onNavigate?.call('dlc_pantauan_ibu_hamil'),
+                borderRadius: BorderRadius.circular(20),
+                child: MetricCard(
+                  icon: Icons.warning_amber_rounded,
+                  label: isEn ? 'HIGH-RISK PREGNANCIES' : 'RISIKO BUMIL (KRT/KEK)',
+                  count: '$totalKrt KRT / $totalKek KEK',
+                  subtitleColor: subtitleColor,
+                  countColor: Colors.deepOrange,
+                  cardBgColor: cardBgColor,
+                  borderColor: borderColor,
+                ),
               ),
             ],
           ),
         ),
 
-        const SizedBox(height: 28),
+        const SizedBox(height: 24),
 
         // Custom list of Coverage Areas / Home visits
         AnimatedEntrance(
@@ -263,7 +395,6 @@ class _PonkesdesDashboardState extends ConsumerState<PonkesdesDashboard> {
   }
 
   Widget _buildVisitItem(String desc, String status, Color color) {
-    final subtitleColor = ref.read(landingPageProvider.notifier).getBodyTextColor();
     final textColor = ref.read(landingPageProvider.notifier).getTextColor();
     final borderColor = ref.read(landingPageProvider.notifier).getBorderColor();
     return Container(

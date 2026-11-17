@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
+import 'package:mapotech/shared/widgets/ui.dart';
 import 'package:mapotech/shared/supabase_service.dart';
 
 enum TransactionType { income, expense }
@@ -79,8 +80,8 @@ class ApotekLaporan extends ConsumerStatefulWidget {
 
 class _ApotekLaporanState extends ConsumerState<ApotekLaporan> {
   bool _isLoading = true;
+  bool get isEn => ref.read(isEnglishProvider);
 
-  final String _dateRangeFilter = '30 hari terakhir';
   String _breakdownMode = 'By Generic'; // 'By Generic', 'By Category', 'By Medicine Form'
   String _dailyFilterTab = 'All'; // 'All', 'Sales', 'Operational'
 
@@ -733,7 +734,7 @@ class _ApotekLaporanState extends ConsumerState<ApotekLaporan> {
               children: [
                 Expanded(
                   child: _buildKpiCard(
-                    'TOTAL REVENUE',
+                    isEn ? 'TOTAL REVENUE' : 'TOTAL PENDAPATAN',
                     'Rp ${_formatPrice(_totalRevenue)}',
                     '+0.0%',
                     Icons.attach_money_rounded,
@@ -748,7 +749,7 @@ class _ApotekLaporanState extends ConsumerState<ApotekLaporan> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: _buildKpiCard(
-                    'ESTIMATED PROFIT',
+                    isEn ? 'ESTIMATED PROFIT' : 'ESTIMASI LABA',
                     'Rp ${_formatPrice(_estimatedProfit > 0 ? _estimatedProfit : 0)}',
                     '+0.0%',
                     Icons.trending_up_rounded,
@@ -763,7 +764,7 @@ class _ApotekLaporanState extends ConsumerState<ApotekLaporan> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: _buildKpiCard(
-                    'TOTAL EXPENSES',
+                    isEn ? 'TOTAL EXPENSES' : 'TOTAL PENGELUARAN',
                     'Rp ${_formatPrice(_totalExpenses)}',
                     '+0.0%',
                     Icons.account_balance_wallet_outlined,
@@ -778,9 +779,9 @@ class _ApotekLaporanState extends ConsumerState<ApotekLaporan> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: _buildKpiCard(
-                    'TRANSACTION COUNT',
+                    isEn ? 'TOTAL TRANSACTIONS' : 'JUMLAH TRANSAKSI',
                     _transactionCount.toString(),
-                    '30 hari terakhir',
+                    isEn ? 'Last 30 days' : '30 hari terakhir',
                     Icons.shopping_bag_outlined,
                     const Color(0xFF0052CC),
                     const Color(0xFFDEEBFF),
@@ -819,7 +820,7 @@ class _ApotekLaporanState extends ConsumerState<ApotekLaporan> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'Revenue vs Estimated Profit',
+                          isEn ? 'Revenue vs Estimated Profit' : 'Pendapatan vs Estimasi Laba',
                           style: GoogleFonts.outfit(fontSize: 14.5, fontWeight: FontWeight.w900, color: textColor),
                         ),
                         Container(
@@ -835,7 +836,7 @@ class _ApotekLaporanState extends ConsumerState<ApotekLaporan> {
                               const Icon(Icons.filter_list_rounded, size: 14, color: Color(0xFF00875A)),
                               const SizedBox(width: 6),
                               Text(
-                                _dateRangeFilter,
+                                isEn ? 'Last 30 days' : '30 hari terakhir',
                                 style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF00875A)),
                               ),
                               const Icon(Icons.arrow_drop_down_rounded, size: 18, color: Color(0xFF00875A)),
@@ -868,11 +869,11 @@ class _ApotekLaporanState extends ConsumerState<ApotekLaporan> {
                       children: [
                         Container(width: 10, height: 10, decoration: BoxDecoration(color: const Color(0xFF57D9A3), borderRadius: BorderRadius.circular(2))),
                         const SizedBox(width: 6),
-                        Text('Estimated Profit', style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor)),
+                        Text(isEn ? 'Estimated Profit' : 'Estimasi Laba', style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor)),
                         const SizedBox(width: 18),
                         Container(width: 10, height: 10, decoration: BoxDecoration(color: const Color(0xFF00875A), borderRadius: BorderRadius.circular(2))),
                         const SizedBox(width: 6),
-                        Text('Revenue', style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor)),
+                        Text(isEn ? 'Revenue' : 'Pendapatan', style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor)),
                       ],
                     ),
                   ],
@@ -898,7 +899,7 @@ class _ApotekLaporanState extends ConsumerState<ApotekLaporan> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'Sales Breakdown',
+                          isEn ? 'Sales Breakdown' : 'Rincian Penjualan',
                           style: GoogleFonts.outfit(fontSize: 14.5, fontWeight: FontWeight.w900, color: textColor),
                         ),
                         Container(
@@ -914,10 +915,10 @@ class _ApotekLaporanState extends ConsumerState<ApotekLaporan> {
                               value: _breakdownMode,
                               dropdownColor: cardBgColor,
                               style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: textColor),
-                              items: const [
-                                DropdownMenuItem(value: 'By Generic', child: Text('By Generic')),
-                                DropdownMenuItem(value: 'By Category', child: Text('By Category')),
-                                DropdownMenuItem(value: 'By Medicine Form', child: Text('By Form')),
+                              items: [
+                                DropdownMenuItem(value: 'By Generic', child: Text(isEn ? 'By Generic' : 'Zat Aktif')),
+                                DropdownMenuItem(value: 'By Category', child: Text(isEn ? 'By Category' : 'Kategori')),
+                                DropdownMenuItem(value: 'By Medicine Form', child: Text(isEn ? 'By Form' : 'Bentuk')),
                               ],
                               onChanged: (v) {
                                 if (v != null) setState(() => _breakdownMode = v);
@@ -990,12 +991,12 @@ class _ApotekLaporanState extends ConsumerState<ApotekLaporan> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Manual Financial Ledger',
+                        isEn ? 'Manual Financial Ledger' : 'Buku Kas Finansial Manual',
                         style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w900, color: textColor),
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Active manual income and expenses for pharmacy bookkeeping needs.',
+                        isEn ? 'Active manual income and expenses for pharmacy bookkeeping.' : 'Catatan pemasukan & pengeluaran kas manual untuk operasional apotek.',
                         style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor),
                       ),
                     ],
@@ -1005,11 +1006,11 @@ class _ApotekLaporanState extends ConsumerState<ApotekLaporan> {
                       OutlinedButton.icon(
                         onPressed: () {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Arsip pembukuan kas.')),
+                            SnackBar(content: Text(isEn ? 'Ledger archive.' : 'Arsip pembukuan kas.')),
                           );
                         },
                         icon: const Icon(Icons.archive_outlined, size: 15, color: Color(0xFF6F6A8A)),
-                        label: Text('Archive', style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color(0xFF6F6A8A))),
+                        label: Text(isEn ? 'Archive' : 'Arsip', style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color(0xFF6F6A8A))),
                         style: OutlinedButton.styleFrom(
                           side: BorderSide(color: borderColor),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -1020,7 +1021,7 @@ class _ApotekLaporanState extends ConsumerState<ApotekLaporan> {
                       ElevatedButton.icon(
                         onPressed: () => _showAddEditTransactionModal(),
                         icon: const Icon(Icons.add_rounded, size: 16, color: Colors.white),
-                        label: Text('Add Transaction', style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w900, color: Colors.white)),
+                        label: Text(isEn ? 'Add Transaction' : 'Tambah Transaksi', style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w900, color: Colors.white)),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF00875A),
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -1042,13 +1043,13 @@ class _ApotekLaporanState extends ConsumerState<ApotekLaporan> {
                 ),
                 child: Row(
                   children: [
-                    Expanded(flex: 3, child: Text('Date', style: GoogleFonts.outfit(fontSize: 11, fontStyle: FontStyle.italic, color: subtitleColor))),
-                    Expanded(flex: 4, child: Text('Description', style: GoogleFonts.outfit(fontSize: 11, fontStyle: FontStyle.italic, color: subtitleColor))),
-                    Expanded(flex: 2, child: Text('Type', style: GoogleFonts.outfit(fontSize: 11, fontStyle: FontStyle.italic, color: subtitleColor))),
-                    Expanded(flex: 2, child: Text('Category', style: GoogleFonts.outfit(fontSize: 11, fontStyle: FontStyle.italic, color: subtitleColor))),
-                    Expanded(flex: 3, child: Text('Input By', style: GoogleFonts.outfit(fontSize: 11, fontStyle: FontStyle.italic, color: subtitleColor))),
-                    Expanded(flex: 3, child: Text('Amount', textAlign: TextAlign.right, style: GoogleFonts.outfit(fontSize: 11, fontStyle: FontStyle.italic, color: subtitleColor))),
-                    Expanded(flex: 2, child: Text('Actions', textAlign: TextAlign.right, style: GoogleFonts.outfit(fontSize: 11, fontStyle: FontStyle.italic, color: subtitleColor))),
+                    Expanded(flex: 3, child: Text(isEn ? 'Date' : 'Tanggal', style: GoogleFonts.outfit(fontSize: 11, fontStyle: FontStyle.italic, color: subtitleColor))),
+                    Expanded(flex: 4, child: Text(isEn ? 'Description' : 'Deskripsi', style: GoogleFonts.outfit(fontSize: 11, fontStyle: FontStyle.italic, color: subtitleColor))),
+                    Expanded(flex: 2, child: Text(isEn ? 'Type' : 'Tipe', style: GoogleFonts.outfit(fontSize: 11, fontStyle: FontStyle.italic, color: subtitleColor))),
+                    Expanded(flex: 2, child: Text(isEn ? 'Category' : 'Kategori', style: GoogleFonts.outfit(fontSize: 11, fontStyle: FontStyle.italic, color: subtitleColor))),
+                    Expanded(flex: 3, child: Text(isEn ? 'Input By' : 'Diinput Oleh', style: GoogleFonts.outfit(fontSize: 11, fontStyle: FontStyle.italic, color: subtitleColor))),
+                    Expanded(flex: 3, child: Text(isEn ? 'Amount' : 'Nominal', textAlign: TextAlign.right, style: GoogleFonts.outfit(fontSize: 11, fontStyle: FontStyle.italic, color: subtitleColor))),
+                    Expanded(flex: 2, child: Text(isEn ? 'Actions' : 'Aksi', textAlign: TextAlign.right, style: GoogleFonts.outfit(fontSize: 11, fontStyle: FontStyle.italic, color: subtitleColor))),
                   ],
                 ),
               ),
@@ -1058,7 +1059,7 @@ class _ApotekLaporanState extends ConsumerState<ApotekLaporan> {
                 Padding(
                   padding: const EdgeInsets.all(24.0),
                   child: Center(
-                    child: Text('No manual transactions yet.', style: GoogleFonts.outfit(fontSize: 12, color: subtitleColor)),
+                    child: Text(isEn ? 'No manual transactions yet.' : 'Belum ada transaksi manual.', style: GoogleFonts.outfit(fontSize: 12, color: subtitleColor)),
                   ),
                 )
               else
@@ -1275,7 +1276,7 @@ class _ApotekLaporanState extends ConsumerState<ApotekLaporan> {
                           Icon(Icons.calendar_today_outlined, size: 14, color: subtitleColor),
                           const SizedBox(width: 8),
                           Text(
-                            _fromDate != null ? '${_fromDate!.day} ${_monthName(_fromDate!.month)} ${_fromDate!.year}' : 'From Date',
+                            _fromDate != null ? '${_fromDate!.day} ${_monthName(_fromDate!.month)} ${_fromDate!.year}' : (isEn ? 'From Date' : 'Dari Tanggal'),
                             style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: textColor),
                           ),
                         ],
@@ -1308,7 +1309,7 @@ class _ApotekLaporanState extends ConsumerState<ApotekLaporan> {
                           Icon(Icons.calendar_today_outlined, size: 14, color: subtitleColor),
                           const SizedBox(width: 8),
                           Text(
-                            _toDate != null ? '${_toDate!.day} ${_monthName(_toDate!.month)} ${_toDate!.year}' : 'To Date',
+                            _toDate != null ? '${_toDate!.day} ${_monthName(_toDate!.month)} ${_toDate!.year}' : (isEn ? 'To Date' : 'Sampai Tanggal'),
                             style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: textColor),
                           ),
                         ],
@@ -1320,14 +1321,14 @@ class _ApotekLaporanState extends ConsumerState<ApotekLaporan> {
               ElevatedButton.icon(
                 onPressed: () {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Laporan keuangan berhasil diekspor ke format Excel/PDF!'),
-                      backgroundColor: Color(0xFF00875A),
+                    SnackBar(
+                      content: Text(isEn ? 'Financial report successfully exported to Excel/PDF!' : 'Laporan keuangan berhasil diekspor ke format Excel/PDF!'),
+                      backgroundColor: const Color(0xFF00875A),
                     ),
                   );
                 },
                 icon: const Icon(Icons.download_rounded, size: 16, color: Colors.white),
-                label: Text('Export', style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w900, color: Colors.white)),
+                label: Text(isEn ? 'Export' : 'Ekspor', style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w900, color: Colors.white)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF00875A),
                   padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
@@ -1357,7 +1358,7 @@ class _ApotekLaporanState extends ConsumerState<ApotekLaporan> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Daily Report Details',
+                    isEn ? 'Daily Report Details' : 'Rincian Laporan Harian',
                     style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w900, color: textColor),
                   ),
                   Container(
@@ -1368,9 +1369,9 @@ class _ApotekLaporanState extends ConsumerState<ApotekLaporan> {
                     ),
                     child: Row(
                       children: [
-                        _buildDailyPillTab('All', isDark),
-                        _buildDailyPillTab('Sales', isDark),
-                        _buildDailyPillTab('Operational', isDark),
+                        _buildDailyPillTab(isEn ? 'All' : 'Semua', isDark),
+                        _buildDailyPillTab(isEn ? 'Sales' : 'Penjualan', isDark),
+                        _buildDailyPillTab(isEn ? 'Operational' : 'Operasional', isDark),
                       ],
                     ),
                   ),
@@ -1387,11 +1388,11 @@ class _ApotekLaporanState extends ConsumerState<ApotekLaporan> {
                 child: Row(
                   children: [
                     Expanded(flex: 1, child: Text('No.', style: GoogleFonts.outfit(fontSize: 10, fontStyle: FontStyle.italic, color: subtitleColor))),
-                    Expanded(flex: 3, child: Text('Date ↓', style: GoogleFonts.outfit(fontSize: 10, fontStyle: FontStyle.italic, color: subtitleColor))),
-                    Expanded(flex: 3, child: Text('Transactions ↑↓', textAlign: TextAlign.right, style: GoogleFonts.outfit(fontSize: 10, fontStyle: FontStyle.italic, color: subtitleColor))),
-                    Expanded(flex: 3, child: Text('Revenue ↑↓', textAlign: TextAlign.right, style: GoogleFonts.outfit(fontSize: 10, fontStyle: FontStyle.italic, color: subtitleColor))),
-                    Expanded(flex: 3, child: Text('Expense ↑↓', textAlign: TextAlign.right, style: GoogleFonts.outfit(fontSize: 10, fontStyle: FontStyle.italic, color: subtitleColor))),
-                    Expanded(flex: 3, child: Text('Estimated Profit ↑↓', textAlign: TextAlign.right, style: GoogleFonts.outfit(fontSize: 10, fontStyle: FontStyle.italic, color: subtitleColor))),
+                    Expanded(flex: 3, child: Text(isEn ? 'Date ↓' : 'Tanggal ↓', style: GoogleFonts.outfit(fontSize: 10, fontStyle: FontStyle.italic, color: subtitleColor))),
+                    Expanded(flex: 3, child: Text(isEn ? 'Transactions ↑↓' : 'Transaksi ↑↓', textAlign: TextAlign.right, style: GoogleFonts.outfit(fontSize: 10, fontStyle: FontStyle.italic, color: subtitleColor))),
+                    Expanded(flex: 3, child: Text(isEn ? 'Revenue ↑↓' : 'Pendapatan ↑↓', textAlign: TextAlign.right, style: GoogleFonts.outfit(fontSize: 10, fontStyle: FontStyle.italic, color: subtitleColor))),
+                    Expanded(flex: 3, child: Text(isEn ? 'Expense ↑↓' : 'Pengeluaran ↑↓', textAlign: TextAlign.right, style: GoogleFonts.outfit(fontSize: 10, fontStyle: FontStyle.italic, color: subtitleColor))),
+                    Expanded(flex: 3, child: Text(isEn ? 'Estimated Profit ↑↓' : 'Estimasi Laba ↑↓', textAlign: TextAlign.right, style: GoogleFonts.outfit(fontSize: 10, fontStyle: FontStyle.italic, color: subtitleColor))),
                   ],
                 ),
               ),
@@ -1414,10 +1415,10 @@ class _ApotekLaporanState extends ConsumerState<ApotekLaporan> {
                         child: const Icon(Icons.description_outlined, color: Color(0xFF00875A), size: 24),
                       ),
                       const SizedBox(height: 12),
-                      Text('No Financial Activity', style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w900, color: textColor)),
+                      Text(isEn ? 'No Financial Activity' : 'Tidak Ada Aktivitas Finansial', style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w900, color: textColor)),
                       const SizedBox(height: 4),
                       Text(
-                        'Daily reports will appear after sales or manual transactions.',
+                        isEn ? 'Daily reports will appear after sales or manual transactions.' : 'Laporan harian akan muncul setelah ada penjualan kasir atau transaksi kas manual.',
                         style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor),
                       ),
                     ],

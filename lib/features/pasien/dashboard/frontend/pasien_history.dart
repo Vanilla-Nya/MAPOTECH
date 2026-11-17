@@ -445,6 +445,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(landingPageProvider);
+    final isEn = state.language == 'en';
     final isDark = state.appearance == 'dark';
     final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
     final subtitleColor = isDark ? Colors.grey[400]! : const Color(0xFF6F6A8A);
@@ -490,7 +491,9 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                           : null,
                     ),
                     child: Text(
-                      'Riwayat Dokter (${_riwayatDokter.length})',
+                      isEn
+                          ? 'Doctor History (${_riwayatDokter.length})'
+                          : 'Riwayat Dokter (${_riwayatDokter.length})',
                       style: GoogleFonts.outfit(
                         fontSize: 12,
                         fontWeight: _selectedTabIndex == 0
@@ -525,7 +528,9 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                           : null,
                     ),
                     child: Text(
-                      'Riwayat Apotek (${_riwayatApotek.length})',
+                      isEn
+                          ? 'Pharmacy History (${_riwayatApotek.length})'
+                          : 'Riwayat Apotek (${_riwayatApotek.length})',
                       style: GoogleFonts.outfit(
                         fontSize: 12,
                         fontWeight: _selectedTabIndex == 1
@@ -540,7 +545,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
               const SizedBox(width: 4),
               IconButton(
                 icon: Icon(Icons.refresh_rounded, size: 18, color: subtitleColor),
-                tooltip: 'Segarkan Riwayat',
+                tooltip: isEn ? 'Refresh History' : 'Segarkan Riwayat',
                 onPressed: _loadHistoryFromDatabase,
                 splashRadius: 20,
               ),
@@ -555,8 +560,10 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
           if (_riwayatDokter.isEmpty)
             EmptyStateWidget(
               icon: Icons.medical_services_outlined,
-              title: 'Belum Ada Riwayat Dokter',
-              subtitle: 'Belum ada riwayat kunjungan atau pemeriksaan dokter.',
+              title: isEn ? 'No Doctor History' : 'Belum Ada Riwayat Dokter',
+              subtitle: isEn
+                  ? 'No doctor visits or medical examinations recorded yet.'
+                  : 'Belum ada riwayat kunjungan atau pemeriksaan dokter.',
               cardBg: isDark ? const Color(0xFF161619) : Colors.white,
               border: isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2),
               textColor: textColor,
@@ -569,15 +576,17 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
               itemCount: _riwayatDokter.length,
               itemBuilder: (context, index) {
                 final rd = _riwayatDokter[index];
-                return _buildDoctorCard(context, rd, isDark, textColor, subtitleColor, themeAccent);
+                return _buildDoctorCard(context, rd, isDark, textColor, subtitleColor, themeAccent, isEn);
               },
             ),
         ] else ...[
           if (_riwayatApotek.isEmpty)
             EmptyStateWidget(
               icon: Icons.receipt_long_rounded,
-              title: 'Belum Ada Transaksi Apotek',
-              subtitle: 'Belum ada riwayat transaksi pembelian obat di apotek.',
+              title: isEn ? 'No Pharmacy Transactions' : 'Belum Ada Transaksi Apotek',
+              subtitle: isEn
+                  ? 'No medication purchase history recorded at pharmacy.'
+                  : 'Belum ada riwayat transaksi pembelian obat di apotek.',
               cardBg: isDark ? const Color(0xFF161619) : Colors.white,
               border: isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2),
               textColor: textColor,
@@ -590,7 +599,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
               itemCount: _riwayatApotek.length,
               itemBuilder: (context, index) {
                 final ra = _riwayatApotek[index];
-                return _buildApotekCard(context, ra, isDark, textColor, subtitleColor, themeAccent);
+                return _buildApotekCard(context, ra, isDark, textColor, subtitleColor, themeAccent, isEn);
               },
             ),
         ],
@@ -605,6 +614,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
     Color text,
     Color subtitle,
     Color purple,
+    bool isEn,
   ) {
     final cardBg = isDark ? const Color(0xFF161619) : Colors.white;
     final border = isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2);
@@ -612,7 +622,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
-        onTap: () => _showDoctorDetail(context, rd, isDark, text, subtitle, purple),
+        onTap: () => _showDoctorDetail(context, rd, isDark, text, subtitle, purple, isEn),
         child: Container(
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(18),
@@ -662,7 +672,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
               ),
               const SizedBox(height: 6),
               Text(
-                'Keluhan: ${rd.keluhan}',
+                '${isEn ? "Complaint" : "Keluhan"}: ${rd.keluhan}',
                 style: GoogleFonts.outfit(fontSize: 11, color: text, fontStyle: FontStyle.italic),
               ),
               const SizedBox(height: 12),
@@ -671,13 +681,13 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                 runSpacing: 6,
                 children: [
                   if (rd.obatDiberikan.isNotEmpty)
-                    _cardSmallBadge('Resep Obat', purple.withOpacity(0.08), purple),
+                    _cardSmallBadge(isEn ? 'Prescription' : 'Resep Obat', purple.withOpacity(0.08), purple),
                   if (rd.suratRujukan != null)
-                    _cardSmallBadge('Rujukan', const Color(0xFF3498DB).withOpacity(0.08), const Color(0xFF3498DB)),
+                    _cardSmallBadge(isEn ? 'Referral' : 'Rujukan', const Color(0xFF3498DB).withOpacity(0.08), const Color(0xFF3498DB)),
                   if (rd.suratSakit != null)
-                    _cardSmallBadge('Surat Sakit', Colors.orange.withOpacity(0.08), Colors.orange),
+                    _cardSmallBadge(isEn ? 'Sick Leave' : 'Surat Sakit', Colors.orange.withOpacity(0.08), Colors.orange),
                   if (rd.suratSehat != null)
-                    _cardSmallBadge('Surat Sehat', Colors.green.withOpacity(0.08), Colors.green),
+                    _cardSmallBadge(isEn ? 'Health Cert' : 'Surat Sehat', Colors.green.withOpacity(0.08), Colors.green),
                 ],
               ),
             ],
@@ -694,6 +704,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
     Color text,
     Color subtitle,
     Color purple,
+    bool isEn,
   ) {
     final cardBg = isDark ? const Color(0xFF161619) : Colors.white;
     final border = isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2);
@@ -701,7 +712,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
-        onTap: () => _showApotekDetail(context, ra, isDark, text, subtitle, purple),
+        onTap: () => _showApotekDetail(context, ra, isDark, text, subtitle, purple, isEn),
         child: Container(
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(18),
@@ -749,7 +760,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                         style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w900, color: purple),
                       ),
                       const SizedBox(height: 4),
-                      _cardSmallBadge('${ra.items.length} Obat', const Color(0xFF27AE60).withOpacity(0.08), const Color(0xFF27AE60)),
+                      _cardSmallBadge('${ra.items.length} ${isEn ? "Items" : "Obat"}', const Color(0xFF27AE60).withOpacity(0.08), const Color(0xFF27AE60)),
                     ],
                   ),
                 ],
@@ -791,6 +802,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
     Color textColor,
     Color subtitleColor,
     Color purpleAccent,
+    bool isEn,
   ) {
     showDialog(
       context: context,
@@ -869,7 +881,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          'KELUHAN:',
+                          isEn ? 'CHIEF COMPLAINT:' : 'KELUHAN:',
                           style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: subtitleColor, letterSpacing: 0.5),
                         ),
                         const SizedBox(height: 4),
@@ -882,7 +894,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                         if (rd.anamnesis != null) ...[
                           const SizedBox(height: 16),
                           Text(
-                            'KELUHAN & ANAMNESIS:',
+                            isEn ? 'COMPLAINT & ANAMNESIS:' : 'KELUHAN & ANAMNESIS:',
                             style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: subtitleColor, letterSpacing: 0.5),
                           ),
                           const SizedBox(height: 6),
@@ -899,7 +911,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                               children: [
                                 if (rd.anamnesis!['main_complaint'] != null && rd.anamnesis!['main_complaint'].toString().isNotEmpty) ...[
                                   Text(
-                                    'Keluhan Utama:',
+                                    isEn ? 'Chief Complaint:' : 'Keluhan Utama:',
                                     style: GoogleFonts.outfit(fontSize: 9.5, fontWeight: FontWeight.bold, color: subtitleColor),
                                   ),
                                   const SizedBox(height: 2),
@@ -911,7 +923,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                                 ],
                                 if (rd.anamnesis!['anamnesis'] != null && rd.anamnesis!['anamnesis'].toString().isNotEmpty) ...[
                                   Text(
-                                    'Catatan Anamnesis:',
+                                    isEn ? 'Anamnesis Notes:' : 'Catatan Anamnesis:',
                                     style: GoogleFonts.outfit(fontSize: 9.5, fontWeight: FontWeight.bold, color: subtitleColor),
                                   ),
                                   const SizedBox(height: 2),
@@ -929,7 +941,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                         if (rd.vitals != null) ...[
                           const SizedBox(height: 16),
                           Text(
-                            'TANDA-TANDA VITAL:',
+                            isEn ? 'VITAL SIGNS:' : 'TANDA-TANDA VITAL:',
                             style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: subtitleColor, letterSpacing: 0.5),
                           ),
                           const SizedBox(height: 6),
@@ -938,17 +950,17 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                             runSpacing: 8,
                             children: [
                               if (rd.vitals!['blood_pressure'] != null && rd.vitals!['blood_pressure'].toString().isNotEmpty)
-                                _buildVitalChip('Tensi', '${rd.vitals!['blood_pressure']} mmHg', Icons.speed_rounded, purpleAccent, isDark),
+                                _buildVitalChip(isEn ? 'BP' : 'Tensi', '${rd.vitals!['blood_pressure']} mmHg', Icons.speed_rounded, purpleAccent, isDark),
                               if (rd.vitals!['body_temperature'] != null && rd.vitals!['body_temperature'].toString().isNotEmpty)
-                                _buildVitalChip('Suhu', '${rd.vitals!['body_temperature']} °C', Icons.thermostat_rounded, purpleAccent, isDark),
+                                _buildVitalChip(isEn ? 'Temp' : 'Suhu', '${rd.vitals!['body_temperature']} °C', Icons.thermostat_rounded, purpleAccent, isDark),
                               if (rd.vitals!['heart_rate'] != null && rd.vitals!['heart_rate'].toString().isNotEmpty)
-                                _buildVitalChip('Nadi', '${rd.vitals!['heart_rate']} bpm', Icons.favorite_rounded, purpleAccent, isDark),
+                                _buildVitalChip(isEn ? 'Pulse' : 'Nadi', '${rd.vitals!['heart_rate']} bpm', Icons.favorite_rounded, purpleAccent, isDark),
                               if (rd.vitals!['oxygen_saturation'] != null && rd.vitals!['oxygen_saturation'].toString().isNotEmpty)
                                 _buildVitalChip('SpO2', '${rd.vitals!['oxygen_saturation']} %', Icons.bubble_chart_rounded, purpleAccent, isDark),
                               if (rd.vitals!['body_weight'] != null && rd.vitals!['body_weight'].toString().isNotEmpty)
-                                _buildVitalChip('Berat', '${rd.vitals!['body_weight']} kg', Icons.monitor_weight_rounded, purpleAccent, isDark),
+                                _buildVitalChip(isEn ? 'Weight' : 'Berat', '${rd.vitals!['body_weight']} kg', Icons.monitor_weight_rounded, purpleAccent, isDark),
                               if (rd.vitals!['body_height'] != null && rd.vitals!['body_height'].toString().isNotEmpty)
-                                _buildVitalChip('Tinggi', '${rd.vitals!['body_height']} cm', Icons.height_rounded, purpleAccent, isDark),
+                                _buildVitalChip(isEn ? 'Height' : 'Tinggi', '${rd.vitals!['body_height']} cm', Icons.height_rounded, purpleAccent, isDark),
                             ],
                           ),
                         ],
@@ -957,7 +969,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                         if (rd.diagnoses.isNotEmpty) ...[
                           const SizedBox(height: 16),
                           Text(
-                            'DIAGNOSIS (ICD-10):',
+                            isEn ? 'DIAGNOSIS (ICD-10):' : 'DIAGNOSIS (ICD-10):',
                             style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: subtitleColor, letterSpacing: 0.5),
                           ),
                           const SizedBox(height: 6),
@@ -1040,12 +1052,14 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        'QR CODE RESEP DIGITAL',
+                                        isEn ? 'DIGITAL PRESCRIPTION QR CODE' : 'QR CODE RESEP DIGITAL',
                                         style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: purpleAccent),
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
-                                        'Tunjukkan QR ini ke Apoteker untuk menebus obat resep Anda.',
+                                        isEn
+                                            ? 'Present this QR code to the Pharmacist to redeem your prescription medications.'
+                                            : 'Tunjukkan QR ini ke Apoteker untuk menebus obat resep Anda.',
                                         style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
                                       ),
                                     ],
@@ -1061,13 +1075,13 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                           const SizedBox(height: 16),
                           _buildCertificateDetailBox(
                             context: ctx,
-                            title: 'SURAT RUJUKAN ELEKTRONIK',
+                            title: isEn ? 'ELECTRONIC REFERRAL LETTER' : 'SURAT RUJUKAN ELEKTRONIK',
                             color: blue,
                             icon: Icons.assignment_turned_in_rounded,
                             details: [
-                              'No. Rujukan: ${rd.suratRujukan!.noSurat}',
-                              'Spesialis / Poli: ${rd.suratRujukan!.poli}',
-                              'Dirujuk Ke: ${rd.suratRujukan!.namaRs}',
+                              '${isEn ? "Referral No" : "No. Rujukan"}: ${rd.suratRujukan!.noSurat}',
+                              '${isEn ? "Specialist / Clinic" : "Spesialis / Poli"}: ${rd.suratRujukan!.poli}',
+                              '${isEn ? "Referred To" : "Dirujuk Ke"}: ${rd.suratRujukan!.namaRs}',
                             ],
                             fileName: 'surat_rujukan_${rd.suratRujukan!.noSurat}.pdf',
                           ),
@@ -1077,14 +1091,14 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                           const SizedBox(height: 16),
                           _buildCertificateDetailBox(
                             context: ctx,
-                            title: 'SURAT KETERANGAN SAKIT DIGITAL',
+                            title: isEn ? 'DIGITAL MEDICAL SICK LEAVE' : 'SURAT KETERANGAN SAKIT DIGITAL',
                             color: Colors.orange,
                             icon: Icons.badge_rounded,
                             details: [
-                              'Durasi Istirahat: ${rd.suratSakit!.jumlahHari} Hari',
-                              'Periode: ${rd.suratSakit!.mulaiTanggal} s/d ${rd.suratSakit!.selesaiTanggal}',
+                              '${isEn ? "Rest Duration" : "Durasi Istirahat"}: ${rd.suratSakit!.jumlahHari} ${isEn ? "Days" : "Hari"}',
+                              '${isEn ? "Period" : "Periode"}: ${rd.suratSakit!.mulaiTanggal} - ${rd.suratSakit!.selesaiTanggal}',
                               if (rd.suratSakit!.riwayatPenyakit.isNotEmpty)
-                                'Diagnosis/Riwayat: ${rd.suratSakit!.riwayatPenyakit}',
+                                '${isEn ? "Diagnosis/History" : "Diagnosis/Riwayat"}: ${rd.suratSakit!.riwayatPenyakit}',
                             ],
                             fileName: 'surat_keterangan_sakit_${rd.id}.pdf',
                           ),
@@ -1094,12 +1108,12 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                           const SizedBox(height: 16),
                           _buildCertificateDetailBox(
                             context: ctx,
-                            title: 'SURAT KETERANGAN SEHAT DIGITAL',
+                            title: isEn ? 'DIGITAL HEALTH CERTIFICATE' : 'SURAT KETERANGAN SEHAT DIGITAL',
                             color: Colors.green,
                             icon: Icons.assignment_ind_rounded,
                             details: [
-                              'Kondisi: Sehat Walafiat',
-                              'Keperluan: ${rd.suratSehat!.keperluan}',
+                              '${isEn ? "Condition" : "Kondisi"}: ${isEn ? "Physically Healthy" : "Sehat Walafiat"}',
+                              '${isEn ? "Purpose" : "Keperluan"}: ${rd.suratSehat!.keperluan}',
                             ],
                             fileName: 'surat_keterangan_sehat_${rd.id}.pdf',
                           ),
@@ -1123,6 +1137,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
     Color textColor,
     Color subtitleColor,
     Color purpleAccent,
+    bool isEn,
   ) {
     showDialog(
       context: context,
@@ -1207,7 +1222,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              'METODE PEMBAYARAN:',
+                              isEn ? 'PAYMENT METHOD:' : 'METODE PEMBAYARAN:',
                               style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: subtitleColor, letterSpacing: 0.5),
                             ),
                             Text(
@@ -1218,7 +1233,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          'RINCIAN BELANJA:',
+                          isEn ? 'PURCHASE DETAILS:' : 'RINCIAN BELANJA:',
                           style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: subtitleColor, letterSpacing: 0.5),
                         ),
                         const SizedBox(height: 6),
@@ -1262,7 +1277,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              'TOTAL PEMBAYARAN',
+                              isEn ? 'TOTAL PAYMENT' : 'TOTAL PEMBAYARAN',
                               style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900, color: textColor),
                             ),
                             Text(
@@ -1283,7 +1298,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                           ),
                           icon: const Icon(Icons.print_rounded, size: 16),
                           label: Text(
-                            'Unduh / Cetak Struk (PDF)',
+                            isEn ? 'Download / Print Receipt (PDF)' : 'Unduh / Cetak Struk (PDF)',
                             style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold),
                           ),
                           onPressed: () {
@@ -1292,7 +1307,9 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                                 behavior: SnackBarBehavior.floating,
                                 backgroundColor: const Color(0xFF27AE60),
                                 content: Text(
-                                  'Berhasil Mengunduh Struk ${ra.noStruk}.pdf',
+                                  isEn
+                                      ? 'Receipt ${ra.noStruk}.pdf downloaded successfully'
+                                      : 'Berhasil Mengunduh Struk ${ra.noStruk}.pdf',
                                   style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
                                 ),
                               ),

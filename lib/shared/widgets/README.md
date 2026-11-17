@@ -187,3 +187,26 @@ CustomCollapsibleCard(
 )
 ```
 
+### 14. `CustomFormStepper`
+* **File**: `custom_form_stepper.dart`
+* **Fungsi**: Indikator langkah (*step-by-step navigation stepper*) horizontal interaktif untuk form panjang yang dibagi menjadi kartu terpisah. Dilengkapi nomor/ikon langkah, indikator validasi (merah jika ada isian wajib kurang, kuning jika opsional kurang, hijau jika selesai), garis penghubung, serta adaptasi layar kompak (horizontal scroll) untuk mobile.
+* **Contoh**:
+```dart
+CustomFormStepper(
+  steps: [
+    FormStepItem(step: 1, label: 'Identitas', isCompleted: true),
+    FormStepItem(step: 2, label: 'Antropometri', hasError: true),
+    FormStepItem(step: 3, label: 'Janin & DJJ'),
+  ],
+  currentStep: _formStep,
+  onStepTapped: (step) => setState(() => _formStep = step),
+  themeAccent: themeAccent,
+  textColor: textColor,
+  subtitleColor: subtitleColor,
+  borderColor: borderColor,
+  cardBgColor: cardBgColor,
+  isDark: isDark,
+)
+```
+
+

@@ -289,6 +289,7 @@ class _PasienPrescriptionState extends ConsumerState<PasienPrescription> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(landingPageProvider);
+    final isEn = state.language == 'en';
 
     final isDark = state.appearance == 'dark';
     final cardBgColor = isDark ? const Color(0xFF161619) : Colors.white;
@@ -317,7 +318,7 @@ class _PasienPrescriptionState extends ConsumerState<PasienPrescription> {
                             Icon(Icons.assignment_turned_in_rounded, size: 48, color: purpleAccent.withOpacity(0.3)),
                             const SizedBox(height: 12),
                             Text(
-                              'Tidak Ada Resep',
+                              isEn ? 'No Prescriptions' : 'Tidak Ada Resep',
                               style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w900, color: textColor),
                             ),
                           ],
@@ -342,6 +343,7 @@ class _PasienPrescriptionState extends ConsumerState<PasienPrescription> {
                           subtitleColor,
                           purpleAccent,
                           isDark,
+                          isEn,
                         ),
                       );
                     },
@@ -358,6 +360,7 @@ class _PasienPrescriptionState extends ConsumerState<PasienPrescription> {
     Color subtitle,
     Color purple,
     bool isDark,
+    bool isEn,
   ) {
     final bool diambil = resep.sudahDiambil;
     final greenColor = const Color(0xFF27AE60);
@@ -451,7 +454,9 @@ class _PasienPrescriptionState extends ConsumerState<PasienPrescription> {
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        diambil ? 'DIAMBIL' : 'BELUM',
+                        diambil
+                            ? (isEn ? 'COLLECTED' : 'DIAMBIL')
+                            : (isEn ? 'PENDING' : 'BELUM'),
                         style: GoogleFonts.outfit(
                           fontSize: 9,
                           fontWeight: FontWeight.w900,
@@ -529,6 +534,8 @@ class _ResepDetailDialog extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(landingPageProvider);
+    final isEn = state.language == 'en';
     final cardBg = isDark ? const Color(0xFF161619) : Colors.white;
     final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
     final subtitleColor = isDark ? Colors.grey[400]! : const Color(0xFF6F6A8A);
@@ -671,7 +678,7 @@ class _ResepDetailDialog extends ConsumerWidget {
                           Icon(Icons.medication_outlined, size: 13, color: purpleAccent),
                           const SizedBox(width: 6),
                           Text(
-                            'DAFTAR OBAT & INSTRUKSI',
+                            isEn ? 'MEDICATION LIST & INSTRUCTIONS' : 'DAFTAR OBAT & INSTRUKSI',
                             style: GoogleFonts.outfit(
                               fontSize: 10,
                               fontWeight: FontWeight.w900,
@@ -695,7 +702,7 @@ class _ResepDetailDialog extends ConsumerWidget {
                               Icon(Icons.check_circle_outlined, size: 11, color: greenColor),
                               const SizedBox(width: 4),
                               Text(
-                                'RESEP SUDAH DIAMBIL',
+                                isEn ? 'PRESCRIPTION COLLECTED' : 'RESEP SUDAH DIAMBIL',
                                 style: GoogleFonts.outfit(
                                   fontSize: 9,
                                   fontWeight: FontWeight.w900,
@@ -765,16 +772,16 @@ class _ResepDetailDialog extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'SURAT RUJUKAN ELEKTRONIK',
+                            isEn ? 'ELECTRONIC REFERRAL LETTER' : 'SURAT RUJUKAN ELEKTRONIK',
                             style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.w900, color: const Color(0xFF3498DB), letterSpacing: 0.5),
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Dirujuk Ke: ${resep.suratRujukan!.namaRs}',
+                            '${isEn ? "Referred To" : "Dirujuk Ke"}: ${resep.suratRujukan!.namaRs}',
                             style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: textColor),
                           ),
                           Text(
-                            'Spesialis / Poli: ${resep.suratRujukan!.poli} • No: ${resep.suratRujukan!.noSurat}',
+                            '${isEn ? "Specialist / Clinic" : "Spesialis / Poli"}: ${resep.suratRujukan!.poli} • No: ${resep.suratRujukan!.noSurat}',
                             style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
                           ),
                         ],
@@ -795,23 +802,25 @@ class _ResepDetailDialog extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'SURAT KETERANGAN SAKIT DIGITAL',
+                            isEn ? 'DIGITAL SICK LEAVE CERTIFICATE' : 'SURAT KETERANGAN SAKIT DIGITAL',
                             style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.w900, color: Colors.orange, letterSpacing: 0.5),
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Diberikan istirahat selama ${resep.suratSakit!.jumlahHari} hari',
+                            isEn
+                                ? 'Granted medical rest for ${resep.suratSakit!.jumlahHari} days'
+                                : 'Diberikan istirahat selama ${resep.suratSakit!.jumlahHari} hari',
                             style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: textColor),
                           ),
                           Text(
-                            'Mulai: ${resep.suratSakit!.mulaiTanggal} s/d ${resep.suratSakit!.selesaiTanggal}',
+                            '${isEn ? "Period" : "Mulai"}: ${resep.suratSakit!.mulaiTanggal} ${isEn ? "to" : "s/d"} ${resep.suratSakit!.selesaiTanggal}',
                             style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
                           ),
                           if (resep.suratSakit!.riwayatPenyakit.isNotEmpty)
                             Padding(
                               padding: const EdgeInsets.only(top: 4.0),
                               child: Text(
-                                'Diagnosis/Riwayat: ${resep.suratSakit!.riwayatPenyakit}',
+                                '${isEn ? "Diagnosis/History" : "Diagnosis/Riwayat"}: ${resep.suratSakit!.riwayatPenyakit}',
                                 style: GoogleFonts.outfit(fontSize: 9, color: subtitleColor, fontStyle: FontStyle.italic),
                               ),
                             ),
@@ -833,16 +842,16 @@ class _ResepDetailDialog extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'SURAT KETERANGAN SEHAT DIGITAL',
+                            isEn ? 'DIGITAL HEALTH CERTIFICATE' : 'SURAT KETERANGAN SEHAT DIGITAL',
                             style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.w900, color: Colors.green, letterSpacing: 0.5),
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Kondisi: Sehat Walafiat',
+                            isEn ? 'Condition: Physically Healthy' : 'Kondisi: Sehat Walafiat',
                             style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: textColor),
                           ),
                           Text(
-                            'Keperluan: ${resep.suratSehat!.keperluan}',
+                            '${isEn ? "Purpose" : "Keperluan"}: ${resep.suratSehat!.keperluan}',
                             style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
                           ),
                         ],
@@ -871,7 +880,7 @@ class _ResepDetailDialog extends ConsumerWidget {
                                   Icon(Icons.lock_rounded, size: 14, color: purpleAccent),
                                   const SizedBox(width: 6),
                                   Text(
-                                    'QR RESEP TERENKRIPSI',
+                                    isEn ? 'ENCRYPTED PRESCRIPTION QR' : 'QR RESEP TERENKRIPSI',
                                     style: GoogleFonts.outfit(
                                       fontSize: 10,
                                       fontWeight: FontWeight.w900,
@@ -946,7 +955,7 @@ class _ResepDetailDialog extends ConsumerWidget {
                           ),
                           const SizedBox(height: 10),
                           Text(
-                            'Token Resep: MAPOTECH-SECURE-RX:${resep.id}',
+                            'Token: MAPOTECH-SECURE-RX:${resep.id}',
                             style: GoogleFonts.outfit(
                               fontSize: 9,
                               fontWeight: FontWeight.bold,
@@ -978,7 +987,9 @@ class _ResepDetailDialog extends ConsumerWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'KERAHASIAAN MEDIS & VERIFIKASI APOTEK',
+                                isEn
+                                    ? 'MEDICAL PRIVACY & PHARMACY VERIFICATION'
+                                    : 'KERAHASIAAN MEDIS & VERIFIKASI APOTEK',
                                 style: GoogleFonts.outfit(
                                   fontSize: 9,
                                   fontWeight: FontWeight.w900,
@@ -988,7 +999,9 @@ class _ResepDetailDialog extends ConsumerWidget {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'QR Code ini terenkripsi dan terlindungi. Jika di-scan oleh kamera umum, detail resep akan terkunci. Hanya Apotek berlisensi yang dapat membuka, memverifikasi, dan memproses resep obat ini.',
+                                isEn
+                                    ? 'This QR code is encrypted and protected. When scanned with a standard camera, prescription details remain hidden. Only verified pharmacies can unlock, review, and dispense this medication.'
+                                    : 'QR Code ini terenkripsi dan terlindungi. Jika di-scan oleh kamera umum, detail resep akan terkunci. Hanya Apotek berlisensi yang dapat membuka, memverifikasi, dan memproses resep obat ini.',
                                 style: GoogleFonts.outfit(
                                   fontSize: 11,
                                   color: const Color(0xFF3498DB),

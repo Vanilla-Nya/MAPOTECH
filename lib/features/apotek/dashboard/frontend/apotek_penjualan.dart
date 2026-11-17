@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
+import 'package:mapotech/shared/widgets/ui.dart';
 import 'package:mapotech/shared/supabase_service.dart';
 import 'package:mapotech/features/apotek/dashboard/backend/inventory_provider.dart';
 import 'package:mapotech/features/apotek/dashboard/backend/prescription_provider.dart';
@@ -74,6 +75,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
   RealtimeChannel? _posChannel;
   bool _isGridView = true;
   bool _hasLoadedActiveRx = false;
+  bool get isEn => ref.read(isEnglishProvider);
 
   final List<Map<String, dynamic>> _registeredPatients = [
     {
@@ -526,8 +528,8 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Keranjang Belanja Kasir', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w900, color: textColor)),
-                              Text('$totalItems item dalam keranjang', style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor)),
+                              Text(isEn ? 'POS Shopping Cart' : 'Keranjang Belanja Kasir', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w900, color: textColor)),
+                              Text(isEn ? '$totalItems items in cart' : '$totalItems item dalam keranjang', style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor)),
                             ],
                           ),
                         ],
@@ -540,7 +542,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                             Navigator.pop(ctx);
                           },
                           icon: const Icon(Icons.delete_sweep_rounded, size: 16, color: Colors.redAccent),
-                          label: Text('Kosongkan', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.redAccent)),
+                          label: Text(isEn ? 'Clear' : 'Kosongkan', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.redAccent)),
                         ),
                     ],
                   ),
@@ -557,9 +559,9 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                         children: [
                           Icon(Icons.remove_shopping_cart_rounded, size: 48, color: subtitleColor.withValues(alpha: 0.4)),
                           const SizedBox(height: 12),
-                          Text('Keranjang Masih Kosong', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w900, color: textColor)),
+                          Text(isEn ? 'Cart is Empty' : 'Keranjang Masih Kosong', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w900, color: textColor)),
                           const SizedBox(height: 4),
-                          Text('Klik pada kartu obat untuk menambahkan ke keranjang.', style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor)),
+                          Text(isEn ? 'Click on medicine cards to add to cart.' : 'Klik pada kartu obat untuk menambahkan ke keranjang.', style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor)),
                         ],
                       ),
                     )
@@ -720,7 +722,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('TOTAL TAGIHAN', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: subtitleColor)),
+                      Text(isEn ? 'TOTAL BILL' : 'TOTAL TAGIHAN', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: subtitleColor)),
                       Text('Rp ${_formatPrice(total)}', style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w900, color: themeAccent)),
                     ],
                   ),
@@ -734,7 +736,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                         _openCheckoutModal(themeAccent, isDark, textColor, subtitleColor, cardBgColor, borderColor);
                       },
                       icon: const Icon(Icons.payment_rounded, size: 18, color: Colors.white),
-                      label: Text('LANJUT KE PEMBAYARAN', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 0.5)),
+                      label: Text(isEn ? 'PROCEED TO PAYMENT' : 'LANJUT KE PEMBAYARAN', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 0.5)),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: themeAccent,
                         padding: const EdgeInsets.symmetric(vertical: 14),
@@ -806,9 +808,11 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Checkout / Pembayaran POS', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w900, color: textColor)),
+                          Text(isEn ? 'POS Checkout & Payment' : 'Checkout / Pembayaran POS', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w900, color: textColor)),
                           Text(
-                            _selectedBuyer.isEmpty ? 'Pembeli: Umum / Walk-in' : 'Pembeli: $_selectedBuyer',
+                            _selectedBuyer.isEmpty
+                                ? (isEn ? 'Customer: Walk-in / General' : 'Pembeli: Umum / Walk-in')
+                                : (isEn ? 'Customer: $_selectedBuyer' : 'Pembeli: $_selectedBuyer'),
                             style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor),
                           ),
                         ],
@@ -827,7 +831,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                     children: [
                       Expanded(
                         child: _buildPayOption(
-                          label: 'Tunai / Cash',
+                          label: isEn ? 'Cash' : 'Tunai / Cash',
                           icon: Icons.payments_rounded,
                           selected: paymentMethod == 'cash',
                           onTap: () => setModalState(() => paymentMethod = 'cash'),
@@ -851,7 +855,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: _buildPayOption(
-                          label: 'Debit / EDC',
+                          label: isEn ? 'Debit / Card' : 'Debit / EDC',
                           icon: Icons.credit_card_rounded,
                           selected: paymentMethod == 'card',
                           onTap: () => setModalState(() => paymentMethod = 'card'),
@@ -877,7 +881,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Uang Tunai Diterima:', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: textColor)),
+                          Text(isEn ? 'Cash Received:' : 'Uang Tunai Diterima:', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: textColor)),
                           const SizedBox(height: 6),
                           Container(
                             height: 46,
@@ -904,7 +908,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                             scrollDirection: Axis.horizontal,
                             child: Row(
                               children: [
-                                _buildCashChip('Uang Pas', () {
+                                _buildCashChip(isEn ? 'Exact' : 'Uang Pas', () {
                                   cashCtrl.text = subtotal.toStringAsFixed(0);
                                   setModalState(() => cashGiven = subtotal);
                                 }, themeAccent),
@@ -933,7 +937,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Kembalian:', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: subtitleColor)),
+                        Text(isEn ? 'Change:' : 'Kembalian:', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: subtitleColor)),
                         Text('Rp ${_formatPrice(change)}', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w900, color: const Color(0xFF27AE60))),
                       ],
                     ),
@@ -960,7 +964,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                           ),
                           const SizedBox(height: 10),
                           Text('NMID: ID102003928192 - MAPOTEK FARMASI', style: GoogleFonts.outfit(fontSize: 9.5, fontWeight: FontWeight.bold, color: subtitleColor)),
-                          Text('Scan QRIS di atas dengan aplikasi BCA, Mandiri, GoPay, OVO, ShopeePay', style: GoogleFonts.outfit(fontSize: 9, color: subtitleColor)),
+                          Text(isEn ? 'Scan the QRIS above with your banking or e-wallet application' : 'Scan QRIS di atas dengan aplikasi BCA, Mandiri, GoPay, OVO, ShopeePay', style: GoogleFonts.outfit(fontSize: 9, color: subtitleColor)),
                         ],
                       ),
                     ),
@@ -980,8 +984,8 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('Mesin EDC Siap', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: textColor)),
-                                Text('Gesek atau masukkan kartu Debit/Kredit pada mesin EDC kasir.', style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor)),
+                                Text(isEn ? 'EDC Terminal Ready' : 'Mesin EDC Siap', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: textColor)),
+                                Text(isEn ? 'Swipe or insert Debit/Credit card into cashier EDC machine.' : 'Gesek atau masukkan kartu Debit/Kredit pada mesin EDC kasir.', style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor)),
                               ],
                             ),
                           ),
@@ -997,7 +1001,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Total Tagihan', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: subtitleColor)),
+                      Text(isEn ? 'Total Bill' : 'Total Tagihan', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: subtitleColor)),
                       Text('Rp ${_formatPrice(subtotal)}', style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w900, color: themeAccent)),
                     ],
                   ),
@@ -1011,7 +1015,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                     },
                     icon: const Icon(Icons.check_circle_rounded, size: 18, color: Colors.white),
                     label: Text(
-                      'SELESAIKAN & CETAK STRUK',
+                      isEn ? 'COMPLETE & PRINT RECEIPT' : 'SELESAIKAN & CETAK STRUK',
                       style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 0.5, color: Colors.white),
                     ),
                     style: ElevatedButton.styleFrom(
@@ -1196,7 +1200,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                   child: const Icon(Icons.check_rounded, color: Colors.white, size: 30),
                 ),
                 const SizedBox(height: 12),
-                Text('TRANSAKSI BERHASIL', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w900, color: const Color(0xFF27AE60), letterSpacing: 0.5)),
+                Text(isEn ? 'TRANSACTION SUCCESSFUL' : 'TRANSAKSI BERHASIL', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w900, color: const Color(0xFF27AE60), letterSpacing: 0.5)),
                 Text('APOTEK MAPOTECH FARMA', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: textColor)),
                 Text('SIPA: 446/182/DINKES/2024 • Jl. Kesehatan No. 12', style: GoogleFonts.outfit(fontSize: 9.5, color: subtitleColor)),
                 const SizedBox(height: 14),
@@ -1206,15 +1210,15 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('No. Struk: $receiptNo', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: textColor)),
-                    Text('Hari ini, ${TimeOfDay.now().format(context)}', style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor)),
+                    Text(isEn ? 'Receipt: $receiptNo' : 'No. Struk: $receiptNo', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: textColor)),
+                    Text(isEn ? 'Today, ${TimeOfDay.now().format(context)}' : 'Hari ini, ${TimeOfDay.now().format(context)}', style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor)),
                   ],
                 ),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Pelanggan: $buyer', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: textColor)),
-                    Text('Kasir: Apoteker', style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor)),
+                    Text(isEn ? 'Customer: $buyer' : 'Pelanggan: $buyer', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: textColor)),
+                    Text(isEn ? 'Cashier: Pharmacist' : 'Kasir: Apoteker', style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor)),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -1244,14 +1248,14 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('TOTAL BAYAR', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w900, color: textColor)),
+                    Text(isEn ? 'TOTAL PAID' : 'TOTAL BAYAR', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w900, color: textColor)),
                     Text('Rp ${_formatPrice(total)}', style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w900, color: themeAccent)),
                   ],
                 ),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Metode Pembayaran', style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor)),
+                    Text(isEn ? 'Payment Method' : 'Metode Pembayaran', style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor)),
                     Text(paymentMethod.toUpperCase(), style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: textColor)),
                   ],
                 ),
@@ -1265,11 +1269,11 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                         onPressed: () {
                           Navigator.pop(ctx);
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Mencetak struk ke printer thermal...'), duration: Duration(seconds: 1)),
+                            SnackBar(content: Text(isEn ? 'Printing receipt to thermal printer...' : 'Mencetak struk ke printer thermal...'), duration: const Duration(seconds: 1)),
                           );
                         },
                         icon: const Icon(Icons.print_rounded, size: 16),
-                        label: Text('CETAK STRUK', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold)),
+                        label: Text(isEn ? 'PRINT RECEIPT' : 'CETAK STRUK', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold)),
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           side: BorderSide(color: borderColor),
@@ -1287,7 +1291,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           elevation: 0,
                         ),
-                        child: Text('SELESAI', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900, color: Colors.white)),
+                        child: Text(isEn ? 'DONE' : 'SELESAI', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900, color: Colors.white)),
                       ),
                     ),
                   ],
@@ -1368,7 +1372,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'QR Code Kasir POS',
+                              isEn ? 'POS Cashier QR Code' : 'QR Code Kasir POS',
                               style: GoogleFonts.outfit(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w900,
@@ -1376,7 +1380,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                               ),
                             ),
                             Text(
-                              'Pindai dari Aplikasi Pasien MAPOTECH',
+                              isEn ? 'Scan from MAPOTECH Patient App' : 'Pindai dari Aplikasi Pasien MAPOTECH',
                               style: GoogleFonts.outfit(
                                 fontSize: 11,
                                 color: subtitleColor,
@@ -1454,7 +1458,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        'Sesi: $_posSessionId • Menunggu Scan Pasien...',
+                        isEn ? 'Session: $_posSessionId • Waiting for Patient Scan...' : 'Sesi: $_posSessionId • Menunggu Scan Pasien...',
                         style: GoogleFonts.outfit(
                           fontSize: 10.5,
                           fontWeight: FontWeight.bold,
@@ -1468,7 +1472,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
 
                 // Demo Simulation Quick Connect
                 Text(
-                  'Simulasikan Scan Pasien (Demo Mode):',
+                  isEn ? 'Simulate Patient Scan (Demo Mode):' : 'Simulasikan Scan Pasien (Demo Mode):',
                   style: GoogleFonts.outfit(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
@@ -1488,7 +1492,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                           color: Color(0xFF48C9B0),
                         ),
                         label: Text(
-                          p['name'] + (p['has_prescription'] == true ? ' (Ada Resep)' : ''),
+                          p['name'] + (p['has_prescription'] == true ? (isEn ? ' (Has Rx)' : ' (Ada Resep)') : ''),
                           style: GoogleFonts.outfit(
                             fontSize: 10.5,
                             fontWeight: FontWeight.bold,
@@ -1703,7 +1707,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                                     Text(
                                       _connectedPatient != null
                                           ? _connectedPatient!['name']
-                                          : 'Identitas Pembeli / Pasien',
+                                          : (isEn ? 'Buyer / Patient Identity' : 'Identitas Pembeli / Pasien'),
                                       style: GoogleFonts.outfit(
                                         fontSize: 13.5,
                                         fontWeight: FontWeight.w900,
@@ -1722,7 +1726,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                                           borderRadius: BorderRadius.circular(6),
                                         ),
                                         child: Text(
-                                          'TERHUBUNG',
+                                          isEn ? 'CONNECTED' : 'TERHUBUNG',
                                           style: GoogleFonts.outfit(
                                             fontSize: 8,
                                             fontWeight: FontWeight.w900,
@@ -1736,8 +1740,8 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                                 const SizedBox(height: 2),
                                 Text(
                                   _connectedPatient != null
-                                      ? 'NIK: ${_connectedPatient!['nik'] ?? '-'} • BPJS: ${_connectedPatient!['bpjs_number'] ?? 'Aktif'} • Telp: ${_connectedPatient!['phone'] ?? _connectedPatient!['phone_number'] ?? '-'}'
-                                      : 'Pembeli Umum (Walk-in) • Hubungkan dengan Pasien Terdaftar / BPJS',
+                                      ? 'NIK: ${_connectedPatient!['nik'] ?? '-'} • BPJS: ${_connectedPatient!['bpjs_number'] ?? (isEn ? 'Active' : 'Aktif')} • Tel: ${_connectedPatient!['phone'] ?? _connectedPatient!['phone_number'] ?? '-'}'
+                                      : (isEn ? 'General Walk-in Customer • Link with Registered Patient / BPJS' : 'Pembeli Umum (Walk-in) • Hubungkan dengan Pasien Terdaftar / BPJS'),
                                   style: GoogleFonts.outfit(
                                     fontSize: 10,
                                     color: subtitleColor,
@@ -1766,7 +1770,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                                 color: themeAccent,
                               ),
                               label: Text(
-                                _isSearchOpen ? 'Tutup' : 'Cari Pasien',
+                                _isSearchOpen ? (isEn ? 'Close' : 'Tutup') : (isEn ? 'Find Patient' : 'Cari Pasien'),
                                 style: GoogleFonts.outfit(
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
@@ -1809,7 +1813,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                                 color: Colors.white,
                               ),
                               label: Text(
-                                'QR Kasir',
+                                isEn ? 'POS QR' : 'QR Kasir',
                                 style: GoogleFonts.outfit(
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
@@ -1838,7 +1842,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                                 color: Colors.redAccent,
                               ),
                               label: Text(
-                                'Putus',
+                                isEn ? 'Disconnect' : 'Putus',
                                 style: GoogleFonts.outfit(
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
@@ -1879,7 +1883,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                'Pasien memiliki resep digital siap checkout (${connectedPatientRx.items.length} obat)',
+                                isEn ? 'Patient has digital prescription ready for checkout (${connectedPatientRx.items.length} meds)' : 'Pasien memiliki resep digital siap checkout (${connectedPatientRx.items.length} obat)',
                                 style: GoogleFonts.outfit(
                                   fontSize: 10.5,
                                   fontWeight: FontWeight.bold,
@@ -1903,7 +1907,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                                 elevation: 0,
                               ),
                               child: Text(
-                                'Muat ke Kasir',
+                                isEn ? 'Load to POS' : 'Muat ke Kasir',
                                 style: GoogleFonts.outfit(
                                   fontSize: 9.5,
                                   fontWeight: FontWeight.bold,
@@ -1948,7 +1952,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                                   color: textColor,
                                 ),
                                 decoration: InputDecoration(
-                                  hintText: 'Cari nama pasien, NIK (16 digit), atau No. BPJS...',
+                                  hintText: isEn ? 'Search patient name, NIK (16 digits), or BPJS...' : 'Cari nama pasien, NIK (16 digit), atau No. BPJS...',
                                   hintStyle: GoogleFonts.outfit(
                                     fontSize: 11.5,
                                     color: subtitleColor.withValues(alpha: 0.7),
@@ -2247,7 +2251,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                                     elevation: 0,
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                   ),
-                                  child: Text('LOAD KE KASIR', style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.w900)),
+                                  child: Text(isEn ? 'LOAD TO POS' : 'LOAD KE KASIR', style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.w900)),
                                 ),
                               ],
                             ),
@@ -2287,7 +2291,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                                 onChanged: (val) => setState(() => _searchQuery = val),
                                 style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: textColor),
                                 decoration: InputDecoration(
-                                  hintText: 'Cari obat, formula, atau SKU...',
+                                  hintText: isEn ? 'Search medicine, formula, or SKU...' : 'Cari obat, formula, atau SKU...',
                                   hintStyle: GoogleFonts.outfit(fontSize: 11, color: subtitleColor.withValues(alpha: 0.6)),
                                   border: InputBorder.none,
                                   isDense: true,
@@ -2304,12 +2308,12 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                       underline: const SizedBox(),
                       dropdownColor: cardBgColor,
                       style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900, color: textColor),
-                      items: const [
-                        DropdownMenuItem(value: 'all', child: Text('Semua Bentuk')),
-                        DropdownMenuItem(value: 'tablet', child: Text('Tablet')),
-                        DropdownMenuItem(value: 'kaplet', child: Text('Kaplet')),
-                        DropdownMenuItem(value: 'kapsul', child: Text('Kapsul')),
-                        DropdownMenuItem(value: 'sirup', child: Text('Sirup')),
+                      items: [
+                        DropdownMenuItem(value: 'all', child: Text(isEn ? 'All Forms' : 'Semua Bentuk')),
+                        const DropdownMenuItem(value: 'tablet', child: Text('Tablet')),
+                        DropdownMenuItem(value: 'kaplet', child: Text(isEn ? 'Caplet' : 'Kaplet')),
+                        DropdownMenuItem(value: 'kapsul', child: Text(isEn ? 'Capsule' : 'Kapsul')),
+                        DropdownMenuItem(value: 'sirup', child: Text(isEn ? 'Syrup' : 'Sirup')),
                       ],
                       onChanged: (val) => setState(() => _selectedForm = val ?? 'all'),
                     ),
@@ -2317,7 +2321,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                     IconButton(
                       icon: Icon(_isGridView ? Icons.view_list_rounded : Icons.grid_view_rounded, size: 20, color: themeAccent),
                       onPressed: () => setState(() => _isGridView = !_isGridView),
-                      tooltip: 'Ganti Tampilan',
+                      tooltip: isEn ? 'Switch View' : 'Ganti Tampilan',
                     ),
                   ],
                 ),
@@ -2334,9 +2338,9 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                     children: [
                       Icon(Icons.medication_outlined, size: 48, color: themeAccent.withValues(alpha: 0.3)),
                       const SizedBox(height: 12),
-                      Text('Tidak Ada Obat Ditemukan', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w900, color: textColor)),
+                      Text(isEn ? 'No Medicines Found' : 'Tidak Ada Obat Ditemukan', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w900, color: textColor)),
                       const SizedBox(height: 4),
-                      Text('Ubah kata kunci pencarian Anda.', style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor)),
+                      Text(isEn ? 'Try changing your search query.' : 'Ubah kata kunci pencarian Anda.', style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor)),
                     ],
                   ),
                 )
@@ -2444,7 +2448,9 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
-                      _cart.length > 1 ? '+$totalQty item • Klik lihat keranjang' : '1 jenis obat • Klik lihat keranjang',
+                      _cart.length > 1
+                          ? (isEn ? '+$totalQty items • Tap to view cart' : '+$totalQty item • Klik lihat keranjang')
+                          : (isEn ? '1 medicine type • Tap to view cart' : '1 jenis obat • Klik lihat keranjang'),
                       style: GoogleFonts.outfit(fontSize: 9.5, color: Colors.white.withValues(alpha: 0.7)),
                     ),
                   ],
@@ -2461,7 +2467,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'TOTAL TAGIHAN',
+                isEn ? 'TOTAL BILL' : 'TOTAL TAGIHAN',
                 style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.white.withValues(alpha: 0.6)),
               ),
               Text(
@@ -2478,7 +2484,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
             onPressed: () => _openCheckoutModal(themeAccent, isDark, textColor, subtitleColor, cardBgColor, borderColor),
             icon: const Icon(Icons.payment_rounded, size: 16, color: Colors.white),
             label: Text(
-              'BAYAR',
+              isEn ? 'CHECKOUT' : 'BAYAR',
               style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w900, color: Colors.white),
             ),
             style: ElevatedButton.styleFrom(
@@ -2529,7 +2535,9 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                       borderRadius: BorderRadius.circular(100),
                     ),
                     child: Text(
-                      med.stock > 0 ? 'Stok: ${med.stock}' : 'Habis',
+                      med.stock > 0
+                          ? (isEn ? 'Stock: ${med.stock}' : 'Stok: ${med.stock}')
+                          : (isEn ? 'Out of stock' : 'Habis'),
                       style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.w900, color: med.stock > 0 ? const Color(0xFF27AE60) : Colors.redAccent),
                     ),
                   ),
@@ -2551,7 +2559,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      '+ TAMBAH',
+                      isEn ? '+ ADD' : '+ TAMBAH',
                       style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: Colors.white),
                     ),
                   ),
@@ -2605,7 +2613,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(med.name, style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w900, color: textColor)),
-                    Text('${med.genericName} • ${med.form} • Stok: ${med.stock}', style: GoogleFonts.outfit(fontSize: 9.5, color: subtitleColor)),
+                    Text('${med.genericName} • ${med.form} • ${isEn ? "Stock: ${med.stock}" : "Stok: ${med.stock}"}', style: GoogleFonts.outfit(fontSize: 9.5, color: subtitleColor)),
                   ],
                 ),
               ),
@@ -2618,7 +2626,7 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  '+ TAMBAH',
+                  isEn ? '+ ADD' : '+ TAMBAH',
                   style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: Colors.white),
                 ),
               ),

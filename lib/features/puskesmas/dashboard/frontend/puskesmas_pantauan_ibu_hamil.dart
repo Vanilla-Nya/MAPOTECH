@@ -49,8 +49,480 @@ class IbuHamilModel {
     this.jumlahKunjungan = 4,
     this.waktuKunjunganTerakhir = '28 Juli 2026, 09:30 WIB',
     this.riwayatKunjungan = const [],
+    this.faskesPemeriksa = 'Ponkesdes Sumber Wringin',
+    this.desaBinaan = 'Sumber Wringin',
+    this.isSyncedToPuskesmas = true,
   });
+
+  final String faskesPemeriksa;
+  final String desaBinaan;
+  final bool isSyncedToPuskesmas;
+
+  IbuHamilModel copyWith({
+    String? id,
+    String? nama,
+    String? nik,
+    int? umur,
+    String? namaSuami,
+    String? usiaKehamilan,
+    String? trimester,
+    String? hpl,
+    String? ksprStatus,
+    Color? ksprColor,
+    String? ancStatus,
+    String? hb,
+    String? lila,
+    double? latitude,
+    double? longitude,
+    String? alamat,
+    String? noTelepon,
+    int? jumlahKunjungan,
+    String? waktuKunjunganTerakhir,
+    List<Map<String, String>>? riwayatKunjungan,
+    String? faskesPemeriksa,
+    String? desaBinaan,
+    bool? isSyncedToPuskesmas,
+  }) {
+    return IbuHamilModel(
+      id: id ?? this.id,
+      nama: nama ?? this.nama,
+      nik: nik ?? this.nik,
+      umur: umur ?? this.umur,
+      namaSuami: namaSuami ?? this.namaSuami,
+      usiaKehamilan: usiaKehamilan ?? this.usiaKehamilan,
+      trimester: trimester ?? this.trimester,
+      hpl: hpl ?? this.hpl,
+      ksprStatus: ksprStatus ?? this.ksprStatus,
+      ksprColor: ksprColor ?? this.ksprColor,
+      ancStatus: ancStatus ?? this.ancStatus,
+      hb: hb ?? this.hb,
+      lila: lila ?? this.lila,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      alamat: alamat ?? this.alamat,
+      noTelepon: noTelepon ?? this.noTelepon,
+      jumlahKunjungan: jumlahKunjungan ?? this.jumlahKunjungan,
+      waktuKunjunganTerakhir: waktuKunjunganTerakhir ?? this.waktuKunjunganTerakhir,
+      riwayatKunjungan: riwayatKunjungan ?? this.riwayatKunjungan,
+      faskesPemeriksa: faskesPemeriksa ?? this.faskesPemeriksa,
+      desaBinaan: desaBinaan ?? this.desaBinaan,
+      isSyncedToPuskesmas: isSyncedToPuskesmas ?? this.isSyncedToPuskesmas,
+    );
+  }
+
+  bool get isKek {
+    final numOnly = lila.replaceAll(RegExp(r'[^0-9.]'), '');
+    final val = double.tryParse(numOnly);
+    return val != null && val > 0 && val < 23.5;
+  }
+
+  bool get isAnemia {
+    final numOnly = hb.replaceAll(RegExp(r'[^0-9.]'), '');
+    final val = double.tryParse(numOnly);
+    return val != null && val > 0 && val < 11.0;
+  }
+
+  String get satuSehatIhs => 'P${nik.length >= 10 ? nik.substring(nik.length - 10) : nik}';
 }
+
+// ─── MASTER DATA AWAL IBU HAMIL TERHUBUNG PUSKESMAS & PONKESDES ─────────────
+final List<IbuHamilModel> _initialMasterIbuHamilData = [
+  IbuHamilModel(
+    id: 'KIA-001',
+    nama: 'Siti Rahmawati',
+    nik: '3511084205940001',
+    umur: 27,
+    namaSuami: 'Budi Santoso',
+    usiaKehamilan: '28 Minggu',
+    trimester: 'Trimester 3',
+    hpl: '14 Agustus 2026',
+    ksprStatus: 'Risiko Rendah (KRR)',
+    ksprColor: Color(0xFF2ECC71),
+    ancStatus: 'K4 Terpenuhi',
+    hb: '11.5 g/dL',
+    lila: '24.5 cm',
+    latitude: -7.9582,
+    longitude: 113.9123,
+    alamat: 'Dusun Krajan, RT 02/RW 01, Sumber Wringin',
+    noTelepon: '0812-3456-7890',
+    jumlahKunjungan: 4,
+    waktuKunjunganTerakhir: '28 Juli 2026, 09:30 WIB',
+    faskesPemeriksa: 'Ponkesdes Sumber Wringin',
+    desaBinaan: 'Sumber Wringin',
+    isSyncedToPuskesmas: true,
+    riwayatKunjungan: [
+      {
+        'kunjungan': 'K1 (Trimester 1)',
+        'date': '15 Jan 2026',
+        'time': '09:00 WIB',
+        'pemeriksa': 'Bidan Anita (Ponkesdes Sumber Wringin)',
+        'td': '110/70 mmHg',
+        'djj': '140 bpm (Normal)',
+        'tfu': '18 cm',
+        'bb_tb': '52 kg | 158 cm',
+        'hb_lila': '11.8 g/dL | 24.0 cm',
+        'protein_urin': 'Negatif | O+',
+        'resep': 'Tablet Tambah Darah (Fe 30 Tab), Asam Folat, Kalsium 500mg',
+        'catatan': 'Pemeriksaan awal kehamilan trimester 1 di Ponkesdes. Skrining laboratorium dasar lengkap, kondisi fisik ibu dan janin sangat sehat.',
+      },
+      {
+        'kunjungan': 'K2 (Trimester 2)',
+        'date': '20 Mar 2026',
+        'time': '10:15 WIB',
+        'pemeriksa': 'Bidan Anita (Ponkesdes Sumber Wringin)',
+        'td': '115/75 mmHg',
+        'djj': '144 bpm (Teratur)',
+        'tfu': '20 cm',
+        'bb_tb': '53.5 kg | 158 cm',
+        'hb_lila': '11.6 g/dL | 24.2 cm',
+        'protein_urin': 'Negatif | O+',
+        'resep': 'Suplemen Fe (Tablet Tambah Darah 30 Tab), Kalk Kalsium',
+        'catatan': 'Skrining USG awal trimester 2, detak jantung janin (+) normal, tensi normal, keluhan mual muntah sudah berkurang.',
+      },
+      {
+        'kunjungan': 'K3 (Trimester 2)',
+        'date': '18 Mei 2026',
+        'time': '08:45 WIB',
+        'pemeriksa': 'dr. Hendra Sp.OG (Rujukan Puskesmas)',
+        'catatan': 'Konsultasi rujukan USG fetomaternal trimester 2. Perkembangan organ janin lengkap, posisi plasenta di fundus.',
+        'td': '110/70 mmHg',
+        'djj': '142 bpm',
+        'tfu': '22 cm',
+        'bb_tb': '54 kg | 158 cm',
+        'hb_lila': '11.5 g/dL | 24.5 cm',
+        'protein_urin': 'Negatif',
+        'resep': 'Fe 30 hari, Kalsium 500mg, Vitamin C',
+      },
+      {
+        'kunjungan': 'K4 (Trimester 3)',
+        'date': '28 Jul 2026',
+        'time': '09:30 WIB',
+        'pemeriksa': 'Bidan Anita (Ponkesdes Sumber Wringin)',
+        'td': '110/70 mmHg',
+        'djj': '145 bpm',
+        'tfu': '26 cm',
+        'bb_tb': '55 kg | 158 cm',
+        'hb_lila': '11.5 g/dL | 24.5 cm',
+        'protein_urin': 'Negatif',
+        'resep': 'Fe 30 Tab, Suplemen Kalsium, Edukasi P4K',
+        'catatan': 'Evaluasi letak janin (presentasi kepala sudah di bawah). Pemantauan tanda bahaya persalinan & edukasi donor darah keluarga.',
+      },
+    ],
+  ),
+  IbuHamilModel(
+    id: 'KIA-002',
+    nama: 'Dewi Lestari',
+    nik: '3511085112960003',
+    umur: 34,
+    namaSuami: 'Ahmad Fauzi',
+    usiaKehamilan: '32 Minggu',
+    trimester: 'Trimester 3',
+    hpl: '18 Juli 2026',
+    ksprStatus: 'Risiko Tinggi (KRT)',
+    ksprColor: Color(0xFFE67E22),
+    ancStatus: 'K5 Terpenuhi',
+    hb: '10.2 g/dL (Anemia Ringan)',
+    lila: '22.0 cm (Kek)',
+    latitude: -7.9645,
+    longitude: 113.9056,
+    alamat: 'Dusun Tengah, RT 05/RW 02, Sukorejo',
+    noTelepon: '0852-9876-5432',
+    jumlahKunjungan: 5,
+    waktuKunjunganTerakhir: '25 Juli 2026, 11:15 WIB',
+    faskesPemeriksa: 'Ponkesdes Sumber Wringin',
+    desaBinaan: 'Sukorejo',
+    isSyncedToPuskesmas: true,
+    riwayatKunjungan: [
+      {
+        'kunjungan': 'K1 (Trimester 1)',
+        'date': '10 Des 2025',
+        'time': '08:30 WIB',
+        'pemeriksa': 'Bidan Rina (Ponkesdes Sumber Wringin)',
+        'td': '120/80 mmHg',
+        'djj': '138 bpm',
+        'tfu': '16 cm',
+        'bb_tb': '48 kg | 154 cm',
+        'hb_lila': '10.5 g/dL | 22.0 cm',
+        'protein_urin': 'Negatif',
+        'resep': 'Sirup Tambah Darah Fe, PMT Biskuit Ibu Hamil',
+        'catatan': 'Pemeriksaan pertama di Ponkesdes, Hb 10.5 g/dL (anemia ringan), LILA 22.0 cm (KEK), resep sirup Fe & rujukan konseling gizi.',
+      },
+      {
+        'kunjungan': 'K2 (Trimester 1)',
+        'date': '12 Feb 2026',
+        'time': '09:45 WIB',
+        'pemeriksa': 'dr. Sugeng (Puskesmas Induk)',
+        'td': '118/78 mmHg',
+        'djj': '140 bpm',
+        'tfu': '18 cm',
+        'bb_tb': '48.5 kg | 154 cm',
+        'hb_lila': '10.3 g/dL | 22.0 cm',
+        'protein_urin': 'Negatif',
+        'resep': 'Tablet Fe 60 Tab, Suplemen Protein Multi-gizi',
+        'catatan': 'Evaluasi gizi KEK & rujukan pemantauan nutrisi ketat Puskesmas.',
+      },
+      {
+        'kunjungan': 'K3 (Trimester 2)',
+        'date': '15 Apr 2026',
+        'time': '10:00 WIB',
+        'pemeriksa': 'Bidan Rina (Ponkesdes Sumber Wringin)',
+        'td': '120/80 mmHg',
+        'djj': '142 bpm',
+        'tfu': '22 cm',
+        'bb_tb': '50 kg | 154 cm',
+        'hb_lila': '10.4 g/dL | 22.2 cm',
+        'protein_urin': 'Negatif',
+        'resep': 'Fe Tablet 30 Tab, Kalsium',
+        'catatan': 'Pemeriksaan berkala di Ponkesdes, TD 120/80 mmHg, denyut jantung janin normal.',
+      },
+      {
+        'kunjungan': 'K4 (Trimester 2)',
+        'date': '20 Mei 2026',
+        'time': '09:00 WIB',
+        'pemeriksa': 'dr. Hendra Sp.OG (Rujukan Puskesmas)',
+        'td': '122/82 mmHg',
+        'djj': '144 bpm',
+        'tfu': '24 cm',
+        'bb_tb': '50.5 kg | 154 cm',
+        'hb_lila': '10.2 g/dL | 22.0 cm',
+        'protein_urin': 'Negatif',
+        'resep': 'Fe Kombinasi, Kalsium Lactate, Asam Folat 1mg',
+        'catatan': 'USG Trimester 2, perkiraan BBJ 1.8 kg, posisi melintang.',
+      },
+      {
+        'kunjungan': 'K5 (Trimester 3)',
+        'date': '25 Jul 2026',
+        'time': '11:15 WIB',
+        'pemeriksa': 'Bidan Rina (Ponkesdes Sumber Wringin)',
+        'td': '120/80 mmHg',
+        'djj': '146 bpm',
+        'tfu': '28 cm',
+        'bb_tb': '51 kg | 154 cm',
+        'hb_lila': '10.2 g/dL | 22.0 cm',
+        'protein_urin': 'Negatif',
+        'resep': 'Fe 30 Tab, Edukasi Rujukan Melahirkan di Puskesmas/RSUD',
+        'catatan': 'Monitoring ketat faktor risiko KRT (KEK & Anemia) & persiapan P4K persalinan.',
+      },
+    ],
+  ),
+  IbuHamilModel(
+    id: 'KIA-003',
+    nama: 'Anisa Putri',
+    nik: '3511086307990002',
+    umur: 22,
+    namaSuami: 'Rian Pratama',
+    usiaKehamilan: '14 Minggu',
+    trimester: 'Trimester 2',
+    hpl: '20 November 2026',
+    ksprStatus: 'Risiko Rendah (KRR)',
+    ksprColor: Color(0xFF2ECC71),
+    ancStatus: 'K2 Terpenuhi',
+    hb: '12.1 g/dL',
+    lila: '25.0 cm',
+    latitude: -7.9512,
+    longitude: 113.9210,
+    alamat: 'Dusun Barat, RT 01/RW 03, Tlogosari',
+    noTelepon: '0813-1122-3344',
+    jumlahKunjungan: 2,
+    waktuKunjunganTerakhir: '19 Juli 2026, 08:30 WIB',
+    faskesPemeriksa: 'Puskesmas Sumber Wringin',
+    desaBinaan: 'Tlogosari',
+    isSyncedToPuskesmas: true,
+    riwayatKunjungan: [
+      {
+        'kunjungan': 'K1 (Trimester 1)',
+        'date': '05 Mei 2026',
+        'time': '09:10 WIB',
+        'pemeriksa': 'Bidan Anita (Puskesmas Induk)',
+        'td': '110/70 mmHg',
+        'djj': '138 bpm',
+        'tfu': '12 cm',
+        'bb_tb': '49 kg | 156 cm',
+        'hb_lila': '12.3 g/dL | 25.0 cm',
+        'protein_urin': 'Negatif',
+        'resep': 'Fe 30 Tablet, Asam Folat 400mcg',
+        'catatan': 'Pemeriksaan kehamilan pertama, HPHT 13 Feb 2026, kondisi fisik ibu & janin sangat baik.',
+      },
+      {
+        'kunjungan': 'K2 (Trimester 2)',
+        'date': '19 Jul 2026',
+        'time': '08:30 WIB',
+        'pemeriksa': 'Bidan Anita (Puskesmas Induk)',
+        'td': '110/75 mmHg',
+        'djj': '140 bpm (Teratur)',
+        'tfu': '16 cm',
+        'bb_tb': '50.5 kg | 156 cm',
+        'hb_lila': '12.1 g/dL | 25.0 cm',
+        'protein_urin': 'Negatif',
+        'resep': 'Fe 30 Tablet, Kalsium 500mg',
+        'catatan': 'Memasuki trimester 2, keluhan mual berkurang, DJJ teratur.',
+      },
+    ],
+  ),
+  IbuHamilModel(
+    id: 'KIA-004',
+    nama: 'Maria Ulfa',
+    nik: '3511084903910005',
+    umur: 38,
+    namaSuami: 'Hendra Wijaya',
+    usiaKehamilan: '36 Minggu',
+    trimester: 'Trimester 3',
+    hpl: '02 Juni 2026',
+    ksprStatus: 'Risiko Sangat Tinggi (KRST)',
+    ksprColor: Color(0xFFE74C3C),
+    ancStatus: 'K6 Terpenuhi',
+    hb: '9.8 g/dL',
+    lila: '21.5 cm (Kek)',
+    latitude: -7.9698,
+    longitude: 113.8990,
+    alamat: 'Dusun Selatan, RT 04/RW 01, Rejoagung',
+    noTelepon: '0877-6543-2100',
+    jumlahKunjungan: 6,
+    waktuKunjunganTerakhir: '29 Juli 2026, 14:00 WIB',
+    faskesPemeriksa: 'Ponkesdes Sumber Wringin',
+    desaBinaan: 'Rejoagung',
+    isSyncedToPuskesmas: true,
+    riwayatKunjungan: [
+      {
+        'kunjungan': 'K1 (Trimester 1)',
+        'date': '02 Nov 2025',
+        'time': '08:15 WIB',
+        'pemeriksa': 'dr. Sugeng (Puskesmas Induk)',
+        'td': '135/85 mmHg',
+        'djj': '140 bpm',
+        'tfu': '14 cm',
+        'bb_tb': '58 kg | 152 cm',
+        'hb_lila': '9.5 g/dL | 21.0 cm',
+        'protein_urin': 'Trace',
+        'resep': 'Antihipertensi Aman Hamil, Fe Sirup, Asam Folat',
+        'catatan': 'Deteksi KRST usia >35 thn, riwayat hipertensi & anemia (Hb 9.5 g/dL).',
+      },
+      {
+        'kunjungan': 'K2 (Trimester 1)',
+        'date': '15 Des 2025',
+        'time': '09:30 WIB',
+        'pemeriksa': 'Bidan Anita (Ponkesdes Sumber Wringin)',
+        'td': '130/80 mmHg',
+        'djj': '142 bpm',
+        'tfu': '16 cm',
+        'bb_tb': '58.5 kg | 152 cm',
+        'hb_lila': '9.6 g/dL | 21.2 cm',
+        'protein_urin': 'Negatif',
+        'resep': 'Fe 60 Tab, Kalsium',
+        'catatan': 'Monitoring tensi 130/80 mmHg & pemberian suplemen asam folat.',
+      },
+      {
+        'kunjungan': 'K3 (Trimester 2)',
+        'date': '20 Feb 2026',
+        'time': '10:00 WIB',
+        'pemeriksa': 'dr. Hendra Sp.OG (Rujukan Puskesmas)',
+        'td': '128/82 mmHg',
+        'djj': '145 bpm',
+        'tfu': '20 cm',
+        'bb_tb': '59 kg | 152 cm',
+        'hb_lila': '9.7 g/dL | 21.5 cm',
+        'protein_urin': 'Negatif',
+        'resep': 'Rujukan Konsultasi RSUD Bondowoso',
+        'catatan': 'Rujukan USG fetomaternal RSUD, kondisi plasenta normal.',
+      },
+      {
+        'kunjungan': 'K4 (Trimester 2)',
+        'date': '10 Apr 2026',
+        'time': '08:45 WIB',
+        'pemeriksa': 'Bidan Anita (Ponkesdes Sumber Wringin)',
+        'td': '125/80 mmHg',
+        'djj': '140 bpm',
+        'tfu': '24 cm',
+        'bb_tb': '60 kg | 152 cm',
+        'hb_lila': '9.8 g/dL | 21.5 cm',
+        'protein_urin': 'Negatif',
+        'resep': 'Fe Kombi, PMT Susu Ibu Hamil',
+        'catatan': 'Evaluasi Hb (9.8 g/dL), terapi suplemen kombi & PMT ibu hamil.',
+      },
+      {
+        'kunjungan': 'K5 (Trimester 3)',
+        'date': '18 Jun 2026',
+        'time': '11:30 WIB',
+        'pemeriksa': 'dr. Sugeng (Puskesmas Induk)',
+        'td': '130/85 mmHg',
+        'djj': '142 bpm',
+        'tfu': '28 cm',
+        'bb_tb': '61 kg | 152 cm',
+        'hb_lila': '9.8 g/dL | 21.5 cm',
+        'protein_urin': 'Negatif',
+        'resep': 'Surat Rujukan Terencana RSUD',
+        'catatan': 'Konsultasi rujukan terencana persalinan di RSUD Bondowoso.',
+      },
+      {
+        'kunjungan': 'K6 (Trimester 3)',
+        'date': '29 Jul 2026',
+        'time': '14:00 WIB',
+        'pemeriksa': 'Bidan Anita (Ponkesdes Sumber Wringin)',
+        'td': '128/80 mmHg',
+        'djj': '144 bpm',
+        'tfu': '32 cm',
+        'bb_tb': '62 kg | 152 cm',
+        'hb_lila': '9.8 g/dL | 21.5 cm',
+        'protein_urin': 'Negatif',
+        'resep': 'Persiapan Ambulance & Donor Darah Siaga',
+        'catatan': 'Kunjungan rumah (home visit) pemantauan persiapan persalinan & donor darah.',
+      },
+    ],
+  ),
+];
+
+// ─── RIVERPOD STATE NOTIFIER UNTUK SINKRONISASI PUSKESMAS & PONKESDES ────────
+
+class IbuHamilListNotifier extends StateNotifier<List<IbuHamilModel>> {
+  IbuHamilListNotifier() : super(_initialMasterIbuHamilData);
+
+  void addPatient(IbuHamilModel patient) {
+    state = [patient, ...state];
+  }
+
+  void updatePatient(IbuHamilModel updated) {
+    state = [
+      for (final p in state)
+        if (p.id == updated.id || p.nik == updated.nik) updated else p
+    ];
+  }
+
+  void recordAncVisit({
+    required String nik,
+    required Map<String, String> newVisit,
+    String? newHb,
+    String? newLila,
+    String? newAncStatus,
+    String? newTrimester,
+    String? faskesPemeriksa,
+  }) {
+    state = [
+      for (final p in state)
+        if (p.nik == nik)
+          p.copyWith(
+            riwayatKunjungan: [newVisit, ...p.riwayatKunjungan],
+            jumlahKunjungan: p.jumlahKunjungan + 1,
+            waktuKunjunganTerakhir: '${newVisit['date']}, ${newVisit['time']}',
+            hb: newHb ?? p.hb,
+            lila: newLila ?? p.lila,
+            ancStatus: newAncStatus ?? p.ancStatus,
+            trimester: newTrimester ?? p.trimester,
+            faskesPemeriksa: faskesPemeriksa ?? p.faskesPemeriksa,
+            isSyncedToPuskesmas: true,
+          )
+        else
+          p
+    ];
+  }
+}
+
+final ibuHamilListProvider =
+    StateNotifierProvider<IbuHamilListNotifier, List<IbuHamilModel>>((ref) {
+  return IbuHamilListNotifier();
+});
+
+/// Shared provider untuk pasien ibu hamil yang sedang dipilih untuk pemeriksaan ANC 10T
+final selectedIbuHamilProvider = StateProvider<IbuHamilModel?>((ref) => null);
 
 class PuskesmasPantauanIbuHamil extends ConsumerStatefulWidget {
   final ValueChanged<String>? onNavigateToForm;
@@ -67,340 +539,6 @@ class PuskesmasPantauanIbuHamil extends ConsumerStatefulWidget {
 class _PuskesmasPantauanIbuHamilState extends ConsumerState<PuskesmasPantauanIbuHamil> {
   String _searchQuery = '';
   String _selectedFilter = 'Semua';
-
-  final List<IbuHamilModel> _dummyData = [
-    IbuHamilModel(
-      id: 'KIA-001',
-      nama: 'Siti Rahmawati',
-      nik: '3511084205940001',
-      umur: 27,
-      namaSuami: 'Budi Santoso',
-      usiaKehamilan: '28 Minggu',
-      trimester: 'Trimester 3',
-      hpl: '14 Agustus 2026',
-      ksprStatus: 'Risiko Rendah (KRR)',
-      ksprColor: Color(0xFF2ECC71),
-      ancStatus: 'K4 Terpenuhi',
-      hb: '11.5 g/dL',
-      lila: '24.5 cm',
-      latitude: -7.9582,
-      longitude: 113.9123,
-      alamat: 'Dusun Krajan, RT 02/RW 01, Sumber Wringin',
-      noTelepon: '0812-3456-7890',
-      jumlahKunjungan: 4,
-      waktuKunjunganTerakhir: '28 Juli 2026, 09:30 WIB',
-      riwayatKunjungan: [
-        {
-          'kunjungan': 'K1 (Trimester 1)',
-          'date': '15 Jan 2026',
-          'time': '09:00 WIB',
-          'pemeriksa': 'Bidan Anita',
-          'td': '110/70 mmHg',
-          'djj': '140 bpm (Normal)',
-          'tfu': '18 cm',
-          'bb_tb': '52 kg | 158 cm',
-          'hb_lila': '11.8 g/dL | 24.0 cm',
-          'protein_urin': 'Negatif | O+',
-          'resep': 'Tablet Tambah Darah (Fe 30 Tab), Asam Folat, Kalsium 500mg',
-          'catatan': 'Pemeriksaan awal kehamilan trimester 1. Skrining laboratorium dasar lengkap, kondisi fisik ibu dan Janin sangat sehat.',
-        },
-        {
-          'kunjungan': 'K2 (Trimester 2)',
-          'date': '20 Mar 2026',
-          'time': '10:15 WIB',
-          'pemeriksa': 'Bidan Anita',
-          'td': '115/75 mmHg',
-          'djj': '144 bpm (Teratur)',
-          'tfu': '20 cm',
-          'bb_tb': '53.5 kg | 158 cm',
-          'hb_lila': '11.6 g/dL | 24.2 cm',
-          'protein_urin': 'Negatif | O+',
-          'resep': 'Suplemen Fe (Tablet Tambah Darah 30 Tab), Kalk Kalsium',
-          'catatan': 'Skrining USG awal trimester 2, detak jantung janin (+) normal, tensi normal, keluhan mual muntah sudah berkurang.',
-        },
-        {
-          'kunjungan': 'K3 (Trimester 2)',
-          'date': '18 Mei 2026',
-          'time': '08:45 WIB',
-          'pemeriksa': 'dr. Hendra Sp.OG',
-          'catatan': 'Konsultasi rujukan USG fetomaternal trimester 2. Perkembangan organ janin lengkap, posisi plasenta di fundus.',
-          'td': '110/70 mmHg',
-          'djj': '142 bpm',
-          'tfu': '22 cm',
-          'bb_tb': '54 kg | 158 cm',
-          'hb_lila': '11.5 g/dL | 24.5 cm',
-          'protein_urin': 'Negatif',
-          'resep': 'Fe 30 hari, Kalsium 500mg, Vitamin C',
-        },
-        {
-          'kunjungan': 'K4 (Trimester 3)',
-          'date': '28 Jul 2026',
-          'time': '09:30 WIB',
-          'pemeriksa': 'Bidan Anita',
-          'td': '110/70 mmHg',
-          'djj': '145 bpm',
-          'tfu': '26 cm',
-          'bb_tb': '55 kg | 158 cm',
-          'hb_lila': '11.5 g/dL | 24.5 cm',
-          'protein_urin': 'Negatif',
-          'resep': 'Fe 30 Tab, Suplemen Kalsium, Edukasi P4K',
-          'catatan': 'Evaluasi letak janin (presentasi kepala sudah di bawah). Pemantauan tanda bahaya persalinan & edukasi donor darah keluarga.',
-        },
-      ],
-    ),
-    IbuHamilModel(
-      id: 'KIA-002',
-      nama: 'Dewi Lestari',
-      nik: '3511085112960003',
-      umur: 34,
-      namaSuami: 'Ahmad Fauzi',
-      usiaKehamilan: '32 Minggu',
-      trimester: 'Trimester 3',
-      hpl: '18 Juli 2026',
-      ksprStatus: 'Risiko Tinggi (KRT)',
-      ksprColor: Color(0xFFE67E22),
-      ancStatus: 'K5 Terpenuhi',
-      hb: '10.2 g/dL (Anemia Ringan)',
-      lila: '22.0 cm (Kek)',
-      latitude: -7.9645,
-      longitude: 113.9056,
-      alamat: 'Dusun Tengah, RT 05/RW 02, Sukorejo',
-      noTelepon: '0852-9876-5432',
-      jumlahKunjungan: 5,
-      waktuKunjunganTerakhir: '25 Juli 2026, 11:15 WIB',
-      riwayatKunjungan: [
-        {
-          'kunjungan': 'K1 (Trimester 1)',
-          'date': '10 Des 2025',
-          'time': '08:30 WIB',
-          'pemeriksa': 'Bidan Rina',
-          'td': '120/80 mmHg',
-          'djj': '138 bpm',
-          'tfu': '16 cm',
-          'bb_tb': '48 kg | 154 cm',
-          'hb_lila': '10.5 g/dL | 22.0 cm',
-          'protein_urin': 'Negatif',
-          'resep': 'Sirup Tambah Darah Fe, PMT Biskuit Ibu Hamil',
-          'catatan': 'Pemeriksaan pertama, Hb 10.5 g/dL (anemia ringan), LILA 22.0 cm (KEK), resep sirup Fe & rujukan konseling gizi.',
-        },
-        {
-          'kunjungan': 'K2 (Trimester 1)',
-          'date': '12 Feb 2026',
-          'time': '09:45 WIB',
-          'pemeriksa': 'dr. Sugeng',
-          'td': '118/78 mmHg',
-          'djj': '140 bpm',
-          'tfu': '18 cm',
-          'bb_tb': '48.5 kg | 154 cm',
-          'hb_lila': '10.3 g/dL | 22.0 cm',
-          'protein_urin': 'Negatif',
-          'resep': 'Tablet Fe 60 Tab, Suplemen Protein Multi-gizi',
-          'catatan': 'Evaluasi gizi KEK & rujukan pemantauan nutrisi ketat Puskesmas.',
-        },
-        {
-          'kunjungan': 'K3 (Trimester 2)',
-          'date': '15 Apr 2026',
-          'time': '10:00 WIB',
-          'pemeriksa': 'Bidan Rina',
-          'td': '120/80 mmHg',
-          'djj': '142 bpm',
-          'tfu': '22 cm',
-          'bb_tb': '50 kg | 154 cm',
-          'hb_lila': '10.4 g/dL | 22.2 cm',
-          'protein_urin': 'Negatif',
-          'resep': 'Fe Tablet 30 Tab, Kalsium',
-          'catatan': 'Pemeriksaan berkala, TD 120/80 mmHg, denyut jantung janin normal.',
-        },
-        {
-          'kunjungan': 'K4 (Trimester 2)',
-          'date': '20 Mei 2026',
-          'time': '09:00 WIB',
-          'pemeriksa': 'dr. Hendra Sp.OG',
-          'td': '122/82 mmHg',
-          'djj': '144 bpm',
-          'tfu': '24 cm',
-          'bb_tb': '51 kg | 154 cm',
-          'hb_lila': '10.2 g/dL | 22.0 cm',
-          'protein_urin': 'Negatif',
-          'resep': 'Tablet Fe Dosis Ganda, Multivitamin',
-          'catatan': 'USG Trimester 2, perkiraan BBJ 1.8 kg, posisi melintang.',
-        },
-        {
-          'kunjungan': 'K5 (Trimester 3)',
-          'date': '25 Jul 2026',
-          'time': '11:15 WIB',
-          'pemeriksa': 'Bidan Rina',
-          'td': '120/80 mmHg',
-          'djj': '140 bpm',
-          'tfu': '28 cm',
-          'bb_tb': '52 kg | 154 cm',
-          'hb_lila': '10.2 g/dL | 22.0 cm',
-          'protein_urin': 'Negatif',
-          'resep': 'Fe Tablet, Persiapan Stiker P4K',
-          'catatan': 'Monitoring ketat faktor risiko KRT & persiapan P4K (persalinan di RSUD).',
-        },
-      ],
-    ),
-    IbuHamilModel(
-      id: 'KIA-003',
-      nama: 'Anisa Putri',
-      nik: '3511086307990002',
-      umur: 22,
-      namaSuami: 'Rian Pratama',
-      usiaKehamilan: '14 Minggu',
-      trimester: 'Trimester 2',
-      hpl: '20 November 2026',
-      ksprStatus: 'Risiko Rendah (KRR)',
-      ksprColor: Color(0xFF2ECC71),
-      ancStatus: 'K2 Terpenuhi',
-      hb: '12.1 g/dL',
-      lila: '25.0 cm',
-      latitude: -7.9512,
-      longitude: 113.9210,
-      alamat: 'Dusun Barat, RT 01/RW 03, Tlogosari',
-      noTelepon: '0813-1122-3344',
-      jumlahKunjungan: 2,
-      waktuKunjunganTerakhir: '19 Juli 2026, 08:30 WIB',
-      riwayatKunjungan: [
-        {
-          'kunjungan': 'K1 (Trimester 1)',
-          'date': '05 Mei 2026',
-          'time': '09:10 WIB',
-          'pemeriksa': 'Bidan Anita',
-          'td': '110/70 mmHg',
-          'djj': '138 bpm',
-          'tfu': '12 cm',
-          'bb_tb': '50 kg | 160 cm',
-          'hb_lila': '12.3 g/dL | 25.0 cm',
-          'protein_urin': 'Negatif',
-          'resep': 'Asam Folat 400mcg, Fe 30 Tab',
-          'catatan': 'Pemeriksaan kehamilan pertama, HPHT 13 Feb 2026, kondisi sangat baik.',
-        },
-        {
-          'kunjungan': 'K2 (Trimester 2)',
-          'date': '19 Jul 2026',
-          'time': '08:30 WIB',
-          'pemeriksa': 'Bidan Anita',
-          'td': '112/72 mmHg',
-          'djj': '142 bpm',
-          'tfu': '14 cm',
-          'bb_tb': '51.5 kg | 160 cm',
-          'hb_lila': '12.1 g/dL | 25.0 cm',
-          'protein_urin': 'Negatif',
-          'resep': 'Fe 30 Tab, Kalsium 500mg',
-          'catatan': 'Memasuki trimester 2, keluhan mual berkurang, DJJ teratur.',
-        },
-      ],
-    ),
-    IbuHamilModel(
-      id: 'KIA-004',
-      nama: 'Maria Ulfa',
-      nik: '3511084903910005',
-      umur: 38,
-      namaSuami: 'Hendra Wijaya',
-      usiaKehamilan: '36 Minggu',
-      trimester: 'Trimester 3',
-      hpl: '02 Juni 2026',
-      ksprStatus: 'Risiko Sangat Tinggi (KRST)',
-      ksprColor: Color(0xFFE74C3C),
-      ancStatus: 'K6 Terpenuhi',
-      hb: '9.8 g/dL',
-      lila: '21.5 cm (Kek)',
-      latitude: -7.9698,
-      longitude: 113.8990,
-      alamat: 'Dusun Selatan, RT 04/RW 01, Rejoagung',
-      noTelepon: '0877-6543-2100',
-      jumlahKunjungan: 6,
-      waktuKunjunganTerakhir: '29 Juli 2026, 14:00 WIB',
-      riwayatKunjungan: [
-        {
-          'kunjungan': 'K1 (Trimester 1)',
-          'date': '02 Nov 2025',
-          'time': '08:15 WIB',
-          'pemeriksa': 'dr. Sugeng',
-          'td': '135/85 mmHg',
-          'djj': '140 bpm',
-          'tfu': '14 cm',
-          'bb_tb': '58 kg | 152 cm',
-          'hb_lila': '9.5 g/dL | 21.0 cm',
-          'protein_urin': 'Trace',
-          'resep': 'Antihipertensi Aman Hamil, Fe Sirup, Asam Folat',
-          'catatan': 'Deteksi KRST usia >35 thn, riwayat hipertensi & anemia (Hb 9.5 g/dL).',
-        },
-        {
-          'kunjungan': 'K2 (Trimester 1)',
-          'date': '15 Des 2025',
-          'time': '09:30 WIB',
-          'pemeriksa': 'Bidan Anita',
-          'td': '130/80 mmHg',
-          'djj': '142 bpm',
-          'tfu': '16 cm',
-          'bb_tb': '58.5 kg | 152 cm',
-          'hb_lila': '9.6 g/dL | 21.2 cm',
-          'protein_urin': 'Negatif',
-          'resep': 'Fe 60 Tab, Kalsium',
-          'catatan': 'Monitoring tensi 130/80 mmHg & pemberian suplemen asam folat.',
-        },
-        {
-          'kunjungan': 'K3 (Trimester 2)',
-          'date': '20 Feb 2026',
-          'time': '10:00 WIB',
-          'pemeriksa': 'dr. Hendra Sp.OG',
-          'td': '128/82 mmHg',
-          'djj': '145 bpm',
-          'tfu': '20 cm',
-          'bb_tb': '59 kg | 152 cm',
-          'hb_lila': '9.7 g/dL | 21.5 cm',
-          'protein_urin': 'Negatif',
-          'resep': 'Rujukan Konsultasi RSUD Bondowoso',
-          'catatan': 'Rujukan USG fetomaternal RSUD, kondisi plasenta normal.',
-        },
-        {
-          'kunjungan': 'K4 (Trimester 2)',
-          'date': '10 Apr 2026',
-          'time': '08:45 WIB',
-          'pemeriksa': 'Bidan Anita',
-          'td': '125/80 mmHg',
-          'djj': '140 bpm',
-          'tfu': '24 cm',
-          'bb_tb': '60 kg | 152 cm',
-          'hb_lila': '9.8 g/dL | 21.5 cm',
-          'protein_urin': 'Negatif',
-          'resep': 'Fe Kombi, PMT Susu Ibu Hamil',
-          'catatan': 'Evaluasi Hb (9.8 g/dL), terapi suplemen kombi & PMT ibu hamil.',
-        },
-        {
-          'kunjungan': 'K5 (Trimester 3)',
-          'date': '18 Jun 2026',
-          'time': '11:30 WIB',
-          'pemeriksa': 'dr. Sugeng',
-          'td': '130/85 mmHg',
-          'djj': '142 bpm',
-          'tfu': '28 cm',
-          'bb_tb': '61 kg | 152 cm',
-          'hb_lila': '9.8 g/dL | 21.5 cm',
-          'protein_urin': 'Negatif',
-          'resep': 'Surat Rujukan Terencana RSUD',
-          'catatan': 'Konsultasi rujukan terencana persalinan di RSUD Bondowoso.',
-        },
-        {
-          'kunjungan': 'K6 (Trimester 3)',
-          'date': '29 Jul 2026',
-          'time': '14:00 WIB',
-          'pemeriksa': 'Bidan Anita',
-          'td': '128/80 mmHg',
-          'djj': '144 bpm',
-          'tfu': '32 cm',
-          'bb_tb': '62 kg | 152 cm',
-          'hb_lila': '9.8 g/dL | 21.5 cm',
-          'protein_urin': 'Negatif',
-          'resep': 'Persiapan Ambulance & Donor Darah Siaga',
-          'catatan': 'Kunjungan rumah (home visit) pemantauan persiapan persalinan & donor darah.',
-        },
-      ],
-    ),
-  ];
-
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(landingPageProvider);
@@ -414,13 +552,22 @@ class _PuskesmasPantauanIbuHamilState extends ConsumerState<PuskesmasPantauanIbu
     final themeAccent = notifier.getPrimaryColor();
     final isMobile = MediaQuery.of(context).size.width < 768;
 
-    final filteredList = _dummyData.where((item) {
+    final masterList = ref.watch(ibuHamilListProvider);
+    final currentRole = state.loggedInRole ?? 'puskesmas';
+    final isPonkesdesUser = currentRole == 'ponkesdes';
+    final currentUserName = state.loggedInName ?? 'Ponkesdes Sumber Wringin';
+
+    final filteredList = masterList.where((item) {
       final q = _searchQuery.toLowerCase();
       final matchesQuery = item.nama.toLowerCase().contains(q) ||
           item.nik.contains(q) ||
-          item.id.toLowerCase().contains(q);
+          item.id.toLowerCase().contains(q) ||
+          item.alamat.toLowerCase().contains(q) ||
+          item.faskesPemeriksa.toLowerCase().contains(q);
 
-      if (_selectedFilter == 'Risiko Tinggi') {
+      if (_selectedFilter == 'Ponkesdes Sumber Wringin') {
+        return matchesQuery && item.faskesPemeriksa.contains('Ponkesdes');
+      } else if (_selectedFilter == 'Risiko Tinggi') {
         return matchesQuery && (item.ksprStatus.contains('Tinggi'));
       } else if (_selectedFilter == 'Trimester 3') {
         return matchesQuery && item.trimester == 'Trimester 3';
@@ -431,6 +578,88 @@ class _PuskesmasPantauanIbuHamilState extends ConsumerState<PuskesmasPantauanIbu
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // Network Sync Banner (Ponkesdes ↔ Puskesmas Integration)
+        Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: isPonkesdesUser
+                  ? [const Color(0xFF27AE60).withOpacity(0.12), const Color(0xFF2ECC71).withOpacity(0.06)]
+                  : [themeAccent.withOpacity(0.12), themeAccent.withOpacity(0.04)],
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isPonkesdesUser ? const Color(0xFF27AE60).withOpacity(0.3) : themeAccent.withOpacity(0.3),
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: isPonkesdesUser ? const Color(0xFF27AE60).withOpacity(0.15) : themeAccent.withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  isPonkesdesUser ? Icons.home_work_rounded : Icons.hub_rounded,
+                  size: 20,
+                  color: isPonkesdesUser ? const Color(0xFF27AE60) : themeAccent,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          isPonkesdesUser
+                              ? 'JEJARING DLC BUMIL: $currentUserName ➔ PUSKESMAS SUMBER WRINGIN'
+                              : 'MONITORING TERPADU ANC PUSKESMAS & PONKESDES SUMBER WRINGIN',
+                          style: GoogleFonts.outfit(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                            color: isPonkesdesUser ? const Color(0xFF27AE60) : textColor,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2ECC71).withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(100),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.sync_rounded, size: 10, color: Color(0xFF2ECC71)),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Real-Time Sync Aktif',
+                                style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.bold, color: const Color(0xFF2ECC71)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      isPonkesdesUser
+                          ? 'Setiap data skrining & ANC 10T yang Anda input otomatis termonitor oleh Dokter & Tim KIA Puskesmas Sumber Wringin.'
+                          : 'Data ibu hamil mencakup jejaring wilayah binaan Ponkesdes Sumber Wringin & Pustu untuk deteksi dini risiko kehamilan.',
+                      style: GoogleFonts.outfit(fontSize: 9.5, color: subtitleColor),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+
         // Top Banner Header
         Container(
           padding: const EdgeInsets.all(24),
@@ -715,11 +944,11 @@ class _PuskesmasPantauanIbuHamilState extends ConsumerState<PuskesmasPantauanIbu
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
-                  value: _selectedFilter,
+                  value: ['Semua', 'Ponkesdes Sumber Wringin', 'Risiko Tinggi', 'Trimester 3'].contains(_selectedFilter) ? _selectedFilter : 'Semua',
                   icon: Icon(Icons.filter_list_rounded, size: 18, color: themeAccent),
                   style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: textColor),
                   dropdownColor: cardBgColor,
-                  items: ['Semua', 'Risiko Tinggi', 'Trimester 3'].map((f) {
+                  items: ['Semua', 'Ponkesdes Sumber Wringin', 'Risiko Tinggi', 'Trimester 3'].map((f) {
                     return DropdownMenuItem(value: f, child: Text(f));
                   }).toList(),
                   onChanged: (v) {
@@ -747,9 +976,7 @@ class _PuskesmasPantauanIbuHamilState extends ConsumerState<PuskesmasPantauanIbu
                     themeAccent: themeAccent,
                     isDark: isDark,
                     onPatientAdded: (newPatient) {
-                      setState(() {
-                        _dummyData.insert(0, newPatient);
-                      });
+                      ref.read(ibuHamilListProvider.notifier).addPatient(newPatient);
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text('Pasien ${newPatient.nama} berhasil ditambahkan!'),
@@ -841,8 +1068,49 @@ class _PuskesmasPantauanIbuHamilState extends ConsumerState<PuskesmasPantauanIbu
                                         style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.w900, color: item.ksprColor),
                                       ),
                                     ),
+                                    if (item.isKek) ...[
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFE74C3C).withOpacity(0.15),
+                                          borderRadius: BorderRadius.circular(100),
+                                        ),
+                                        child: Text(
+                                          '⚠️ KEK (LiLA < 23.5)',
+                                          style: GoogleFonts.outfit(fontSize: 7.5, fontWeight: FontWeight.w900, color: const Color(0xFFE74C3C)),
+                                        ),
+                                      ),
+                                    ],
+                                    if (item.isAnemia) ...[
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFE67E22).withOpacity(0.15),
+                                          borderRadius: BorderRadius.circular(100),
+                                        ),
+                                        child: Text(
+                                          '🩸 Anemia (Hb < 11)',
+                                          style: GoogleFonts.outfit(fontSize: 7.5, fontWeight: FontWeight.w900, color: const Color(0xFFE67E22)),
+                                        ),
+                                      ),
+                                    ],
                                     const SizedBox(width: 6),
-                                    Icon(Icons.touch_app_rounded, size: 12, color: themeAccent.withOpacity(0.7)),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF009688).withOpacity(0.12),
+                                        borderRadius: BorderRadius.circular(100),
+                                        border: Border.all(color: const Color(0xFF009688).withOpacity(0.3)),
+                                      ),
+                                      child: Text(
+                                        'RME: ${item.satuSehatIhs}',
+                                        style: GoogleFonts.firaCode(fontSize: 7.5, fontWeight: FontWeight.bold, color: const Color(0xFF009688)),
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    Icon(Icons.touch_app_rounded, size: 14, color: themeAccent.withOpacity(0.7)),
                                   ],
                                 ),
                                 const SizedBox(height: 2),
@@ -858,6 +1126,26 @@ class _PuskesmasPantauanIbuHamilState extends ConsumerState<PuskesmasPantauanIbu
                                     Text(
                                       item.alamat,
                                       style: GoogleFonts.outfit(fontSize: 9.5, color: subtitleColor, fontWeight: FontWeight.w600),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF3498DB).withOpacity(0.12),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: const Color(0xFF3498DB).withOpacity(0.3)),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.home_work_rounded, size: 9, color: Color(0xFF3498DB)),
+                                          const SizedBox(width: 3),
+                                          Text(
+                                            item.faskesPemeriksa,
+                                            style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.bold, color: const Color(0xFF3498DB)),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -949,7 +1237,7 @@ class _PuskesmasPantauanIbuHamilState extends ConsumerState<PuskesmasPantauanIbu
 
 // ─── REUSABLE PATIENT ANC DETAIL MODAL ────────────────────────────────────────
 
-class PatientAncDetailModal extends StatefulWidget {
+class PatientAncDetailModal extends ConsumerStatefulWidget {
   final IbuHamilModel item;
   final Color cardBgColor;
   final Color textColor;
@@ -972,10 +1260,10 @@ class PatientAncDetailModal extends StatefulWidget {
   });
 
   @override
-  State<PatientAncDetailModal> createState() => _PatientAncDetailModalState();
+  ConsumerState<PatientAncDetailModal> createState() => _PatientAncDetailModalState();
 }
 
-class _PatientAncDetailModalState extends State<PatientAncDetailModal> {
+class _PatientAncDetailModalState extends ConsumerState<PatientAncDetailModal> {
   Map<String, String>? _selectedVisitDetail;
 
   @override
@@ -1046,6 +1334,26 @@ class _PatientAncDetailModalState extends State<PatientAncDetailModal> {
                                 child: Text(
                                   widget.item.ksprStatus,
                                   style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: widget.item.ksprColor),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF009688).withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(100),
+                                  border: Border.all(color: const Color(0xFF009688).withOpacity(0.3)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.verified_rounded, size: 10, color: Color(0xFF009688)),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'IHS: ${widget.item.satuSehatIhs}',
+                                      style: GoogleFonts.firaCode(fontSize: 8.5, fontWeight: FontWeight.bold, color: const Color(0xFF009688)),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
@@ -1494,6 +1802,7 @@ class _PatientAncDetailModalState extends State<PatientAncDetailModal> {
                     elevation: 2,
                   ),
                   onPressed: () {
+                    ref.read(selectedIbuHamilProvider.notifier).state = widget.item;
                     Navigator.pop(context);
                     if (widget.onNavigateToForm != null) {
                       widget.onNavigateToForm!('dlc_form_ibu_hamil');
@@ -1703,7 +2012,7 @@ class _PatientAncDetailModalState extends State<PatientAncDetailModal> {
                 const SizedBox(height: 20),
 
                 // 2. Clinical Vitals & Screening Grid
-                _buildModalSectionHeader('HASIL SKRINING & VITAL SIGN KLINIS', Icons.monitor_heart_rounded, widget.themeAccent, widget.textColor),
+                _buildModalSectionHeader('HASIL SKRINING & VITAL SIGN KLINIS (STANDAR LOINC & FHIR R4)', Icons.monitor_heart_rounded, widget.themeAccent, widget.textColor),
                 const SizedBox(height: 10),
                 GridView.count(
                   shrinkWrap: true,
@@ -1713,12 +2022,12 @@ class _PatientAncDetailModalState extends State<PatientAncDetailModal> {
                   mainAxisSpacing: 10,
                   childAspectRatio: 2.3,
                   children: [
-                    _buildModalMetricTile('Tekanan Darah', v['td'] ?? '110/70 mmHg', Icons.speed_rounded, const Color(0xFF3498DB), widget.cardBgColor, widget.borderColor, widget.textColor, widget.subtitleColor),
-                    _buildModalMetricTile('Denyut Jantung Janin', v['djj'] ?? '142 bpm (Normal)', Icons.favorite_rounded, widget.themeAccent, widget.cardBgColor, widget.borderColor, widget.textColor, widget.subtitleColor),
-                    _buildModalMetricTile('Tinggi Fundus (TFU)', v['tfu'] ?? '24 cm', Icons.straighten_rounded, const Color(0xFFE67E22), widget.cardBgColor, widget.borderColor, widget.textColor, widget.subtitleColor),
-                    _buildModalMetricTile('Berat & Tinggi Badan', v['bb_tb'] ?? '54 kg | 158 cm', Icons.fitness_center_rounded, const Color(0xFF9B59B6), widget.cardBgColor, widget.borderColor, widget.textColor, widget.subtitleColor),
-                    _buildModalMetricTile('Kadar Hb & LiLA', v['hb_lila'] ?? '${widget.item.hb} | ${widget.item.lila}', Icons.bloodtype_rounded, const Color(0xFF2ECC71), widget.cardBgColor, widget.borderColor, widget.textColor, widget.subtitleColor),
-                    _buildModalMetricTile('Protein Urin & Gol. Darah', v['protein_urin'] ?? 'Negatif | O+', Icons.science_rounded, const Color(0xFF1ABC9C), widget.cardBgColor, widget.borderColor, widget.textColor, widget.subtitleColor),
+                    _buildModalMetricTile('Tekanan Darah (LOINC 8480-6 / 8462-4)', v['td'] ?? '110/70 mmHg', Icons.speed_rounded, const Color(0xFF3498DB), widget.cardBgColor, widget.borderColor, widget.textColor, widget.subtitleColor),
+                    _buildModalMetricTile('Denyut Jantung Janin (LOINC 55283-6)', v['djj'] ?? '142 bpm (Normal)', Icons.favorite_rounded, widget.themeAccent, widget.cardBgColor, widget.borderColor, widget.textColor, widget.subtitleColor),
+                    _buildModalMetricTile('Tinggi Fundus Uteri (LOINC 11881-0)', v['tfu'] ?? '24 cm', Icons.straighten_rounded, const Color(0xFFE67E22), widget.cardBgColor, widget.borderColor, widget.textColor, widget.subtitleColor),
+                    _buildModalMetricTile('Berat & TB (LOINC 29463-7 / 8302-2)', v['bb_tb'] ?? '54 kg | 158 cm', Icons.fitness_center_rounded, const Color(0xFF9B59B6), widget.cardBgColor, widget.borderColor, widget.textColor, widget.subtitleColor),
+                    _buildModalMetricTile('Kadar Hb & LiLA (LOINC 718-7 / 56072-2)', v['hb_lila'] ?? '${widget.item.hb} | ${widget.item.lila}', Icons.bloodtype_rounded, const Color(0xFF2ECC71), widget.cardBgColor, widget.borderColor, widget.textColor, widget.subtitleColor),
+                    _buildModalMetricTile('Protein Urin & Golongan Darah', v['protein_urin'] ?? 'Negatif | O+', Icons.science_rounded, const Color(0xFF1ABC9C), widget.cardBgColor, widget.borderColor, widget.textColor, widget.subtitleColor),
                   ],
                 ),
 
@@ -1802,6 +2111,7 @@ class _PatientAncDetailModalState extends State<PatientAncDetailModal> {
                   elevation: 2,
                 ),
                 onPressed: () {
+                  ref.read(selectedIbuHamilProvider.notifier).state = widget.item;
                   Navigator.pop(context);
                   if (widget.onNavigateToForm != null) {
                     widget.onNavigateToForm!('dlc_form_ibu_hamil');
@@ -2582,7 +2892,7 @@ class _AddPatientModalDialogState extends State<AddPatientModalDialog> {
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<String>(
                         isExpanded: true,
-                        value: _trimester,
+                        value: ['Trimester 1', 'Trimester 2', 'Trimester 3'].contains(_trimester) ? _trimester : 'Trimester 1',
                         style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: widget.textColor),
                         dropdownColor: widget.cardBgColor,
                         items: ['Trimester 1', 'Trimester 2', 'Trimester 3'].map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
@@ -2612,7 +2922,7 @@ class _AddPatientModalDialogState extends State<AddPatientModalDialog> {
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<String>(
                         isExpanded: true,
-                        value: _ksprStatus,
+                        value: ['Risiko Rendah (KRR)', 'Risiko Tinggi (KRT)', 'Risiko Sangat Tinggi (KRST)'].contains(_ksprStatus) ? _ksprStatus : 'Risiko Rendah (KRR)',
                         style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: widget.textColor),
                         dropdownColor: widget.cardBgColor,
                         items: ['Risiko Rendah (KRR)', 'Risiko Tinggi (KRT)', 'Risiko Sangat Tinggi (KRST)'].map((k) => DropdownMenuItem(value: k, child: Text(k))).toList(),

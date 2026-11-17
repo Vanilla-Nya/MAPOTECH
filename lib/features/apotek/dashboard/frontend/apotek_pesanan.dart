@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:mapotech/shared/widgets/skeleton_loading.dart';
+import 'package:mapotech/shared/widgets/ui.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/supabase_service.dart';
 import 'package:mapotech/features/apotek/dashboard/backend/prescription_provider.dart';
@@ -58,6 +58,7 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
   // Mock / database incoming prescriptions queue
   List<IncomingPrescription> _orders = [];
   String _activeTab = 'pending'; // 'pending', 'compounding', 'ready', 'completed'
+  bool get isEn => ref.read(isEnglishProvider);
 
   @override
   void initState() {
@@ -361,7 +362,7 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Pesanan Masuk & Resep Digital',
+                            isEn ? 'Incoming Orders & Digital Prescriptions' : 'Pesanan Masuk & Resep Digital',
                             style: GoogleFonts.outfit(
                               fontSize: 16,
                               fontWeight: FontWeight.w900,
@@ -370,7 +371,7 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'Validasi QR resep terkunci dari dokter dan kelola tahapan peracikan obat',
+                            isEn ? 'Validate encrypted doctor prescriptions and manage compounding stages' : 'Validasi QR resep terkunci dari dokter dan kelola tahapan peracikan obat',
                             style: GoogleFonts.outfit(
                               fontSize: 11,
                               color: subtitleColor,
@@ -392,7 +393,7 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
                       ),
                       icon: const Icon(Icons.qr_code_scanner_rounded, size: 16, color: Colors.white),
                       label: Text(
-                        'Scan QR Resep Dokter',
+                        isEn ? 'Scan Doctor QR Prescription' : 'Scan QR Resep Dokter',
                         style: GoogleFonts.outfit(
                           fontSize: 12,
                           fontWeight: FontWeight.w800,
@@ -424,13 +425,13 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      _buildTabButton('Antrian', 'pending', pendingCount, Colors.orangeAccent),
+                      _buildTabButton(isEn ? 'Queued' : 'Antrian', 'pending', pendingCount, Colors.orangeAccent),
                       const SizedBox(width: 8),
-                      _buildTabButton('Diracik', 'compounding', compoundingCount, Colors.amber),
+                      _buildTabButton(isEn ? 'Compounding' : 'Diracik', 'compounding', compoundingCount, Colors.amber),
                       const SizedBox(width: 8),
-                      _buildTabButton('Siap', 'ready', readyCount, themeAccent),
+                      _buildTabButton(isEn ? 'Ready' : 'Siap', 'ready', readyCount, themeAccent),
                       const SizedBox(width: 8),
-                      _buildTabButton('Selesai', 'completed', completedCount, const Color(0xFF6F6A8A)),
+                      _buildTabButton(isEn ? 'Completed' : 'Selesai', 'completed', completedCount, const Color(0xFF6F6A8A)),
                     ],
                   ),
                 ),
@@ -449,12 +450,12 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
                       Icon(Icons.assignment_turned_in_rounded, size: 48, color: themeAccent.withValues(alpha: 0.3)),
                       const SizedBox(height: 12),
                       Text(
-                        'Tidak Ada Antrian',
+                        isEn ? 'No Orders in Queue' : 'Tidak Ada Antrian',
                         style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w900, color: textColor),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Antrian resep untuk kategori ini kosong. Scan QR resep dokter untuk menambahkan.',
+                        isEn ? 'Prescription queue for this category is empty. Scan doctor QR prescription to add.' : 'Antrian resep untuk kategori ini kosong. Scan QR resep dokter untuk menambahkan.',
                         style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
                       ),
                     ],
@@ -470,23 +471,23 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
                     final rx = filteredOrders[index];
 
                     Color statusColor = Colors.orangeAccent;
-                    String statusLabel = 'Dalam Antrian';
-                    String actionLabel = 'MULAI MERACIK';
+                    String statusLabel = isEn ? 'In Queue' : 'Dalam Antrian';
+                    String actionLabel = isEn ? 'START COMPOUNDING' : 'MULAI MERACIK';
                     IconData actionIcon = Icons.hourglass_top_rounded;
 
                     if (rx.status == 'compounding') {
                       statusColor = Colors.amber;
-                      statusLabel = 'Sedang Diracik';
-                      actionLabel = 'SELESAIKAN RACIKAN';
+                      statusLabel = isEn ? 'Compounding' : 'Sedang Diracik';
+                      actionLabel = isEn ? 'FINISH COMPOUNDING' : 'SELESAIKAN RACIKAN';
                       actionIcon = Icons.check_circle_outline_rounded;
                     } else if (rx.status == 'ready') {
                       statusColor = const Color(0xFF27AE60);
-                      statusLabel = 'Siap Diambil / Kasir';
-                      actionLabel = 'PROSES DI KASIR (POS)';
+                      statusLabel = isEn ? 'Ready for Pickup / POS' : 'Siap Diambil / Kasir';
+                      actionLabel = isEn ? 'PROCESS IN POS' : 'PROSES DI KASIR (POS)';
                       actionIcon = Icons.point_of_sale_rounded;
                     } else if (rx.status == 'completed') {
                       statusColor = const Color(0xFF6F6A8A);
-                      statusLabel = 'Selesai';
+                      statusLabel = isEn ? 'Completed' : 'Selesai';
                     }
 
                     return Container(

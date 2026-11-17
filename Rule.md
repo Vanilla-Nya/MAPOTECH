@@ -129,3 +129,36 @@ Secara default, tema **REV Mode** (`appearance == 'rev'`) **HANYA** boleh menggu
   * Tipografi, ukuran font, hierarki heading, dan warna teks.
   * Bentuk dan interaksi tombol (`CustomButton`), input teks (`CustomTextField`), dropdown (`CustomDropdown`), *search bar* (`CustomSearchBar`), *chip filter* (`CustomFilterChip`), dan modal dialog (`CustomDialog` / `CustomConfirmDialog`).
 * Hindari mendesain halaman dengan gaya yang berbeda jauh dari halaman-halaman yang sudah ada di proyek.
+
+---
+
+## 7. Standar Internasionalisasi & Lokalisasi Bahasa (Multi-Language / L10n Standard)
+* **Wajib Mendukung 2 Bahasa (Bilingual)**: Seluruh teks antarmuka (label menu, judul kartu, tombol aksi, tooltip, placeholder input pencarian, dialog modal/konfirmasi, status badge, dan opsi filter) **WAJIB** mendukung 2 bahasa:
+  1. **Bahasa Indonesia (`'id'`)**
+  2. **Bahasa Inggris (`'en'`)**
+  * Dilarang keras melakukan hardcode teks hanya dalam satu bahasa saja di halaman mana pun.
+* **Single Source of Truth**: Bahasa aplikasi dikontrol penuh oleh preferensi bahasa pengguna (`state.language` atau `appLanguageProvider` dari Riverpod `landingPageProvider`).
+* **Zero-Lag & Kerapian Kode**:
+  * Untuk mencegah *over-rebuilding* dan memastikan transisi pergantian bahasa berlangsung cepat serta **TIDAK NGELAG**, gunakan Riverpod selector:
+    ```dart
+    final isEn = ref.watch(isEnglishProvider); // Reaktif, ultra-cepat, 0-lag
+    // atau
+    final lang = ref.watch(appLanguageProvider);
+    ```
+  * Seluruh komponen lokalisasi diekspos melalui `lib/shared/widgets/ui.dart` (`AppTranslations`, `isEnglishProvider`, `appLanguageProvider`, serta extension `ref.tr(...)`).
+* **Panduan AI Assistant & Developer Saat Menambah Menu / Fitur / UI Baru ("Jangan Panik")**:
+  1. **Teks Dinamis / Inline**: Gunakan `ref.tr(id: '...', en: '...')` atau `isEn ? '...' : '...'`:
+     ```dart
+     CustomButton(
+       text: ref.tr(id: 'Simpan Rekam Medis', en: 'Save Medical Record'),
+       onPressed: () => _handleSave(),
+     )
+     ```
+  2. **Format Tanggal Otomatis**: Dilarang membuat array nama hari/bulan manual di dalam file UI. Wajib menggunakan `AppTranslations.formatDate(...)`:
+     ```dart
+     final dateStr = AppTranslations.formatDate(DateTime.now(), lang: state.language);
+     // ID: "Selasa, 26 Mei 2026"
+     // EN: "Tuesday, 26 May 2026"
+     ```
+  3. **Konsistensi Lintas Tab**: Seluruh tab (Pasien, Dokter, Apotek, Puskesmas, Ponkesdes, dan seluruh DLC) harus merespons pilihan bahasa pengguna di Settings secara seragam.
+

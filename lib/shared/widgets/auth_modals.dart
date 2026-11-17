@@ -10,7 +10,6 @@ import 'package:mapotech/shared/supabase_service.dart';
 import 'package:mapotech/shared/widgets/animated_transitions.dart';
 import 'package:mapotech/shared/widgets/ui.dart';
 import 'package:mapotech/shared/widgets/location_selector_widget.dart';
-import 'package:mapotech/shared/location_service.dart';
 import 'dart:async';
 
 /// Shows the premium login modal dialog.
@@ -139,10 +138,13 @@ class _LoginModalContentState extends State<_LoginModalContent> {
       isStaticValid = true;
       staticRole = 'puskesmas';
       staticName = 'Puskesmas Sumbersari';
-    } else if (lowerUser == 'ponkesdes' && password == '123') {
+    } else if ((lowerUser == 'pkdsumberwringin@gmail.com' ||
+            lowerUser == 'pkdsumberwringin' ||
+            lowerUser == 'ponkesdes') &&
+        (password == 'pkdsumberwringin1!' || password == '123')) {
       isStaticValid = true;
       staticRole = 'ponkesdes';
-      staticName = 'Ponkesdes Sukowono';
+      staticName = 'Ponkesdes Sumber Wringin';
     }
 
     if (isStaticValid) {
@@ -167,22 +169,25 @@ class _LoginModalContentState extends State<_LoginModalContent> {
             'https://media1.tenor.com/m/vXcb3pS1xs8AAAAd/elysia-honkai-impact-3rd.gif';
       }
 
+      final isPonkesdes = staticRole == 'ponkesdes';
       final mockUser = {
-        'id': 'mock-id-1234567890',
+        'id': isPonkesdes ? 'mock-ponkesdes-sumberwringin' : 'mock-id-1234567890',
         'name': staticName,
-        'email': '$staticRole@company.com',
-        'nik': '3511081208000003',
-        'phone_number': '08XXXXXXXXXX',
-        'birth_date': '2000-12-08',
-        'gender': 'male',
+        'email': isPonkesdes ? 'pkdsumberwringin@gmail.com' : '$staticRole@company.com',
+        'nik': isPonkesdes ? '3511085203920002' : '3511081208000003',
+        'phone_number': isPonkesdes ? '0812-3456-7890' : '08XXXXXXXXXX',
+        'birth_date': isPonkesdes ? '1992-03-22' : '2000-12-08',
+        'gender': isPonkesdes ? 'female' : 'male',
         'role': staticRole,
         'province': 'JAWA TIMUR',
         'district': 'KABUPATEN BONDOWOSO',
-        'sub_district': 'PUER',
-        'village': 'KEJAYAN',
-        'address':
-            'Kel. KEJAYAN, Kec. PUER, KABUPATEN BONDOWOSO, Prov. JAWA TIMUR',
-        'subscription_status': 'inactive',
+        'sub_district': isPonkesdes ? 'SUMBER WRINGIN' : 'PUER',
+        'village': isPonkesdes ? 'SUMBER WRINGIN' : 'KEJAYAN',
+        'puskesmas_induk': 'UPTD Puskesmas Sumber Wringin',
+        'address': isPonkesdes
+            ? 'Dusun Krajan RT 01/RW 01, Desa Sumber Wringin, Kec. Sumber Wringin, Bondowoso'
+            : 'Kel. KEJAYAN, Kec. PUER, KABUPATEN BONDOWOSO, Prov. JAWA TIMUR',
+        'subscription_status': isPonkesdes ? 'active' : 'inactive',
         'subscription_expires_at': null,
         'avatar_url': staticAvatarUrl,
       };
@@ -520,7 +525,6 @@ class _LoginModalContentState extends State<_LoginModalContent> {
     ];
     final isSoonActive = soonPortals.contains(state.activeTab);
 
-    final activeTab = state.activeTab;
     final isRev = state.appearance == 'rev';
 
     final isDark = state.appearance == 'dark';
@@ -798,7 +802,7 @@ class _LoginModalContentState extends State<_LoginModalContent> {
                   ],
                 ),
               ),
-              const SizedBox(height: 36),
+              const SizedBox(height: 24),
 
               // MAIN ACTION BUTTON
               if (isSoonActive)
@@ -940,7 +944,6 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
   bool _isLoading = false;
   bool _otpSent = false;
   bool _otpVerified = false;
-  String _otpDebugCode = ''; // For development display
 
   @override
   void initState() {
@@ -2238,7 +2241,6 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
                               final otp = await db.sendOtp(email);
                               setState(() {
                                 _otpSent = true;
-                                _otpDebugCode = otp;
                                 _isLoading = false;
                               });
                               if (context.mounted) {
@@ -2780,7 +2782,7 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
                           );
 
                           // Fast-forward progress to 100% and close the loading page
-                          loadingTimer?.cancel();
+                          loadingTimer.cancel();
                           double currentVal = progressNotifier.value;
                           while (currentVal < 1.0) {
                             currentVal = (currentVal + 0.05).clamp(0.0, 1.0);
@@ -2814,7 +2816,7 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
                             );
                           }
                         } catch (e) {
-                          loadingTimer?.cancel();
+                          loadingTimer.cancel();
                           if (context.mounted && Navigator.canPop(context)) {
                             Navigator.pop(context);
                           }

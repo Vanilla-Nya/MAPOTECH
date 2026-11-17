@@ -303,6 +303,7 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(landingPageProvider);
+    final isEn = state.language == 'en';
 
     final isDark = state.appearance == 'dark';
     final notifier = ref.read(landingPageProvider.notifier);
@@ -351,12 +352,20 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
                         ),
                         decoration: InputDecoration(
                           hintText: _selectedFilter == 'puskesmas'
-                              ? 'Cari nama puskesmas, poli, atau daerah...'
+                              ? (isEn
+                                  ? 'Search public health center, clinic, or area...'
+                                  : 'Cari nama puskesmas, poli, atau daerah...')
                               : _selectedFilter == 'ponkesdes'
-                                  ? 'Cari nama pustu, ponkesdes, atau desa...'
+                                  ? (isEn
+                                      ? 'Search village health post, pustu, or village...'
+                                      : 'Cari nama pustu, ponkesdes, atau desa...')
                                   : _selectedFilter == 'bidan'
-                                      ? 'Cari bidan, perawat, atau tempat praktik...'
-                                      : 'Cari praktik mandiri atau spesialis...',
+                                      ? (isEn
+                                          ? 'Search midwife, nurse, or clinic...'
+                                          : 'Cari bidan, perawat, atau tempat praktik...')
+                                      : (isEn
+                                          ? 'Search private practice or specialist...'
+                                          : 'Cari praktik mandiri atau spesialis...'),
                           hintStyle: GoogleFonts.outfit(
                             fontSize: 13,
                             color: subtitleColor.withOpacity(0.6),
@@ -394,7 +403,7 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
                     onPressed: () => _openQrScanner(context),
                     icon: const Icon(Icons.qr_code_scanner_rounded, size: 16),
                     label: Text(
-                      'Scan QR Dokter',
+                      isEn ? 'Scan Doctor QR' : 'Scan QR Dokter',
                       style: GoogleFonts.outfit(
                         fontWeight: FontWeight.bold,
                         fontSize: 11.5,
@@ -416,7 +425,7 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
                   Row(
                     children: [
                       _buildFilterChip(
-                        'Semua',
+                        isEn ? 'All' : 'Semua',
                         'semua',
                         subtitleColor,
                         purpleAccent,
@@ -425,7 +434,7 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
                       ),
                       const SizedBox(width: 8),
                       _buildFilterChip(
-                        'Dokter',
+                        isEn ? 'Doctors' : 'Dokter',
                         'dokter',
                         subtitleColor,
                         purpleAccent,
@@ -434,7 +443,7 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
                       ),
                       const SizedBox(width: 8),
                       _buildFilterChip(
-                        'Bidan',
+                        isEn ? 'Midwives' : 'Bidan',
                         'bidan',
                         subtitleColor,
                         purpleAccent,
@@ -448,7 +457,7 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
                         color: subtitleColor,
                       ),
                       Text(
-                        'Filter Urutan',
+                        isEn ? 'Sort Filter' : 'Filter Urutan',
                         style: GoogleFonts.outfit(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
@@ -476,12 +485,12 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
                 Text(
                   widget.customTitle ??
                       (_selectedFilter == 'puskesmas'
-                          ? 'Faskes Puskesmas Tersedia'
+                          ? (isEn ? 'Available Public Health Centers' : 'Faskes Puskesmas Tersedia')
                           : _selectedFilter == 'ponkesdes'
-                              ? 'Faskes Pustu & Ponkesdes Tersedia'
+                              ? (isEn ? 'Available Village Health Posts' : 'Faskes Pustu & Ponkesdes Tersedia')
                               : _selectedFilter == 'bidan'
-                                  ? 'Praktik Bidan Tersedia'
-                                  : 'Praktik Mandiri Tersedia'),
+                                  ? (isEn ? 'Available Midwife Practices' : 'Praktik Bidan Tersedia')
+                                  : (isEn ? 'Available Private Practices' : 'Praktik Mandiri Tersedia')),
                   style: GoogleFonts.outfit(
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
@@ -491,8 +500,8 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
                 const SizedBox(height: 2),
                 Text(
                   _searchQuery.isEmpty
-                      ? 'Menampilkan hasil pencarian terbaik untuk Anda'
-                      : 'Hasil pencarian untuk "$_searchQuery"',
+                      ? (isEn ? 'Showing the best healthcare search results for you' : 'Menampilkan hasil pencarian terbaik untuk Anda')
+                      : (isEn ? 'Search results for "$_searchQuery"' : 'Hasil pencarian untuk "$_searchQuery"'),
                   style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor),
                 ),
               ],
@@ -506,7 +515,7 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
               child: Text(
                 _isLoading
                     ? '...'
-                    : '${_filteredDokters.length} Hasil',
+                    : (isEn ? '${_filteredDokters.length} Results' : '${_filteredDokters.length} Hasil'),
                 style: GoogleFonts.outfit(
                   fontSize: 10,
                   fontWeight: FontWeight.w900,

@@ -42,6 +42,7 @@ import 'package:mapotech/features/puskesmas/dashboard/frontend/puskesmas_pantaua
 import 'package:mapotech/features/puskesmas/dashboard/frontend/puskesmas_form_ibu_hamil.dart';
 import 'package:mapotech/features/puskesmas/dashboard/frontend/puskesmas_profile.dart';
 import 'package:mapotech/features/ponkesdes/dashboard/frontend/ponkesdes_profile.dart';
+import 'package:mapotech/features/ponkesdes/dashboard/frontend/ponkesdes_dashboard.dart';
 import 'package:mapotech/features/pekerja/dashboard/frontend/management_pekerja.dart';
 import 'package:mapotech/features/puskesmas/dashboard/frontend/management_pustu_ponkesdes.dart';
 import 'package:mapotech/features/puskesmas/dlc/vitascale/pages/vitascale_data_anak_page.dart';
@@ -654,7 +655,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                               size: 20,
                               color: textColor.withOpacity(0.8),
                             ),
-                            tooltip: 'Scan QR Dokter / Apotek',
+                            tooltip: state.language == 'en' ? 'Scan Doctor / Pharmacy QR' : 'Scan QR Dokter / Apotek',
                             onPressed: () {
                               setState(() {
                                 _activeMenu = 'qr_scanner';
@@ -889,6 +890,23 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
         case 'management_pekerja':
           return const ManagementPekerjaWidget();
         case 'dashboard':
+          return PonkesdesDashboard(
+            onNavigate: (menu) {
+              setState(() {
+                _activeMenu = menu;
+              });
+            },
+          );
+        case 'dlc_pantauan_ibu_hamil':
+          return PuskesmasPantauanIbuHamil(
+            onNavigateToForm: (menu) {
+              setState(() {
+                _activeMenu = menu;
+              });
+            },
+          );
+        case 'dlc_form_ibu_hamil':
+          return const PuskesmasFormIbuHamil();
         case 'dlc_vitascale_data_anak':
           return VitaScaleDataAnakPage(
             onNavigateToMenu: (menu) => setState(() => _activeMenu = menu),
@@ -903,7 +921,13 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
             onNavigateToMenu: (menu) => setState(() => _activeMenu = menu),
           );
         default:
-          return const DokterDashboard();
+          return PonkesdesDashboard(
+            onNavigate: (menu) {
+              setState(() {
+                _activeMenu = menu;
+              });
+            },
+          );
       }
     } else if (role == 'apotek') {
       switch (_activeMenu) {

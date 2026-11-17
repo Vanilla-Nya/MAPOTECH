@@ -48,6 +48,7 @@ class MyApp extends ConsumerWidget {
     return MaterialApp(
       title: 'MAPOTECH',
       debugShowCheckedModeBanner: false,
+      locale: Locale(state.language),
       themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
       theme: ThemeData(
         brightness: Brightness.light,

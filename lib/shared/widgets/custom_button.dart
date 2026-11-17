@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 class CustomButton extends StatefulWidget {
   final String text;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final bool isSecondary;
   final IconData? icon;
   final double? width;
@@ -16,7 +16,7 @@ class CustomButton extends StatefulWidget {
   const CustomButton({
     super.key,
     required this.text,
-    required this.onPressed,
+    this.onPressed,
     this.isSecondary = false,
     this.icon,
     this.width,
@@ -38,8 +38,11 @@ class _CustomButtonState extends State<CustomButton> {
 
   @override
   Widget build(BuildContext context) {
-    final defaultPrimaryColor = widget.primaryColor ?? Theme.of(context).colorScheme.primary;
-    final defaultTextColor = widget.textColor ?? Theme.of(context).colorScheme.secondary;
+    final isEnabled = widget.onPressed != null;
+    final defaultPrimaryColor =
+        widget.primaryColor ?? Theme.of(context).colorScheme.primary;
+    final defaultTextColor =
+        widget.textColor ?? Theme.of(context).colorScheme.secondary;
     final defaultBorderColor = widget.borderColor ?? Colors.grey[300]!;
 
     Color buttonColor;
@@ -47,27 +50,40 @@ class _CustomButtonState extends State<CustomButton> {
     Border? border;
 
     if (widget.isSecondary) {
-      buttonColor = _isHovered
+      buttonColor = (_isHovered && isEnabled)
           ? (Theme.of(context).brightness == Brightness.dark
-              ? Colors.grey[800]!
-              : Colors.grey[100]!)
+                ? Colors.grey[800]!
+                : Colors.grey[100]!)
           : Colors.transparent;
-      buttonTextColor = defaultTextColor;
-      border = Border.all(color: defaultBorderColor, width: 1.5);
+      buttonTextColor = isEnabled
+          ? defaultTextColor
+          : defaultTextColor.withOpacity(0.5);
+      border = Border.all(
+        color: isEnabled
+            ? defaultBorderColor
+            : defaultBorderColor.withOpacity(0.5),
+        width: 1.5,
+      );
     } else {
-      buttonColor = defaultPrimaryColor;
+      buttonColor = isEnabled
+          ? defaultPrimaryColor
+          : defaultPrimaryColor.withOpacity(0.5);
       buttonTextColor = widget.textColor ?? Colors.white;
     }
 
-    final double scale = _isPressed ? 0.95 : (_isHovered ? 1.05 : 1.0);
+    final double scale = (!isEnabled)
+        ? 1.0
+        : (_isPressed ? 0.95 : (_isHovered ? 1.05 : 1.0));
 
     return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
+      onEnter: isEnabled ? (_) => setState(() => _isHovered = true) : null,
+      onExit: isEnabled ? (_) => setState(() => _isHovered = false) : null,
       child: GestureDetector(
-        onTapDown: (_) => setState(() => _isPressed = true),
-        onTapUp: (_) => setState(() => _isPressed = false),
-        onTapCancel: () => setState(() => _isPressed = false),
+        onTapDown: isEnabled ? (_) => setState(() => _isPressed = true) : null,
+        onTapUp: isEnabled ? (_) => setState(() => _isPressed = false) : null,
+        onTapCancel: isEnabled
+            ? () => setState(() => _isPressed = false)
+            : null,
         onTap: widget.onPressed,
         child: AnimatedScale(
           scale: scale,
@@ -80,8 +96,12 @@ class _CustomButtonState extends State<CustomButton> {
               color: widget.isGradient ? null : buttonColor,
               gradient: widget.isGradient
                   ? LinearGradient(
-                      colors: widget.gradientColors ??
-                          [Theme.of(context).colorScheme.primary, Theme.of(context).colorScheme.secondary],
+                      colors:
+                          widget.gradientColors ??
+                          [
+                            Theme.of(context).colorScheme.primary,
+                            Theme.of(context).colorScheme.secondary,
+                          ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     )
@@ -91,7 +111,9 @@ class _CustomButtonState extends State<CustomButton> {
               boxShadow: [
                 if (!widget.isSecondary)
                   BoxShadow(
-                    color: defaultPrimaryColor.withOpacity(_isHovered ? 0.35 : 0.2),
+                    color: defaultPrimaryColor.withOpacity(
+                      _isHovered ? 0.35 : 0.2,
+                    ),
                     blurRadius: _isHovered ? 16 : 10,
                     offset: const Offset(0, 4),
                   ),
