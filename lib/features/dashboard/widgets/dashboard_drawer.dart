@@ -396,6 +396,11 @@ List<DrawerMenuItem> getMenuItemsForRole(
         icon: Icons.medication_rounded,
       ),
       DrawerMenuItem(
+        id: 'children',
+        label: isEn ? 'My Children' : 'Data Anak',
+        icon: Icons.child_care_rounded,
+      ),
+      DrawerMenuItem(
         id: 'profile',
         label: isEn ? 'Profile' : 'Profil',
         icon: Icons.person_rounded,

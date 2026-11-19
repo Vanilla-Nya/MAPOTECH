@@ -702,7 +702,13 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
     );
   }
 
-  Widget _buildReviewRow(String label, String value, Color subColor, Color textColor, {bool isBold = false}) {
+  Widget _buildReviewRow(
+    String label,
+    String value,
+    Color subColor,
+    Color textColor, {
+    bool isBold = false,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2.5),
       child: Row(
@@ -754,15 +760,27 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
           title: Row(
             children: [
               Icon(
-                isFormLengkap ? Icons.verified_rounded : (redErrors.isNotEmpty ? Icons.assignment_late_rounded : Icons.info_outline_rounded),
-                color: isFormLengkap ? const Color(0xFF27AE60) : (redErrors.isNotEmpty ? const Color(0xFFE74C3C) : const Color(0xFFF39C12)),
+                isFormLengkap
+                    ? Icons.verified_rounded
+                    : (redErrors.isNotEmpty
+                          ? Icons.assignment_late_rounded
+                          : Icons.info_outline_rounded),
+                color: isFormLengkap
+                    ? const Color(0xFF27AE60)
+                    : (redErrors.isNotEmpty
+                          ? const Color(0xFFE74C3C)
+                          : const Color(0xFFF39C12)),
                 size: 22,
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   'Review & Validasi Form ANC 10T',
-                  style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w900, color: textColor),
+                  style: GoogleFonts.outfit(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    color: textColor,
+                  ),
                 ),
               ),
             ],
@@ -793,8 +811,12 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
                     child: Row(
                       children: [
                         Icon(
-                          isFormLengkap ? Icons.check_circle_rounded : Icons.error_outline_rounded,
-                          color: isFormLengkap ? const Color(0xFF27AE60) : const Color(0xFFE74C3C),
+                          isFormLengkap
+                              ? Icons.check_circle_rounded
+                              : Icons.error_outline_rounded,
+                          color: isFormLengkap
+                              ? const Color(0xFF27AE60)
+                              : const Color(0xFFE74C3C),
                           size: 20,
                         ),
                         const SizedBox(width: 10),
@@ -805,13 +827,15 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
                               Text(
                                 isFormLengkap
                                     ? (yellowWarnings.isEmpty
-                                        ? '✅ Form Lengkap (Semua Data 10T Terpenuhi)'
-                                        : '✅ Data Wajib Lengkap (${yellowWarnings.length} Saran Opsional)')
+                                          ? '✅ Form Lengkap (Semua Data 10T Terpenuhi)'
+                                          : '✅ Data Wajib Lengkap (${yellowWarnings.length} Saran Opsional)')
                                     : '❌ Form Belum Lengkap (${redErrors.length} Data Wajib Kurang)',
                                 style: GoogleFonts.outfit(
                                   fontSize: 11.5,
                                   fontWeight: FontWeight.bold,
-                                  color: isFormLengkap ? const Color(0xFF27AE60) : const Color(0xFFE74C3C),
+                                  color: isFormLengkap
+                                      ? const Color(0xFF27AE60)
+                                      : const Color(0xFFE74C3C),
                                 ),
                               ),
                               const SizedBox(height: 2),
@@ -819,7 +843,10 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
                                 isFormLengkap
                                     ? 'Seluruh parameter klinis siap disimpan & disinkronkan ke SATUSEHAT RME.'
                                     : 'Klik chip merah di bawah untuk langsung menuju step yang belum lengkap.',
-                                style: GoogleFonts.outfit(fontSize: 9.5, color: subtitleColor),
+                                style: GoogleFonts.outfit(
+                                  fontSize: 9.5,
+                                  color: subtitleColor,
+                                ),
                               ),
                             ],
                           ),
@@ -833,7 +860,11 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
                     const SizedBox(height: 14),
                     Text(
                       'Data Wajib Belum Diisi (Klik chip untuk menuju form):',
-                      style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.bold, color: const Color(0xFFE74C3C)),
+                      style: GoogleFonts.outfit(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFFE74C3C),
+                      ),
                     ),
                     const SizedBox(height: 6),
                     Wrap(
@@ -841,14 +872,26 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
                       runSpacing: 6,
                       children: redErrors.map((err) {
                         return ActionChip(
-                          avatar: const Icon(Icons.warning_rounded, size: 13, color: Color(0xFFE74C3C)),
+                          avatar: const Icon(
+                            Icons.warning_rounded,
+                            size: 13,
+                            color: Color(0xFFE74C3C),
+                          ),
                           label: Text(
                             'Step ${err['step']}: ${err['message']}',
-                            style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFFE74C3C)),
+                            style: GoogleFonts.outfit(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFFE74C3C),
+                            ),
                           ),
-                          backgroundColor: const Color(0xFFE74C3C).withOpacity(0.08),
+                          backgroundColor: const Color(
+                            0xFFE74C3C,
+                          ).withOpacity(0.08),
                           side: const BorderSide(color: Color(0xFFE74C3C)),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(100),
+                          ),
                           onPressed: () {
                             Navigator.pop(ctx);
                             setState(() {
@@ -865,7 +908,11 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
                     const SizedBox(height: 14),
                     Text(
                       'Peringatan / Data Opsional (Klik chip untuk melengkapi):',
-                      style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.bold, color: const Color(0xFFD68910)),
+                      style: GoogleFonts.outfit(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFFD68910),
+                      ),
                     ),
                     const SizedBox(height: 6),
                     Wrap(
@@ -873,14 +920,26 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
                       runSpacing: 6,
                       children: yellowWarnings.map((warn) {
                         return ActionChip(
-                          avatar: const Icon(Icons.info_outline_rounded, size: 13, color: Color(0xFFF39C12)),
+                          avatar: const Icon(
+                            Icons.info_outline_rounded,
+                            size: 13,
+                            color: Color(0xFFF39C12),
+                          ),
                           label: Text(
                             'Step ${warn['step']}: ${warn['message']}',
-                            style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFFD68910)),
+                            style: GoogleFonts.outfit(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFFD68910),
+                            ),
                           ),
-                          backgroundColor: const Color(0xFFF39C12).withOpacity(0.08),
+                          backgroundColor: const Color(
+                            0xFFF39C12,
+                          ).withOpacity(0.08),
                           side: const BorderSide(color: Color(0xFFF39C12)),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(100),
+                          ),
                           onPressed: () {
                             Navigator.pop(ctx);
                             setState(() {
@@ -896,37 +955,122 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
 
                   // Ringkasan Data Pemeriksaan
                   _buildReviewSectionTitle('1. Pasien & ANC', textColor),
-                  _buildReviewRow('Nama Pasien', _namaController.text, subtitleColor, textColor),
-                  _buildReviewRow('NIK', _nikController.text, subtitleColor, textColor),
-                  _buildReviewRow('Kunjungan', '$_kunjungan ($_trimester)', subtitleColor, textColor),
+                  _buildReviewRow(
+                    'Nama Pasien',
+                    _namaController.text,
+                    subtitleColor,
+                    textColor,
+                  ),
+                  _buildReviewRow(
+                    'NIK',
+                    _nikController.text,
+                    subtitleColor,
+                    textColor,
+                  ),
+                  _buildReviewRow(
+                    'Kunjungan',
+                    '$_kunjungan ($_trimester)',
+                    subtitleColor,
+                    textColor,
+                  ),
 
                   const SizedBox(height: 8),
-                  _buildReviewSectionTitle('2. Antropometri & Tensi', textColor),
-                  _buildReviewRow('Tinggi / Berat', '${_tbController.text} cm / ${_bbController.text} kg', subtitleColor, textColor),
-                  _buildReviewRow('LiLA (Status Gizi)', '${_lilaController.text} cm (${_isKek ? "KEK" : "Normal"})', subtitleColor, textColor),
-                  _buildReviewRow('Tekanan Darah', '${_sistoleController.text}/${_diastoleController.text} mmHg', subtitleColor, textColor),
+                  _buildReviewSectionTitle(
+                    '2. Antropometri & Tensi',
+                    textColor,
+                  ),
+                  _buildReviewRow(
+                    'Tinggi / Berat',
+                    '${_tbController.text} cm / ${_bbController.text} kg',
+                    subtitleColor,
+                    textColor,
+                  ),
+                  _buildReviewRow(
+                    'LiLA (Status Gizi)',
+                    '${_lilaController.text} cm (${_isKek ? "KEK" : "Normal"})',
+                    subtitleColor,
+                    textColor,
+                  ),
+                  _buildReviewRow(
+                    'Tekanan Darah',
+                    '${_sistoleController.text}/${_diastoleController.text} mmHg',
+                    subtitleColor,
+                    textColor,
+                  ),
 
                   const SizedBox(height: 8),
                   _buildReviewSectionTitle('3. Janin & Kebidanan', textColor),
-                  _buildReviewRow('TFU / TBJ', '${_tfuController.text} cm / ~${_calculatedTbj?.toStringAsFixed(0) ?? "-"} g', subtitleColor, textColor),
-                  _buildReviewRow('DJJ / Presentasi', '${_djjController.text} bpm / $_presentasiJanin', subtitleColor, textColor),
+                  _buildReviewRow(
+                    'TFU / TBJ',
+                    '${_tfuController.text} cm / ~${_calculatedTbj?.toStringAsFixed(0) ?? "-"} g',
+                    subtitleColor,
+                    textColor,
+                  ),
+                  _buildReviewRow(
+                    'DJJ / Presentasi',
+                    '${_djjController.text} bpm / $_presentasiJanin',
+                    subtitleColor,
+                    textColor,
+                  ),
 
                   const SizedBox(height: 8),
-                  _buildReviewSectionTitle('4. Laboratorium & Terapi', textColor),
-                  _buildReviewRow('Hemoglobin (Hb)', '${_hbController.text} g/dL (${_isAnemia ? "Anemia" : "Normal"})', subtitleColor, textColor),
-                  _buildReviewRow('Gol. Darah / Urin', '$_golDarah / Protein: $_proteinUrin', subtitleColor, textColor),
-                  _buildReviewRow('Suplemen TTD', _ttdDiberikan ? 'Diberikan (90 Tab)' : 'Tidak', subtitleColor, textColor),
+                  _buildReviewSectionTitle(
+                    '4. Laboratorium & Terapi',
+                    textColor,
+                  ),
+                  _buildReviewRow(
+                    'Hemoglobin (Hb)',
+                    '${_hbController.text} g/dL (${_isAnemia ? "Anemia" : "Normal"})',
+                    subtitleColor,
+                    textColor,
+                  ),
+                  _buildReviewRow(
+                    'Gol. Darah / Urin',
+                    '$_golDarah / Protein: $_proteinUrin',
+                    subtitleColor,
+                    textColor,
+                  ),
+                  _buildReviewRow(
+                    'Suplemen TTD',
+                    _ttdDiberikan ? 'Diberikan (90 Tab)' : 'Tidak',
+                    subtitleColor,
+                    textColor,
+                  ),
 
                   const SizedBox(height: 8),
-                  _buildReviewSectionTitle('5. Skrining Risiko (KSPR)', textColor),
-                  _buildReviewRow('Kategori KSPR', _skorKspr, subtitleColor, textColor, isBold: true),
+                  _buildReviewSectionTitle(
+                    '5. Skrining Risiko (KSPR)',
+                    textColor,
+                  ),
+                  _buildReviewRow(
+                    'Kategori KSPR',
+                    _skorKspr,
+                    subtitleColor,
+                    textColor,
+                    isBold: true,
+                  ),
 
                   const SizedBox(height: 8),
                   _buildReviewSectionTitle('6. Perencanaan P4K', textColor),
-                  _buildReviewRow('Tempat / Penolong', '$_p4kTempatBersalin / $_p4kPenolong', subtitleColor, textColor),
-                  _buildReviewRow('Rencana KB', _p4kRencanaKb, subtitleColor, textColor),
+                  _buildReviewRow(
+                    'Tempat / Penolong',
+                    '$_p4kTempatBersalin / $_p4kPenolong',
+                    subtitleColor,
+                    textColor,
+                  ),
+                  _buildReviewRow(
+                    'Rencana KB',
+                    _p4kRencanaKb,
+                    subtitleColor,
+                    textColor,
+                  ),
                   if (_catatanController.text.isNotEmpty)
-                    _buildReviewRow('Catatan', _catatanController.text, subtitleColor, textColor),
+                    _buildReviewRow(
+                      'Catatan',
+                      _catatanController.text,
+                      subtitleColor,
+                      textColor,
+                    ),
                 ],
               ),
             ),
@@ -936,15 +1080,24 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
               onPressed: () => Navigator.pop(ctx),
               child: Text(
                 'Batal / Kembali ke Form',
-                style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: subtitleColor),
+                style: GoogleFonts.outfit(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: subtitleColor,
+                ),
               ),
             ),
             if (redErrors.isNotEmpty)
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFE74C3C),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
                 ),
                 onPressed: () {
                   Navigator.pop(ctx);
@@ -952,29 +1105,57 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
                     _formStep = redErrors.first['step'] as int;
                   });
                 },
-                icon: const Icon(Icons.arrow_forward_rounded, size: 14, color: Colors.white),
+                icon: const Icon(
+                  Icons.arrow_forward_rounded,
+                  size: 14,
+                  color: Colors.white,
+                ),
                 label: Text(
                   'Lengkapi Step ${redErrors.first['step']}',
-                  style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                  style: GoogleFonts.outfit(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
               )
             else
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF27AE60),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 10,
+                  ),
                 ),
                 onPressed: () {
                   Navigator.pop(ctx);
                   _executeSaveForm();
                 },
                 icon: _isSyncingSatuSehat
-                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Icon(Icons.cloud_upload_rounded, size: 16, color: Colors.white),
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(
+                        Icons.cloud_upload_rounded,
+                        size: 16,
+                        color: Colors.white,
+                      ),
                 label: Text(
                   'Konfirmasi & Simpan SatuSehat',
-                  style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                  style: GoogleFonts.outfit(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
               ),
           ],
@@ -2777,8 +2958,12 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
         Builder(
           builder: (context) {
             final issues = _validateAncForm();
-            final redErrors = issues.where((i) => i['isError'] == true).toList();
-            final yellowWarnings = issues.where((i) => i['isError'] == false).toList();
+            final redErrors = issues
+                .where((i) => i['isError'] == true)
+                .toList();
+            final yellowWarnings = issues
+                .where((i) => i['isError'] == false)
+                .toList();
             final stepHasError = <int, bool>{};
             final stepHasWarning = <int, bool>{};
             for (final issue in issues) {
@@ -2864,23 +3049,77 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
                   child: Column(
                     children: [
                       if (_formStep == 1)
-                        _buildFormSection1(context, isDark, cardBgColor, textColor, subtitleColor, borderColor, themeAccent)
+                        _buildFormSection1(
+                          context,
+                          isDark,
+                          cardBgColor,
+                          textColor,
+                          subtitleColor,
+                          borderColor,
+                          themeAccent,
+                        )
                       else if (_formStep == 2)
-                        _buildFormSection2(context, isDark, cardBgColor, textColor, subtitleColor, borderColor, themeAccent)
+                        _buildFormSection2(
+                          context,
+                          isDark,
+                          cardBgColor,
+                          textColor,
+                          subtitleColor,
+                          borderColor,
+                          themeAccent,
+                        )
                       else if (_formStep == 3)
-                        _buildFormSection3(context, isDark, cardBgColor, textColor, subtitleColor, borderColor, themeAccent)
+                        _buildFormSection3(
+                          context,
+                          isDark,
+                          cardBgColor,
+                          textColor,
+                          subtitleColor,
+                          borderColor,
+                          themeAccent,
+                        )
                       else if (_formStep == 4)
-                        _buildFormSection4(context, isDark, cardBgColor, textColor, subtitleColor, borderColor, themeAccent)
+                        _buildFormSection4(
+                          context,
+                          isDark,
+                          cardBgColor,
+                          textColor,
+                          subtitleColor,
+                          borderColor,
+                          themeAccent,
+                        )
                       else if (_formStep == 5)
-                        _buildFormSection5(context, isDark, cardBgColor, textColor, subtitleColor, borderColor, themeAccent)
+                        _buildFormSection5(
+                          context,
+                          isDark,
+                          cardBgColor,
+                          textColor,
+                          subtitleColor,
+                          borderColor,
+                          themeAccent,
+                        )
                       else if (_formStep == 6)
-                        _buildFormSection6(context, isDark, cardBgColor, textColor, subtitleColor, borderColor, themeAccent),
+                        _buildFormSection6(
+                          context,
+                          isDark,
+                          cardBgColor,
+                          textColor,
+                          subtitleColor,
+                          borderColor,
+                          themeAccent,
+                        ),
 
                       const SizedBox(height: 16),
 
                       // 7. SATUSEHAT FHIR R4 Integration Status Card (If Synced)
                       if (_satuSehatSyncResult != null) ...[
-                        _buildSatuSehatSyncCard(cardBgColor, borderColor, textColor, subtitleColor, themeAccent),
+                        _buildSatuSehatSyncCard(
+                          cardBgColor,
+                          borderColor,
+                          textColor,
+                          subtitleColor,
+                          themeAccent,
+                        ),
                         const SizedBox(height: 16),
                       ],
 
@@ -2954,23 +3193,50 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: Color(0xFF009688)),
                   backgroundColor: const Color(0xFF009688).withOpacity(0.08),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
                 ),
                 onPressed: _isCheckingSatuSehat ? null : _checkSatuSehatPatient,
                 icon: _isCheckingSatuSehat
-                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF009688)))
-                    : const Icon(Icons.verified_user_rounded, size: 16, color: Color(0xFF009688)),
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Color(0xFF009688),
+                        ),
+                      )
+                    : const Icon(
+                        Icons.verified_user_rounded,
+                        size: 16,
+                        color: Color(0xFF009688),
+                      ),
                 label: Text(
                   _isCheckingSatuSehat ? 'Memeriksa...' : 'Cek SATUSEHAT',
-                  style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF009688)),
+                  style: GoogleFonts.outfit(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF009688),
+                  ),
                 ),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               flex: 4,
-              child: _buildTextField('Nama Lengkap Ibu Hamil', _namaController, textColor, subtitleColor, borderColor, cardBgColor),
+              child: _buildTextField(
+                'Nama Lengkap Ibu Hamil',
+                _namaController,
+                textColor,
+                subtitleColor,
+                borderColor,
+                cardBgColor,
+              ),
             ),
           ],
         ),
@@ -2978,15 +3244,31 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
         Row(
           children: [
             Expanded(
-              child: _buildDropdown('Trimester Kehamilan', _trimester, ['Trimester 1', 'Trimester 2', 'Trimester 3'], (v) {
-                if (v != null) setState(() => _trimester = v);
-              }, textColor, cardBgColor, borderColor),
+              child: _buildDropdown(
+                'Trimester Kehamilan',
+                _trimester,
+                ['Trimester 1', 'Trimester 2', 'Trimester 3'],
+                (v) {
+                  if (v != null) setState(() => _trimester = v);
+                },
+                textColor,
+                cardBgColor,
+                borderColor,
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: _buildDropdown('Kontak Kunjungan (ANC Standar 6x)', _kunjungan, ['K1', 'K2', 'K3', 'K4', 'K5', 'K6'], (v) {
-                if (v != null) setState(() => _kunjungan = v);
-              }, textColor, cardBgColor, borderColor),
+              child: _buildDropdown(
+                'Kontak Kunjungan (ANC Standar 6x)',
+                _kunjungan,
+                ['K1', 'K2', 'K3', 'K4', 'K5', 'K6'],
+                (v) {
+                  if (v != null) setState(() => _kunjungan = v);
+                },
+                textColor,
+                cardBgColor,
+                borderColor,
+              ),
             ),
           ],
         ),
@@ -3006,7 +3288,11 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
               Expanded(
                 child: Text(
                   'Standar Buku KIA 2024: ANC minimal 6x (K1-K6). Wajib minimal 2x diperiksa Dokter & USG: 1x di Trimester 1 (K1) dan 1x di Trimester 3 (K5) untuk deteksi dini risiko kehamilan.',
-                  style: GoogleFonts.outfit(fontSize: 10, color: textColor, height: 1.3),
+                  style: GoogleFonts.outfit(
+                    fontSize: 10,
+                    color: textColor,
+                    height: 1.3,
+                  ),
                 ),
               ),
             ],
@@ -3018,7 +3304,11 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
           activeColor: themeAccent,
           title: Text(
             'Pemeriksaan Dokter Umum/Spesialis & Skrining USG Terpenuhi (Wajib di K1 & K5)',
-            style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: textColor),
+            style: GoogleFonts.outfit(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: textColor,
+            ),
           ),
           subtitle: Text(
             'Konfirmasi skrining USG kehamilan trimester 1 / 3 telah dilaksanakan oleh dokter',
@@ -3048,11 +3338,7 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
       cardBgColor,
       borderColor,
       textColor,
-      topChips: [
-        ?_lilaStatusBadge,
-        ?_imtStatusBadge,
-        ?_tdStatusBadge,
-      ],
+      topChips: [?_lilaStatusBadge, ?_imtStatusBadge, ?_tdStatusBadge],
       [
         Row(
           children: [
@@ -3060,7 +3346,15 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildTextField('Tinggi Badan (cm)', _tbController, textColor, subtitleColor, borderColor, cardBgColor, keyboardType: TextInputType.number),
+                  _buildTextField(
+                    'Tinggi Badan (cm)',
+                    _tbController,
+                    textColor,
+                    subtitleColor,
+                    borderColor,
+                    cardBgColor,
+                    keyboardType: TextInputType.number,
+                  ),
                   const SizedBox(height: 4),
                   _buildLoincBadge('LOINC: 8302-2 (Body height)'),
                 ],
@@ -3071,7 +3365,15 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildTextField('Berat Badan (kg)', _bbController, textColor, subtitleColor, borderColor, cardBgColor, keyboardType: TextInputType.number),
+                  _buildTextField(
+                    'Berat Badan (kg)',
+                    _bbController,
+                    textColor,
+                    subtitleColor,
+                    borderColor,
+                    cardBgColor,
+                    keyboardType: TextInputType.number,
+                  ),
                   const SizedBox(height: 4),
                   _buildLoincBadge('LOINC: 29463-7 (Body weight)'),
                 ],
@@ -3082,7 +3384,15 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildTextField('LiLA (cm)', _lilaController, textColor, subtitleColor, borderColor, cardBgColor, keyboardType: TextInputType.number),
+                  _buildTextField(
+                    'LiLA (cm)',
+                    _lilaController,
+                    textColor,
+                    subtitleColor,
+                    borderColor,
+                    cardBgColor,
+                    keyboardType: TextInputType.number,
+                  ),
                   const SizedBox(height: 4),
                   _buildLoincBadge('LOINC: 56072-2 (Mid upper arm circ)'),
                 ],
@@ -3099,7 +3409,15 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildTextField('Tekanan Darah Sistole (mmHg)', _sistoleController, textColor, subtitleColor, borderColor, cardBgColor, keyboardType: TextInputType.number),
+                  _buildTextField(
+                    'Tekanan Darah Sistole (mmHg)',
+                    _sistoleController,
+                    textColor,
+                    subtitleColor,
+                    borderColor,
+                    cardBgColor,
+                    keyboardType: TextInputType.number,
+                  ),
                   const SizedBox(height: 4),
                   _buildLoincBadge('LOINC: 8480-6 (Systolic BP)'),
                 ],
@@ -3110,7 +3428,15 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildTextField('Tekanan Darah Diastole (mmHg)', _diastoleController, textColor, subtitleColor, borderColor, cardBgColor, keyboardType: TextInputType.number),
+                  _buildTextField(
+                    'Tekanan Darah Diastole (mmHg)',
+                    _diastoleController,
+                    textColor,
+                    subtitleColor,
+                    borderColor,
+                    cardBgColor,
+                    keyboardType: TextInputType.number,
+                  ),
                   const SizedBox(height: 4),
                   _buildLoincBadge('LOINC: 8462-4 (Diastolic BP)'),
                 ],
@@ -3139,10 +3465,7 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
       cardBgColor,
       borderColor,
       textColor,
-      topChips: [
-        ?_tbjStatusBadge,
-        ?_djjStatusBadge,
-      ],
+      topChips: [?_tbjStatusBadge, ?_djjStatusBadge],
       [
         Row(
           children: [
@@ -3150,7 +3473,15 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildTextField('Tinggi Fundus Uteri (TFU) cm', _tfuController, textColor, subtitleColor, borderColor, cardBgColor, keyboardType: TextInputType.number),
+                  _buildTextField(
+                    'Tinggi Fundus Uteri (TFU) cm',
+                    _tfuController,
+                    textColor,
+                    subtitleColor,
+                    borderColor,
+                    cardBgColor,
+                    keyboardType: TextInputType.number,
+                  ),
                   const SizedBox(height: 4),
                   _buildLoincBadge('LOINC: 11881-0 (Uterus Fundal height)'),
                 ],
@@ -3161,7 +3492,15 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildTextField('Denyut Jantung Janin (DJJ) x/mnt', _djjController, textColor, subtitleColor, borderColor, cardBgColor, keyboardType: TextInputType.number),
+                  _buildTextField(
+                    'Denyut Jantung Janin (DJJ) x/mnt',
+                    _djjController,
+                    textColor,
+                    subtitleColor,
+                    borderColor,
+                    cardBgColor,
+                    keyboardType: TextInputType.number,
+                  ),
                   const SizedBox(height: 4),
                   _buildLoincBadge('LOINC: 55283-6 (Fetal Heart rate)'),
                 ],
@@ -3178,7 +3517,11 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
               child: _buildDropdown(
                 'Presentasi Janin (Letak Janin)',
                 _presentasiJanin,
-                ['Kepala (Normal)', 'Bokong (Sungsang)', 'Lintang (Transverse)'],
+                [
+                  'Kepala (Normal)',
+                  'Bokong (Sungsang)',
+                  'Lintang (Transverse)',
+                ],
                 (v) {
                   if (v != null) setState(() => _presentasiJanin = v);
                 },
@@ -3192,7 +3535,13 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
               child: _buildDropdown(
                 'Status Imunisasi Tetanus (T)',
                 _statusImunisasiT,
-                ['T1 (Awal)', 'T2 (3 Tahun)', 'T3 (5 Tahun)', 'T4 (10 Tahun)', 'T5 (Lengkap)'],
+                [
+                  'T1 (Awal)',
+                  'T2 (3 Tahun)',
+                  'T3 (5 Tahun)',
+                  'T4 (10 Tahun)',
+                  'T5 (Lengkap)',
+                ],
                 (v) {
                   if (v != null) setState(() => _statusImunisasiT = v);
                 },
@@ -3211,7 +3560,11 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
           activeColor: themeAccent,
           title: Text(
             'Pemberian Imunisasi Td (Tetanus Difteri) pada Kunjungan Ini',
-            style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: textColor),
+            style: GoogleFonts.outfit(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: textColor,
+            ),
           ),
           subtitle: Text(
             'Diberikan jika status imunisasi T belum lengkap sesuai interval Buku KIA',
@@ -3241,9 +3594,7 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
       cardBgColor,
       borderColor,
       textColor,
-      topChips: [
-        ?_hbStatusBadge,
-      ],
+      topChips: [?_hbStatusBadge],
       [
         Row(
           children: [
@@ -3251,7 +3602,15 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildTextField('Kadar Hemoglobin (Hb) g/dL', _hbController, textColor, subtitleColor, borderColor, cardBgColor, keyboardType: TextInputType.number),
+                  _buildTextField(
+                    'Kadar Hemoglobin (Hb) g/dL',
+                    _hbController,
+                    textColor,
+                    subtitleColor,
+                    borderColor,
+                    cardBgColor,
+                    keyboardType: TextInputType.number,
+                  ),
                   const SizedBox(height: 4),
                   _buildLoincBadge('LOINC: 718-7 (Hemoglobin blood)'),
                 ],
@@ -3259,9 +3618,17 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: _buildDropdown('Golongan Darah & Rhesus', _golDarah, ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'], (v) {
-                if (v != null) setState(() => _golDarah = v);
-              }, textColor, cardBgColor, borderColor),
+              child: _buildDropdown(
+                'Golongan Darah & Rhesus',
+                _golDarah,
+                ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'],
+                (v) {
+                  if (v != null) setState(() => _golDarah = v);
+                },
+                textColor,
+                cardBgColor,
+                borderColor,
+              ),
             ),
           ],
         ),
@@ -3274,7 +3641,13 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
               child: _buildDropdown(
                 'Protein Urin (Deteksi Preeklamsia)',
                 _proteinUrin,
-                ['Negatif', 'Positif 1 (+1)', 'Positif 2 (+2)', 'Positif 3 (+3)', 'Positif 4 (+4)'],
+                [
+                  'Negatif',
+                  'Positif 1 (+1)',
+                  'Positif 2 (+2)',
+                  'Positif 3 (+3)',
+                  'Positif 4 (+4)',
+                ],
                 (v) {
                   if (v != null) setState(() => _proteinUrin = v);
                 },
@@ -3288,7 +3661,12 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
               child: _buildDropdown(
                 'Glukosa Urin (Deteksi DM Gestasional)',
                 _glukosaUrin,
-                ['Negatif', 'Positif 1 (+1)', 'Positif 2 (+2)', 'Positif 3 (+3)'],
+                [
+                  'Negatif',
+                  'Positif 1 (+1)',
+                  'Positif 2 (+2)',
+                  'Positif 3 (+3)',
+                ],
                 (v) {
                   if (v != null) setState(() => _glukosaUrin = v);
                 },
@@ -3305,7 +3683,14 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           activeColor: themeAccent,
-          title: Text('Pemberian Tablet Tambah Darah (TTD minimal 90 Tablet selama Hamil)', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: textColor)),
+          title: Text(
+            'Pemberian Tablet Tambah Darah (TTD minimal 90 Tablet selama Hamil)',
+            style: GoogleFonts.outfit(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: textColor,
+            ),
+          ),
           value: _ttdDiberikan,
           onChanged: (v) => setState(() => _ttdDiberikan = v),
         ),
@@ -3313,8 +3698,18 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           activeColor: themeAccent,
-          title: Text('Skrining Triple Eliminasi (HIV / Sifilis / Hepatitis B Non-Reaktif)', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: textColor)),
-          subtitle: Text('Wajib dilakukan 1 kali pada Trimester 1 (K1) di Puskesmas', style: GoogleFonts.outfit(fontSize: 9.5, color: subtitleColor)),
+          title: Text(
+            'Skrining Triple Eliminasi (HIV / Sifilis / Hepatitis B Non-Reaktif)',
+            style: GoogleFonts.outfit(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: textColor,
+            ),
+          ),
+          subtitle: Text(
+            'Wajib dilakukan 1 kali pada Trimester 1 (K1) di Puskesmas',
+            style: GoogleFonts.outfit(fontSize: 9.5, color: subtitleColor),
+          ),
           value: _tripleEliminasiNonReaktif,
           onChanged: (v) => setState(() => _tripleEliminasiNonReaktif = v),
         ),
@@ -3358,12 +3753,16 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
           decoration: BoxDecoration(
             color: _skorKspr.contains('Sangat Tinggi')
                 ? const Color(0xFFE74C3C).withOpacity(0.12)
-                : (_skorKspr.contains('Tinggi') ? const Color(0xFFE67E22).withOpacity(0.12) : const Color(0xFF2ECC71).withOpacity(0.12)),
+                : (_skorKspr.contains('Tinggi')
+                      ? const Color(0xFFE67E22).withOpacity(0.12)
+                      : const Color(0xFF2ECC71).withOpacity(0.12)),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: _skorKspr.contains('Sangat Tinggi')
                   ? const Color(0xFFE74C3C).withOpacity(0.3)
-                  : (_skorKspr.contains('Tinggi') ? const Color(0xFFE67E22).withOpacity(0.3) : const Color(0xFF2ECC71).withOpacity(0.3)),
+                  : (_skorKspr.contains('Tinggi')
+                        ? const Color(0xFFE67E22).withOpacity(0.3)
+                        : const Color(0xFF2ECC71).withOpacity(0.3)),
             ),
           ),
           child: Row(
@@ -3371,11 +3770,15 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
               Icon(
                 _skorKspr.contains('Sangat Tinggi')
                     ? Icons.dangerous_rounded
-                    : (_skorKspr.contains('Tinggi') ? Icons.warning_rounded : Icons.check_circle_rounded),
+                    : (_skorKspr.contains('Tinggi')
+                          ? Icons.warning_rounded
+                          : Icons.check_circle_rounded),
                 size: 20,
                 color: _skorKspr.contains('Sangat Tinggi')
                     ? const Color(0xFFE74C3C)
-                    : (_skorKspr.contains('Tinggi') ? const Color(0xFFE67E22) : const Color(0xFF27AE60)),
+                    : (_skorKspr.contains('Tinggi')
+                          ? const Color(0xFFE67E22)
+                          : const Color(0xFF27AE60)),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -3383,14 +3786,16 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
                   _skorKspr.contains('Sangat Tinggi')
                       ? '🔴 KRST (Risiko Sangat Tinggi): Persalinan wajib direncanakan di Rumah Sakit rujukan komprehensif (PONEK) dengan penanganan Dokter Spesialis Obgyn.'
                       : (_skorKspr.contains('Tinggi')
-                          ? '🟠 KRT (Risiko Tinggi): Rujukan berencana untuk konsultasi Dokter Spesialis Obgyn di RS. Penolong persalinan dapat Dokter Puskesmas / RS.'
-                          : '🟢 KRR (Risiko Rendah): Antenatal care dan persalinan normal dapat ditolong oleh Bidan / Dokter di Fasilitas Pelayanan Kesehatan Primer (Puskesmas).'),
+                            ? '🟠 KRT (Risiko Tinggi): Rujukan berencana untuk konsultasi Dokter Spesialis Obgyn di RS. Penolong persalinan dapat Dokter Puskesmas / RS.'
+                            : '🟢 KRR (Risiko Rendah): Antenatal care dan persalinan normal dapat ditolong oleh Bidan / Dokter di Fasilitas Pelayanan Kesehatan Primer (Puskesmas).'),
                   style: GoogleFonts.outfit(
                     fontSize: 10.5,
                     fontWeight: FontWeight.bold,
                     color: _skorKspr.contains('Sangat Tinggi')
                         ? const Color(0xFFE74C3C)
-                        : (_skorKspr.contains('Tinggi') ? const Color(0xFFE67E22) : const Color(0xFF27AE60)),
+                        : (_skorKspr.contains('Tinggi')
+                              ? const Color(0xFFE67E22)
+                              : const Color(0xFF27AE60)),
                   ),
                 ),
               ),
@@ -3454,7 +3859,11 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
               child: _buildDropdown(
                 'Rencana Penolong Persalinan',
                 _p4kPenolong,
-                ['Bidan & Dokter Puskesmas', 'Dokter Spesialis Kebidanan (Sp.OG)', 'Bidan Praktik Mandiri'],
+                [
+                  'Bidan & Dokter Puskesmas',
+                  'Dokter Spesialis Kebidanan (Sp.OG)',
+                  'Bidan Praktik Mandiri',
+                ],
                 (v) {
                   if (v != null) setState(() => _p4kPenolong = v);
                 },
@@ -3468,7 +3877,13 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
               child: _buildDropdown(
                 'Rencana KB Pasca Persalinan',
                 _p4kRencanaKb,
-                ['IUD Pasca Persalinan', 'Implan / Susuk KB', 'Suntik Progestin', 'Tubektomi (MOW)', 'Kondom'],
+                [
+                  'IUD Pasca Persalinan',
+                  'Implan / Susuk KB',
+                  'Suntik Progestin',
+                  'Tubektomi (MOW)',
+                  'Kondom',
+                ],
                 (v) {
                   if (v != null) setState(() => _p4kRencanaKb = v);
                 },
@@ -3513,11 +3928,19 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
         children: [
           Row(
             children: [
-              const Icon(Icons.check_circle_rounded, size: 20, color: Color(0xFF009688)),
+              const Icon(
+                Icons.check_circle_rounded,
+                size: 20,
+                color: Color(0xFF009688),
+              ),
               const SizedBox(width: 8),
               Text(
                 'Sinkronisasi RME SATUSEHAT Berhasil',
-                style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w900, color: const Color(0xFF009688)),
+                style: GoogleFonts.outfit(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                  color: const Color(0xFF009688),
+                ),
               ),
               const Spacer(),
               Container(
@@ -3528,7 +3951,11 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
                 ),
                 child: Text(
                   _satuSehatSyncResult!['mode'] ?? 'FHIR R4',
-                  style: GoogleFonts.outfit(fontSize: 9.5, fontWeight: FontWeight.bold, color: const Color(0xFF009688)),
+                  style: GoogleFonts.outfit(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF009688),
+                  ),
                 ),
               ),
             ],
@@ -3537,9 +3964,24 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildMiniInfo('Encounter ID', _satuSehatSyncResult!['encounter_id'] ?? '-', subtitleColor, textColor),
-              _buildMiniInfo('IHS Pasien', _satuSehatSyncResult!['patient_id'] ?? '-', subtitleColor, textColor),
-              _buildMiniInfo('Kode ICD-10', _satuSehatSyncResult!['diagnoses'] ?? '-', subtitleColor, themeAccent),
+              _buildMiniInfo(
+                'Encounter ID',
+                _satuSehatSyncResult!['encounter_id'] ?? '-',
+                subtitleColor,
+                textColor,
+              ),
+              _buildMiniInfo(
+                'IHS Pasien',
+                _satuSehatSyncResult!['patient_id'] ?? '-',
+                subtitleColor,
+                textColor,
+              ),
+              _buildMiniInfo(
+                'Kode ICD-10',
+                _satuSehatSyncResult!['diagnoses'] ?? '-',
+                subtitleColor,
+                themeAccent,
+              ),
             ],
           ),
         ],
@@ -3572,7 +4014,11 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _buildValidationStatusPill(redErrors, yellowWarnings, subtitleColor),
+            _buildValidationStatusPill(
+              redErrors,
+              yellowWarnings,
+              subtitleColor,
+            ),
             const SizedBox(height: 12),
             Row(
               children: [
@@ -3581,12 +4027,21 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
                     child: OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(color: borderColor),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                       onPressed: () => setState(() => _formStep--),
                       icon: const Icon(Icons.arrow_back_rounded, size: 14),
-                      label: Text('Sebelumnya', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: textColor)),
+                      label: Text(
+                        'Sebelumnya',
+                        style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: textColor,
+                        ),
+                      ),
                     ),
                   )
                 else
@@ -3594,12 +4049,21 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
                     child: OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(color: borderColor),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                       onPressed: () => setState(() => _step = 2),
                       icon: const Icon(Icons.arrow_back_rounded, size: 14),
-                      label: Text('Riwayat', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: textColor)),
+                      label: Text(
+                        'Riwayat',
+                        style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: textColor,
+                        ),
+                      ),
                     ),
                   ),
                 const SizedBox(width: 8),
@@ -3609,30 +4073,64 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: themeAccent,
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                       onPressed: () => setState(() => _formStep++),
-                      icon: const Icon(Icons.arrow_forward_rounded, size: 14, color: Colors.white),
-                      label: Text('Selanjutnya', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+                      icon: const Icon(
+                        Icons.arrow_forward_rounded,
+                        size: 14,
+                        color: Colors.white,
+                      ),
+                      label: Text(
+                        'Selanjutnya',
+                        style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
                   )
                 else
                   Expanded(
                     child: ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: redErrors.isNotEmpty ? const Color(0xFFE74C3C) : const Color(0xFF27AE60),
+                        backgroundColor: redErrors.isNotEmpty
+                            ? const Color(0xFFE74C3C)
+                            : const Color(0xFF27AE60),
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                       onPressed: _isSyncingSatuSehat ? null : _simpanForm,
                       icon: _isSyncingSatuSehat
-                          ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                          : const Icon(Icons.cloud_upload_rounded, size: 14, color: Colors.white),
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.cloud_upload_rounded,
+                              size: 14,
+                              color: Colors.white,
+                            ),
                       label: Text(
-                        _isSyncingSatuSehat ? 'Sinkronisasi...' : 'Simpan SatuSehat',
-                        style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                        _isSyncingSatuSehat
+                            ? 'Sinkronisasi...'
+                            : 'Simpan SatuSehat',
+                        style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
@@ -3665,28 +4163,46 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
             OutlinedButton.icon(
               style: OutlinedButton.styleFrom(
                 side: BorderSide(color: borderColor),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
               ),
               onPressed: () => setState(() => _formStep--),
               icon: const Icon(Icons.arrow_back_rounded, size: 16),
               label: Text(
                 '← Sebelumnya',
-                style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: textColor),
+                style: GoogleFonts.outfit(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: textColor,
+                ),
               ),
             )
           else
             OutlinedButton.icon(
               style: OutlinedButton.styleFrom(
                 side: BorderSide(color: borderColor),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
               ),
               onPressed: () => setState(() => _step = 2),
               icon: const Icon(Icons.arrow_back_rounded, size: 16),
               label: Text(
                 '← Riwayat Pasien',
-                style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: textColor),
+                style: GoogleFonts.outfit(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: textColor,
+                ),
               ),
             ),
 
@@ -3700,14 +4216,27 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
               OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(
                   side: BorderSide(color: themeAccent),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
                 ),
                 onPressed: _showReviewAndSubmitDialog,
-                icon: Icon(Icons.fact_check_rounded, size: 16, color: themeAccent),
+                icon: Icon(
+                  Icons.fact_check_rounded,
+                  size: 16,
+                  color: themeAccent,
+                ),
                 label: Text(
                   'Review Validasi',
-                  style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: themeAccent),
+                  style: GoogleFonts.outfit(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: themeAccent,
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
@@ -3716,33 +4245,70 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: themeAccent,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
                     elevation: 2,
                   ),
                   onPressed: () => setState(() => _formStep++),
-                  icon: const Icon(Icons.arrow_forward_rounded, size: 16, color: Colors.white),
+                  icon: const Icon(
+                    Icons.arrow_forward_rounded,
+                    size: 16,
+                    color: Colors.white,
+                  ),
                   label: Text(
                     'Selanjutnya ➔',
-                    style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                    style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
                   ),
                 )
               else
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: redErrors.isNotEmpty ? const Color(0xFFE74C3C) : const Color(0xFF27AE60),
+                    backgroundColor: redErrors.isNotEmpty
+                        ? const Color(0xFFE74C3C)
+                        : const Color(0xFF27AE60),
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 22,
+                      vertical: 12,
+                    ),
                     elevation: 2,
                   ),
                   onPressed: _isSyncingSatuSehat ? null : _simpanForm,
                   icon: _isSyncingSatuSehat
-                      ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Icon(Icons.cloud_upload_rounded, color: Colors.white, size: 16),
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(
+                          Icons.cloud_upload_rounded,
+                          color: Colors.white,
+                          size: 16,
+                        ),
                   label: Text(
-                    _isSyncingSatuSehat ? 'Menyinkronkan...' : 'Simpan Form ANC & Sync SatuSehat',
-                    style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.bold, color: Colors.white),
+                    _isSyncingSatuSehat
+                        ? 'Menyinkronkan...'
+                        : 'Simpan Form ANC & Sync SatuSehat',
+                    style: GoogleFonts.outfit(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
             ],

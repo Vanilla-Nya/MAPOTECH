@@ -57,7 +57,8 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
 
   // Mock / database incoming prescriptions queue
   List<IncomingPrescription> _orders = [];
-  String _activeTab = 'pending'; // 'pending', 'compounding', 'ready', 'completed'
+  String _activeTab =
+      'pending'; // 'pending', 'compounding', 'ready', 'completed'
   bool get isEn => ref.read(isEnglishProvider);
 
   @override
@@ -88,13 +89,15 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
             final itemsList = decoded['items'] as List<dynamic>?;
             if (itemsList != null && itemsList.isNotEmpty) {
               for (final it in itemsList) {
-                parsedItems.add(RxItem(
-                  name: it['name'] ?? 'Obat',
-                  dosage: it['dosage'] ?? 'Sesuai Petunjuk',
-                  qty: int.tryParse(it['qty']?.toString() ?? '1') ?? 1,
-                  unit: it['unit'] ?? 'Tablet',
-                  kfaCode: it['kfa_code'],
-                ));
+                parsedItems.add(
+                  RxItem(
+                    name: it['name'] ?? 'Obat',
+                    dosage: it['dosage'] ?? 'Sesuai Petunjuk',
+                    qty: int.tryParse(it['qty']?.toString() ?? '1') ?? 1,
+                    unit: it['unit'] ?? 'Tablet',
+                    kfaCode: it['kfa_code'],
+                  ),
+                );
               }
             }
           } else if (notes.contains('|')) {
@@ -106,8 +109,20 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
 
         if (parsedItems.isEmpty) {
           parsedItems = const [
-            RxItem(name: 'Paracetamol 500mg', dosage: '3x1 Sehari', qty: 10, unit: 'Tablet', kfaCode: '93001030'),
-            RxItem(name: 'Amoxicillin 500mg', dosage: '3x1 Sehari (Habiskan)', qty: 10, unit: 'Kaplet', kfaCode: '93001029'),
+            RxItem(
+              name: 'Paracetamol 500mg',
+              dosage: '3x1 Sehari',
+              qty: 10,
+              unit: 'Tablet',
+              kfaCode: '93001030',
+            ),
+            RxItem(
+              name: 'Amoxicillin 500mg',
+              dosage: '3x1 Sehari (Habiskan)',
+              qty: 10,
+              unit: 'Kaplet',
+              kfaCode: '93001029',
+            ),
           ];
         }
 
@@ -120,15 +135,17 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
           displayStatus = status; // e.g. compounding
         }
 
-        loaded.add(IncomingPrescription(
-          id: id.isNotEmpty ? id : 'RX-8827',
-          sessionNumber: loaded.length + 1,
-          patientName: patient,
-          doctorName: doctor,
-          date: 'Hari ini',
-          status: displayStatus,
-          items: parsedItems,
-        ));
+        loaded.add(
+          IncomingPrescription(
+            id: id.isNotEmpty ? id : 'RX-8827',
+            sessionNumber: loaded.length + 1,
+            patientName: patient,
+            doctorName: doctor,
+            date: 'Hari ini',
+            status: displayStatus,
+            items: parsedItems,
+          ),
+        );
       }
 
       if (loaded.isEmpty) {
@@ -141,8 +158,20 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
             date: 'Hari ini, 10:15',
             status: 'pending',
             items: const [
-              RxItem(name: 'Amoxicillin 500mg', dosage: '3x1 Sehari (Habiskan)', qty: 10, unit: 'Tablet', kfaCode: '93001029'),
-              RxItem(name: 'Paracetamol 500mg', dosage: '3x1 Sehari Jika Demam', qty: 10, unit: 'Tablet', kfaCode: '93001030'),
+              RxItem(
+                name: 'Amoxicillin 500mg',
+                dosage: '3x1 Sehari (Habiskan)',
+                qty: 10,
+                unit: 'Tablet',
+                kfaCode: '93001029',
+              ),
+              RxItem(
+                name: 'Paracetamol 500mg',
+                dosage: '3x1 Sehari Jika Demam',
+                qty: 10,
+                unit: 'Tablet',
+                kfaCode: '93001030',
+              ),
             ],
           ),
           IncomingPrescription(
@@ -153,8 +182,20 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
             date: 'Hari ini, 12:30',
             status: 'compounding',
             items: const [
-              RxItem(name: 'Cetirizine 10mg', dosage: '1x1 Malam', qty: 5, unit: 'Tablet', kfaCode: '93001045'),
-              RxItem(name: 'Vitamin C 500mg', dosage: '1x1 Pagi', qty: 10, unit: 'Tablet', kfaCode: '93001031'),
+              RxItem(
+                name: 'Cetirizine 10mg',
+                dosage: '1x1 Malam',
+                qty: 5,
+                unit: 'Tablet',
+                kfaCode: '93001045',
+              ),
+              RxItem(
+                name: 'Vitamin C 500mg',
+                dosage: '1x1 Pagi',
+                qty: 10,
+                unit: 'Tablet',
+                kfaCode: '93001031',
+              ),
             ],
           ),
         ]);
@@ -175,7 +216,12 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
             date: 'Hari ini, 12:30',
             status: 'compounding',
             items: const [
-              RxItem(name: 'Paracetamol 500mg', dosage: '3x1 Sehari', qty: 2, unit: 'Strip'),
+              RxItem(
+                name: 'Paracetamol 500mg',
+                dosage: '3x1 Sehari',
+                qty: 2,
+                unit: 'Strip',
+              ),
             ],
           ),
         ];
@@ -193,13 +239,17 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
         doctorName: order.doctorName,
         date: order.date,
         status: 'ready',
-        items: order.items.map((it) => ApotekRxItem(
-          name: it.name,
-          dosage: it.dosage,
-          qty: it.qty,
-          unit: it.unit,
-          kfaCode: it.kfaCode,
-        )).toList(),
+        items: order.items
+            .map(
+              (it) => ApotekRxItem(
+                name: it.name,
+                dosage: it.dosage,
+                qty: it.qty,
+                unit: it.unit,
+                kfaCode: it.kfaCode,
+              ),
+            )
+            .toList(),
       );
 
       ref.read(activePosPrescriptionProvider.notifier).state = rxOrder;
@@ -208,7 +258,13 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Resep ${order.patientName} dialihkan ke Kasir (POS). Silakan selesaikan pembayaran.', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600)),
+            content: Text(
+              'Resep ${order.patientName} dialihkan ke Kasir (POS). Silakan selesaikan pembayaran.',
+              style: GoogleFonts.outfit(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             backgroundColor: const Color(0xFF27AE60),
             duration: const Duration(seconds: 2),
           ),
@@ -230,7 +286,12 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
 
       // Update status in database and provider
       await _db.updatePrescriptionStatus(order.id, dbStatus);
-      await ref.read(apotekPrescriptionProvider.notifier).updateStatus(order.id, order.status == 'pending' ? 'compounding' : 'ready');
+      await ref
+          .read(apotekPrescriptionProvider.notifier)
+          .updateStatus(
+            order.id,
+            order.status == 'pending' ? 'compounding' : 'ready',
+          );
       await ref.read(apotekPrescriptionProvider.notifier).loadPrescriptions();
       await _loadOrdersFromDatabase();
 
@@ -241,7 +302,10 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
               order.status == 'pending'
                   ? 'Resep ${order.patientName} mulai diracik.'
                   : 'Resep ${order.patientName} selesai diracik dan siap diproses di Kasir!',
-              style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600),
+              style: GoogleFonts.outfit(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
             ),
             backgroundColor: const Color(0xFF48C9B0),
             duration: const Duration(seconds: 2),
@@ -253,7 +317,13 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Gagal memperbarui status antrian: $e', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600)),
+            content: Text(
+              'Gagal memperbarui status antrian: $e',
+              style: GoogleFonts.outfit(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -261,7 +331,15 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
     }
   }
 
-  void _showQrScannerModal(BuildContext context, bool isDark, Color themeAccent, Color textColor, Color subtitleColor, Color cardBgColor, Color borderColor) {
+  void _showQrScannerModal(
+    BuildContext context,
+    bool isDark,
+    Color themeAccent,
+    Color textColor,
+    Color subtitleColor,
+    Color cardBgColor,
+    Color borderColor,
+  ) {
     final user = ref.read(landingPageProvider).loggedInUser;
     final apotekId = user?['id']?.toString() ?? 'APOTEK-VERIFIED-001';
     final messenger = ScaffoldMessenger.of(context);
@@ -287,7 +365,9 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
             apotekId: apotekId,
           );
 
-          await ref.read(apotekPrescriptionProvider.notifier).loadPrescriptions();
+          await ref
+              .read(apotekPrescriptionProvider.notifier)
+              .loadPrescriptions();
           await _loadOrdersFromDatabase();
 
           setState(() {
@@ -300,12 +380,19 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
             SnackBar(
               content: Row(
                 children: [
-                  const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+                  const Icon(
+                    Icons.check_circle_rounded,
+                    color: Colors.white,
+                    size: 18,
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       'Resep digital untuk ${prescriptionData['patient_name'] ?? 'Pasien'} berhasil dibuka & disimpan ke database!',
-                      style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 12),
+                      style: GoogleFonts.outfit(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
                     ),
                   ),
                 ],
@@ -325,30 +412,39 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
     final isDark = state.appearance == 'dark';
     final isRev = state.appearance == 'rev';
 
-    final themeAccent = isRev ? const Color(0xFFB577F2) : const Color(0xFF48C9B0);
+    final themeAccent = isRev
+        ? const Color(0xFFB577F2)
+        : const Color(0xFF48C9B0);
     final cardBgColor = isDark ? const Color(0xFF161619) : Colors.white;
     final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
     final subtitleColor = isDark ? Colors.grey[400]! : const Color(0xFF6F6A8A);
-    final borderColor = isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2);
+    final borderColor = isDark
+        ? const Color(0xFF252528)
+        : const Color(0xFFECEEF2);
 
     // Count states
     int pendingCount = _orders.where((o) => o.status == 'pending').length;
-    int compoundingCount = _orders.where((o) => o.status == 'compounding').length;
+    int compoundingCount = _orders
+        .where((o) => o.status == 'compounding')
+        .length;
     int readyCount = _orders.where((o) => o.status == 'ready').length;
     int completedCount = _orders.where((o) => o.status == 'completed').length;
 
-    final filteredOrders = _orders.where((o) => o.status == _activeTab).toList();
+    final filteredOrders = _orders
+        .where((o) => o.status == _activeTab)
+        .toList();
 
     return _isLoading
-        ? const SkeletonScope(
-            child: SkeletonApotekDashboard(type: 'orders'),
-          )
+        ? const SkeletonScope(child: SkeletonApotekDashboard(type: 'orders'))
         : Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // Header action card with Scan QR Resep Dokter button
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
                 decoration: BoxDecoration(
                   color: cardBgColor,
                   borderRadius: BorderRadius.circular(20),
@@ -362,7 +458,9 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            isEn ? 'Incoming Orders & Digital Prescriptions' : 'Pesanan Masuk & Resep Digital',
+                            isEn
+                                ? 'Incoming Orders & Digital Prescriptions'
+                                : 'Pesanan Masuk & Resep Digital',
                             style: GoogleFonts.outfit(
                               fontSize: 16,
                               fontWeight: FontWeight.w900,
@@ -371,7 +469,9 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            isEn ? 'Validate encrypted doctor prescriptions and manage compounding stages' : 'Validasi QR resep terkunci dari dokter dan kelola tahapan peracikan obat',
+                            isEn
+                                ? 'Validate encrypted doctor prescriptions and manage compounding stages'
+                                : 'Validasi QR resep terkunci dari dokter dan kelola tahapan peracikan obat',
                             style: GoogleFonts.outfit(
                               fontSize: 11,
                               color: subtitleColor,
@@ -391,9 +491,15 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
                         cardBgColor,
                         borderColor,
                       ),
-                      icon: const Icon(Icons.qr_code_scanner_rounded, size: 16, color: Colors.white),
+                      icon: const Icon(
+                        Icons.qr_code_scanner_rounded,
+                        size: 16,
+                        color: Colors.white,
+                      ),
                       label: Text(
-                        isEn ? 'Scan Doctor QR Prescription' : 'Scan QR Resep Dokter',
+                        isEn
+                            ? 'Scan Doctor QR Prescription'
+                            : 'Scan QR Resep Dokter',
                         style: GoogleFonts.outfit(
                           fontSize: 12,
                           fontWeight: FontWeight.w800,
@@ -402,8 +508,13 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: themeAccent,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         elevation: 0,
                       ),
                     ),
@@ -425,13 +536,33 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      _buildTabButton(isEn ? 'Queued' : 'Antrian', 'pending', pendingCount, Colors.orangeAccent),
+                      _buildTabButton(
+                        isEn ? 'Queued' : 'Antrian',
+                        'pending',
+                        pendingCount,
+                        Colors.orangeAccent,
+                      ),
                       const SizedBox(width: 8),
-                      _buildTabButton(isEn ? 'Compounding' : 'Diracik', 'compounding', compoundingCount, Colors.amber),
+                      _buildTabButton(
+                        isEn ? 'Compounding' : 'Diracik',
+                        'compounding',
+                        compoundingCount,
+                        Colors.amber,
+                      ),
                       const SizedBox(width: 8),
-                      _buildTabButton(isEn ? 'Ready' : 'Siap', 'ready', readyCount, themeAccent),
+                      _buildTabButton(
+                        isEn ? 'Ready' : 'Siap',
+                        'ready',
+                        readyCount,
+                        themeAccent,
+                      ),
                       const SizedBox(width: 8),
-                      _buildTabButton(isEn ? 'Completed' : 'Selesai', 'completed', completedCount, const Color(0xFF6F6A8A)),
+                      _buildTabButton(
+                        isEn ? 'Completed' : 'Selesai',
+                        'completed',
+                        completedCount,
+                        const Color(0xFF6F6A8A),
+                      ),
                     ],
                   ),
                 ),
@@ -447,16 +578,29 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.assignment_turned_in_rounded, size: 48, color: themeAccent.withValues(alpha: 0.3)),
+                      Icon(
+                        Icons.assignment_turned_in_rounded,
+                        size: 48,
+                        color: themeAccent.withValues(alpha: 0.3),
+                      ),
                       const SizedBox(height: 12),
                       Text(
                         isEn ? 'No Orders in Queue' : 'Tidak Ada Antrian',
-                        style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w900, color: textColor),
+                        style: GoogleFonts.outfit(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                          color: textColor,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        isEn ? 'Prescription queue for this category is empty. Scan doctor QR prescription to add.' : 'Antrian resep untuk kategori ini kosong. Scan QR resep dokter untuk menambahkan.',
-                        style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
+                        isEn
+                            ? 'Prescription queue for this category is empty. Scan doctor QR prescription to add.'
+                            : 'Antrian resep untuk kategori ini kosong. Scan QR resep dokter untuk menambahkan.',
+                        style: GoogleFonts.outfit(
+                          fontSize: 10,
+                          color: subtitleColor,
+                        ),
                       ),
                     ],
                   ),
@@ -472,18 +616,26 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
 
                     Color statusColor = Colors.orangeAccent;
                     String statusLabel = isEn ? 'In Queue' : 'Dalam Antrian';
-                    String actionLabel = isEn ? 'START COMPOUNDING' : 'MULAI MERACIK';
+                    String actionLabel = isEn
+                        ? 'START COMPOUNDING'
+                        : 'MULAI MERACIK';
                     IconData actionIcon = Icons.hourglass_top_rounded;
 
                     if (rx.status == 'compounding') {
                       statusColor = Colors.amber;
                       statusLabel = isEn ? 'Compounding' : 'Sedang Diracik';
-                      actionLabel = isEn ? 'FINISH COMPOUNDING' : 'SELESAIKAN RACIKAN';
+                      actionLabel = isEn
+                          ? 'FINISH COMPOUNDING'
+                          : 'SELESAIKAN RACIKAN';
                       actionIcon = Icons.check_circle_outline_rounded;
                     } else if (rx.status == 'ready') {
                       statusColor = const Color(0xFF27AE60);
-                      statusLabel = isEn ? 'Ready for Pickup / POS' : 'Siap Diambil / Kasir';
-                      actionLabel = isEn ? 'PROCESS IN POS' : 'PROSES DI KASIR (POS)';
+                      statusLabel = isEn
+                          ? 'Ready for Pickup / POS'
+                          : 'Siap Diambil / Kasir';
+                      actionLabel = isEn
+                          ? 'PROCESS IN POS'
+                          : 'PROSES DI KASIR (POS)';
                       actionIcon = Icons.point_of_sale_rounded;
                     } else if (rx.status == 'completed') {
                       statusColor = const Color(0xFF6F6A8A);
@@ -509,24 +661,38 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
                                 children: [
                                   Text(
                                     rx.patientName,
-                                    style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w900, color: textColor),
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w900,
+                                      color: textColor,
+                                    ),
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
                                     'Sesi ${rx.sessionNumber} • ${rx.date}',
-                                    style: GoogleFonts.outfit(fontSize: 9, color: subtitleColor),
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 9,
+                                      color: subtitleColor,
+                                    ),
                                   ),
                                 ],
                               ),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
                                 decoration: BoxDecoration(
                                   color: statusColor.withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(100),
                                 ),
                                 child: Text(
                                   statusLabel,
-                                  style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.w900, color: statusColor),
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.w900,
+                                    color: statusColor,
+                                  ),
                                 ),
                               ),
                             ],
@@ -534,7 +700,11 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
                           const SizedBox(height: 12),
                           Text(
                             'Resep dari: ${rx.doctorName}',
-                            style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: subtitleColor),
+                            style: GoogleFonts.outfit(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: subtitleColor,
+                            ),
                           ),
                           const SizedBox(height: 10),
                           Divider(color: borderColor),
@@ -546,20 +716,33 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
                             itemBuilder: (context, itemIdx) {
                               final item = rx.items[itemIdx];
                               return Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 4,
+                                ),
                                 child: Row(
                                   children: [
-                                    Icon(Icons.circle, size: 5, color: themeAccent),
+                                    Icon(
+                                      Icons.circle,
+                                      size: 5,
+                                      color: themeAccent,
+                                    ),
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
                                         item.name,
-                                        style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: textColor),
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: textColor,
+                                        ),
                                       ),
                                     ),
                                     Text(
                                       '${item.qty} ${item.unit} • ${item.dosage}',
-                                      style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 10,
+                                        color: subtitleColor,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -571,13 +754,24 @@ class _ApotekPesananState extends ConsumerState<ApotekPesanan> {
                             ElevatedButton.icon(
                               onPressed: () => _advanceOrderStatus(rx),
                               icon: Icon(actionIcon, size: 14),
-                              label: Text(actionLabel, style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
+                              label: Text(
+                                actionLabel,
+                                style: GoogleFonts.outfit(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: statusColor,
                                 foregroundColor: Colors.white,
                                 elevation: 0,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
                               ),
                             ),
                           ],
@@ -659,10 +853,12 @@ class _ApotekQrResepScannerDialog extends StatefulWidget {
   });
 
   @override
-  State<_ApotekQrResepScannerDialog> createState() => _ApotekQrResepScannerDialogState();
+  State<_ApotekQrResepScannerDialog> createState() =>
+      _ApotekQrResepScannerDialogState();
 }
 
-class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog>
+class _ApotekQrResepScannerDialogState
+    extends State<_ApotekQrResepScannerDialog>
     with SingleTickerProviderStateMixin {
   final SupabaseService _db = SupabaseService();
   final TextEditingController _qrInputController = TextEditingController();
@@ -670,8 +866,10 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
   late AnimationController _laserController;
   late Animation<double> _laserAnimation;
 
-  bool _isApotekMode = true; // True = Authorized Apotek, False = General Public / Unauthorized
-  bool _scanModeIsCamera = true; // True = Camera Scanner Viewfinder, False = Manual Token Input
+  bool _isApotekMode =
+      true; // True = Authorized Apotek, False = General Public / Unauthorized
+  bool _scanModeIsCamera =
+      true; // True = Camera Scanner Viewfinder, False = Manual Token Input
   bool _isTorchOn = false;
   bool _isFrontCamera = false;
   bool _isProcessing = false;
@@ -725,8 +923,10 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
     final borderColor = widget.borderColor;
     final themeAccent = widget.themeAccent;
 
-    final doctorName = data['doctor_name']?.toString() ?? 'dr. Agoes Soetanto, Sp.PD';
-    final doctorSip = data['doctor_sip']?.toString() ?? 'SIP. 446/128/DINKES/2024';
+    final doctorName =
+        data['doctor_name']?.toString() ?? 'dr. Agoes Soetanto, Sp.PD';
+    final doctorSip =
+        data['doctor_sip']?.toString() ?? 'SIP. 446/128/DINKES/2024';
     final patientName = data['patient_name']?.toString() ?? 'Pasien';
     final patientNik = data['patient_nik']?.toString() ?? '-';
     final items = (data['items'] as List<dynamic>? ?? []);
@@ -737,7 +937,10 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
       builder: (modalCtx) {
         return Dialog(
           backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 20,
+          ),
           child: Container(
             width: 520,
             constraints: const BoxConstraints(maxHeight: 680),
@@ -760,12 +963,18 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                 children: [
                   // Top Banner
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 16,
+                    ),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: isDark
                             ? [const Color(0xFF1E3A34), const Color(0xFF132723)]
-                            : [const Color(0xFF7BE5D3), const Color(0xFF48C9B0)],
+                            : [
+                                const Color(0xFF7BE5D3),
+                                const Color(0xFF48C9B0),
+                              ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
@@ -780,7 +989,11 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                             shape: BoxShape.circle,
                           ),
                           alignment: Alignment.center,
-                          child: const Icon(Icons.assignment_turned_in_rounded, color: Color(0xFF27AE60), size: 24),
+                          child: const Icon(
+                            Icons.assignment_turned_in_rounded,
+                            color: Color(0xFF27AE60),
+                            size: 24,
+                          ),
                         ),
                         const SizedBox(width: 14),
                         Expanded(
@@ -807,7 +1020,10 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.close_rounded, color: Colors.white),
+                          icon: const Icon(
+                            Icons.close_rounded,
+                            color: Colors.white,
+                          ),
                           onPressed: () => Navigator.pop(modalCtx),
                           splashRadius: 18,
                         ),
@@ -826,7 +1042,9 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                           Container(
                             padding: const EdgeInsets.all(14),
                             decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF1E1E22) : const Color(0xFFF8FAFD),
+                              color: isDark
+                                  ? const Color(0xFF1E1E22)
+                                  : const Color(0xFFF8FAFD),
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(color: borderColor),
                             ),
@@ -839,28 +1057,46 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                                       width: 36,
                                       height: 36,
                                       decoration: BoxDecoration(
-                                        color: themeAccent.withValues(alpha: 0.15),
+                                        color: themeAccent.withValues(
+                                          alpha: 0.15,
+                                        ),
                                         shape: BoxShape.circle,
                                       ),
                                       alignment: Alignment.center,
-                                      child: Icon(Icons.medical_services_rounded, size: 18, color: themeAccent),
+                                      child: Icon(
+                                        Icons.medical_services_rounded,
+                                        size: 18,
+                                        color: themeAccent,
+                                      ),
                                     ),
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             'DARI DOKTER:',
-                                            style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.w800, color: subtitleColor),
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 8.5,
+                                              fontWeight: FontWeight.w800,
+                                              color: subtitleColor,
+                                            ),
                                           ),
                                           Text(
                                             doctorName,
-                                            style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: textColor),
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.bold,
+                                              color: textColor,
+                                            ),
                                           ),
                                           Text(
                                             doctorSip,
-                                            style: GoogleFonts.outfit(fontSize: 9.5, color: subtitleColor),
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 9.5,
+                                              color: subtitleColor,
+                                            ),
                                           ),
                                         ],
                                       ),
@@ -869,7 +1105,9 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                                 ),
 
                                 Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 8,
+                                  ),
                                   child: Divider(height: 1, color: borderColor),
                                 ),
 
@@ -880,28 +1118,46 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                                       width: 36,
                                       height: 36,
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFF3B82F6).withValues(alpha: 0.15),
+                                        color: const Color(
+                                          0xFF3B82F6,
+                                        ).withValues(alpha: 0.15),
                                         shape: BoxShape.circle,
                                       ),
                                       alignment: Alignment.center,
-                                      child: const Icon(Icons.person_rounded, size: 18, color: Color(0xFF3B82F6)),
+                                      child: const Icon(
+                                        Icons.person_rounded,
+                                        size: 18,
+                                        color: Color(0xFF3B82F6),
+                                      ),
                                     ),
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             'UNTUK PASIEN:',
-                                            style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.w800, color: subtitleColor),
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 8.5,
+                                              fontWeight: FontWeight.w800,
+                                              color: subtitleColor,
+                                            ),
                                           ),
                                           Text(
                                             patientName,
-                                            style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: textColor),
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.bold,
+                                              color: textColor,
+                                            ),
                                           ),
                                           Text(
                                             'NIK: $patientNik',
-                                            style: GoogleFonts.outfit(fontSize: 9.5, color: subtitleColor),
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 9.5,
+                                              color: subtitleColor,
+                                            ),
                                           ),
                                         ],
                                       ),
@@ -920,22 +1176,39 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                             children: [
                               Text(
                                 'DAFTAR OBAT & ATURAN PAKAI:',
-                                style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w900, color: textColor),
+                                style: GoogleFonts.outfit(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  color: textColor,
+                                ),
                               ),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF27AE60).withValues(alpha: 0.12),
+                                  color: const Color(
+                                    0xFF27AE60,
+                                  ).withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(100),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    const Icon(Icons.verified_rounded, size: 11, color: Color(0xFF27AE60)),
+                                    const Icon(
+                                      Icons.verified_rounded,
+                                      size: 11,
+                                      color: Color(0xFF27AE60),
+                                    ),
                                     const SizedBox(width: 4),
                                     Text(
                                       '${items.length} Macam Obat',
-                                      style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.w900, color: const Color(0xFF27AE60)),
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 8.5,
+                                        fontWeight: FontWeight.w900,
+                                        color: const Color(0xFF27AE60),
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -946,7 +1219,9 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
 
                           Container(
                             decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF1E1E22) : const Color(0xFFF8FAFD),
+                              color: isDark
+                                  ? const Color(0xFF1E1E22)
+                                  : const Color(0xFFF8FAFD),
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(color: borderColor),
                             ),
@@ -955,7 +1230,8 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                               physics: const NeverScrollableScrollPhysics(),
                               padding: const EdgeInsets.all(10),
                               itemCount: items.length,
-                              separatorBuilder: (_, _) => Divider(height: 12, color: borderColor),
+                              separatorBuilder: (_, _) =>
+                                  Divider(height: 12, color: borderColor),
                               itemBuilder: (context, index) {
                                 final it = items[index];
                                 return Row(
@@ -964,30 +1240,47 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                                       width: 28,
                                       height: 28,
                                       decoration: BoxDecoration(
-                                        color: themeAccent.withValues(alpha: 0.1),
+                                        color: themeAccent.withValues(
+                                          alpha: 0.1,
+                                        ),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                       alignment: Alignment.center,
-                                      child: Icon(Icons.medication_rounded, size: 14, color: themeAccent),
+                                      child: Icon(
+                                        Icons.medication_rounded,
+                                        size: 14,
+                                        color: themeAccent,
+                                      ),
                                     ),
                                     const SizedBox(width: 10),
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             it['name']?.toString() ?? 'Obat',
-                                            style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: textColor),
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 11.5,
+                                              fontWeight: FontWeight.bold,
+                                              color: textColor,
+                                            ),
                                           ),
                                           Text(
                                             '${it['dosage'] ?? '-'} ${it['instructions'] != null && it['instructions'].toString().isNotEmpty ? '• ${it['instructions']}' : ''}',
-                                            style: GoogleFonts.outfit(fontSize: 9.5, color: subtitleColor),
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 9.5,
+                                              color: subtitleColor,
+                                            ),
                                           ),
                                         ],
                                       ),
                                     ),
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 3,
+                                      ),
                                       decoration: BoxDecoration(
                                         color: cardBgColor,
                                         borderRadius: BorderRadius.circular(8),
@@ -995,7 +1288,11 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                                       ),
                                       child: Text(
                                         '${it['qty']} ${it['unit']}',
-                                        style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w800, color: themeAccent),
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w800,
+                                          color: themeAccent,
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -1010,9 +1307,14 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
 
                   // Bottom Action Buttons
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 14,
+                    ),
                     decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF18181B) : const Color(0xFFFAFAFC),
+                      color: isDark
+                          ? const Color(0xFF18181B)
+                          : const Color(0xFFFAFAFC),
                       border: Border(top: BorderSide(color: borderColor)),
                     ),
                     child: Row(
@@ -1023,11 +1325,17 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                             style: OutlinedButton.styleFrom(
                               side: BorderSide(color: borderColor),
                               padding: const EdgeInsets.symmetric(vertical: 13),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
                             child: Text(
                               'Batal',
-                              style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w600, color: subtitleColor),
+                              style: GoogleFonts.outfit(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                                color: subtitleColor,
+                              ),
                             ),
                           ),
                         ),
@@ -1039,15 +1347,25 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                               Navigator.pop(modalCtx);
                               widget.onPrescriptionAccepted(data);
                             },
-                            icon: const Icon(Icons.check_circle_rounded, size: 16, color: Colors.white),
+                            icon: const Icon(
+                              Icons.check_circle_rounded,
+                              size: 16,
+                              color: Colors.white,
+                            ),
                             label: Text(
                               'Ya, Terima Resep Ini',
-                              style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                              style: GoogleFonts.outfit(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
                             ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF27AE60),
                               padding: const EdgeInsets.symmetric(vertical: 13),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                               elevation: 0,
                             ),
                           ),
@@ -1070,7 +1388,9 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Arahkan QR Code E-Resep ke kamera atau gunakan sampel resep di bawah.'),
+            content: Text(
+              'Arahkan QR Code E-Resep ke kamera atau gunakan sampel resep di bawah.',
+            ),
             duration: Duration(seconds: 2),
             backgroundColor: Color(0xFF1E293B),
           ),
@@ -1099,7 +1419,8 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
           _scanResult = {
             'is_locked': true,
             'is_verified': false,
-            'error': 'Akses Dibatasi: QR Resep Digital Terkunci. Hanya Apotek resmi dengan ID & Kunci Apotek terverifikasi yang dapat membuka resep medis ini.',
+            'error':
+                'Akses Dibatasi: QR Resep Digital Terkunci. Hanya Apotek resmi dengan ID & Kunci Apotek terverifikasi yang dapat membuka resep medis ini.',
           };
         });
       }
@@ -1161,7 +1482,10 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
             children: [
               // Header Banner
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: isDark
@@ -1181,7 +1505,11 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                         shape: BoxShape.circle,
                       ),
                       alignment: Alignment.center,
-                      child: Icon(Icons.qr_code_scanner_rounded, color: themeAccent, size: 24),
+                      child: Icon(
+                        Icons.qr_code_scanner_rounded,
+                        color: themeAccent,
+                        size: 24,
+                      ),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
@@ -1208,7 +1536,10 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close_rounded, color: Colors.white),
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: Colors.white,
+                      ),
                       onPressed: () => Navigator.pop(context),
                       splashRadius: 18,
                     ),
@@ -1225,9 +1556,14 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                     children: [
                       // Scanner authorization simulator toggle
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
                         decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF1E1E22) : const Color(0xFFF8FAFD),
+                          color: isDark
+                              ? const Color(0xFF1E1E22)
+                              : const Color(0xFFF8FAFD),
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(color: borderColor),
                         ),
@@ -1237,8 +1573,12 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                             Row(
                               children: [
                                 Icon(
-                                  _isApotekMode ? Icons.verified_user_rounded : Icons.lock_outline_rounded,
-                                  color: _isApotekMode ? const Color(0xFF27AE60) : Colors.redAccent,
+                                  _isApotekMode
+                                      ? Icons.verified_user_rounded
+                                      : Icons.lock_outline_rounded,
+                                  color: _isApotekMode
+                                      ? const Color(0xFF27AE60)
+                                      : Colors.redAccent,
                                   size: 18,
                                 ),
                                 const SizedBox(width: 10),
@@ -1246,7 +1586,9 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      _isApotekMode ? 'Otorisasi: Apotek Terdaftar' : 'Simulasi: Publik / Tidak Terdaftar',
+                                      _isApotekMode
+                                          ? 'Otorisasi: Apotek Terdaftar'
+                                          : 'Simulasi: Publik / Tidak Terdaftar',
                                       style: GoogleFonts.outfit(
                                         fontSize: 11.5,
                                         fontWeight: FontWeight.bold,
@@ -1254,7 +1596,9 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                                       ),
                                     ),
                                     Text(
-                                      _isApotekMode ? 'ID Apotek: ${widget.apotekId}' : 'Akses scanner tanpa Kunci Apotek',
+                                      _isApotekMode
+                                          ? 'ID Apotek: ${widget.apotekId}'
+                                          : 'Akses scanner tanpa Kunci Apotek',
                                       style: GoogleFonts.outfit(
                                         fontSize: 9.5,
                                         color: subtitleColor,
@@ -1284,7 +1628,9 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                       Container(
                         padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF18181B) : const Color(0xFFF0F3F8),
+                          color: isDark
+                              ? const Color(0xFF18181B)
+                              : const Color(0xFFF0F3F8),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: borderColor),
                         ),
@@ -1295,7 +1641,8 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                                 label: 'Kamera Scanner',
                                 icon: Icons.camera_alt_rounded,
                                 isSelected: _scanModeIsCamera,
-                                onTap: () => setState(() => _scanModeIsCamera = true),
+                                onTap: () =>
+                                    setState(() => _scanModeIsCamera = true),
                                 themeAccent: themeAccent,
                                 textColor: textColor,
                                 isDark: isDark,
@@ -1307,7 +1654,8 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                                 label: 'Input Manual Token',
                                 icon: Icons.keyboard_alt_rounded,
                                 isSelected: !_scanModeIsCamera,
-                                onTap: () => setState(() => _scanModeIsCamera = false),
+                                onTap: () =>
+                                    setState(() => _scanModeIsCamera = false),
                                 themeAccent: themeAccent,
                                 textColor: textColor,
                                 isDark: isDark,
@@ -1327,7 +1675,10 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                           decoration: BoxDecoration(
                             color: const Color(0xFF0F141C),
                             borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: themeAccent.withValues(alpha: 0.4), width: 1.5),
+                            border: Border.all(
+                              color: themeAccent.withValues(alpha: 0.4),
+                              width: 1.5,
+                            ),
                             boxShadow: [
                               BoxShadow(
                                 color: Colors.black.withValues(alpha: 0.4),
@@ -1382,7 +1733,9 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                                         child: Icon(
                                           Icons.qr_code_2_rounded,
                                           size: 70,
-                                          color: Colors.white.withValues(alpha: 0.08),
+                                          color: Colors.white.withValues(
+                                            alpha: 0.08,
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -1396,17 +1749,29 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                                 left: 14,
                                 right: 14,
                                 child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 4,
+                                      ),
                                       decoration: BoxDecoration(
-                                        color: Colors.black.withValues(alpha: 0.65),
-                                        borderRadius: BorderRadius.circular(100),
+                                        color: Colors.black.withValues(
+                                          alpha: 0.65,
+                                        ),
+                                        borderRadius: BorderRadius.circular(
+                                          100,
+                                        ),
                                         border: Border.all(
                                           color: _isCameraReady
-                                              ? const Color(0xFF27AE60).withValues(alpha: 0.6)
-                                              : Colors.amber.withValues(alpha: 0.6),
+                                              ? const Color(
+                                                  0xFF27AE60,
+                                                ).withValues(alpha: 0.6)
+                                              : Colors.amber.withValues(
+                                                  alpha: 0.6,
+                                                ),
                                         ),
                                       ),
                                       child: Row(
@@ -1416,19 +1781,25 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                                             width: 7,
                                             height: 7,
                                             decoration: BoxDecoration(
-                                              color: _isCameraReady ? const Color(0xFF2ECC71) : Colors.amber,
+                                              color: _isCameraReady
+                                                  ? const Color(0xFF2ECC71)
+                                                  : Colors.amber,
                                               shape: BoxShape.circle,
                                             ),
                                           ),
                                           const SizedBox(width: 6),
                                           Text(
                                             _isCameraReady
-                                                ? (_cameraStatusMessage?.toUpperCase() ?? 'KAMERA AKTIF')
+                                                ? (_cameraStatusMessage
+                                                          ?.toUpperCase() ??
+                                                      'KAMERA AKTIF')
                                                 : 'MENDETEKSI KAMERA...',
                                             style: GoogleFonts.outfit(
                                               fontSize: 9,
                                               fontWeight: FontWeight.w900,
-                                              color: _isCameraReady ? const Color(0xFF2ECC71) : Colors.amber,
+                                              color: _isCameraReady
+                                                  ? const Color(0xFF2ECC71)
+                                                  : Colors.amber,
                                               letterSpacing: 0.5,
                                             ),
                                           ),
@@ -1439,22 +1810,36 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                                       children: [
                                         // Flashlight toggle
                                         InkWell(
-                                          onTap: () => setState(() => _isTorchOn = !_isTorchOn),
-                                          borderRadius: BorderRadius.circular(100),
+                                          onTap: () => setState(
+                                            () => _isTorchOn = !_isTorchOn,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            100,
+                                          ),
                                           child: Container(
                                             padding: const EdgeInsets.all(6),
                                             decoration: BoxDecoration(
                                               color: _isTorchOn
-                                                  ? Colors.amber.withValues(alpha: 0.25)
-                                                  : Colors.black.withValues(alpha: 0.6),
+                                                  ? Colors.amber.withValues(
+                                                      alpha: 0.25,
+                                                    )
+                                                  : Colors.black.withValues(
+                                                      alpha: 0.6,
+                                                    ),
                                               shape: BoxShape.circle,
                                               border: Border.all(
-                                                color: _isTorchOn ? Colors.amber : Colors.white24,
+                                                color: _isTorchOn
+                                                    ? Colors.amber
+                                                    : Colors.white24,
                                               ),
                                             ),
                                             child: Icon(
-                                              _isTorchOn ? Icons.flash_on_rounded : Icons.flash_off_rounded,
-                                              color: _isTorchOn ? Colors.amber : Colors.white70,
+                                              _isTorchOn
+                                                  ? Icons.flash_on_rounded
+                                                  : Icons.flash_off_rounded,
+                                              color: _isTorchOn
+                                                  ? Colors.amber
+                                                  : Colors.white70,
                                               size: 16,
                                             ),
                                           ),
@@ -1462,14 +1847,23 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                                         const SizedBox(width: 8),
                                         // Flip camera
                                         InkWell(
-                                          onTap: () => setState(() => _isFrontCamera = !_isFrontCamera),
-                                          borderRadius: BorderRadius.circular(100),
+                                          onTap: () => setState(
+                                            () => _isFrontCamera =
+                                                !_isFrontCamera,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            100,
+                                          ),
                                           child: Container(
                                             padding: const EdgeInsets.all(6),
                                             decoration: BoxDecoration(
-                                              color: Colors.black.withValues(alpha: 0.6),
+                                              color: Colors.black.withValues(
+                                                alpha: 0.6,
+                                              ),
                                               shape: BoxShape.circle,
-                                              border: Border.all(color: Colors.white24),
+                                              border: Border.all(
+                                                color: Colors.white24,
+                                              ),
                                             ),
                                             child: const Icon(
                                               Icons.flip_camera_ios_rounded,
@@ -1488,7 +1882,10 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                               Positioned(
                                 bottom: 10,
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 4,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: Colors.black.withValues(alpha: 0.65),
                                     borderRadius: BorderRadius.circular(100),
@@ -1499,7 +1896,9 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                                         : 'Arahkan QR Code E-Resep pasien ke dalam kotak pemindai',
                                     style: GoogleFonts.outfit(
                                       fontSize: 9.5,
-                                      color: Colors.white.withValues(alpha: 0.85),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.85,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -1514,22 +1913,39 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton.icon(
-                            onPressed: _isProcessing ? null : () => _processScan(),
+                            onPressed: _isProcessing
+                                ? null
+                                : () => _processScan(),
                             icon: _isProcessing
                                 ? const SizedBox(
                                     width: 16,
                                     height: 16,
-                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
                                   )
-                                : const Icon(Icons.qr_code_scanner_rounded, size: 18, color: Colors.white),
+                                : const Icon(
+                                    Icons.qr_code_scanner_rounded,
+                                    size: 18,
+                                    color: Colors.white,
+                                  ),
                             label: Text(
-                              _isProcessing ? 'Memindai & Mendekripsi...' : 'Scan & Dekripsi QR Code',
-                              style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                              _isProcessing
+                                  ? 'Memindai & Mendekripsi...'
+                                  : 'Scan & Dekripsi QR Code',
+                              style: GoogleFonts.outfit(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
                             ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: themeAccent,
                               padding: const EdgeInsets.symmetric(vertical: 13),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
                               elevation: 0,
                             ),
                           ),
@@ -1551,17 +1967,28 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                               child: Container(
                                 height: 46,
                                 decoration: BoxDecoration(
-                                  color: isDark ? const Color(0xFF1E1E22) : const Color(0xFFF8FAFD),
+                                  color: isDark
+                                      ? const Color(0xFF1E1E22)
+                                      : const Color(0xFFF8FAFD),
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(color: borderColor),
                                 ),
-                                padding: const EdgeInsets.symmetric(horizontal: 14),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                ),
                                 child: TextField(
                                   controller: _qrInputController,
-                                  style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: textColor),
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: textColor,
+                                  ),
                                   decoration: InputDecoration(
                                     hintText: 'Masukkan token QR resep...',
-                                    hintStyle: GoogleFonts.outfit(fontSize: 11, color: subtitleColor),
+                                    hintStyle: GoogleFonts.outfit(
+                                      fontSize: 11,
+                                      color: subtitleColor,
+                                    ),
                                     border: InputBorder.none,
                                   ),
                                 ),
@@ -1569,22 +1996,40 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                             ),
                             const SizedBox(width: 8),
                             ElevatedButton.icon(
-                              onPressed: _isProcessing ? null : () => _processScan(),
+                              onPressed: _isProcessing
+                                  ? null
+                                  : () => _processScan(),
                               icon: _isProcessing
                                   ? const SizedBox(
                                       width: 14,
                                       height: 14,
-                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
                                     )
-                                  : const Icon(Icons.check_circle_outline_rounded, size: 16, color: Colors.white),
+                                  : const Icon(
+                                      Icons.check_circle_outline_rounded,
+                                      size: 16,
+                                      color: Colors.white,
+                                    ),
                               label: Text(
                                 _isProcessing ? 'Memproses...' : 'Dekripsi',
-                                style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                                style: GoogleFonts.outfit(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
                               ),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: themeAccent,
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 12,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
                                 elevation: 0,
                               ),
                             ),
@@ -1597,7 +2042,11 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                       // Quick Sample Prescriptions Chips
                       Text(
                         'Uji Coba Cepat Resep Dokter:',
-                        style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: subtitleColor),
+                        style: GoogleFonts.outfit(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: subtitleColor,
+                        ),
                       ),
                       const SizedBox(height: 6),
                       SingleChildScrollView(
@@ -1613,16 +2062,25 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                                 },
                                 borderRadius: BorderRadius.circular(100),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 5,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: themeAccent.withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(100),
-                                    border: Border.all(color: themeAccent.withValues(alpha: 0.3)),
+                                    border: Border.all(
+                                      color: themeAccent.withValues(alpha: 0.3),
+                                    ),
                                   ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(Icons.local_hospital_rounded, size: 11, color: themeAccent),
+                                      Icon(
+                                        Icons.local_hospital_rounded,
+                                        size: 11,
+                                        color: themeAccent,
+                                      ),
                                       const SizedBox(width: 4),
                                       Text(
                                         sample['label']!,
@@ -1652,7 +2110,9 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                             decoration: BoxDecoration(
                               color: Colors.red.withValues(alpha: 0.08),
                               borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: Colors.red.withValues(alpha: 0.25)),
+                              border: Border.all(
+                                color: Colors.red.withValues(alpha: 0.25),
+                              ),
                             ),
                             child: Column(
                               children: [
@@ -1664,7 +2124,11 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                                     shape: BoxShape.circle,
                                   ),
                                   alignment: Alignment.center,
-                                  child: const Icon(Icons.lock_rounded, size: 24, color: Colors.redAccent),
+                                  child: const Icon(
+                                    Icons.lock_rounded,
+                                    size: 24,
+                                    color: Colors.redAccent,
+                                  ),
                                 ),
                                 const SizedBox(height: 10),
                                 Text(
@@ -1678,7 +2142,8 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                                 ),
                                 const SizedBox(height: 6),
                                 Text(
-                                  _scanResult!['error'] ?? 'Resep medis ini terkunci. Hanya Apotek resmi yang dapat membuka resep.',
+                                  _scanResult!['error'] ??
+                                      'Resep medis ini terkunci. Hanya Apotek resmi yang dapat membuka resep.',
                                   textAlign: TextAlign.center,
                                   style: GoogleFonts.outfit(
                                     fontSize: 11,
@@ -1696,7 +2161,9 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                             decoration: BoxDecoration(
                               color: Colors.amber.withValues(alpha: 0.08),
                               borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                              border: Border.all(
+                                color: Colors.amber.withValues(alpha: 0.3),
+                              ),
                             ),
                             child: Column(
                               children: [
@@ -1708,7 +2175,11 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                                     shape: BoxShape.circle,
                                   ),
                                   alignment: Alignment.center,
-                                  child: const Icon(Icons.warning_amber_rounded, size: 24, color: Colors.amber),
+                                  child: const Icon(
+                                    Icons.warning_amber_rounded,
+                                    size: 24,
+                                    color: Colors.amber,
+                                  ),
                                 ),
                                 const SizedBox(height: 10),
                                 Text(
@@ -1722,7 +2193,8 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
                                 ),
                                 const SizedBox(height: 6),
                                 Text(
-                                  _scanResult!['error'] ?? 'QR Code tidak dikenali sebagai E-Resep MAPOTECH.',
+                                  _scanResult!['error'] ??
+                                      'QR Code tidak dikenali sebagai E-Resep MAPOTECH.',
                                   textAlign: TextAlign.center,
                                   style: GoogleFonts.outfit(
                                     fontSize: 11,
@@ -1782,7 +2254,9 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
             Icon(
               icon,
               size: 15,
-              color: isSelected ? themeAccent : textColor.withValues(alpha: 0.5),
+              color: isSelected
+                  ? themeAccent
+                  : textColor.withValues(alpha: 0.5),
             ),
             const SizedBox(width: 6),
             Text(
@@ -1790,7 +2264,9 @@ class _ApotekQrResepScannerDialogState extends State<_ApotekQrResepScannerDialog
               style: GoogleFonts.outfit(
                 fontSize: 11,
                 fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
-                color: isSelected ? textColor : textColor.withValues(alpha: 0.6),
+                color: isSelected
+                    ? textColor
+                    : textColor.withValues(alpha: 0.6),
               ),
             ),
           ],
@@ -1838,7 +2314,10 @@ class _ScannerTargetPainter extends CustomPainter {
     final tlPath = Path()
       ..moveTo(0, cornerLength)
       ..lineTo(0, cornerRadius)
-      ..arcToPoint(const Offset(cornerRadius, 0), radius: const Radius.circular(cornerRadius))
+      ..arcToPoint(
+        const Offset(cornerRadius, 0),
+        radius: const Radius.circular(cornerRadius),
+      )
       ..lineTo(cornerLength, 0);
     canvas.drawPath(tlPath, cornerPaint);
 
@@ -1846,7 +2325,10 @@ class _ScannerTargetPainter extends CustomPainter {
     final trPath = Path()
       ..moveTo(size.width - cornerLength, 0)
       ..lineTo(size.width - cornerRadius, 0)
-      ..arcToPoint(Offset(size.width, cornerRadius), radius: const Radius.circular(cornerRadius))
+      ..arcToPoint(
+        Offset(size.width, cornerRadius),
+        radius: const Radius.circular(cornerRadius),
+      )
       ..lineTo(size.width, cornerLength);
     canvas.drawPath(trPath, cornerPaint);
 
@@ -1854,7 +2336,10 @@ class _ScannerTargetPainter extends CustomPainter {
     final blPath = Path()
       ..moveTo(0, size.height - cornerLength)
       ..lineTo(0, size.height - cornerRadius)
-      ..arcToPoint(Offset(cornerRadius, size.height), radius: const Radius.circular(cornerRadius))
+      ..arcToPoint(
+        Offset(cornerRadius, size.height),
+        radius: const Radius.circular(cornerRadius),
+      )
       ..lineTo(cornerLength, size.height);
     canvas.drawPath(blPath, cornerPaint);
 
@@ -1862,7 +2347,10 @@ class _ScannerTargetPainter extends CustomPainter {
     final brPath = Path()
       ..moveTo(size.width - cornerLength, size.height)
       ..lineTo(size.width - cornerRadius, size.height)
-      ..arcToPoint(Offset(size.width, size.height - cornerRadius), radius: const Radius.circular(cornerRadius))
+      ..arcToPoint(
+        Offset(size.width, size.height - cornerRadius),
+        radius: const Radius.circular(cornerRadius),
+      )
       ..lineTo(size.width, size.height - cornerLength);
     canvas.drawPath(brPath, cornerPaint);
 
@@ -1882,12 +2370,16 @@ class _ScannerTargetPainter extends CustomPainter {
       ..strokeWidth = 2.5
       ..style = PaintingStyle.stroke;
 
-    canvas.drawLine(Offset(8, laserY), Offset(size.width - 8, laserY), laserPaint);
+    canvas.drawLine(
+      Offset(8, laserY),
+      Offset(size.width - 8, laserY),
+      laserPaint,
+    );
   }
 
   @override
   bool shouldRepaint(covariant _ScannerTargetPainter oldDelegate) {
-    return oldDelegate.laserProgress != laserProgress || oldDelegate.accentColor != accentColor;
+    return oldDelegate.laserProgress != laserProgress ||
+        oldDelegate.accentColor != accentColor;
   }
 }
-

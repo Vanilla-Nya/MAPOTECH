@@ -16,6 +16,7 @@ import 'package:mapotech/features/pasien/dashboard/frontend/pasien_puskesmas_sea
 import 'package:mapotech/features/pasien/dashboard/frontend/pasien_apotek_search.dart';
 import 'package:mapotech/features/pasien/dashboard/frontend/pasien_history.dart';
 import 'package:mapotech/features/pasien/dashboard/frontend/pasien_prescription.dart';
+import 'package:mapotech/features/pasien/dashboard/frontend/pasien_children.dart';
 import 'package:mapotech/features/pasien/dashboard/frontend/pasien_profile.dart';
 import 'package:mapotech/features/pasien/dashboard/frontend/pasien_settings.dart';
 import 'package:mapotech/features/pasien/dashboard/frontend/pasien_qr_scanner_page.dart';
@@ -981,6 +982,14 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
           return const PasienHistory();
         case 'prescription':
           return const PasienPrescription();
+        case 'children':
+          return PasienChildren(
+            onNavigate: (menu) {
+              setState(() {
+                _activeMenu = menu;
+              });
+            },
+          );
         case 'profile':
           return const PasienProfile();
         case 'settings':

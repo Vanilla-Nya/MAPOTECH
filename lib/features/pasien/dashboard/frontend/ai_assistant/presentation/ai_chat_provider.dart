@@ -104,6 +104,76 @@ class AIChatNotifier extends StateNotifier<AIChatState> {
     );
   }
 
+  Future<void> startChildNutritionConsultation({
+    required String childName,
+    required String age,
+    required String bb,
+    required String tb,
+    required String statusGizi,
+    required String nutritionPlan,
+    String? customQuestion,
+  }) async {
+    final questionText = customQuestion ??
+        "Halo MAPOTECH AI, saya ingin berkonsultasi mengenai menu makanan & kebutuhan gizi untuk anak saya $childName (Usia: $age, BB: $bb, TB: $tb, Status Gizi: $statusGizi). Berdasarkan rekam medis ini, apa saja rekomendasi menu makanan harian, variasi protein hewani (seperti telur/ikan/ayam), dan tips pemberian makan yang tepat untuknya?";
+
+    final userMessage = AIChatMessage(
+      text: questionText,
+      sender: MessageSender.user,
+      timestamp: DateTime.now(),
+    );
+
+    final nutritionQuickActions = [
+      'Menu protein hewani untuk $childName',
+      'Cara mengatasi anak susah makan (GTM)',
+      'Jadwal & tekstur makanan sesuai usia',
+      'Cemilan sehat penambah berat badan',
+      'Cari Dokter Anak terdekat',
+    ];
+
+    state = state.copyWith(
+      messages: [...state.messages, userMessage],
+      isTyping: true,
+      quickActions: nutritionQuickActions,
+    );
+
+    final promptForAi =
+        "Pasien berkonsultasi tentang gizi anak:\n"
+        "- Nama Anak: $childName\n"
+        "- Usia: $age\n"
+        "- Berat Badan: $bb\n"
+        "- Tinggi Badan: $tb\n"
+        "- Status Gizi: $statusGizi\n"
+        "- Rekomendasi Faskes Sebelumnya: $nutritionPlan\n\n"
+        "Pertanyaan orang tua: $questionText";
+
+    final response = await _service.getResponse(promptForAi);
+
+    final aiMessage = AIChatMessage(
+      text: response.text,
+      sender: MessageSender.ai,
+      timestamp: DateTime.now(),
+      actions: response.actions.isNotEmpty
+          ? response.actions
+          : [
+              const AIChatAction(
+                label: 'Data Anak',
+                icon: 'child_care',
+                menuId: 'children',
+              ),
+              const AIChatAction(
+                label: 'Cari Dokter Anak',
+                icon: 'person_search',
+                menuId: 'dokter_search',
+              ),
+            ],
+    );
+
+    state = state.copyWith(
+      messages: [...state.messages, aiMessage],
+      isTyping: false,
+    );
+  }
+
   void resetChat() {
     state = AIChatState(
       messages: [
