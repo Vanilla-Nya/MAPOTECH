@@ -246,21 +246,29 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(32),
-                child: Image.network(
-                  'mapotech_hero_illustration.png',
+                child: Image.asset(
+                  'assets/images/mapotech_hero_illustration.png',
                   fit: BoxFit.cover,
                   height: 400,
                   width: 320,
                   errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      width: 320,
+                    return Image.network(
+                      'mapotech_hero_illustration.png',
+                      fit: BoxFit.cover,
                       height: 400,
-                      color: activeColor.withOpacity(0.1),
-                      child: Icon(
-                        Icons.tablet_rounded,
-                        size: 64,
-                        color: activeColor,
-                      ),
+                      width: 320,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          width: 320,
+                          height: 400,
+                          color: activeColor.withValues(alpha: 0.1),
+                          child: Icon(
+                            Icons.tablet_rounded,
+                            size: 64,
+                            color: activeColor,
+                          ),
+                        );
+                      },
                     );
                   },
                 ),

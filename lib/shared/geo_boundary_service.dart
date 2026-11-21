@@ -90,30 +90,59 @@ class GeoBoundaryService {
                   .timeout(const Duration(seconds: 4));
 
               if (dataRes.statusCode == 200) {
-                final Map<String, dynamic> geoJsonData = jsonDecode(dataRes.body);
-                if (geoJsonData['type'] == 'FeatureCollection' && geoJsonData['features'] != null) {
-                  final List features = geoJsonData['features'];
-                  dynamic matchedFeature;
-                  for (final f in features) {
-                    final props = f['properties'] ?? {};
-                    final dName = props['district'] ?? props['NAMOBJ'] ?? props['WADMKC'] ?? f['name'] ?? '';
-                    if (_cleanName(dName.toString()) == cleanDist) {
-                      matchedFeature = f;
-                      break;
-                    }
-                  }
+                final dynamic rawData = jsonDecode(dataRes.body);
+                List<List<LatLng>> extractedPolys = [];
 
-                  if (matchedFeature != null) {
-                    final polys = _extractPolygonsFromGeoJson(matchedFeature as Map<String, dynamic>);
-                    if (polys.isNotEmpty) {
-                      final center = _calculateCentroid(polys.first);
-                      return GeoBoundaryResult(
-                        polygons: polys,
-                        centerPoint: center,
-                        displayName: 'Kecamatan $cleanDist, $cleanReg',
-                      );
+                if (rawData is List) {
+                  // RevGeo structure: Array of FeatureCollections or Features
+                  for (final item in rawData) {
+                    if (item is Map) {
+                      final mapItem = Map<String, dynamic>.from(item);
+                      final props = mapItem['properties'] ?? {};
+                      final String itemName = (mapItem['name'] ?? props['district'] ?? props['NAMOBJ'] ?? props['WADMKC'] ?? '').toString();
+
+                      final bool nameMatches = _cleanName(itemName) == cleanDist ||
+                          _cleanName(itemName).contains(cleanDist) ||
+                          cleanDist.contains(_cleanName(itemName));
+
+                      if (nameMatches) {
+                        extractedPolys.addAll(_extractPolygonsFromGeoJson(mapItem));
+                        if (extractedPolys.isNotEmpty) break;
+                      }
                     }
                   }
+                } else if (rawData is Map) {
+                  final mapData = Map<String, dynamic>.from(rawData);
+                  if (mapData['type'] == 'FeatureCollection' && mapData['features'] is List) {
+                    final List features = mapData['features'];
+                    for (final f in features) {
+                      if (f is Map) {
+                        final fMap = Map<String, dynamic>.from(f);
+                        final props = fMap['properties'] ?? {};
+                        final String itemName = (fMap['name'] ?? props['district'] ?? props['NAMOBJ'] ?? props['WADMKC'] ?? '').toString();
+
+                        final bool nameMatches = _cleanName(itemName) == cleanDist ||
+                            _cleanName(itemName).contains(cleanDist) ||
+                            cleanDist.contains(_cleanName(itemName));
+
+                        if (nameMatches) {
+                          extractedPolys.addAll(_extractPolygonsFromGeoJson(fMap));
+                          if (extractedPolys.isNotEmpty) break;
+                        }
+                      }
+                    }
+                  } else {
+                    extractedPolys.addAll(_extractPolygonsFromGeoJson(mapData));
+                  }
+                }
+
+                if (extractedPolys.isNotEmpty) {
+                  final center = _calculateCentroid(extractedPolys);
+                  return GeoBoundaryResult(
+                    polygons: extractedPolys,
+                    centerPoint: center,
+                    displayName: 'Kecamatan $cleanDist, $cleanReg',
+                  );
                 }
               }
             }
@@ -152,7 +181,7 @@ class GeoBoundaryService {
               }
               return GeoBoundaryResult(
                 polygons: polys,
-                centerPoint: center ?? _calculateCentroid(polys.first),
+                centerPoint: center ?? _calculateCentroid(polys),
                 displayName: 'Kecamatan $cleanDist, $cleanReg',
               );
             }
@@ -171,22 +200,40 @@ class GeoBoundaryService {
     );
   }
 
-  static LatLng _calculateCentroid(List<LatLng> points) {
-    if (points.isEmpty) return const LatLng(-7.9797, 113.8228);
+  static LatLng _calculateCentroid(List<List<LatLng>> allPolys) {
+    if (allPolys.isEmpty) return const LatLng(-7.9797, 113.8228);
     double sumLat = 0;
     double sumLng = 0;
-    for (final p in points) {
-      sumLat += p.latitude;
-      sumLng += p.longitude;
+    int count = 0;
+    for (final poly in allPolys) {
+      for (final p in poly) {
+        sumLat += p.latitude;
+        sumLng += p.longitude;
+        count++;
+      }
     }
-    return LatLng(sumLat / points.length, sumLng / points.length);
+    if (count == 0) return const LatLng(-7.9797, 113.8228);
+    return LatLng(sumLat / count, sumLng / count);
   }
 
   static List<List<LatLng>> _extractPolygonsFromGeoJson(Map<String, dynamic> geojson) {
     List<List<LatLng>> results = [];
     final type = geojson['type'];
-    final coords = geojson['coordinates'];
 
+    if (type == 'FeatureCollection' && geojson['features'] is List) {
+      for (final f in geojson['features']) {
+        if (f is Map) {
+          results.addAll(_extractPolygonsFromGeoJson(Map<String, dynamic>.from(f)));
+        }
+      }
+      return results;
+    }
+
+    if (type == 'Feature' && geojson['geometry'] is Map) {
+      return _extractPolygonsFromGeoJson(Map<String, dynamic>.from(geojson['geometry']));
+    }
+
+    final coords = geojson['coordinates'];
     if (coords == null) return results;
 
     if (type == 'Polygon' && coords is List) {
@@ -215,8 +262,6 @@ class GeoBoundaryService {
           if (ring.isNotEmpty) results.add(ring);
         }
       }
-    } else if (type == 'Feature' && geojson['geometry'] != null) {
-      return _extractPolygonsFromGeoJson(geojson['geometry'] as Map<String, dynamic>);
     }
     return results;
   }

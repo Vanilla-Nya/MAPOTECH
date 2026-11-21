@@ -823,3 +823,414 @@ class SkeletonPembukuan extends StatelessWidget {
   }
 }
 
+// 9. SkeletonChildrenList - Children health records & KIA card skeleton
+class SkeletonChildrenList extends StatelessWidget {
+  final int itemCount;
+  const SkeletonChildrenList({super.key, this.itemCount = 2});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Top Controls: Search Bar & Add Button
+        Row(
+          children: [
+            Expanded(
+              child: SkeletonBox(
+                height: 42,
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            const SizedBox(width: 10),
+            SkeletonBox(
+              height: 42,
+              width: 120,
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // Filter chips row
+        Row(
+          children: [
+            SkeletonBox(height: 32, width: 85, borderRadius: BorderRadius.circular(100)),
+            const SizedBox(width: 8),
+            SkeletonBox(height: 32, width: 125, borderRadius: BorderRadius.circular(100)),
+            const SizedBox(width: 8),
+            SkeletonBox(height: 32, width: 115, borderRadius: BorderRadius.circular(100)),
+          ],
+        ),
+        const SizedBox(height: 18),
+
+        // Children Cards
+        ...List.generate(itemCount, (index) {
+          return Card(
+            elevation: 0,
+            margin: const EdgeInsets.only(bottom: 18),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            child: Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Top child identity row
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SkeletonBox(width: 50, height: 50, shape: BoxShape.circle),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SkeletonBox(height: 18, width: 130),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: [
+                                SkeletonBox(height: 16, width: 65, borderRadius: BorderRadius.circular(6)),
+                                SkeletonBox(height: 16, width: 75, borderRadius: BorderRadius.circular(6)),
+                                SkeletonBox(height: 16, width: 45, borderRadius: BorderRadius.circular(6)),
+                                SkeletonBox(height: 16, width: 110, borderRadius: BorderRadius.circular(6)),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      SkeletonBox(height: 24, width: 75, borderRadius: BorderRadius.circular(100)),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+
+                  // Location and checkup status
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          SkeletonBox(height: 13, width: 220),
+                          SizedBox(height: 4),
+                          SkeletonBox(height: 11, width: 160),
+                        ],
+                      ),
+                      SkeletonBox(height: 22, width: 95, borderRadius: BorderRadius.circular(100)),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 3 Measurements row
+                  Row(
+                    children: List.generate(3, (i) {
+                      return Expanded(
+                        child: Container(
+                          margin: EdgeInsets.only(right: i < 2 ? 10 : 0),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Theme.of(context).brightness == Brightness.dark
+                                  ? Colors.white10
+                                  : Colors.black.withValues(alpha: 0.06),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: const [
+                              SkeletonBox(height: 10, width: 60),
+                              SizedBox(height: 8),
+                              SkeletonBox(height: 18, width: 80),
+                              SizedBox(height: 6),
+                              SkeletonBox(height: 10, width: 50),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // AI Recommendation card
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white.withValues(alpha: 0.03)
+                          : const Color(0xFF00BFA6).withValues(alpha: 0.06),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const SkeletonBox(height: 13, width: 170),
+                            SkeletonBox(height: 18, width: 85, borderRadius: BorderRadius.circular(6)),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        const SkeletonBox(height: 11, width: 140),
+                        const SizedBox(height: 6),
+                        const SkeletonBox(height: 10, width: double.infinity),
+                        const SizedBox(height: 12),
+                        const SkeletonBox(height: 11, width: 150),
+                        const SizedBox(height: 6),
+                        const SkeletonBox(height: 10, width: double.infinity),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+}
+
+// 10. SkeletonGenericPage - Versatile generic skeleton for any new page or tab
+class SkeletonGenericPage extends StatelessWidget {
+  final int cardCount;
+  const SkeletonGenericPage({super.key, this.cardCount = 3});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Top Banner Skeleton
+        Card(
+          elevation: 0,
+          margin: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Row(
+              children: [
+                const SkeletonBox(width: 46, height: 46, borderRadius: BorderRadius.all(Radius.circular(14))),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      SkeletonBox(height: 18, width: 180),
+                      SizedBox(height: 8),
+                      SkeletonBox(height: 12, width: 260),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Controls bar skeleton
+        Row(
+          children: [
+            Expanded(
+              child: SkeletonBox(height: 42, borderRadius: BorderRadius.circular(12)),
+            ),
+            const SizedBox(width: 10),
+            SkeletonBox(height: 42, width: 110, borderRadius: BorderRadius.circular(12)),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // Cards list
+        ...List.generate(cardCount, (index) {
+          return Card(
+            elevation: 0,
+            margin: const EdgeInsets.only(bottom: 14),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const SkeletonBox(width: 40, height: 40, shape: BoxShape.circle),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: const [
+                            SkeletonBox(height: 15, width: 140),
+                            SizedBox(height: 6),
+                            SkeletonBox(height: 11, width: 90),
+                          ],
+                        ),
+                      ),
+                      SkeletonBox(height: 22, width: 70, borderRadius: BorderRadius.circular(100)),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  const SkeletonBox(height: 11, width: double.infinity),
+                  const SizedBox(height: 6),
+                  const SkeletonBox(height: 11, width: 220),
+                ],
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+}
+
+/// ─────────────────────────────────────────────────────────────────────────────
+/// SKELETON MAP
+/// Sleek placeholder skeleton for OpenStreetMap / RevGeo boundary maps.
+/// Displays simulated street grids, floating badges, pulsing center pin,
+/// and map action buttons.
+/// ─────────────────────────────────────────────────────────────────────────────
+class SkeletonMap extends StatelessWidget {
+  final double height;
+  final BorderRadius? borderRadius;
+
+  const SkeletonMap({
+    super.key,
+    this.height = 380,
+    this.borderRadius,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final r = borderRadius ?? BorderRadius.circular(16);
+
+    return SkeletonScope(
+      child: Container(
+        height: height,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF141824) : const Color(0xFFF1F5F9),
+          borderRadius: r,
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.08)
+                : Colors.black.withValues(alpha: 0.08),
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          children: [
+            // Simulated grid pattern / map roads
+            Positioned.fill(
+              child: Opacity(
+                opacity: isDark ? 0.08 : 0.06,
+                child: CustomPaint(
+                  painter: _SkeletonMapGridPainter(isDark: isDark),
+                ),
+              ),
+            ),
+            // Top-left location badge skeleton
+            Positioned(
+              top: 14,
+              left: 14,
+              child: SkeletonBox(
+                width: 180,
+                height: 28,
+                borderRadius: BorderRadius.circular(100),
+              ),
+            ),
+            // Center pin placeholder
+            Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: (isDark ? Colors.white : Colors.black)
+                          .withValues(alpha: 0.06),
+                    ),
+                    child: const Center(
+                      child: SkeletonBox(
+                        width: 26,
+                        height: 26,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SkeletonBox(
+                    width: 130,
+                    height: 12,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                ],
+              ),
+            ),
+            // Bottom-right map controls skeleton
+            Positioned(
+              bottom: 14,
+              right: 14,
+              child: Row(
+                children: [
+                  SkeletonBox(
+                    width: 95,
+                    height: 32,
+                    borderRadius: BorderRadius.circular(100),
+                  ),
+                  const SizedBox(width: 8),
+                  SkeletonBox(
+                    width: 32,
+                    height: 32,
+                    borderRadius: BorderRadius.circular(100),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SkeletonMapGridPainter extends CustomPainter {
+  final bool isDark;
+  _SkeletonMapGridPainter({required this.isDark});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = isDark ? Colors.white : Colors.black
+      ..strokeWidth = 1.2
+      ..style = PaintingStyle.stroke;
+
+    const step = 45.0;
+    for (double x = -size.height; x < size.width + size.height; x += step) {
+      canvas.drawLine(
+        Offset(x, 0),
+        Offset(x + size.height * 0.5, size.height),
+        paint,
+      );
+    }
+    for (double y = 0; y < size.height; y += step) {
+      canvas.drawLine(
+        Offset(0, y),
+        Offset(size.width, y + 15),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+
+

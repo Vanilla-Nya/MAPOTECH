@@ -154,6 +154,10 @@ CustomSnackbar.warning(context, 'Stok obat tersisa 3 butir.');
 ### 11. `RevGeoWilayahMapWidget` & `LocationSelectorWidget`
 * **File**: `revgeo_wilayah_map_widget.dart`, `location_selector_widget.dart`
 * **Fungsi**: Visualisasi peta poligon batas administratif via **RevGeo API** (`https://revgeo.relvastudio.com/`) dan pemilih bertingkat Provinsi/Kabupaten/Kecamatan/Desa.
+* **Fitur Utama**:
+  - **Zero-Lag Lazy Loading**: Dilengkapi `SkeletonMap` dan `CustomProgressBar` animasi 1%–100% bawaan saat pertama kali dibuka sehingga transisi halaman tidak freeze / lag.
+  - **Interactive Patient Pin & Callout**: Mendukung `onMarkerTap` yang membuka detail rekam medis / modal data pasien (`PatientAncDetailModal`). Pin pada Desktop memiliki efek hover tooltip rapi dan callout card mengambang interaktif.
+  - **Multi-Polygon RevGeo Parsing**: Mengurai poligon batas wilayah resmi (Kecamatan Sumber Wringin, dsb.) secara otomatis dengan `PolygonLayer` dan auto-fit bounds kamera.
 
 ### 12. `CustomQrisDialog`
 * **File**: `custom_qris_dialog.dart`
@@ -208,5 +212,53 @@ CustomFormStepper(
   isDark: isDark,
 )
 ```
+
+### 15. `FormattedMarkdownText`
+* **File**: `formatted_markdown_text.dart`
+* **Fungsi**: Komponen parser dan penampil teks markdown (bold `**...**`, italic `*...*`, numbered & bullet lists, headings `#`, inline code) yang dihasilkan dari model AI/LLM (Gemini, MAPOTECH AI, VitaScale Clinical Reasoning) agar tidak menyisakan tanda bintang atau karakter mentah (`**`) di layar. Mendukung typewriter streaming tanpa bocor karakter mentah di akhir string.
+* **Contoh**:
+```dart
+FormattedMarkdownText(
+  text: message.text,
+  style: GoogleFonts.outfit(fontSize: 14, color: textColor),
+  accentColor: primaryColor,
+)
+```
+
+### 16. `CustomLazyLoader` & `CustomPageLoader`
+* **File**: `custom_lazy_loader.dart`
+* **Fungsi**: Komponen lazy loading wajib untuk menggantikan raw `CircularProgressIndicator`. Menampilkan progress bar horizontal animasi (1% s/d 100% dari kiri ke kanan), teks persentase dinamis, label proses dwibahasa, serta kerangka `SkeletonLoading`. Ketika loading selesai, loader menghilang perlahan (*fade-out*) dan UI konten baru muncul secara halus (*fade-in* + micro-slide).
+* **Contoh**:
+```dart
+// Pola Wrapper (Rekomendasi Utama):
+CustomLazyLoader(
+  isLoading: _isLoading,
+  loadingText: isEn ? 'Loading health records...' : 'Memuat data rekam medis...',
+  skeleton: const SkeletonChildrenList(),
+  child: _buildMainContent(),
+)
+
+// Pola Standalone (Return Widget Langsung):
+if (_isLoading) {
+  return CustomPageLoader(
+    message: isEn ? 'Loading directory...' : 'Memuat data direktori...',
+    skeleton: const SkeletonPatientGrid(),
+  );
+}
+```
+
+### 17. `CustomProgressBar`
+* **File**: `custom_lazy_loader.dart`
+* **Fungsi**: Indikator progres linier horizontal (1% - 100%) dengan gradien warna tema, badge persentase, track anti-aliased, dan kilau cahaya (*shimmer flare*) animasi kiri-ke-kanan.
+* **Contoh**:
+```dart
+CustomProgressBar(
+  value: 0.75, // 75%
+  label: 'Sinkronisasi SatuSehat...',
+  height: 7.0,
+)
+```
+
+
 
 

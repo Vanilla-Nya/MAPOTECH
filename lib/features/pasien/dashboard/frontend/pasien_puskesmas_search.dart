@@ -250,11 +250,11 @@ class _PasienPuskesmasSearchState extends ConsumerState<PasienPuskesmasSearch> {
 
         // ─── Puskesmas List ────────────────────────────────────────
         if (_isLoading)
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 60),
-              child: CircularProgressIndicator(color: themeAccent),
-            ),
+          CustomPageLoader(
+            message: state.language == 'en'
+                ? 'Loading Puskesmas & Clinic directory...'
+                : 'Memuat data faskes Puskesmas & Klinik...',
+            skeleton: const SkeletonPatientGrid(),
           )
         else if (_errorMessage != null)
           Center(

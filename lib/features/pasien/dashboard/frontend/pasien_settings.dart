@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/widgets/settings_widgets.dart';
+import 'package:mapotech/features/pasien/dashboard/frontend/ai_assistant/presentation/ai_chat_provider.dart';
 
 /// Pengaturan Pasien — dedicated settings page for the masyarakat/pasien role.
 class PasienSettings extends ConsumerWidget {
@@ -132,7 +133,10 @@ class PasienSettings extends ConsumerWidget {
               SettingsChip(
                 label: 'Indonesian',
                 isSelected: state.language == 'id',
-                onTap: () => notifier.setLanguage('id'),
+                onTap: () {
+                  notifier.setLanguage('id');
+                  ref.read(aiChatProvider.notifier).onLanguageChanged('id');
+                },
                 purple: purple,
                 teal: teal,
                 isDark: isDark,
@@ -146,7 +150,10 @@ class PasienSettings extends ConsumerWidget {
               SettingsChip(
                 label: 'English',
                 isSelected: state.language == 'en',
-                onTap: () => notifier.setLanguage('en'),
+                onTap: () {
+                  notifier.setLanguage('en');
+                  ref.read(aiChatProvider.notifier).onLanguageChanged('en');
+                },
                 purple: purple,
                 teal: teal,
                 isDark: isDark,
@@ -210,164 +217,184 @@ class PasienSettings extends ConsumerWidget {
   ) {
     final orange = const Color(0xFFF39C12);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: borderColor),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Left: content
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth >= 540;
+
+        final leftContent = Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Orange badge
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: orange.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: orange.withValues(alpha: 0.25)),
+                ),
+                child: Text(
+                  isEn
+                      ? 'This feature is only available for Premium members.'
+                      : 'Fitur ini hanya tersedia untuk anggota Premium.',
+                  style: GoogleFonts.outfit(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    color: orange,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              Text(
+                isEn ? 'Upgrade to Premium' : 'Ayo Jadi Premium',
+                style: GoogleFonts.outfit(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  color: textColor,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                isEn
+                    ? 'Unlock exclusive customization features including custom GIF backgrounds and theme colors.'
+                    : 'Buka fitur kustomisasi eksklusif termasuk latar belakang GIF kustom dan warna tema.',
+                style: GoogleFonts.outfit(
+                  fontSize: 11,
+                  color: subtitleColor,
+                  height: 1.5,
+                ),
+              ),
+
+              const SizedBox(height: 14),
+
+              // Feature bullets
+              Row(
                 children: [
-                  // Orange badge
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: orange.withOpacity(0.10),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: orange.withOpacity(0.25)),
-                    ),
-                    child: Text(
-                      isEn
-                          ? 'This feature is only available for Premium members.'
-                          : 'Fitur ini hanya tersedia untuk anggota Premium.',
-                      style: GoogleFonts.outfit(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
-                        color: orange,
-                      ),
-                    ),
+                  _premiumFeatureBullet(
+                    Icons.color_lens_outlined,
+                    isEn ? 'Theme Color' : 'Warna Tema',
+                    subtitleColor,
                   ),
-                  const SizedBox(height: 12),
-
-                  Text(
-                    isEn ? 'Upgrade to Premium' : 'Ayo Jadi Premium',
-                    style: GoogleFonts.outfit(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
-                      color: textColor,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    isEn
-                        ? 'Unlock exclusive customization features including custom GIF backgrounds and theme colors.'
-                        : 'Buka fitur kustomisasi eksklusif termasuk latar belakang GIF kustom dan warna tema.',
-                    style: GoogleFonts.outfit(
-                      fontSize: 11,
-                      color: subtitleColor,
-                      height: 1.5,
-                    ),
-                  ),
-
-                  const SizedBox(height: 14),
-
-                  // Feature bullets
-                  Row(
-                    children: [
-                      _premiumFeatureBullet(
-                        Icons.color_lens_outlined,
-                        isEn ? 'Theme Color' : 'Warna Tema',
-                        subtitleColor,
-                      ),
-                      const SizedBox(width: 16),
-                      _premiumFeatureBullet(
-                        Icons.image_outlined,
-                        isEn ? 'Header Effect' : 'Efek Header',
-                        subtitleColor,
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 18),
-
-                  // Upgrade button
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.star_rounded, size: 16),
-                    label: Text(
-                      isEn ? 'Upgrade Now' : 'Upgrade Sekarang',
-                      style: GoogleFonts.outfit(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: purple,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 0,
-                    ),
-                    onPressed: () {},
+                  const SizedBox(width: 16),
+                  _premiumFeatureBullet(
+                    Icons.image_outlined,
+                    isEn ? 'Header Effect' : 'Efek Header',
+                    subtitleColor,
                   ),
                 ],
               ),
-            ),
-          ),
 
-          // Right: Star visual
-          Container(
-            width: 140,
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E1E22) : const Color(0xFFF9F5FF),
-              border: Border(left: BorderSide(color: borderColor)),
-            ),
-            alignment: Alignment.center,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 72,
-                  height: 72,
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF2A2A30) : Colors.white,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: purple.withOpacity(0.15),
-                        blurRadius: 20,
-                        offset: const Offset(0, 6),
-                      ),
+              const SizedBox(height: 18),
+
+              // Upgrade button
+              ElevatedButton.icon(
+                icon: const Icon(Icons.star_rounded, size: 16),
+                label: Text(
+                  isEn ? 'Upgrade Now' : 'Upgrade Sekarang',
+                  style: GoogleFonts.outfit(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: purple,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 0,
+                ),
+                onPressed: () {},
+              ),
+            ],
+          ),
+        );
+
+        final rightVisual = Container(
+          width: isWide ? 140 : double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E1E22) : const Color(0xFFF9F5FF),
+            border: isWide
+                ? Border(left: BorderSide(color: borderColor))
+                : Border(top: BorderSide(color: borderColor)),
+          ),
+          alignment: Alignment.center,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF2A2A30) : Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: purple.withValues(alpha: 0.15),
+                      blurRadius: 20,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                alignment: Alignment.center,
+                child: const Icon(
+                  Icons.star_rounded,
+                  color: Color(0xFFF1C40F),
+                  size: 36,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'EXCLUSIVE',
+                style: GoogleFonts.outfit(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w900,
+                  color: purple.withValues(alpha: 0.6),
+                  letterSpacing: 1.5,
+                ),
+              ),
+            ],
+          ),
+        );
+
+        return Container(
+          decoration: BoxDecoration(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: borderColor),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: isWide
+              ? IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(child: leftContent),
+                      rightVisual,
                     ],
                   ),
-                  alignment: Alignment.center,
-                  child: const Icon(
-                    Icons.star_rounded,
-                    color: Color(0xFFF1C40F),
-                    size: 36,
-                  ),
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    leftContent,
+                    rightVisual,
+                  ],
                 ),
-                const SizedBox(height: 10),
-                Text(
-                  'EXCLUSIVE',
-                  style: GoogleFonts.outfit(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w900,
-                    color: purple.withOpacity(0.6),
-                    letterSpacing: 1.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -405,14 +432,14 @@ class PasienSettings extends ConsumerWidget {
             width: 52,
             height: 52,
             decoration: BoxDecoration(
-              color: purple.withOpacity(0.08),
+              color: purple.withValues(alpha: 0.08),
               shape: BoxShape.circle,
             ),
             alignment: Alignment.center,
             child: Icon(
               Icons.bug_report_outlined,
               size: 26,
-              color: purple.withOpacity(0.5),
+              color: purple.withValues(alpha: 0.5),
             ),
           ),
           const SizedBox(height: 12),

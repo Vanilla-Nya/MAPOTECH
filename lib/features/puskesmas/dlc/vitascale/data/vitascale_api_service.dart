@@ -362,5 +362,54 @@ class VitaScaleApiService {
       rethrow;
     }
   }
+
+  /// ============================================================================
+  /// PENGUKURAN PANJANG/TINGGI OBJEK VIA PCV (7 TAHAP)
+  /// Endpoint: POST /measure
+  /// ============================================================================
+  static Future<Map<String, dynamic>> ukurTinggiObjek({
+    String? base64Image,
+    double? h,
+    double? ppm100,
+    double? t,
+    double? k1,
+  }) async {
+    final uri = Uri.parse('${VitaScaleApiConfig.baseUrl}/measure');
+
+    try {
+      final payload = <String, dynamic>{
+        if (base64Image != null && base64Image.isNotEmpty) 'image': base64Image,
+        if (h != null) 'H': h,
+        if (ppm100 != null) 'PPM100': ppm100,
+        if (t != null) 't': t,
+        if (k1 != null) 'k1': k1,
+      };
+
+      final response = await _client
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(payload),
+          )
+          .timeout(const Duration(seconds: 20));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        return data;
+      } else {
+        final err = jsonDecode(response.body) as Map<String, dynamic>?;
+        return {
+          'status': 'error',
+          'message': err?['error'] ?? err?['message'] ?? 'Gagal memproses gambar (HTTP ${response.statusCode})',
+        };
+      }
+    } catch (e) {
+      debugPrint('[VitaScaleApi] ukurTinggiObjek error: $e');
+      return {
+        'status': 'error',
+        'message': 'Gagal menghubungi server pengukuran di ${VitaScaleApiConfig.baseUrl}: $e',
+      };
+    }
+  }
 }
 

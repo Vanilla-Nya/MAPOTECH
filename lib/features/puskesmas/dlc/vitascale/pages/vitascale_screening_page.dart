@@ -881,7 +881,7 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                   _executeSaveScreening();
                 },
                 icon: _isSyncingSatuSehat
-                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    ? const Icon(Icons.sync_rounded, size: 16, color: Colors.white)
                     : const Icon(Icons.cloud_upload_rounded, size: 16, color: Colors.white),
                 label: Text(
                   'Konfirmasi & Simpan Database',
@@ -961,29 +961,38 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
   }
 
   // ===========================================================================
-  // EKSEKUSI KLASIFIKASI MODEL MLP & REASONING MODEL
+  // EKSEKUSI KLASIFIKASI MODEL MLP (OTOMATIS) & REASONING (DENGAN TOMBOL)
   // ===========================================================================
-  Future<void> _runClassification() async {
+  void _checkAndAutoRunMlp() {
+    final bb = double.tryParse(_weightController.text.trim()) ?? 0.0;
+    final tb = double.tryParse(_heightController.text.trim()) ?? 0.0;
+    if (bb > 0 && tb > 0 && _smartGrowthResult == null && !_isLoadingClassification) {
+      _runMlpClassification(silent: true);
+    }
+  }
+
+  Future<void> _runMlpClassification({bool silent = false}) async {
     final bb = double.tryParse(_weightController.text.trim());
     final tb = double.tryParse(_heightController.text.trim());
 
     if (bb == null || bb <= 0 || tb == null || tb <= 0) {
-      CustomSnackbar.warning(
-        context,
-        'Harap masukkan angka Berat Badan dan Tinggi Badan yang valid.',
-        title: 'Input Tidak Lengkap',
-      );
+      if (!silent) {
+        CustomSnackbar.warning(
+          context,
+          'Harap masukkan angka Berat Badan dan Tinggi Badan yang valid.',
+          title: 'Input Tidak Lengkap',
+        );
+      }
       return;
     }
 
+    if (_isLoadingClassification) return;
+
     setState(() {
       _isLoadingClassification = true;
-      _smartGrowthResult = null;
-      _reasoningResult = null;
     });
 
     try {
-      // Model Smart Growth (4 Fitur Antropometri Utama)
       final inputSG = InputSmartGrowthBalita(
         jk: _selectedGender,
         usiaBulan: _ageMonths,
@@ -992,30 +1001,63 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
       );
 
       final result = await VitaScaleApiService.prediksiSmartGrowth(inputSG);
-      setState(() {
-        _smartGrowthResult = result;
-        _isLoadingClassification = false;
-      });
-
-      _runReasoning(result, bb, tb);
-
       if (mounted) {
-        CustomSnackbar.success(
-          context,
-          'Klasifikasi model MLP selesai! Reasoning model sedang memproses penalaran klinis...',
-          title: 'Prediksi Berhasil',
-        );
+        setState(() {
+          _smartGrowthResult = result;
+          _isLoadingClassification = false;
+        });
+
+        if (!silent) {
+          CustomSnackbar.success(
+            context,
+            'Klasifikasi model MLP selesai! Status gizi & pertumbuhan teridentifikasi.',
+            title: 'Prediksi MLP Berhasil',
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoadingClassification = false);
-        CustomSnackbar.error(
-          context,
-          'Gagal menghubungkan ke backend FastAPI: $e\nPastikan python main.py berjalan di ${VitaScaleApiConfig.baseUrl}',
-          title: 'Koneksi API Gagal',
-        );
+        if (!silent) {
+          CustomSnackbar.error(
+            context,
+            'Gagal menghubungkan ke backend FastAPI: $e\nPastikan python main.py berjalan di ${VitaScaleApiConfig.baseUrl}',
+            title: 'Koneksi API Gagal',
+          );
+        }
       }
     }
+  }
+
+  Future<void> _runReasoningOnly() async {
+    final bb = double.tryParse(_weightController.text.trim());
+    final tb = double.tryParse(_heightController.text.trim());
+
+    if (bb == null || bb <= 0 || tb == null || tb <= 0) {
+      CustomSnackbar.warning(
+        context,
+        'Harap lengkapi data Berat Badan dan Tinggi Badan di Langkah 2 terlebih dahulu.',
+        title: 'Input Tidak Lengkap',
+      );
+      return;
+    }
+
+    if (_smartGrowthResult == null) {
+      await _runMlpClassification(silent: true);
+      if (_smartGrowthResult == null) {
+        if (mounted) {
+          CustomSnackbar.error(
+            context,
+            'Gagal menjalankan klasifikasi MLP. Pastikan server AI aktif.',
+            title: 'Klasifikasi Gagal',
+          );
+        }
+        return;
+      }
+    }
+
+    final mlpResult = _smartGrowthResult!;
+    await _runReasoning(mlpResult, bb, tb);
   }
 
   Future<void> _runReasoning(HasilSmartGrowthBalita mlpResult, double bb, double tb) async {
@@ -1040,6 +1082,7 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
         kmsStatus: _getKmsLabel(_kmsStatus),
         receivedVitA: _receivedVitA,
         receivedDeworming: _ageMonths >= 12 ? _receivedDeworming : null,
+        language: ref.read(appLanguageProvider),
       );
 
       if (mounted) {
@@ -1159,7 +1202,7 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                 if (onConfirm != null) {
                   onConfirm();
                 } else {
-                  _runClassification();
+                  _runReasoningOnly();
                 }
               },
               icon: const Icon(Icons.refresh_rounded, size: 15, color: Colors.white),
@@ -1630,7 +1673,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                     icon: Icons.psychology_rounded,
                     hasError: redErrors.any((e) => e['step'] == 3),
                     hasWarning: yellowWarnings.any((w) => w['step'] == 3),
-                    isCompleted: _smartGrowthResult != null && _reasoningResult != null,
+                    isCompleted: _smartGrowthResult != null,
                   ),
                   FormStepItem(
                     step: 4,
@@ -1642,7 +1685,12 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   ),
                 ],
                 currentStep: _formStep,
-                onStepTapped: (step) => setState(() => _formStep = step),
+                onStepTapped: (step) {
+                  setState(() => _formStep = step);
+                  if (step == 3) {
+                    _checkAndAutoRunMlp();
+                  }
+                },
                 themeAccent: const Color(0xFF1ABC9C),
                 textColor: textColor,
                 subtitleColor: subtitleColor,
@@ -3361,13 +3409,140 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
   }
 
   // ===========================================================================
-  // LANGKAH 3: KLASIFIKASI MODEL MLP & CLINICAL REASONING AI (GEMINI)
+  // PROGRESS BAR LOADING CARD (LINEAR PROGRESS - TIDAK PAKAI LOADING CIRCLE)
+  // ===========================================================================
+  Widget _buildProgressBarLoadingCard({
+    required String title,
+    required String subtitle,
+    required Color cardBg,
+    required Color border,
+    required Color text,
+    required Color sub,
+    IconData icon = Icons.psychology_rounded,
+    List<String>? steps,
+    int activeStepIndex = 1,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1ABC9C).withOpacity(0.06),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF1ABC9C).withOpacity(0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1ABC9C).withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 20, color: const Color(0xFF1ABC9C)),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: GoogleFonts.outfit(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.bold,
+                        color: text,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: GoogleFonts.outfit(fontSize: 11, color: sub),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // Progress Bar Linear (Sesuai Permintaan Pengguna: Progress Bar, Bukan Lingkaran)
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: SizedBox(
+              height: 8,
+              child: LinearProgressIndicator(
+                backgroundColor: const Color(0xFF1ABC9C).withOpacity(0.15),
+                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF1ABC9C)),
+              ),
+            ),
+          ),
+          if (steps != null && steps.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: List.generate(steps.length, (idx) {
+                final isDone = idx < activeStepIndex;
+                final isCurrent = idx == activeStepIndex;
+                final stepColor = isDone
+                    ? const Color(0xFF27AE60)
+                    : isCurrent
+                        ? const Color(0xFF1ABC9C)
+                        : sub.withOpacity(0.5);
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: stepColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: stepColor.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (isDone)
+                        const Icon(Icons.check_rounded, size: 11, color: Color(0xFF27AE60))
+                      else if (isCurrent)
+                        const Icon(Icons.sync_rounded, size: 11, color: Color(0xFF1ABC9C))
+                      else
+                        Icon(Icons.circle_outlined, size: 9, color: sub.withOpacity(0.5)),
+                      const SizedBox(width: 4),
+                      Text(
+                        steps[idx],
+                        style: GoogleFonts.outfit(
+                          fontSize: 9.5,
+                          fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
+                          color: stepColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // LANGKAH 3: KLASIFIKASI MODEL MLP (OTOMATIS) & CLINICAL REASONING (TOMBOL)
   // ===========================================================================
   Widget _buildStep3ReasoningAndAi(Color cardBg, Color border, Color text, Color sub, bool isMobile) {
     final bb = double.tryParse(_weightController.text.trim()) ?? 0.0;
     final tb = double.tryParse(_heightController.text.trim()) ?? 0.0;
     final isAntroValid = bb > 0 && tb > 0;
-    final hasAiResult = _smartGrowthResult != null && _reasoningResult != null;
+    final isEn = ref.watch(landingPageProvider).language == 'en';
+
+    // Otomatis mengeksekusi model MLP (Keras Smart Growth) jika belum dijalankan
+    if (isAntroValid && _smartGrowthResult == null && !_isLoadingClassification) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _smartGrowthResult == null && !_isLoadingClassification) {
+          _runMlpClassification(silent: true);
+        }
+      });
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -3399,57 +3574,79 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                         Row(
                           children: [
                             Text(
-                              'Langkah 3: Klasifikasi MLP & Clinical AI Reasoning',
+                              isEn
+                                  ? 'Step 3: MLP Classification & Clinical AI Reasoning'
+                                  : 'Langkah 3: Klasifikasi MLP & Clinical AI Reasoning',
                               style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w800, color: text),
                             ),
                             const SizedBox(width: 8),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                               decoration: BoxDecoration(
-                                color: (hasAiResult ? const Color(0xFF27AE60) : const Color(0xFFF39C12)).withOpacity(0.15),
+                                color: (_reasoningResult != null
+                                        ? const Color(0xFF27AE60)
+                                        : (_smartGrowthResult != null
+                                            ? const Color(0xFF1ABC9C)
+                                            : const Color(0xFFF39C12)))
+                                    .withOpacity(0.15),
                                 borderRadius: BorderRadius.circular(6),
                                 border: Border.all(
-                                  color: (hasAiResult ? const Color(0xFF27AE60) : const Color(0xFFF39C12)).withOpacity(0.3),
+                                  color: (_reasoningResult != null
+                                          ? const Color(0xFF27AE60)
+                                          : (_smartGrowthResult != null
+                                              ? const Color(0xFF1ABC9C)
+                                              : const Color(0xFFF39C12)))
+                                      .withOpacity(0.3),
                                 ),
                               ),
                               child: Text(
-                                hasAiResult
-                                    ? 'AI Selesai (${_reasoningPromptCount}x diprompt)'
-                                    : 'Disarankan (Opsional)',
+                                _reasoningResult != null
+                                    ? (isEn ? 'AI Complete (${_reasoningPromptCount}x prompt)' : 'AI Selesai (${_reasoningPromptCount}x diprompt)')
+                                    : (_smartGrowthResult != null
+                                        ? (isEn ? 'MLP Auto Done • Reasoning Ready' : 'MLP Selesai (Otomatis) • Reasoning Siap')
+                                        : (_isLoadingClassification
+                                            ? (isEn ? 'Auto Running MLP...' : 'Otomatis Memproses MLP...')
+                                            : (isEn ? 'Disarankan (Opsional)' : 'Disarankan (Opsional)'))),
                                 style: GoogleFonts.outfit(
                                   fontSize: 8.5,
                                   fontWeight: FontWeight.bold,
-                                  color: hasAiResult ? const Color(0xFF27AE60) : const Color(0xFFD68910),
+                                  color: _reasoningResult != null
+                                      ? const Color(0xFF27AE60)
+                                      : (_smartGrowthResult != null
+                                          ? const Color(0xFF1ABC9C)
+                                          : const Color(0xFFD68910)),
                                 ),
                               ),
                             ),
                           ],
                         ),
                         Text(
-                          'Analisis Machine Learning Keras & Penalaran Klinis Gemini 2.5 Flash untuk deteksi stunting dan intervensi gizi (opsional, dapat dilewati).',
+                          isEn
+                              ? 'Keras MLP automatic classification & Gemini 2.5 Flash clinical reasoning for stunting detection and nutritional intervention.'
+                              : 'Klasifikasi otomatis Machine Learning Keras MLP & Penalaran Klinis Gemini 2.5 Flash untuk deteksi stunting dan intervensi gizi.',
                           style: GoogleFonts.outfit(fontSize: 10.5, color: sub),
                         ),
                       ],
                     ),
                   ),
-                  if (hasAiResult || _reasoningPromptCount > 0) ...[
+                  if (_smartGrowthResult != null) ...[
+                    if (_reasoningResult != null || _reasoningPromptCount > 0) ...[
+                      CustomButton(
+                        text: _isLoadingReasoning
+                            ? (isEn ? 'Processing...' : 'Memproses...')
+                            : (isEn ? 'Re-Prompt AI (${_reasoningPromptCount}x)' : 'Prompt Ulang AI (${_reasoningPromptCount}x)'),
+                        icon: Icons.refresh_rounded,
+                        height: 34,
+                        primaryColor: const Color(0xFF1ABC9C),
+                        isSecondary: true,
+                        onPressed: (_isLoadingClassification || _isLoadingReasoning)
+                            ? null
+                            : () => _confirmRePromptDialog(),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
                     CustomButton(
-                      text: _isLoadingClassification || _isLoadingReasoning
-                          ? 'Memproses...'
-                          : 'Prompt Ulang AI (${_reasoningPromptCount}x)',
-                      icon: Icons.refresh_rounded,
-                      height: 34,
-                      primaryColor: const Color(0xFF1ABC9C),
-                      isSecondary: true,
-                      onPressed: (_isLoadingClassification || _isLoadingReasoning)
-                          ? null
-                          : () {
-                              _confirmRePromptDialog();
-                            },
-                    ),
-                    const SizedBox(width: 8),
-                    CustomButton(
-                      text: 'Salin Laporan',
+                      text: isEn ? 'Copy Report' : 'Salin Laporan',
                       icon: Icons.copy_rounded,
                       height: 34,
                       isSecondary: true,
@@ -3461,63 +3658,118 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
 
               const SizedBox(height: 16),
 
-              // Loading State Banner
-              if (_isLoadingClassification || _isLoadingReasoning) ...[
+              // 1. Loading State Banner untuk MLP Otomatis (PROGRESS BAR)
+              if (_isLoadingClassification) ...[
+                _buildProgressBarLoadingCard(
+                  title: isEn
+                      ? 'MLP Model Automatically Classifying Anthropometric Ratios...'
+                      : 'Model MLP Mengklasifikasikan Rasio Antropometri (Otomatis)...',
+                  subtitle: isEn
+                      ? 'Analyzing probabilities of weight-for-height and height-for-age linear growth without manual trigger.'
+                      : 'Menganalisis probabilitas status gizi BB/TB dan status pertumbuhan linier TB/U secara otomatis tanpa perlu tombol.',
+                  cardBg: cardBg,
+                  border: border,
+                  text: text,
+                  sub: sub,
+                  icon: Icons.memory_rounded,
+                  steps: isEn
+                      ? ['FastAPI Model Link', 'BB/TB & TB/U Inference', 'Confidence Scoring']
+                      : ['Koneksi Model FastAPI', 'Inferensi BB/TB & TB/U', 'Kalkulasi Confidence'],
+                  activeStepIndex: 1,
+                ),
+              ]
+              // 2. Data Not Valid Warning
+              else if (!isAntroValid) ...[
                 Container(
-                  padding: const EdgeInsets.all(24),
+                  padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1ABC9C).withOpacity(0.06),
+                    color: const Color(0xFFE67E22).withOpacity(0.08),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFF1ABC9C).withOpacity(0.2)),
+                    border: Border.all(color: const Color(0xFFE67E22).withOpacity(0.3)),
                   ),
-                  child: Column(
+                  child: Row(
                     children: [
-                      const CircularProgressIndicator(color: Color(0xFF1ABC9C), strokeWidth: 3),
-                      const SizedBox(height: 16),
-                      Text(
-                        _isLoadingClassification
-                            ? 'Model MLP Sedang Mengklasifikasikan Rasio Antropometri...'
-                            : 'Clinical Reasoning Engine Sedang Bekerja (Gemini 2.5 Flash)...',
-                        style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.bold, color: text),
+                      const Icon(Icons.warning_amber_rounded, size: 28, color: Color(0xFFE67E22)),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              isEn ? 'Anthropometry Data Incomplete' : 'Data Antropometri Belum Lengkap',
+                              style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w900, color: const Color(0xFFE67E22)),
+                            ),
+                            Text(
+                              isEn
+                                  ? 'Please input valid Weight and Height in Step 2 to run automatic MLP classification.'
+                                  : 'Harap lengkapi data Berat Badan dan Tinggi/Panjang Badan di Langkah 2 terlebih dahulu agar model MLP dapat berjalan otomatis.',
+                              style: GoogleFonts.outfit(fontSize: 11, color: sub),
+                            ),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _isLoadingClassification
-                            ? 'Menganalisis probabilitas status gizi BB/TB dan status pertumbuhan linier TB/U.'
-                            : 'Menyusun alur berpikir medis (Chain of Thought), faktor risiko, rekomendasi gizi PMT & protokol rujukan.',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.outfit(fontSize: 11, color: sub),
+                      const SizedBox(width: 12),
+                      CustomButton(
+                        text: isEn ? '← Back to Step 2' : '← Kembali ke Langkah 2',
+                        height: 38,
+                        onPressed: () => setState(() => _formStep = 2),
                       ),
                     ],
                   ),
                 ),
               ]
-              // Belum Dijalankan (Prompt Card)
-              else if (!hasAiResult) ...[
+              // 3. Clinical AI Reasoning Card (Butuh Tombol untuk Dijalankan)
+              else if (_reasoningResult == null && !_isLoadingReasoning) ...[
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF39C12).withOpacity(0.08),
+                    color: const Color(0xFF1ABC9C).withOpacity(0.06),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFF39C12).withOpacity(0.3)),
+                    border: Border.all(color: const Color(0xFF1ABC9C).withOpacity(0.25)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.psychology_alt_rounded, size: 24, color: Color(0xFFD68910)),
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1ABC9C).withOpacity(0.12),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.psychology_alt_rounded, size: 24, color: Color(0xFF1ABC9C)),
+                          ),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  'Rekomendasi Klinis AI (Opsional)',
-                                  style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w900, color: const Color(0xFFD68910)),
+                                Row(
+                                  children: [
+                                    Text(
+                                      isEn ? 'Clinical AI Reasoning (Gemini 2.5 Flash)' : 'Penalaran Klinis AI (Gemini 2.5 Flash)',
+                                      style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w900, color: const Color(0xFF16A085)),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF39C12).withOpacity(0.12),
+                                        borderRadius: BorderRadius.circular(5),
+                                      ),
+                                      child: Text(
+                                        isEn ? 'Optional • Click to Run' : 'Opsional • Tekan Tombol',
+                                        style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.bold, color: const Color(0xFFD68910)),
+                                      ),
+                                    ),
+                                  ],
                                 ),
+                                const SizedBox(height: 2),
                                 Text(
-                                  'Sesuai alur Buku KIA 2024, analisis stunting & penalaran klinis dokter spesialis anak (Gemini 2.5 Flash + MLP) sangat dianjurkan tetapi bersifat opsional. Anda dapat menjalankannya sekarang atau langsung melompat ke Langkah 4 untuk menyimpan data fisik balita.',
+                                  isEn
+                                      ? 'MLP classification has completed automatically below. To generate pediatrician clinical chain-of-thought, risk factor analysis, and Buku KIA nutritional guidance, press the button below (or proceed to Step 4).'
+                                      : 'Klasifikasi model MLP telah berjalan otomatis di bawah. Untuk menghasilkan alur berpikir medis dokter spesialis anak, analisis faktor risiko gizi, dan rekomendasi Buku KIA 2024, silakan tekan tombol di bawah (atau lewati ke Langkah 4).',
                                   style: GoogleFonts.outfit(fontSize: 10.5, color: sub),
                                 ),
                               ],
@@ -3540,39 +3792,31 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                           if (_headCircumferenceController.text.isNotEmpty)
                             _buildMiniBadge('Lingkar Kepala', '${_headCircumferenceController.text} cm'),
                           _buildMiniBadge('Tren KMS', _kmsStatus),
+                          if (_smartGrowthResult != null)
+                            _buildMiniBadge('Status Gizi MLP', _smartGrowthResult!.kategoriGiziBbtb),
                         ],
                       ),
                       const SizedBox(height: 16),
-                      // Tombol Generate AI & Tombol Lewati
+                      // Tombol Generate Reasoning & Tombol Lewati
                       Row(
                         children: [
                           Expanded(
                             flex: 3,
                             child: CustomButton(
-                              text: isAntroValid
-                                  ? (_reasoningPromptCount > 0
-                                      ? 'Prompt Ulang VitaScale AI & Reasoning ➔'
-                                      : 'Jalankan Klasifikasi VitaScale AI (MLP) & Reasoning Gemini ➔')
-                                  : 'Lengkapi Data BB & TB di Langkah 2 Terlebih Dahulu',
+                              text: isEn
+                                  ? 'Run Clinical AI Reasoning (Gemini 2.5 Flash) ➔'
+                                  : 'Jalankan Penalaran Klinis AI (Gemini 2.5 Flash) ➔',
                               icon: Icons.psychology_rounded,
                               height: 46,
                               primaryColor: const Color(0xFF1ABC9C),
-                              onPressed: isAntroValid
-                                  ? () {
-                                      if (_reasoningPromptCount >= 1) {
-                                        _confirmRePromptDialog();
-                                      } else {
-                                        _runClassification();
-                                      }
-                                    }
-                                  : null,
+                              onPressed: _runReasoningOnly,
                             ),
                           ),
                           const SizedBox(width: 10),
                           Expanded(
                             flex: 2,
                             child: CustomButton(
-                              text: 'Lewati ke Langkah 4 ➔',
+                              text: isEn ? 'Next to Step 4 (SATUSEHAT) ➔' : 'Lanjut ke Langkah 4 ➔',
                               isSecondary: true,
                               height: 46,
                               onPressed: () => setState(() => _formStep = 4),
@@ -3584,7 +3828,27 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   ),
                 ),
               ]
-              // Hasil Tersedia (Banner Sukses & Opsi Analisis Ulang)
+              // 4. Loading Reasoning State Banner (PROGRESS BAR - BUKAN CIRCULAR SPINNER)
+              else if (_isLoadingReasoning) ...[
+                _buildProgressBarLoadingCard(
+                  title: isEn
+                      ? 'Clinical Reasoning Engine Working (Gemini 2.5 Flash)...'
+                      : 'Clinical Reasoning Engine Sedang Bekerja (Gemini 2.5 Flash)...',
+                  subtitle: isEn
+                      ? 'Structuring pediatric chain-of-thought, clinical risk factors, and KIA nutrition intervention plan.'
+                      : 'Menyusun alur berpikir medis (Chain of Thought), faktor risiko klinis, rekomendasi gizi PMT & protokol rujukan Buku KIA 2024.',
+                  cardBg: cardBg,
+                  border: border,
+                  text: text,
+                  sub: sub,
+                  icon: Icons.psychology_rounded,
+                  steps: isEn
+                      ? ['Child Anthropometric Data', 'Gemini 2.5 Flash Reasoning', 'KIA Nutritional Action Plan']
+                      : ['Data Antropometri Balita', 'Penalaran Gemini 2.5 Flash', 'Rekomendasi Intervensi Gizi KIA'],
+                  activeStepIndex: 1,
+                ),
+              ]
+              // 5. Reasoning Completed Success Banner
               else ...[
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -3599,7 +3863,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          '✅ Klasifikasi Model MLP & Clinical Reasoning AI Selesai (Sudah diprompt $_reasoningPromptCount kali). Anda dapat melakukan Prompt Ulang (Re-Prompt) untuk memperbarui analisis atau lanjut ke Langkah 4 untuk Simpan.',
+                          isEn
+                              ? '✅ MLP Model Classification & Clinical AI Reasoning Complete (Prompted $_reasoningPromptCount time(s)). You may Re-Prompt or proceed to Step 4.'
+                              : '✅ Klasifikasi Model MLP & Clinical Reasoning AI Selesai (Sudah diprompt $_reasoningPromptCount kali). Anda dapat melakukan Prompt Ulang atau lanjut ke Langkah 4 untuk Simpan.',
                           style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.bold, color: const Color(0xFF27AE60)),
                         ),
                       ),
@@ -3613,8 +3879,23 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                         onPressed: () => _confirmRePromptDialog(),
                         icon: const Icon(Icons.refresh_rounded, size: 14, color: Color(0xFF27AE60)),
                         label: Text(
-                          'Prompt Ulang (${_reasoningPromptCount}x)',
+                          isEn ? 'Re-Prompt (${_reasoningPromptCount}x)' : 'Prompt Ulang (${_reasoningPromptCount}x)',
                           style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF27AE60)),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF27AE60),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        ),
+                        onPressed: () => setState(() => _formStep = 4),
+                        icon: const Icon(Icons.arrow_forward_rounded, size: 14, color: Colors.white),
+                        label: Text(
+                          isEn ? 'Step 4 ➔' : 'Langkah 4 ➔',
+                          style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.white),
                         ),
                       ),
                     ],
@@ -3625,10 +3906,14 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
           ),
         ),
 
-        // Display MLP Results & Gemini Reasoning Section if results available
-        if (hasAiResult) ...[
+        // Tampilkan Hasil Klasifikasi MLP Segera Setelah Selesai (Otomatis)
+        if (_smartGrowthResult != null) ...[
           const SizedBox(height: 16),
           _buildMlpClassificationResult(cardBg, border, text, sub, isMobile),
+        ],
+
+        // Tampilkan Section Clinical AI Reasoning Hanya Jika Sudah Dijalankan
+        if (_reasoningResult != null) ...[
           const SizedBox(height: 16),
           _buildReasoningSection(cardBg, border, text, sub, isMobile),
         ],
@@ -3961,6 +4246,8 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
   }
 
   Widget _buildFooterActionButton(bool hasAi, List<Map<String, dynamic>> redErrors) {
+    final isEn = ref.watch(landingPageProvider).language == 'en';
+
     if (_formStep < 3) {
       return ElevatedButton.icon(
         style: ElevatedButton.styleFrom(
@@ -3970,15 +4257,21 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           elevation: 2,
         ),
-        onPressed: () => setState(() => _formStep++),
+        onPressed: () {
+          final next = _formStep + 1;
+          setState(() => _formStep = next);
+          if (next == 3) {
+            _checkAndAutoRunMlp();
+          }
+        },
         icon: const Icon(Icons.arrow_forward_rounded, size: 16, color: Colors.white),
         label: Text(
-          'Selanjutnya ➔',
+          isEn ? 'Next ➔' : 'Selanjutnya ➔',
           style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
         ),
       );
     } else if (_formStep == 3) {
-      if (!hasAi) {
+      if (_reasoningResult == null) {
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -3989,9 +4282,11 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               ),
               onPressed: () => setState(() => _formStep = 4),
-              icon: const Icon(Icons.skip_next_rounded, size: 16, color: Color(0xFF1ABC9C)),
+              icon: const Icon(Icons.arrow_forward_rounded, size: 16, color: Color(0xFF1ABC9C)),
               label: Text(
-                'Lewati ➔',
+                _smartGrowthResult != null
+                    ? (isEn ? 'Next to Step 4 ➔' : 'Lanjut ke Langkah 4 ➔')
+                    : (isEn ? 'Skip ➔' : 'Lewati ➔'),
                 style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF1ABC9C)),
               ),
             ),
@@ -4007,17 +4302,17 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
               onPressed: (_isLoadingClassification || _isLoadingReasoning)
                   ? null
                   : () {
-                      if (_reasoningPromptCount >= 1) {
-                        _confirmRePromptDialog();
-                      } else {
-                        _runClassification();
-                      }
+                      _runReasoningOnly();
                     },
               icon: (_isLoadingClassification || _isLoadingReasoning)
-                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  ? const Icon(Icons.sync_rounded, size: 16, color: Colors.white)
                   : const Icon(Icons.psychology_rounded, size: 16, color: Colors.white),
               label: Text(
-                (_isLoadingClassification || _isLoadingReasoning) ? 'Menganalisis...' : 'Generate AI (Opsional) ➔',
+                _isLoadingReasoning
+                    ? (isEn ? 'Processing Reasoning...' : 'Memproses Reasoning...')
+                    : (_isLoadingClassification
+                        ? (isEn ? 'Classifying MLP...' : 'Memproses MLP...')
+                        : (isEn ? 'Run Reasoning AI ➔' : 'Jalankan Reasoning Gemini ➔')),
                 style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
               ),
             ),
@@ -4036,7 +4331,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
               onPressed: () => _confirmRePromptDialog(),
               icon: const Icon(Icons.refresh_rounded, size: 15, color: Color(0xFF1ABC9C)),
               label: Text(
-                'Prompt Ulang (${_reasoningPromptCount}x)',
+                isEn ? 'Re-Prompt (${_reasoningPromptCount}x)' : 'Prompt Ulang (${_reasoningPromptCount}x)',
                 style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF1ABC9C)),
               ),
             ),
@@ -4052,7 +4347,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
               onPressed: () => setState(() => _formStep = 4),
               icon: const Icon(Icons.arrow_forward_rounded, size: 16, color: Colors.white),
               label: Text(
-                'Selanjutnya (SATUSEHAT) ➔',
+                isEn ? 'Next (SATUSEHAT) ➔' : 'Selanjutnya (SATUSEHAT) ➔',
                 style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
               ),
             ),
@@ -4423,28 +4718,24 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
   // CLINICAL AI REASONING MODEL (GEMINI 2.5 FLASH)
   // ===========================================================================
   Widget _buildReasoningSection(Color cardBg, Color border, Color text, Color sub, bool isMobile) {
+    final isEn = ref.watch(landingPageProvider).language == 'en';
     if (_isLoadingReasoning) {
-      return CustomCard(
-        color: cardBg,
-        borderColor: border,
-        padding: const EdgeInsets.all(28),
-        child: Column(
-          children: [
-            const CircularProgressIndicator(color: Color(0xFF1ABC9C), strokeWidth: 3),
-            const SizedBox(height: 18),
-            Text(
-              'Clinical Reasoning Engine Sedang Bekerja...',
-              style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: text),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Model Penalaran Klinis AI (Gemini 2.5 Flash) sedang menyusun alur berpikir medis, '
-              'analisis faktor risiko, dan rencana intervensi nutrisi sesuai standar WHO/Kemenkes RI.',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.outfit(fontSize: 11, color: sub),
-            ),
-          ],
-        ),
+      return _buildProgressBarLoadingCard(
+        title: isEn
+            ? 'Clinical Reasoning Engine Working (Gemini 2.5 Flash)...'
+            : 'Clinical Reasoning Engine Sedang Bekerja (Gemini 2.5 Flash)...',
+        subtitle: isEn
+            ? 'Structuring pediatric chain-of-thought, clinical risk factors, and KIA nutrition intervention plan.'
+            : 'Model Penalaran Klinis AI (Gemini 2.5 Flash) sedang menyusun alur berpikir medis, analisis faktor risiko, dan rencana intervensi nutrisi sesuai standar WHO/Kemenkes RI.',
+        cardBg: cardBg,
+        border: border,
+        text: text,
+        sub: sub,
+        icon: Icons.psychology_rounded,
+        steps: isEn
+            ? ['Child Anthropometric Data', 'Gemini 2.5 Flash Reasoning', 'KIA Nutritional Action Plan']
+            : ['Data Antropometri Balita', 'Penalaran Gemini 2.5 Flash', 'Rekomendasi Intervensi Gizi KIA'],
+        activeStepIndex: 1,
       );
     }
 
@@ -4533,9 +4824,10 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                 const Icon(Icons.format_quote_rounded, size: 20, color: Color(0xFF1ABC9C)),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Text(
-                    reasoning.reasoningSummary,
+                  child: FormattedMarkdownText(
+                    text: reasoning.reasoningSummary,
                     style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w600, color: text, height: 1.4),
+                    boldStyle: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w800, color: const Color(0xFF1ABC9C), height: 1.4),
                   ),
                 ),
               ],
@@ -4638,9 +4930,10 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Text(
-                      stepText,
+                    child: FormattedMarkdownText(
+                      text: stepText,
                       style: GoogleFonts.outfit(fontSize: 11.5, color: text, height: 1.4),
+                      boldStyle: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color(0xFF1ABC9C), height: 1.4),
                     ),
                   ),
                 ],
@@ -4669,9 +4962,10 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                 ],
               ),
               const SizedBox(height: 8),
-              Text(
-                r.riskAndEtiology,
+              FormattedMarkdownText(
+                text: r.riskAndEtiology,
                 style: GoogleFonts.outfit(fontSize: 11.5, color: text, height: 1.5),
+                boldStyle: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: Colors.amber[800], height: 1.5),
               ),
             ],
           ),
@@ -4697,9 +4991,10 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                 ],
               ),
               const SizedBox(height: 8),
-              Text(
-                r.nutritionalIntervention,
+              FormattedMarkdownText(
+                text: r.nutritionalIntervention,
                 style: GoogleFonts.outfit(fontSize: 11.5, color: text, height: 1.5),
+                boldStyle: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color(0xFF27AE60), height: 1.5),
               ),
             ],
           ),
@@ -4725,9 +5020,10 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                 ],
               ),
               const SizedBox(height: 8),
-              Text(
-                r.medicalProtocol,
+              FormattedMarkdownText(
+                text: r.medicalProtocol,
                 style: GoogleFonts.outfit(fontSize: 11.5, color: text, height: 1.5),
+                boldStyle: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color(0xFF3498DB), height: 1.5),
               ),
             ],
           ),
@@ -4754,9 +5050,10 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                 ],
               ),
               const SizedBox(height: 8),
-              Text(
-                r.parentEducation,
+              FormattedMarkdownText(
+                text: r.parentEducation,
                 style: GoogleFonts.outfit(fontSize: 11.5, color: text, height: 1.5),
+                boldStyle: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color(0xFFE91E63), height: 1.5),
               ),
             ],
           ),

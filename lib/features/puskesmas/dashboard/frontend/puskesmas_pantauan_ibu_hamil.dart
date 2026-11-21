@@ -884,15 +884,34 @@ class _PuskesmasPantauanIbuHamilState extends ConsumerState<PuskesmasPantauanIbu
                 markers: filteredList.map((item) {
                   final colorHex = '#${item.ksprColor.value.toRadixString(16).substring(2)}';
                   return {
+                    'id': item.id,
+                    'patient': item,
                     'lat': item.latitude,
                     'lng': item.longitude,
                     'title': '🤰 ${item.nama} (${item.umur} th)',
                     'subtitle': item.ksprStatus,
-                    'info': '• Usia Hamil: ${item.usiaKehamilan}<br/>• HPL: ${item.hpl}<br/>• Suami: ${item.namaSuami}',
+                    'info': '• Usia Hamil: ${item.usiaKehamilan}\n• HPL: ${item.hpl}\n• Suami: ${item.namaSuami}',
                     'details': '📍 ${item.alamat}',
                     'color': colorHex,
                   };
                 }).toList(),
+                onMarkerTap: (markerData) {
+                  final patient = markerData['patient'] as IbuHamilModel? ??
+                      filteredList.firstWhere(
+                        (p) => p.id == markerData['id'],
+                        orElse: () => filteredList.first,
+                      );
+                  _showPatientDetailModal(
+                    context,
+                    patient,
+                    cardBgColor,
+                    textColor,
+                    subtitleColor,
+                    borderColor,
+                    themeAccent,
+                    isDark,
+                  );
+                },
                 onChanged: (_, __, ___, ____) {},
               ),
             ],
@@ -1217,6 +1236,7 @@ class _PuskesmasPantauanIbuHamilState extends ConsumerState<PuskesmasPantauanIbu
     Color themeAccent,
     bool isDark,
   ) {
+    ref.read(selectedIbuHamilProvider.notifier).state = item;
     showDialog(
       context: context,
       builder: (ctx) {

@@ -1,13 +1,16 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/features/dokter/dashboard/frontend/dokter_antrian.dart';
 import 'package:mapotech/features/dokter/dashboard/frontend/dokter_pasien.dart';
 import 'package:mapotech/features/dokter/dashboard/frontend/dokter_obat.dart';
+import 'package:mapotech/features/puskesmas/dlc/vitascale/data/vitascale_api_service.dart';
 import 'package:mapotech/shared/icd_codes.dart';
 import 'package:mapotech/shared/supabase_service.dart';
 import 'package:mapotech/shared/satusehat_service.dart';
@@ -131,6 +134,32 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
           '${_tensiSysController.text}/${_tensiDiaController.text}';
     }
     setState(() {});
+  }
+
+  void _showWebcamMeasurementModal() {
+    showDialog<double>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => const _WebcamMeasurementDialog(),
+    ).then((measuredHeight) {
+      if (measuredHeight != null && measuredHeight > 0) {
+        setState(() {
+          _tinggiController.text = measuredHeight.toStringAsFixed(1);
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '✅ Tinggi badan berhasil diisi dari webcam: ${measuredHeight.toStringAsFixed(1)} cm',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              backgroundColor: const Color(0xFF2ECC71),
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+      }
+    });
   }
 
   VitalWarning? getBPWarning(String sysStr, String diaStr) {
@@ -3861,6 +3890,33 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                   borderCol: borderCol,
                   purple: purple,
                   hintText: '170',
+                  action: InkWell(
+                    onTap: _showWebcamMeasurementModal,
+                    borderRadius: BorderRadius.circular(4),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: purple.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: purple.withOpacity(0.35)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.camera_alt_rounded, size: 8.5, color: purple),
+                          const SizedBox(width: 3),
+                          Text(
+                            'UKUR WEBCAM',
+                            style: GoogleFonts.outfit(
+                              fontSize: 7.5,
+                              fontWeight: FontWeight.w900,
+                              color: purple,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -4057,6 +4113,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
     required Color borderCol,
     required Color purple,
     String? hintText,
+    Widget? action,
   }) {
     VitalWarning? warning;
     if (label.contains('HEART RATE')) {
@@ -4089,23 +4146,32 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                 color: subtitleCol,
               ),
             ),
-            if (warning != null)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: warning.bgColor,
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: warning.borderColor),
-                ),
-                child: Text(
-                  warning.label.toUpperCase(),
-                  style: GoogleFonts.outfit(
-                    fontSize: 7,
-                    fontWeight: FontWeight.w900,
-                    color: warning.color,
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (action != null) ...[
+                  action,
+                  const SizedBox(width: 4),
+                ],
+                if (warning != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: warning.bgColor,
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: warning.borderColor),
+                    ),
+                    child: Text(
+                      warning.label.toUpperCase(),
+                      style: GoogleFonts.outfit(
+                        fontSize: 7,
+                        fontWeight: FontWeight.w900,
+                        color: warning.color,
+                      ),
+                    ),
                   ),
-                ),
-              ),
+              ],
+            ),
           ],
         ),
         const SizedBox(height: 6),
@@ -9681,5 +9747,474 @@ class VitalInputFormatter extends TextInputFormatter {
     }
 
     return newValue;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// DIALOG MODAL PENGUKURAN TINGGI VIA COMPUTER VISION (PCV 7 TAHAP)
+// ══════════════════════════════════════════════════════════════════════════════
+class _WebcamMeasurementDialog extends StatefulWidget {
+  const _WebcamMeasurementDialog();
+
+  @override
+  State<_WebcamMeasurementDialog> createState() => _WebcamMeasurementDialogState();
+}
+
+class _WebcamMeasurementDialogState extends State<_WebcamMeasurementDialog> {
+  bool _isLoading = false;
+  String? _statusMessage;
+  double? _measuredCm;
+  double? _measuredPx;
+  String? _annotatedImageBase64;
+  bool _isSuccess = false;
+  String? _errorMessage;
+
+  Future<void> _processImageBytes(Uint8List bytes) async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+      _statusMessage = 'Mengunggah & memproses 7 tahap PCV di server...';
+    });
+
+    try {
+      final b64 = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+      final res = await VitaScaleApiService.ukurTinggiObjek(base64Image: b64);
+
+      if (!mounted) return;
+
+      if (res['status'] == 'ok') {
+        setState(() {
+          _isSuccess = true;
+          _measuredCm = (res['tinggi_cm'] as num?)?.toDouble();
+          _measuredPx = (res['panjang_px'] as num?)?.toDouble();
+          _annotatedImageBase64 = res['annotated_image']?.toString();
+          _statusMessage = 'Pengukuran berhasil! Objek terdeteksi dan diukur.';
+        });
+      } else if (res['status'] == 'tidak_terdeteksi') {
+        setState(() {
+          _isSuccess = false;
+          _measuredCm = null;
+          _measuredPx = null;
+          _annotatedImageBase64 = res['annotated_image']?.toString();
+          _statusMessage = res['message'] ?? 'Tidak ada objek terdeteksi di area pengukuran.';
+        });
+      } else {
+        setState(() {
+          _isSuccess = false;
+          _errorMessage = res['message'] ?? 'Terjadi kesalahan saat memproses gambar.';
+          _statusMessage = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isSuccess = false;
+          _errorMessage = 'Gagal menghubungi layanan pengukuran: $e';
+          _statusMessage = null;
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _pickImageFile() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        withData: true,
+      );
+      if (result != null && result.files.isNotEmpty) {
+        final bytes = result.files.first.bytes;
+        if (bytes != null) {
+          await _processImageBytes(bytes);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Gagal memilih file gambar: $e';
+        });
+      }
+    }
+  }
+
+  Future<void> _measureViaServer() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+      _statusMessage = 'Menghubungkan ke kamera / server PCV...';
+    });
+
+    try {
+      final res = await VitaScaleApiService.ukurTinggiObjek();
+      if (!mounted) return;
+
+      if (res['status'] == 'ok') {
+        setState(() {
+          _isSuccess = true;
+          _measuredCm = (res['tinggi_cm'] as num?)?.toDouble();
+          _measuredPx = (res['panjang_px'] as num?)?.toDouble();
+          _annotatedImageBase64 = res['annotated_image']?.toString();
+          _statusMessage = 'Pengukuran webcam berhasil!';
+        });
+      } else if (res['status'] == 'tidak_terdeteksi') {
+        setState(() {
+          _isSuccess = false;
+          _measuredCm = null;
+          _measuredPx = null;
+          _annotatedImageBase64 = res['annotated_image']?.toString();
+          _statusMessage = res['message'] ?? 'Tidak ada objek terdeteksi di area pengukuran.';
+        });
+      } else {
+        setState(() {
+          _isSuccess = false;
+          _errorMessage = res['message'] ?? 'Webcam lokal tidak terdeteksi atau gambar belum diunggah.';
+          _statusMessage = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isSuccess = false;
+          _errorMessage = 'Gagal memproses pengukuran: $e';
+          _statusMessage = null;
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const teal = Color(0xFF1ABC9C);
+    const darkBg = Color(0xFF0F141C);
+
+    return Dialog(
+      backgroundColor: const Color(0xFF161F2E),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: const BorderSide(color: Color(0xFF2B3A4F)),
+      ),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 680, maxHeight: 720),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: teal.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.camera_enhance_rounded, color: teal, size: 22),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'PENGUKURAN TINGGI OBJEK (PCV)',
+                          style: GoogleFonts.outfit(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        Text(
+                          'Pipeline 7 Tahap (Koreksi Lensa, Otsu, Morfologi, minAreaRect)',
+                          style: GoogleFonts.outfit(
+                            fontSize: 10,
+                            color: Colors.white60,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Kalibrasi Info Banner
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0D1624),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF1E2D42)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildCalibItem('H (Kamera)', '170 cm'),
+                    _buildCalibItem('PPM100', '14.50 px/cm'),
+                    _buildCalibItem('t (Objek)', '10.5 cm'),
+                    _buildCalibItem('k1 (Distorsi)', '-0.22'),
+                    _buildCalibItem('Skala Efektif', '9.09 px/cm', highlight: true),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Area Pratinjau Citra Hasil PCV
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: darkBg,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFF223046)),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      if (_annotatedImageBase64 != null && _annotatedImageBase64!.isNotEmpty)
+                        Builder(
+                          builder: (context) {
+                            try {
+                              String b64 = _annotatedImageBase64!;
+                              if (b64.contains(',')) b64 = b64.split(',')[1];
+                              final imageBytes = base64Decode(b64);
+                              return Image.memory(
+                                imageBytes,
+                                fit: BoxFit.contain,
+                                width: double.infinity,
+                                height: double.infinity,
+                              );
+                            } catch (_) {
+                              return const Center(
+                                child: Text('Gagal menampilkan citra hasil.', style: TextStyle(color: Colors.white60)),
+                              );
+                            }
+                          },
+                        )
+                      else
+                        Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.image_search_rounded,
+                                size: 54,
+                                color: Colors.white.withOpacity(0.2),
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'Pratinjau Hasil Pengukuran 7 Tahap PCV',
+                                style: GoogleFonts.outfit(
+                                  color: Colors.white70,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 32),
+                                child: Text(
+                                  'Posisikan objek di atas alas putih di dalam kotak ROI, lalu unggah foto atau tangkap melalui webcam.',
+                                  textAlign: TextAlign.center,
+                                  style: GoogleFonts.outfit(color: Colors.white38, fontSize: 10),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                      // Loading Overlay
+                      if (_isLoading)
+                        Container(
+                          color: Colors.black.withOpacity(0.75),
+                          child: Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const SizedBox(
+                                  width: 38,
+                                  height: 38,
+                                  child: CircularProgressIndicator(strokeWidth: 3, color: teal),
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  _statusMessage ?? 'Memproses citra...',
+                                  style: GoogleFonts.outfit(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Status Result Banner
+              if (_isSuccess && _measuredCm != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2ECC71).withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF2ECC71).withOpacity(0.4)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.check_circle_rounded, color: Color(0xFF2ECC71), size: 24),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'PANJANG TERDETEKSI: ${_measuredCm!.toStringAsFixed(2)} CM',
+                              style: GoogleFonts.outfit(
+                                color: const Color(0xFF2ECC71),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                            Text(
+                              'Panjang Sumbu: ${_measuredPx?.toStringAsFixed(1) ?? '—'} px  •  Skala Efektif: 9.09 px/cm  •  Alas: 8.53 px/cm',
+                              style: GoogleFonts.outfit(color: Colors.white70, fontSize: 10),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else if (_errorMessage != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.red.withOpacity(0.4)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _errorMessage!,
+                          style: GoogleFonts.outfit(color: Colors.redAccent, fontSize: 10.5),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else if (_statusMessage != null && !_isLoading)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.orange.withOpacity(0.4)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded, color: Colors.orangeAccent, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _statusMessage!,
+                          style: GoogleFonts.outfit(color: Colors.orangeAccent, fontSize: 10.5),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: 16),
+
+              // Tombol-Tombol Aksi
+              Row(
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: _isLoading ? null : _pickImageFile,
+                    icon: const Icon(Icons.upload_file_rounded, size: 16),
+                    label: const Text('Pilih Foto / Screenshot'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: const BorderSide(color: Color(0xFF2B3A4F)),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  OutlinedButton.icon(
+                    onPressed: _isLoading ? null : _measureViaServer,
+                    icon: const Icon(Icons.videocam_rounded, size: 16),
+                    label: const Text('Kamera / Server'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: const BorderSide(color: Color(0xFF2B3A4F)),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  const Spacer(),
+                  if (_isSuccess && _measuredCm != null)
+                    ElevatedButton.icon(
+                      onPressed: () => Navigator.of(context).pop(_measuredCm),
+                      icon: const Icon(Icons.check_rounded, size: 16),
+                      label: Text('Terapkan (${_measuredCm!.toStringAsFixed(1)} cm)'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2ECC71),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    )
+                  else
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Tutup', style: TextStyle(color: Colors.white60)),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCalibItem(String label, String value, {bool highlight = false}) {
+    return Column(
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.outfit(fontSize: 8.5, color: Colors.white54, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: GoogleFonts.outfit(
+            fontSize: 10,
+            color: highlight ? const Color(0xFF2ECC71) : Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
   }
 }

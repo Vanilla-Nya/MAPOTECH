@@ -203,10 +203,9 @@ class _ApotekDashboardState extends ConsumerState<ApotekDashboard> {
     final userName = state.loggedInName ?? (isEn ? 'Pharmacist' : 'Apoteker');
 
     if (_isLoading) {
-      return Container(
-        height: 350,
-        alignment: Alignment.center,
-        child: CircularProgressIndicator(color: themeAccent),
+      return CustomPageLoader(
+        message: isEn ? 'Loading pharmacy metrics...' : 'Memuat ringkasan apotek...',
+        skeleton: const SkeletonApotekDashboard(type: 'dashboard'),
       );
     }
 

@@ -1773,10 +1773,9 @@ class _ApotekInventoriState extends ConsumerState<ApotekInventori> {
     }).toList();
 
     if (isLoading && items.isEmpty) {
-      return Container(
-        height: 300,
-        alignment: Alignment.center,
-        child: CircularProgressIndicator(color: themeAccent),
+      return CustomPageLoader(
+        message: isEn ? 'Loading medicine inventory...' : 'Memuat data inventori obat...',
+        skeleton: const SkeletonApotekDashboard(type: 'inventory'),
       );
     }
 

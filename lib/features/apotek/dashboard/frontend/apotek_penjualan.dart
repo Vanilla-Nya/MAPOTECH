@@ -1614,10 +1614,9 @@ class _ApotekPenjualanState extends ConsumerState<ApotekPenjualan> {
     final isMobile = MediaQuery.of(context).size.width < 768;
 
     if (_isLoading) {
-      return Container(
-        height: 300,
-        alignment: Alignment.center,
-        child: CircularProgressIndicator(color: themeAccent),
+      return CustomPageLoader(
+        message: isEn ? 'Loading POS sales transactions...' : 'Memuat data transaksi penjualan kasir...',
+        skeleton: const SkeletonApotekDashboard(type: 'sales'),
       );
     }
 

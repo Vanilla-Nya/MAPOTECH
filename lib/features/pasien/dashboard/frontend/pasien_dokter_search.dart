@@ -8,7 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/supabase_service.dart';
-import 'package:mapotech/shared/widgets/empty_state_widget.dart';
+import 'package:mapotech/shared/widgets/ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:mapotech/features/dokter/dashboard/frontend/web_map_widget.dart';
 import 'package:mapotech/features/pasien/dashboard/frontend/widgets/pasien_qr_scanner_dialog.dart';
@@ -530,11 +530,11 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
 
         // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Dokter List Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
         if (_isLoading)
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 60),
-              child: CircularProgressIndicator(color: themeAccent),
-            ),
+          CustomPageLoader(
+            message: state.language == 'en'
+                ? 'Loading doctor directory...'
+                : 'Memuat data dokter...',
+            skeleton: const SkeletonPatientGrid(),
           )
         else if (_errorMessage != null)
           Center(

@@ -101,6 +101,7 @@ class _VitaScaleDataAnakPageState extends ConsumerState<VitaScaleDataAnakPage> {
     final borderColor = notifier.getBorderColor();
     final isMobile = MediaQuery.of(context).size.width < 768;
     final isDark = state.appearance == 'dark';
+    final isEn = state.language == 'en';
 
     final filtered = _children.where((c) {
       if (_selectedFilter == 'Balita < 5 Thn') {
@@ -345,9 +346,11 @@ class _VitaScaleDataAnakPageState extends ConsumerState<VitaScaleDataAnakPage> {
 
             // Daftar Kartu Pasien Anak
             if (_isLoading)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 40),
-                child: Center(child: CircularProgressIndicator(color: Color(0xFF1ABC9C))),
+              CustomPageLoader(
+                message: isEn
+                    ? 'Loading child records & measurements...'
+                    : 'Memuat data sasaran anak & penimbangan...',
+                skeleton: const SkeletonChildrenList(),
               )
             else if (filtered.isEmpty)
               EmptyStateWidget(

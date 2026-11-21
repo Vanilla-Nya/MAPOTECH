@@ -81,6 +81,7 @@ class VitaScaleReasoningService {
     String? kmsStatus,
     bool? receivedVitA,
     bool? receivedDeworming,
+    String language = 'id',
   }) async {
     final apiKey = (dotenv.env['GEMINI_API_KEY'] != null &&
             dotenv.env['GEMINI_API_KEY']!.isNotEmpty)
@@ -88,6 +89,10 @@ class VitaScaleReasoningService {
         : _fallbackApiKey;
 
     const modelName = 'gemini-2.5-flash';
+    final isEn = language == 'en';
+    final langDirective = isEn
+        ? 'MANDATORY LANGUAGE: ENGLISH. The user interface language is set to ENGLISH. You MUST provide the response, chain of thought, and clinical recommendations in ENGLISH. All values for keys in the JSON must be in fluent English.'
+        : 'BAHASA RESPON: WAJIB BAHASA INDONESIA. Pengguna menggunakan Bahasa Indonesia. Seluruh isi nilai pada JSON wajib dalam Bahasa Indonesia yang formal, terstruktur, dan berbasis bukti.';
 
     final model = GenerativeModel(
       model: modelName,
@@ -99,6 +104,8 @@ class VitaScaleReasoningService {
       systemInstruction: Content.system('''
 Anda adalah Dokter Spesialis Anak Konsultan Tumbuh Kembang & Ahli Gizi Klinis di sistem MAPOTECH VitaScale terintegrasi SATUSEHAT Kemenkes RI.
 Tugas Anda adalah melakukan Clinical Reasoning (Penalaran Klinis Berbasis Bukti) terhadap data skrining balita dan hasil klasifikasi Machine Learning (Keras MLP).
+
+$langDirective
 
 STANDAR ACUAN RESMI:
 1. Buku KIA (Kesehatan Ibu dan Anak) Edisi 2024 - Kementerian Kesehatan RI (Bagian Kesehatan & Tumbuh Kembang Balita)
@@ -228,6 +235,7 @@ Berikan alur penalaran klinis terstruktur (Chain of Thought), evaluasi tren KMS 
         headCircumferenceCm: headCircumferenceCm,
         measurementMethod: measurementMethod,
         kmsStatus: kmsStatus,
+        language: language,
       );
     }
   }
@@ -243,7 +251,9 @@ Berikan alur penalaran klinis terstruktur (Chain of Thought), evaluasi tren KMS 
     double? headCircumferenceCm,
     String? measurementMethod,
     String? kmsStatus,
+    String language = 'id',
   }) {
+    final isEn = language == 'en';
     final isStunting = mlpResult.isStunting;
     final isGiziKurang = mlpResult.isGiziBurukAtauKurang;
     final is2T = kmsStatus?.contains('2T') ?? false;
@@ -258,50 +268,98 @@ Berikan alur penalaran klinis terstruktur (Chain of Thought), evaluasi tren KMS 
 
     // Panduan nutrisi berbasis rentang usia (Buku KIA 2024)
     String ageBasedNutrition;
-    if (ageMonths < 6) {
-      ageBasedNutrition = 'Usia di bawah 6 bulan: Berikan HANYA ASI Eksklusif sesering mungkin (on demand, minimal 8 kali sehari). Belum diperkenankan MP-ASI atau susu formula tanpa instruksi dokter spesialis.';
-    } else if (ageMonths < 9) {
-      ageBasedNutrition = 'Usia 6-8 bulan (Buku KIA 2024): Berikan bubur lumat/kental (tidak tumpah saat sendok dimiringkan) 2-3 kali/hari @ 2-3 sdm bertahap hingga 1/2 mangkuk (125 ml) + 1-2 kali selingan. Wajib sertakan protein hewani (1 butir telur/hari, hati ayam, atau ikan) dan lemak tambahan (santan/minyak).';
-    } else if (ageMonths < 12) {
-      ageBasedNutrition = 'Usia 9-11 bulan (Buku KIA 2024): Berikan makanan cincang halus/kasar atau finger food 3-4 kali/hari @ 1/2 sampai 3/4 mangkuk (250 ml) + 1-2 kali selingan bergizi. Utamakan protein hewani di setiap jadwal makan.';
-    } else if (ageMonths < 24) {
-      ageBasedNutrition = 'Usia 12-23 bulan (Buku KIA 2024): Berikan makanan keluarga padat gizi 3-4 kali/hari @ 3/4 sampai 1 mangkuk penuh (250 ml) + 1-2 kali selingan bergizi. Teruskan pemberian ASI hingga 2 tahun dan wajib konsumsi telur/ikan/daging setiap hari.';
+    if (isEn) {
+      if (ageMonths < 6) {
+        ageBasedNutrition = 'Under 6 months: Exclusive breastfeeding only on demand (minimum 8 times/day). No solid food or formula without specialist pediatrician instruction.';
+      } else if (ageMonths < 9) {
+        ageBasedNutrition = '6-8 months (KIA Handbook 2024): Thick mashed puree 2-3 times/day @ 2-3 tbsp progressing to 1/2 cup (125 ml) + 1-2 snacks. Must include animal protein (1 egg/day, chicken liver, or fish) and added healthy fat.';
+      } else if (ageMonths < 12) {
+        ageBasedNutrition = '9-11 months (KIA Handbook 2024): Minced/chopped food or finger foods 3-4 times/day @ 1/2 to 3/4 cup (250 ml) + 1-2 nutritious snacks. Prioritize animal protein at every meal.';
+      } else if (ageMonths < 24) {
+        ageBasedNutrition = '12-23 months (KIA Handbook 2024): Nutrient-dense family food 3-4 times/day @ 3/4 to 1 full cup (250 ml) + 1-2 nutritious snacks. Continue breastfeeding up to 2 years and ensure daily egg/fish/meat.';
+      } else {
+        ageBasedNutrition = '2-5 years (KIA Handbook 2024): Balanced family meals following "Isi Piringku Balita" (1/3 carbs, 1/3 iron-rich animal protein, 1/3 veggies & fruit). Provide 1 egg and animal protein sources daily.';
+      }
     } else {
-      ageBasedNutrition = 'Usia 2-5 tahun (Buku KIA 2024): Berikan makanan keluarga gizi seimbang prinsip "Isi Piringku Balita" (1/3 karbohidrat, 1/3 protein hewani kaya zat besi, 1/3 sayur & buah). Penuhi kebutuhan 1 butir telur dan lauk hewani lain setiap hari.';
+      if (ageMonths < 6) {
+        ageBasedNutrition = 'Usia di bawah 6 bulan: Berikan HANYA ASI Eksklusif sesering mungkin (on demand, minimal 8 kali sehari). Belum diperkenankan MP-ASI atau susu formula tanpa instruksi dokter spesialis.';
+      } else if (ageMonths < 9) {
+        ageBasedNutrition = 'Usia 6-8 bulan (Buku KIA 2024): Berikan bubur lumat/kental (tidak tumpah saat sendok dimiringkan) 2-3 kali/hari @ 2-3 sdm bertahap hingga 1/2 mangkuk (125 ml) + 1-2 kali selingan. Wajib sertakan protein hewani (1 butir telur/hari, hati ayam, atau ikan) dan lemak tambahan (santan/minyak).';
+      } else if (ageMonths < 12) {
+        ageBasedNutrition = 'Usia 9-11 bulan (Buku KIA 2024): Berikan makanan cincang halus/kasar atau finger food 3-4 kali/hari @ 1/2 sampai 3/4 mangkuk (250 ml) + 1-2 kali selingan bergizi. Utamakan protein hewani di setiap jadwal makan.';
+      } else if (ageMonths < 24) {
+        ageBasedNutrition = 'Usia 12-23 bulan (Buku KIA 2024): Berikan makanan keluarga padat gizi 3-4 kali/hari @ 3/4 sampai 1 mangkuk penuh (250 ml) + 1-2 kali selingan bergizi. Teruskan pemberian ASI hingga 2 tahun dan wajib konsumsi telur/ikan/daging setiap hari.';
+      } else {
+        ageBasedNutrition = 'Usia 2-5 tahun (Buku KIA 2024): Berikan makanan keluarga gizi seimbang prinsip "Isi Piringku Balita" (1/3 karbohidrat, 1/3 protein hewani kaya zat besi, 1/3 sayur & buah). Penuhi kebutuhan 1 butir telur dan lauk hewani lain setiap hari.';
+      }
     }
 
     if (isStunting || isGiziKurang || is2T || isBgm) {
-      final flagLabel = is2T ? 'tren 2T (dua kali tidak naik)' : (isBgm ? 'posisi BGM (Bawah Garis Merah)' : 'indikasi malnutrisi');
-      summary = 'Hasil penapisan antropometri menunjukkan status ${mlpResult.kategoriStuntingTbu} (TB/U) '
-          'dan ${mlpResult.kategoriGiziBbtb} (BB/TB) dengan $flagLabel. Mengacu pada Buku KIA 2024, kondisi ini memerlukan akselerasi nutrisi protein hewani padat kalori serta evaluasi tanda gagal tumbuh (weight faltering).';
-      steps = [
-        'Evaluasi rasio berat badan terhadap panjang/tinggi ($weightKg kg / $heightCm cm) menunjukkan deviasi pada anak ${genderLabel.toLowerCase()} usia ${ageMonths.toStringAsFixed(0)} bulan.',
-        'Pertumbuhan linier menunjukkan deviasi yang mengarah pada status ${mlpResult.kategoriStuntingTbu} dengan tingkat keyakinan model MLP ${mlpResult.confidenceTbu.toStringAsFixed(1)}%.',
-        if (headCircumferenceCm != null)
-          'Pengukuran lingkar kepala $headCircumferenceCm cm dicatat untuk verifikasi grafik Nellhaus Buku KIA 2024.',
-        if (is2T || isBgm)
-          'PERINGATAN KMS: Terdeteksi status $kmsStatus. Buku KIA 2024 menetapkan status ini sebagai Tanda Bahaya (Red Flag) rujukan medis segera.',
-        'Sesuai protokol Buku KIA 2024 & SATUSEHAT, anak dengan deviasi pertumbuhan wajib dipantau ketat di faskes primer/Puskesmas.'
-      ];
-      etiology = 'Faktor risiko yang sering menjadi penyebab: kepadatan kalori dan protein hewani MP-ASI yang kurang optimal, tekstur makanan yang terlambat dinaikkan, riwayat sakit berulang (ISPA, diare, atau TBC balita), atau sanitasi lingkungan.';
-      nutrition = '$ageBasedNutrition Untuk mengejar ketertinggalan pertumbuhan, berikan minimal 1 butir telur utuh setiap hari ditambah hati ayam/sapi atau ikan berlemak. Hindari pemberian sayur berlebihan atau makanan rendah kalori.';
-      protocol = 'Jadwalkan penimbangan ulang 14 hari ke depan di Puskesmas/Posyandu. Jika berat badan tidak naik sesuai KBM (indikasi 2T), anak berada di Bawah Garis Merah (BGM), atau tampak sangat kurus, SEGERA rujuk ke Dokter Spesialis Anak di RS/Puskesmas.';
-      parent = 'Bunda dan Ayah tidak perlu berkecil hati. Di usia emas ini, pemulihan pertumbuhan sangat efektif jika anak mendapatkan cukup protein hewani di setiap waktu makan. Prioritaskan lauk hewani sebelum camilan manis.';
+      if (isEn) {
+        final flagLabel = is2T ? '2T trend (faltering)' : (isBgm ? 'below red line (BGM)' : 'malnutrition indicators');
+        summary = 'Anthropometric screening indicates ${mlpResult.kategoriStuntingTbu} (HAZ) and ${mlpResult.kategoriGiziBbtb} (WHZ) with $flagLabel. Guided by WHO & KIA 2024 protocols, this condition requires accelerated calorie-dense animal protein nutrition and close monitoring.';
+        steps = [
+          'Weight-to-height ratio evaluation ($weightKg kg / $heightCm cm) shows growth deviation for ${genderLabel.toLowerCase()} child at ${ageMonths.toStringAsFixed(0)} months old.',
+          'Linear growth curve shows deviation classified as ${mlpResult.kategoriStuntingTbu} with MLP model confidence ${mlpResult.confidenceTbu.toStringAsFixed(1)}%.',
+          if (headCircumferenceCm != null)
+            'Head circumference $headCircumferenceCm cm recorded for Nellhaus curve verification.',
+          if (is2T || isBgm)
+            'RED FLAG: Growth trajectory detected as $kmsStatus requiring prompt medical attention.',
+          'Following protocol, regular anthropometric monitoring is required at the primary healthcare center.'
+        ];
+        etiology = 'Common risk factors include: suboptimal calorie density and animal protein in complementary feeding, delayed food texture progression, recurrent childhood infections, or sanitation.';
+        nutrition = '$ageBasedNutrition To support catch-up growth, provide at least 1 whole egg daily plus chicken/beef liver or fish. Avoid replacing meals with excessive clear broth or empty snacks.';
+        protocol = 'Schedule follow-up weight measurement in 14 days at Puskesmas/clinic. If weight fails to gain (2T) or child remains below red line, refer immediately to a Pediatrician.';
+        parent = 'Do not be discouraged. During these golden early years, nutritional recovery is very effective when children receive adequate daily animal protein with every meal. Prioritize eggs and fish before sweet snacks.';
+      } else {
+        final flagLabel = is2T ? 'tren 2T (dua kali tidak naik)' : (isBgm ? 'posisi BGM (Bawah Garis Merah)' : 'indikasi malnutrisi');
+        summary = 'Hasil penapisan antropometri menunjukkan status ${mlpResult.kategoriStuntingTbu} (TB/U) '
+            'dan ${mlpResult.kategoriGiziBbtb} (BB/TB) dengan $flagLabel. Mengacu pada Buku KIA 2024, kondisi ini memerlukan akselerasi nutrisi protein hewani padat kalori serta evaluasi tanda gagal tumbuh (weight faltering).';
+        steps = [
+          'Evaluasi rasio berat badan terhadap panjang/tinggi ($weightKg kg / $heightCm cm) menunjukkan deviasi pada anak ${genderLabel.toLowerCase()} usia ${ageMonths.toStringAsFixed(0)} bulan.',
+          'Pertumbuhan linier menunjukkan deviasi yang mengarah pada status ${mlpResult.kategoriStuntingTbu} dengan tingkat keyakinan model MLP ${mlpResult.confidenceTbu.toStringAsFixed(1)}%.',
+          if (headCircumferenceCm != null)
+            'Pengukuran lingkar kepala $headCircumferenceCm cm dicatat untuk verifikasi grafik Nellhaus Buku KIA 2024.',
+          if (is2T || isBgm)
+            'PERINGATAN KMS: Terdeteksi status $kmsStatus. Buku KIA 2024 menetapkan status ini sebagai Tanda Bahaya (Red Flag) rujukan medis segera.',
+          'Sesuai protokol Buku KIA 2024 & SATUSEHAT, anak dengan deviasi pertumbuhan wajib dipantau ketat di faskes primer/Puskesmas.'
+        ];
+        etiology = 'Faktor risiko yang sering menjadi penyebab: kepadatan kalori dan protein hewani MP-ASI yang kurang optimal, tekstur makanan yang terlambat dinaikkan, riwayat sakit berulang (ISPA, diare, atau TBC balita), atau sanitasi lingkungan.';
+        nutrition = '$ageBasedNutrition Untuk mengejar ketertinggalan pertumbuhan, berikan minimal 1 butir telur utuh setiap hari ditambah hati ayam/sapi atau ikan berlemak. Hindari pemberian sayur berlebihan atau makanan rendah kalori.';
+        protocol = 'Jadwalkan penimbangan ulang 14 hari ke depan di Puskesmas/Posyandu. Jika berat badan tidak naik sesuai KBM (indikasi 2T), anak berada di Bawah Garis Merah (BGM), atau tampak sangat kurus, SEGERA rujuk ke Dokter Spesialis Anak di RS/Puskesmas.';
+        parent = 'Bunda dan Ayah tidak perlu berkecil hati. Di usia emas ini, pemulihan pertumbuhan sangat efektif jika anak mendapatkan cukup protein hewani di setiap waktu makan. Prioritaskan lauk hewani sebelum camilan manis.';
+      }
     } else {
-      summary = 'Status pertumbuhan $childName tergolong ${mlpResult.kategoriGiziBbtb} (BB/TB) dan ${mlpResult.kategoriStuntingTbu} (TB/U). '
-          'Indikator antropometri berada dalam batas aman grafik KMS Buku KIA 2024 dan standar WHO.';
-      steps = [
-        'Panjang/tinggi badan $heightCm cm proporsional dan sesuai median kurva pertumbuhan untuk balita usia ${ageMonths.toStringAsFixed(0)} bulan.',
-        'Berat badan $weightKg kg seimbang dengan tinggi badan saat ini (${mlpResult.kategoriGiziBbtb}), menandakan status nutrisi akut yang baik.',
-        if (headCircumferenceCm != null)
-          'Lingkar kepala $headCircumferenceCm cm berada dalam batas normal kurva pertumbuhan kepala Nellhaus.',
-        'Confidence model MLP mencapai ${mlpResult.confidenceBbtb.toStringAsFixed(1)}% untuk status gizi BB/TB dan ${mlpResult.confidenceTbu.toStringAsFixed(1)}% untuk status stunting TB/U.',
-        'Pertumbuhan anak berada pada pita hijau KMS, pertahankan tren kenaikan berat badan tiap bulan (N).'
-      ];
-      etiology = 'Pertumbuhan dan perkembangan berlangsung optimal tanpa tanda-tanda malnutrisi akut maupun kronis.';
-      nutrition = '$ageBasedNutrition Pertahankan pola asupan bergizi dengan kombinasi karbohidrat, protein hewani berkualitas tinggi, lemak sehat, serta sayur dan buah secukupnya.';
-      protocol = 'Lanjutkan pemantauan rutin bulanan di Posyandu/Puskesmas terdekat untuk memastikan kurva KMS anak selalu naik mengikuti pita hijau (indikator N). Berikan kapsul Vitamin A pada bulan Februari dan Agustus.';
-      parent = 'Hebat sekali Bunda & Ayah! Pola asuh dan pemberian makan yang diterapkan sudah sangat tepat. Tetap rutin datang ke Posyandu setiap bulan untuk menimbang dan memantau perkembangan ananda.';
+      if (isEn) {
+        summary = 'Growth status for $childName is classified as ${mlpResult.kategoriGiziBbtb} (WHZ) and ${mlpResult.kategoriStuntingTbu} (HAZ). Anthropometric parameters are well within normal ranges under WHO and KIA standards.';
+        steps = [
+          'Height/length $heightCm cm is proportional and well aligned with median growth curve for a child aged ${ageMonths.toStringAsFixed(0)} months.',
+          'Weight $weightKg kg is balanced with current height (${mlpResult.kategoriGiziBbtb}), indicating healthy acute nutritional status.',
+          if (headCircumferenceCm != null)
+            'Head circumference $headCircumferenceCm cm is within normal limits on the Nellhaus growth curve.',
+          'MLP model confidence reached ${mlpResult.confidenceBbtb.toStringAsFixed(1)}% for WHZ and ${mlpResult.confidenceTbu.toStringAsFixed(1)}% for HAZ.',
+          'Growth remains on track on the green trajectory. Maintain steady monthly weight gains.'
+        ];
+        etiology = 'Growth and developmental milestones are proceeding optimally without acute or chronic malnutrition indicators.';
+        nutrition = '$ageBasedNutrition Maintain balanced intake combining carbohydrates, high-quality animal proteins, healthy fats, and adequate fruits and vegetables.';
+        protocol = 'Continue monthly anthropometric checkups at the nearest Puskesmas/Posyandu to ensure steady growth. Ensure biannual Vitamin A supplementation in February and August.';
+        parent = 'Great job parents! Your feeding practices and nurturing care are exemplary. Keep up regular monthly visits to monitor continued healthy development.';
+      } else {
+        summary = 'Status pertumbuhan $childName tergolong ${mlpResult.kategoriGiziBbtb} (BB/TB) dan ${mlpResult.kategoriStuntingTbu} (TB/U). '
+            'Indikator antropometri berada dalam batas aman grafik KMS Buku KIA 2024 dan standar WHO.';
+        steps = [
+          'Panjang/tinggi badan $heightCm cm proporsional dan sesuai median kurva pertumbuhan untuk balita usia ${ageMonths.toStringAsFixed(0)} bulan.',
+          'Berat badan $weightKg kg seimbang dengan tinggi badan saat ini (${mlpResult.kategoriGiziBbtb}), menandakan status nutrisi akut yang baik.',
+          if (headCircumferenceCm != null)
+            'Lingkar kepala $headCircumferenceCm cm berada dalam batas normal kurva pertumbuhan kepala Nellhaus.',
+          'Confidence model MLP mencapai ${mlpResult.confidenceBbtb.toStringAsFixed(1)}% untuk status gizi BB/TB dan ${mlpResult.confidenceTbu.toStringAsFixed(1)}% untuk status stunting TB/U.',
+          'Pertumbuhan anak berada pada pita hijau KMS, pertahankan tren kenaikan berat badan tiap bulan (N).'
+        ];
+        etiology = 'Pertumbuhan dan perkembangan berlangsung optimal tanpa tanda-tanda malnutrisi akut maupun kronis.';
+        nutrition = '$ageBasedNutrition Pertahankan pola asupan bergizi dengan kombinasi karbohidrat, protein hewani berkualitas tinggi, lemak sehat, serta sayur dan buah secukupnya.';
+        protocol = 'Lanjutkan pemantauan rutin bulanan di Posyandu/Puskesmas terdekat untuk memastikan kurva KMS anak selalu naik mengikuti pita hijau (indikator N). Berikan kapsul Vitamin A pada bulan Februari dan Agustus.';
+        parent = 'Hebat sekali Bunda & Ayah! Pola asuh dan pemberian makan yang diterapkan sudah sangat tepat. Tetap rutin datang ke Posyandu setiap bulan untuk menimbang dan memantau perkembangan ananda.';
+      }
     }
 
     return VitaScaleReasoningResult(

@@ -34,7 +34,7 @@ Setiap elemen tampilan wajib menggunakan padanan komponen kustom berikut:
 | **Chip Entitas** | `EntityChip` | `entity_chip.dart` | Tag visual untuk nama dokter, klinik, apotek, atau poli. |
 | **Kartu Metrik / KPI** | `MetricCard` | `metric_card.dart` | Kartu ringkasan angka statistik dashboard faskes. |
 | **Placeholder Kosong** | `EmptyStateWidget` | `empty_state_widget.dart` | Tampilan saat data kosong / belum ada antrian/obat dengan tombol aksi. |
-| **Indikator Loading** | `SkeletonLoading` / `MapotechLoadingScreen` | `skeleton_loading.dart`, `mapotech_loading_screen.dart` | Animasi shimmer skeleton loading untuk tabel, list, dan kartu saat fetching. |
+| **Indikator Loading & Lazy Loading** | `CustomLazyLoader` / `CustomPageLoader` / `CustomProgressBar` / `SkeletonLoading` / `MapotechLoadingScreen` | `custom_lazy_loader.dart`, `skeleton_loading.dart`, `mapotech_loading_screen.dart` | Komponen lazy loading wajib dengan progress bar 1-100%, transisi fade-out/fade-in, dan shimmer skeleton saat membuka/memuat halaman. |
 | **Peta Batas Wilayah** | `RevGeoWilayahMapWidget` | `revgeo_wilayah_map_widget.dart` | Peta poligon wilayah administrasi via API RevGeo resmi. |
 | **Pemilih Wilayah** | `LocationSelectorWidget` | `location_selector_widget.dart` | Dropdown bertingkat Provinsi / Kabupaten / Kecamatan / Desa terhubung API RevGeo. |
 | **Paginasi Tabel** | `CommonPagination` | `common_pagination.dart` | Kontrol halaman data tabel (prev, next, info page). |
@@ -161,4 +161,88 @@ Secara default, tema **REV Mode** (`appearance == 'rev'`) **HANYA** boleh menggu
      // EN: "Tuesday, 26 May 2026"
      ```
   3. **Konsistensi Lintas Tab**: Seluruh tab (Pasien, Dokter, Apotek, Puskesmas, Ponkesdes, dan seluruh DLC) harus merespons pilihan bahasa pengguna di Settings secara seragam.
+
+---
+
+## 8. Standar Wajib Lazy Loading & Transisi Halaman (Anti-Raw Circular Loading)
+
+Dokumen ini menetapkan aturan ketat untuk alur pemuatan antarmuka (*page loading*) pada seluruh proyek **MAPOTECH**. Wajib diterapkan pada setiap halaman yang sudah ada maupun **SETIAP PEMBUATAN HALAMAN/MENU BARU**:
+
+### A. Larangan Mutlak: Raw `CircularProgressIndicator` Pada Halaman / Konten
+* **DILARANG KERAS** menggunakan raw `CircularProgressIndicator` (lingkaran loading mentah) sebagai indikator pemuatan halaman penuh (*full-page loading*), tab konten, maupun saat halaman pertama kali dibuka (*first open* / initial fetch).
+* Raw `CircularProgressIndicator` hanya ditoleransi untuk indikator mikro berskala kecil (maksimal ukuran 14-16px) di dalam tombol aksi saat proses penyimpanan (*saving state*) jika tombol tersebut tidak muat untuk progress bar.
+
+### B. Kewajiban Penggunaan Custom Lazy Loader & Progress Bar (1% - 100%)
+* Setiap halaman / menu baru **WAJIB** membungkus antarmuka atau status loading-nya menggunakan:
+  * `CustomLazyLoader` (rekomendasi utama sebagai pembungkus halaman: otomatis mengelola progres bar, skeleton shimmer, dan transisi halus).
+  * Atau `CustomPageLoader` (jika menggunakan pola `if (_isLoading) return CustomPageLoader(...)`).
+* **Visual Progress Bar 1% - 100%**:
+  * Indikator pemuatan harus menampilkan progress bar horizontal yang bergerak dari kiri ke kanan (1% s/d 100%).
+  * Dilengkapi teks persentase dinamis serta label proses yang informatif dan mendukung dwibahasa ID & EN (contoh: *"Memuat data rekam medis anak..."* / *"Loading children health records..."*).
+  * Menggunakan warna gradien tema aktif (Primary & Secondary) dengan efek kilau (*shimmer flare*) dinamis.
+
+### C. Kewajiban Transisi Halus (Fade-Out Loader & Fade-In UI)
+* Saat proses pemuatan data selesai (`isLoading == false`):
+  1. Tampilan loading (progress bar & skeleton) **WAJIB menghilang secara perlahan (*fade-out* transparan)**.
+  2. Tampilan UI konten baru **WAJIB muncul secara halus (*fade-in* + subtle micro-slide)**.
+* **Dilarang keras** terjadi pemotongan tampilan mendadak (*abrupt snap*), layar putih sekejap (*blank frame*), atau kedipan layar (*screen flickering*).
+
+### D. Kewajiban Penggunaan Skeleton Loading (Kerangka Antarmuka)
+* Selama proses lazy loading / fetching data berlangsung, antarmuka **WAJIB** menampilkan kerangka tata letak antarmuka (*skeleton shimmer*) yang sesuai dengan bentuk konten halaman asli (bukan layar kosong).
+* Gunakan katalog skeleton resmi dari `lib/shared/widgets/skeleton_loading.dart`:
+  * `SkeletonChildrenList` untuk halaman anak / KIA / Vitascale.
+  * `SkeletonPatientGrid` untuk direktori dokter / puskesmas.
+  * `SkeletonDashboard` untuk dashboard pasien / dokter.
+  * `SkeletonApotekDashboard` untuk penjualan, inventori, laporan apotek.
+  * `SkeletonPembukuan` untuk modul keuangan.
+  * `SkeletonHistoryList` untuk riwayat transaksi / resep.
+  * `SkeletonGenericPage` sebagai fallback bawaan untuk halaman baru umum.
+
+### E. Contoh Implementasi Halaman Baru yang Benar
+```dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mapotech/shared/widgets/ui.dart';
+
+class HalamanFiturBaru extends ConsumerStatefulWidget {
+  const HalamanFiturBaru({super.key});
+  @override
+  ConsumerState<HalamanFiturBaru> createState() => _HalamanFiturBaruState();
+}
+
+class _HalamanFiturBaruState extends ConsumerState<HalamanFiturBaru> {
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchData();
+  }
+
+  Future<void> _fetchData() async {
+    // Simulasi atau panggilan API riil
+    await Future.delayed(const Duration(milliseconds: 800));
+    if (mounted) setState(() => _isLoading = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isEn = ref.watch(isEnglishProvider);
+
+    // BUNGKUS DENGAN CustomLazyLoader
+    return CustomLazyLoader(
+      isLoading: _isLoading,
+      loadingText: isEn ? 'Loading feature data...' : 'Memuat data fitur...',
+      loadingSubtext: isEn ? 'Connecting with secure servers...' : 'Menghubungkan server aman...',
+      skeleton: const SkeletonGenericPage(), // atau skeleton spesifik
+      child: Column(
+        children: [
+          // UI Konten Asli Halaman
+          Text('Konten Halaman Baru'),
+        ],
+      ),
+    );
+  }
+}
+```
 

@@ -257,7 +257,7 @@ class LandingPageNotifier extends StateNotifier<LandingPageState> {
       blurProfileEffectEnabled: blurProfileEffectEnabled ?? state.blurProfileEffectEnabled,
       defaultServiceFee: defaultServiceFee ?? state.defaultServiceFee,
       satusehatAutoSync: satusehatAutoSync ?? state.satusehatAutoSync,
-      language: language ?? state.language,
+      language: language ?? (user?['language'] as String?) ?? state.language,
       favoriteMenuItems: favoriteMenuItems ?? state.favoriteMenuItems,
     );
 

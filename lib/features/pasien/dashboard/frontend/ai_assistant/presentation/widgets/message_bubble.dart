@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:mapotech/shared/widgets/formatted_markdown_text.dart';
 import '../../domain/ai_chat_message.dart';
 
 class MessageBubble extends StatelessWidget {
@@ -117,8 +118,8 @@ class MessageBubble extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        message.text,
+                      FormattedMarkdownText(
+                        text: message.text,
                         style: GoogleFonts.outfit(
                           fontSize: 14,
                           height: 1.5,
@@ -127,6 +128,16 @@ class MessageBubble extends StatelessWidget {
                               : (isDark
                                   ? Colors.white.withOpacity(0.9)
                                   : const Color(0xFF1E293B)),
+                        ),
+                        boldStyle: GoogleFonts.outfit(
+                          fontSize: 14,
+                          height: 1.5,
+                          fontWeight: FontWeight.w800,
+                          color: isUser
+                              ? Colors.white
+                              : (isDark
+                                  ? const Color(0xFF48C9B0)
+                                  : const Color(0xFF0F9D58)),
                         ),
                       ),
                       if (message.actions.isNotEmpty) ...[

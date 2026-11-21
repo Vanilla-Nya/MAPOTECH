@@ -2,104 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
-import 'package:mapotech/shared/supabase_service.dart';
 import 'package:mapotech/shared/widgets/ui.dart';
-import 'package:mapotech/features/puskesmas/dlc/vitascale/data/vitascale_models.dart';
-import 'package:mapotech/features/puskesmas/dlc/vitascale/data/vitascale_repository.dart';
 import 'package:mapotech/features/puskesmas/dlc/vitascale/pages/vitascale_child_history_page.dart';
 import 'package:mapotech/features/pasien/dashboard/frontend/ai_assistant/presentation/ai_chat_provider.dart';
+import 'package:mapotech/features/pasien/dashboard/frontend/application/pasien_children_service.dart';
 
-// ─── Data Models ─────────────────────────────────────────────────────────────
-
-/// Enriched Child Data combining Profile Family Member and VitaScale Clinical Records
-class PasienChildModel {
-  final Map<String, dynamic> familyMember;
-  final ChildProfile? vitascaleProfile;
-  final List<ChildVisitRecord> visitHistory;
-  final ChildVisitRecord? lastVisit;
-
-  PasienChildModel({
-    required this.familyMember,
-    this.vitascaleProfile,
-    this.visitHistory = const [],
-    this.lastVisit,
-  });
-
-  String get name {
-    final n = (familyMember['nama'] as String?)?.trim() ??
-        (familyMember['name'] as String?)?.trim();
-    if (n != null && n.isNotEmpty) return n;
-    return vitascaleProfile?.name ?? 'Anak Terdaftar';
-  }
-
-  String get nik {
-    final n = (familyMember['nik'] as String?)?.trim();
-    if (n != null && n.isNotEmpty) return n;
-    return vitascaleProfile?.nik ?? '-';
-  }
-
-  String get maskedNik {
-    final raw = nik;
-    if (raw.length >= 8) {
-      return '${raw.substring(0, 4)}••••${raw.substring(raw.length - 4)}';
-    }
-    return raw;
-  }
-
-  String get hubungan {
-    final h = (familyMember['hubungan'] as String?)?.trim();
-    if (h != null && h.isNotEmpty) return h;
-    return 'Anak';
-  }
-
-  String get gender {
-    final g = (familyMember['gender'] as String?)?.trim() ??
-        vitascaleProfile?.gender ??
-        'L';
-    if (g.toLowerCase().startsWith('p') || g.toLowerCase() == 'female') {
-      return 'Perempuan';
-    }
-    return 'Laki-laki';
-  }
-
-  bool get isMale => gender == 'Laki-laki';
-
-  String get ageLabel {
-    if (vitascaleProfile != null) {
-      return vitascaleProfile!.ageLabel;
-    }
-    final usia = familyMember['usia'] as String?;
-    if (usia != null && usia.isNotEmpty) return usia;
-    return '-';
-  }
-
-  int get ageInMonths {
-    if (vitascaleProfile != null) {
-      return vitascaleProfile!.ageInMonths;
-    }
-    final usiaStr = (familyMember['usia'] as String? ?? '').toLowerCase();
-    final numMatch = RegExp(r'\d+').firstMatch(usiaStr);
-    if (numMatch != null) {
-      final val = int.tryParse(numMatch.group(0) ?? '0') ?? 0;
-      if (usiaStr.contains('th') || usiaStr.contains('tahun')) {
-        return val * 12;
-      }
-      return val;
-    }
-    return 24;
-  }
-
-  bool get isBalita => ageInMonths < 60;
-  bool get isUnder24Months => ageInMonths < 24;
-  String get categoryLabel {
-    if (isUnder24Months) return 'Bayi (< 24 Bln)';
-    if (isBalita) return 'Balita (2-5 Thn)';
-    return 'Anak (> 5 Thn)';
-  }
-
-  String get bloodType => (familyMember['gol_darah'] as String?) ?? 'O+';
-  String get bpjsNumber => (familyMember['no_bpjs'] as String?) ?? '-';
-}
+export 'package:mapotech/features/pasien/dashboard/frontend/application/pasien_children_service.dart';
 
 // ─── Main Screen Widget ───────────────────────────────────────────────────────
 
@@ -112,9 +20,6 @@ class PasienChildren extends ConsumerStatefulWidget {
 }
 
 class _PasienChildrenState extends ConsumerState<PasienChildren> {
-  final SupabaseService _db = SupabaseService();
-  final VitaScaleRepository _vitaRepo = VitaScaleRepository();
-
   bool _isLoading = true;
   String? _errorMessage;
   List<PasienChildModel> _allChildren = [];
@@ -136,148 +41,7 @@ class _PasienChildrenState extends ConsumerState<PasienChildren> {
 
     try {
       final user = ref.read(landingPageProvider).loggedInUser;
-      final userId = user?['id']?.toString() ?? '';
-      final userName = (user?['name'] as String? ?? '').trim();
-      final userNik = (user?['nik'] as String? ?? '').trim();
-      final userKk = (user?['no_kk'] as String? ?? '').trim();
-
-      // 1. Ambil data anggota keluarga dari profil pasien (patient_family_members)
-      List<Map<String, dynamic>> familyMembers = [];
-      if (userId.isNotEmpty) {
-        familyMembers = await _db.fetchAllFamilyMembersForUser(userId);
-      }
-
-      // Filter hanya anggota keluarga anak/bayi/balita
-      final childMembers = familyMembers.where((m) {
-        final rel = ((m['hubungan'] as String?) ?? '').toLowerCase();
-        return rel.contains('anak') ||
-            rel.contains('bayi') ||
-            rel.contains('balita') ||
-            rel.contains('putra') ||
-            rel.contains('putri') ||
-            rel.contains('cucu');
-      }).toList();
-
-      // 2. Ambil semua profil anak dari ekosistem VitaScale Puskesmas
-      final vitascaleChildren = await _vitaRepo.searchChildren();
-
-      final List<PasienChildModel> enriched = [];
-      final Set<String> processedNiks = {};
-
-      // 3. Gabungkan anak dari profil KK pasien
-      for (final member in childMembers) {
-        final memberNik = ((member['nik'] as String?) ?? '').trim();
-        final memberName = ((member['nama'] as String?) ??
-                (member['name'] as String?) ??
-                '')
-            .trim();
-
-        ChildProfile? matchedProfile;
-        if (memberNik.isNotEmpty) {
-          try {
-            matchedProfile = vitascaleChildren.firstWhere(
-              (c) => c.nik == memberNik,
-            );
-          } catch (_) {}
-        }
-
-        if (matchedProfile == null && memberName.isNotEmpty) {
-          try {
-            matchedProfile = vitascaleChildren.firstWhere(
-              (c) => c.name.toLowerCase() == memberName.toLowerCase(),
-            );
-          } catch (_) {}
-        }
-
-        // Buat atau gunakan profil VitaScale untuk generate visit history & AI reasoning
-        final effectiveProfile = matchedProfile ??
-            _createProfileFromFamily(member, userName, userKk);
-
-        final visits = _generateVisitsForChild(effectiveProfile);
-        final lastVisit = visits.isNotEmpty ? visits.first : null;
-
-        if (memberNik.isNotEmpty) processedNiks.add(memberNik);
-
-        enriched.add(PasienChildModel(
-          familyMember: member,
-          vitascaleProfile: effectiveProfile,
-          visitHistory: visits,
-          lastVisit: lastVisit,
-        ));
-      }
-
-      // 4. Jika orang tua terdaftar memiliki anak di master data VitaScale (misal matching KK atau nama orang tua)
-      for (final vc in vitascaleChildren) {
-        if (processedNiks.contains(vc.nik)) continue;
-
-        bool isMatchedParent = false;
-        if (userKk.isNotEmpty && vc.noKk != null && vc.noKk == userKk) {
-          isMatchedParent = true;
-        } else if (userNik.isNotEmpty && vc.parentName.contains(userNik)) {
-          isMatchedParent = true;
-        } else if (userName.isNotEmpty &&
-            vc.parentName.toLowerCase().contains(userName.toLowerCase())) {
-          isMatchedParent = true;
-        }
-
-        if (isMatchedParent) {
-          processedNiks.add(vc.nik);
-          final visits = _generateVisitsForChild(vc);
-          enriched.add(PasienChildModel(
-            familyMember: {
-              'nama': vc.name,
-              'nik': vc.nik,
-              'hubungan': vc.isUnder24Months
-                  ? 'Bayi'
-                  : (vc.isBalita ? 'Balita' : 'Anak Kandung'),
-              'gender': vc.gender == 'L' ? 'Laki-laki' : 'Perempuan',
-              'usia': vc.ageLabel,
-              'no_kk': vc.noKk ?? userKk,
-              'gol_darah': 'O+',
-              'no_bpjs': '0001239874561 (Aktif)',
-            },
-            vitascaleProfile: vc,
-            visitHistory: visits,
-            lastVisit: visits.isNotEmpty ? visits.first : null,
-          ));
-        }
-      }
-
-      // 5. Fallback demo data jika belum ada anak terdaftar di profil
-      if (enriched.isEmpty) {
-        // Berikan contoh terdaftar agar orang tua langsung memahami visual antarmuka
-        final sampleChild = vitascaleChildren.isNotEmpty
-            ? vitascaleChildren.first
-            : ChildProfile(
-                id: 'ANK-001',
-                name: 'Muhammad Rayyan Al-Fatih',
-                nik: '3511082208230001',
-                birthDate: DateTime.now().subtract(const Duration(days: 420)),
-                gender: 'L',
-                parentName: userName.isNotEmpty ? userName : 'Ahmad Fauzi & Siti Rahmawati',
-                noKk: userKk.isNotEmpty ? userKk : '3511080101180005',
-                phone: '0812-3456-7890',
-                address: 'Dusun Krajan RT 02 / RW 01, Sumber Wringin',
-              );
-
-        final visits = _generateVisitsForChild(sampleChild);
-        enriched.add(PasienChildModel(
-          familyMember: {
-            'nama': sampleChild.name,
-            'nik': sampleChild.nik,
-            'hubungan': 'Anak Kandung (Balita)',
-            'gender': 'Laki-laki',
-            'usia': sampleChild.ageLabel,
-            'no_kk': sampleChild.noKk ?? userKk,
-            'gol_darah': 'B+',
-            'no_bpjs': '0001289456712 (Aktif)',
-            'is_demo_linked': true,
-          },
-          vitascaleProfile: sampleChild,
-          visitHistory: visits,
-          lastVisit: visits.first,
-        ));
-      }
+      final enriched = await PasienChildrenService.fetchFamilyChildrenForUser(user);
 
       if (mounted) {
         setState(() {
@@ -294,121 +58,6 @@ class _PasienChildrenState extends ConsumerState<PasienChildren> {
       }
     }
   }
-
-  ChildProfile _createProfileFromFamily(
-    Map<String, dynamic> member,
-    String parentName,
-    String noKk,
-  ) {
-    final name = (member['nama'] as String?) ??
-        (member['name'] as String?) ??
-        'Anak';
-    final nik = (member['nik'] as String?) ?? '-';
-    final gender = ((member['gender'] as String?) ?? 'L')
-            .toLowerCase()
-            .startsWith('p')
-        ? 'P'
-        : 'L';
-
-    // Estimasi tanggal lahir dari teks usia
-    final usiaStr = (member['usia'] as String? ?? '').toLowerCase();
-    int monthsAgo = 18;
-    final match = RegExp(r'\d+').firstMatch(usiaStr);
-    if (match != null) {
-      final numVal = int.tryParse(match.group(0) ?? '18') ?? 18;
-      if (usiaStr.contains('th') || usiaStr.contains('tahun')) {
-        monthsAgo = numVal * 12;
-      } else {
-        monthsAgo = numVal;
-      }
-    }
-
-    final bDate = DateTime.now().subtract(Duration(days: monthsAgo * 30));
-
-    return ChildProfile(
-      id: 'ANK-${nik.isNotEmpty ? nik.substring(nik.length.clamp(0, 6)) : "GEN"}',
-      name: name,
-      nik: nik,
-      birthDate: bDate,
-      gender: gender,
-      parentName: parentName.isNotEmpty ? parentName : 'Orang Tua Terdaftar',
-      noKk: noKk,
-      address: 'Kabupaten Bondowoso',
-    );
-  }
-
-  /// Menghasilkan riwayat kunjungan antropometri & clinical reasoning AI
-  List<ChildVisitRecord> _generateVisitsForChild(ChildProfile c) {
-    final now = DateTime.now();
-    final isUnder24 = c.isUnder24Months;
-    final modeCode = isUnder24 ? 'PB' : 'TB';
-
-    // Kunjungan 4 (Pemeriksaan Terakhir)
-    final v4 = ChildVisitRecord(
-      visitNumber: 'Kunjungan Terakhir (Bulan Ini)',
-      monthAgeLabel: 'Bulan ke-${c.ageInMonths}',
-      visitDate: now.subtract(const Duration(days: 3)),
-      weightKg: isUnder24 ? 11.5 : 16.8,
-      heightCm: isUnder24 ? 85.0 : 104.5,
-      waistCm: isUnder24 ? 46.0 : 51.5,
-      lilaCm: isUnder24 ? 14.8 : 16.2,
-      mode: modeCode,
-      statusGizi: 'Gizi Baik (Normal)',
-      statusGiziColor: const Color(0xFF27AE60),
-      statusStunting: 'Normal (Tinggi Sesuai Standar WHO)',
-      statusStuntingColor: const Color(0xFF27AE60),
-      confidenceGizi: 97.4,
-      confidenceStunting: 98.1,
-      examiner: 'Puskesmas Tlogosari (dr. Hendra Sp.A & Bidan Anita)',
-      reasoningSummary:
-          'Pertumbuhan fisik ananda ${c.name} berada pada laju optimal standar WHO. Parameter rasio BB/TB dan TB/U menunjukkan tren kurva pertumbuhan yang stabil.',
-      chainOfThought: [
-        'Evaluasi usia ${c.ageInMonths} bulan terhadap median berat dan panjang/tinggi standar Permenkes 2020.',
-        'Model MLP mengonfirmasi status Gizi Baik (Confidence 97.4%) dan Tinggi Normal (Confidence 98.1%).',
-        'Pertumbuhan linier memadai tanpa deviasi stunting kronis (Z-score -0.4 SD).',
-      ],
-      riskEtiology:
-          'Tidak teridentifikasi faktor risiko defisit nutrisi akut. Nafsu makan anak baik dan tidak terdapat riwayat infeksi berulang.',
-      nutritionPlan:
-          'Tingkatkan variasi protein hewani harian (1 butir telur/hari, ikan lokal, daging/hati ayam). Pastikan pemenuhan mikronutrien Zat Besi dan Zinc sesuai Buku KIA 2024.',
-      medicalProtocol:
-          'Jadwalkan kunjungan antropometri berkala bulan depan di Posyandu/Puskesmas. Pantau kepatuhan suplementasi Vitamin A kapsul sesuai jadwal.',
-      parentEducation:
-          'Bunda dan Ayah disarankan tetap mempertahankan pola makan gizi seimbang dengan 1 butir telur per hari, memberikan stimulasi motorik dan bicara melalui bermain bersama, serta memastikan cuci tangan pakai sabun sebelum memberi makan anak.',
-    );
-
-    // Kunjungan 3 (~3 bulan lalu)
-    final v3 = ChildVisitRecord(
-      visitNumber: 'Kunjungan 3 Bulan Lalu',
-      monthAgeLabel: 'Bulan ke-${(c.ageInMonths - 3).clamp(1, 144)}',
-      visitDate: now.subtract(const Duration(days: 90)),
-      weightKg: isUnder24 ? 10.4 : 15.6,
-      heightCm: isUnder24 ? 80.5 : 100.0,
-      waistCm: isUnder24 ? 44.5 : 50.0,
-      lilaCm: isUnder24 ? 14.2 : 15.8,
-      mode: modeCode,
-      statusGizi: 'Gizi Baik (Normal)',
-      statusGiziColor: const Color(0xFF27AE60),
-      statusStunting: 'Normal (Tinggi Sesuai)',
-      statusStuntingColor: const Color(0xFF27AE60),
-      confidenceGizi: 96.2,
-      confidenceStunting: 96.8,
-      examiner: 'Posyandu Melati Dusun Krajan (Bidan Anita)',
-      reasoningSummary:
-          'Kenaikan berat badan bulanan melampaui KBM (Kenaikan Berat Minimal) grafik KMS Buku KIA.',
-      chainOfThought: [
-        'Kenaikan berat badan bulanan melampaui KBM.',
-        'Status stunting terpantau aman pada rentang hijau median WHO.',
-      ],
-      riskEtiology: 'Pemberian MP-ASI adekuat, sanitasi rumah tangga bersih.',
-      nutritionPlan: 'Lanjutkan pemberian makanan kaya serat, kalsium, dan zat besi.',
-      medicalProtocol: 'Imunisasi lanjutan terverifikasi lengkap sesuai usia.',
-      parentEducation: 'Jaga kebersihan alat makan dan sanitasi air minum keluarga.',
-    );
-
-    return [v4, v3];
-  }
-
   Color _getAvatarColor(String name) {
     final colors = [
       const Color(0xFFF1948A), // Pink
@@ -442,25 +91,6 @@ class _PasienChildrenState extends ConsumerState<PasienChildren> {
     final borderColor = notifier.getBorderColor();
     final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
 
-    if (_isLoading) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 40),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(color: themeAccent),
-              const SizedBox(height: 16),
-              Text(
-                isEn ? 'Loading children health records...' : 'Memuat data rekam medis anak...',
-                style: GoogleFonts.outfit(color: bodyText, fontSize: 13),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
     // Filter list
     final filteredChildren = _allChildren.where((c) {
       // Filter kategori
@@ -477,88 +107,96 @@ class _PasienChildrenState extends ConsumerState<PasienChildren> {
       return true;
     }).toList();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // ── Top Header Banner ───────────────────────────────────
-        _buildHeaderBanner(
-          isEn: isEn,
-          isDark: isDark,
-          isRev: isRev,
-          themeAccent: themeAccent,
-          textColor: textColor,
-          bodyText: bodyText,
-          cardBg: cardBg,
-          borderColor: borderColor,
-        ),
-
-        const SizedBox(height: 18),
-
-        // ── Search & Category Filter Chips ──────────────────────
-        _buildControls(
-          isEn: isEn,
-          isDark: isDark,
-          themeAccent: themeAccent,
-          textColor: textColor,
-          bodyText: bodyText,
-          cardBg: cardBg,
-          borderColor: borderColor,
-        ),
-
-        const SizedBox(height: 16),
-
-        // ── Error Message if any ────────────────────────────────
-        if (_errorMessage != null) ...[
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE74C3C).withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE74C3C).withValues(alpha: 0.3)),
-            ),
-            child: Text(
-              _errorMessage!,
-              style: GoogleFonts.outfit(fontSize: 12, color: const Color(0xFFE74C3C)),
-            ),
+    return CustomLazyLoader(
+      isLoading: _isLoading,
+      loadingText: isEn ? 'Loading children health records...' : 'Memuat data rekam medis anak...',
+      loadingSubtext: isEn
+          ? 'Syncing with SatuSehat & Family Card records...'
+          : 'Sinkronisasi data Buku KIA & Kartu Keluarga...',
+      skeleton: const SkeletonChildrenList(itemCount: 2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ── Top Header Banner ───────────────────────────────────
+          _buildHeaderBanner(
+            isEn: isEn,
+            isDark: isDark,
+            isRev: isRev,
+            themeAccent: themeAccent,
+            textColor: textColor,
+            bodyText: bodyText,
+            cardBg: cardBg,
+            borderColor: borderColor,
           ),
-          const SizedBox(height: 16),
-        ],
 
-        // ── List of Children Cards or Empty State ───────────────
-        if (filteredChildren.isEmpty)
-          _buildEmptyState(
+          const SizedBox(height: 18),
+
+          // ── Search & Category Filter Chips ──────────────────────
+          _buildControls(
             isEn: isEn,
             isDark: isDark,
             themeAccent: themeAccent,
             textColor: textColor,
             bodyText: bodyText,
-          )
-        else
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: filteredChildren.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 18),
-            itemBuilder: (context, index) {
-              final childData = filteredChildren[index];
-              return _ChildCardItem(
-                child: childData,
-                isEn: isEn,
-                isDark: isDark,
-                isRev: isRev,
-                lang: lang,
-                themeAccent: themeAccent,
-                cardBg: cardBg,
-                textColor: textColor,
-                bodyText: bodyText,
-                borderColor: borderColor,
-                avatarColor: _getAvatarColor(childData.name),
-                onNavigate: widget.onNavigate,
-              );
-            },
+            cardBg: cardBg,
+            borderColor: borderColor,
           ),
-        const SizedBox(height: 32),
-      ],
+
+          const SizedBox(height: 16),
+
+          // ── Error Message if any ────────────────────────────────
+          if (_errorMessage != null) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE74C3C).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE74C3C).withValues(alpha: 0.3)),
+              ),
+              child: Text(
+                _errorMessage!,
+                style: GoogleFonts.outfit(fontSize: 12, color: const Color(0xFFE74C3C)),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          // ── List of Children Cards or Empty State ───────────────
+          if (filteredChildren.isEmpty)
+            _buildEmptyState(
+              isEn: isEn,
+              isDark: isDark,
+              themeAccent: themeAccent,
+              textColor: textColor,
+              bodyText: bodyText,
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: filteredChildren.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 18),
+              itemBuilder: (context, index) {
+                final childData = filteredChildren[index];
+                return _ChildCardItem(
+                  child: childData,
+                  isEn: isEn,
+                  isDark: isDark,
+                  isRev: isRev,
+                  lang: lang,
+                  themeAccent: themeAccent,
+                  cardBg: cardBg,
+                  textColor: textColor,
+                  bodyText: bodyText,
+                  borderColor: borderColor,
+                  avatarColor: _getAvatarColor(childData.name),
+                  onNavigate: widget.onNavigate,
+                );
+              },
+            ),
+          const SizedBox(height: 32),
+        ],
+      ),
     );
   }
 
@@ -1031,11 +669,17 @@ class _ChildCardItemState extends ConsumerState<_ChildCardItem> {
                                 Icon(Icons.psychology_rounded, size: 14, color: widget.themeAccent),
                                 const SizedBox(width: 6),
                                 Expanded(
-                                  child: Text(
-                                    v.parentEducation,
+                                  child: FormattedMarkdownText(
+                                    text: v.parentEducation,
                                     style: GoogleFonts.outfit(
                                       fontSize: 10.5,
                                       color: widget.textColor,
+                                      height: 1.4,
+                                    ),
+                                    boldStyle: GoogleFonts.outfit(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: widget.themeAccent,
                                       height: 1.4,
                                     ),
                                   ),
@@ -1200,8 +844,47 @@ class _ChildCardItemState extends ConsumerState<_ChildCardItem> {
                 ),
                 const SizedBox(height: 16),
 
+                // Direct Chat button without consuming prompt tokens
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _openDirectAiChat(child: child, last: last);
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: themeAccent.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: themeAccent.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.chat_bubble_outline_rounded, size: 18, color: themeAccent),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              isEn
+                                  ? 'Open AI Chat with ${child.name}\'s Data (0 Tokens)'
+                                  : 'Buka Chat AI dengan Data ${child.name} (0 Token)',
+                              style: GoogleFonts.outfit(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: themeAccent,
+                              ),
+                            ),
+                          ),
+                          Icon(Icons.arrow_forward_ios_rounded, size: 12, color: themeAccent),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
                 Text(
-                  isEn ? 'Select a topic or ask a custom question:' : 'Pilih topik konsultasi atau ajukan pertanyaan:',
+                  isEn ? 'Or select a topic / ask a custom question:' : 'Atau pilih topik / ajukan pertanyaan langsung:',
                   style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: bodyText),
                 ),
                 const SizedBox(height: 10),
@@ -1310,20 +993,67 @@ class _ChildCardItemState extends ConsumerState<_ChildCardItem> {
     );
   }
 
-  void _sendToAiChat({
+  void _openDirectAiChat({
     required PasienChildModel child,
     required ChildVisitRecord? last,
-    required String question,
   }) {
-    ref.read(aiChatProvider.notifier).startChildNutritionConsultation(
+    final user = ref.read(landingPageProvider).loggedInUser;
+    final isEn = ref.read(landingPageProvider).language == 'en';
+    final ownerName = (user?['name'] as String?) ??
+        (user?['nama_lengkap'] as String?) ??
+        (isEn ? 'Parent' : 'Bunda/Ayah');
+
+    final childCtx = ActiveChildContext(
       childName: child.name,
       age: child.ageLabel,
       bb: '${last?.weightKg ?? 12.0} kg',
       tb: '${last?.heightCm ?? 85.0} cm',
       statusGizi: last?.statusGizi ?? 'Gizi Baik (Normal)',
       nutritionPlan: last?.nutritionPlan ?? 'Tingkatkan asupan protein hewani harian.',
-      customQuestion: question,
+      childId: child.vitascaleProfile?.id ??
+          child.familyMember['id']?.toString(),
+      childNik: child.nik,
+      isSelf: false,
     );
+
+    ref.read(aiChatProvider.notifier).selectChildContext(
+      childContext: childCtx,
+      accountOwnerName: ownerName,
+    );
+
+    widget.onNavigate?.call('ai_assistant');
+  }
+
+  void _sendToAiChat({
+    required PasienChildModel child,
+    required ChildVisitRecord? last,
+    required String question,
+  }) {
+    final user = ref.read(landingPageProvider).loggedInUser;
+    final isEn = ref.read(landingPageProvider).language == 'en';
+    final ownerName = (user?['name'] as String?) ??
+        (user?['nama_lengkap'] as String?) ??
+        (isEn ? 'Parent' : 'Bunda/Ayah');
+
+    final childCtx = ActiveChildContext(
+      childName: child.name,
+      age: child.ageLabel,
+      bb: '${last?.weightKg ?? 12.0} kg',
+      tb: '${last?.heightCm ?? 85.0} cm',
+      statusGizi: last?.statusGizi ?? 'Gizi Baik (Normal)',
+      nutritionPlan: last?.nutritionPlan ?? 'Tingkatkan asupan protein hewani harian.',
+      childId: child.vitascaleProfile?.id ??
+          child.familyMember['id']?.toString(),
+      childNik: child.nik,
+      isSelf: false,
+    );
+
+    ref.read(aiChatProvider.notifier).selectChildContext(
+      childContext: childCtx,
+      accountOwnerName: ownerName,
+    );
+
+    ref.read(aiChatProvider.notifier).sendMessage(question);
 
     widget.onNavigate?.call('ai_assistant');
   }
@@ -1944,11 +1674,17 @@ class _ChildCardItemState extends ConsumerState<_ChildCardItem> {
             ],
           ),
           const SizedBox(height: 4),
-          Text(
-            content,
+          FormattedMarkdownText(
+            text: content,
             style: GoogleFonts.outfit(
               fontSize: 11,
               color: widget.textColor,
+              height: 1.45,
+            ),
+            boldStyle: GoogleFonts.outfit(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: accentColor,
               height: 1.45,
             ),
           ),
