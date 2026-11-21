@@ -11,11 +11,15 @@ class VitaScaleApiConfig {
   /// Cadangan / lokal: 'http://127.0.0.1:8000' atau 'http://10.0.2.2:8000'
   static String baseUrl = 'https://vitascalemapotech.vercel.app';
 
+  /// URL dedicated Vercel untuk pemrosesan Computer Vision (PCV 7 Tahap):
+  static String pcvBaseUrl = 'https://pcvmapotechs5.vercel.app';
+
   static const String smartGrowthEndpoint = '/prediksi/smart-growth';
   static const String giziEndpoint = '/prediksi/gizi';
   static const String stuntingEndpoint = '/prediksi/stunting';
   static const String longitudinalEndpoint = '/prediksi';
   static const String healthEndpoint = '/health';
+  static const String measureEndpoint = '/measure';
 }
 
 /// ============================================================================
@@ -374,7 +378,10 @@ class VitaScaleApiService {
     double? t,
     double? k1,
   }) async {
-    final uri = Uri.parse('${VitaScaleApiConfig.baseUrl}/measure');
+    final targetUrl = VitaScaleApiConfig.pcvBaseUrl.isNotEmpty
+        ? '${VitaScaleApiConfig.pcvBaseUrl}${VitaScaleApiConfig.measureEndpoint}'
+        : '${VitaScaleApiConfig.baseUrl}${VitaScaleApiConfig.measureEndpoint}';
+    final uri = Uri.parse(targetUrl);
 
     try {
       final payload = <String, dynamic>{
