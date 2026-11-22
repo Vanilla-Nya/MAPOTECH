@@ -15,6 +15,7 @@ import 'package:mapotech/shared/widgets/ui.dart';
 
 import '../cv/vitascale_camera_bridge.dart';
 import '../data/vitascale_api_service.dart';
+import '../data/mqtt/vitascale_mqtt_service.dart';
 import '../data/vitascale_device_simulator.dart';
 import '../data/vitascale_models.dart';
 import '../data/vitascale_repository.dart';
@@ -58,8 +59,8 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
   // ===========================================================================
   // STATE INPUT MANUAL & API MLP & REASONING MODEL
   // ===========================================================================
-  final TextEditingController _nameController = TextEditingController(text: 'Muhammad Rayyan Al-Fatih');
-  final TextEditingController _nikController = TextEditingController(text: '3511082208230001');
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _nikController = TextEditingController();
   final TextEditingController _ageController = TextEditingController(text: '24');
   final TextEditingController _weightController = TextEditingController(text: '11.5');
   final TextEditingController _heightController = TextEditingController(text: '85.0');
@@ -119,6 +120,15 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
   String? _pcvErrorMessage;
   bool _pcvShowAnnotated = true;
 
+  // ===========================================================================
+  // STATE MQTT IOT TELEMETRY (Sensor Ultrasonik HC-SR04 & Load Cell HX711)
+  // ===========================================================================
+  final VitaScaleMqttService _mqttService = VitaScaleMqttService();
+  StreamSubscription? _mqttTelemetrySub;
+  StreamSubscription? _mqttStatusSub;
+  bool _isMqttConnecting = false;
+  Map<String, dynamic>? _lastMqttTelemetry;
+
   @override
   void initState() {
     super.initState();
@@ -126,6 +136,7 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
       stateMachine: ref.read(screeningStateProvider.notifier),
     );
 
+    _initMqttListeners();
     _initSession();
     _checkServer();
   }
@@ -218,6 +229,8 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
 
   @override
   void dispose() {
+    _mqttTelemetrySub?.cancel();
+    _mqttStatusSub?.cancel();
     _pcvProgressTimer?.cancel();
     _pcvUrlController.dispose();
     _simulator.dispose();
@@ -232,6 +245,111 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
     _lilaController.dispose();
     _headCircumferenceController.dispose();
     super.dispose();
+  }
+
+  // ===========================================================================
+  // HANDLER MQTT TELEMETRI & KONTROL IOT
+  // ===========================================================================
+  void _initMqttListeners() {
+    _mqttTelemetrySub = _mqttService.telemetryStream.listen((data) {
+      if (mounted) {
+        _handleMqttTelemetry(data);
+      }
+    });
+
+    _mqttStatusSub = _mqttService.connectionStatusStream.listen((status) {
+      if (mounted) {
+        setState(() {
+          _isMqttConnecting = (status == DeviceConnectionStatus.connecting);
+        });
+        ref.read(screeningStateProvider.notifier).setDeviceStatus(status);
+      }
+    });
+  }
+
+  void _handleMqttTelemetry(Map<String, dynamic> data) {
+    setState(() {
+      _lastMqttTelemetry = data;
+    });
+
+    // Parse data berat badan dari Load Cell HX711
+    if (data.containsKey('weight') && data['weight'] is Map) {
+      final weightMap = data['weight'] as Map<String, dynamic>;
+      final valKg = (weightMap['val_kg'] as num?)?.toDouble();
+      final isStable = weightMap['is_stable'] == true;
+      if (valKg != null && valKg > 0) {
+        _weightController.text = valKg.toStringAsFixed(2);
+        ref.read(screeningStateProvider.notifier).updateWeight(
+          value: valKg,
+          status: isStable ? MeasurementStatus.stable : MeasurementStatus.measuring,
+          source: 'esp32_hx711_mqtt',
+        );
+      }
+    }
+
+    // Parse data tinggi/panjang badan dari Ultrasonik HC-SR04
+    if (data.containsKey('height') && data['height'] is Map) {
+      final heightMap = data['height'] as Map<String, dynamic>;
+      final valCm = (heightMap['val_cm'] as num?)?.toDouble();
+      if (valCm != null && valCm > 0) {
+        _heightController.text = valCm.toStringAsFixed(1);
+        ref.read(screeningStateProvider.notifier).updateHeight(
+          value: valCm,
+          status: MeasurementStatus.stable,
+          source: 'esp32_ultrasonic_mqtt',
+        );
+      }
+    }
+  }
+
+  Future<void> _toggleMqttConnection() async {
+    if (_mqttService.isConnected) {
+      _mqttService.disconnect();
+      if (mounted) {
+        setState(() {});
+        CustomSnackbar.info(
+          context,
+          'Koneksi MQTT ke perangkat VitaScale telah diputus.',
+          title: 'MQTT Disconnected',
+        );
+      }
+    } else {
+      setState(() => _isMqttConnecting = true);
+      final success = await _mqttService.connect();
+      if (mounted) {
+        setState(() => _isMqttConnecting = false);
+        if (success) {
+          CustomSnackbar.success(
+            context,
+            'Terhubung ke Broker MQTT (${_mqttService.broker}) - Menunggu stream sensor HC-SR04 & HX711!',
+            title: 'MQTT Terhubung',
+          );
+        } else {
+          CustomSnackbar.error(
+            context,
+            'Gagal terhubung ke MQTT broker (${_mqttService.broker}). Pastikan koneksi internet aktif.',
+            title: 'MQTT Error',
+          );
+        }
+      }
+    }
+  }
+
+  void _sendMqttTare() {
+    if (!_mqttService.isConnected) {
+      CustomSnackbar.warning(
+        context,
+        'Hubungkan ke MQTT terlebih dahulu sebelum melakukan Tare.',
+        title: 'MQTT Offline',
+      );
+      return;
+    }
+    _mqttService.tareScale();
+    CustomSnackbar.info(
+      context,
+      'Perintah Tare (Nol-kan Timbangan) telah dikirim ke perangkat IoT ESP32.',
+      title: 'Tare Sent',
+    );
   }
 
   // ===========================================================================
@@ -1331,48 +1449,104 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
   }
 
   void _showPatientPickerModal() {
+    String modalSearchQuery = '';
     showDialog(
       context: context,
       builder: (ctx) {
-        return CustomDialog(
-          title: 'Pilih Sasaran Anak / Bayi',
-          icon: Icons.people_rounded,
-          iconColor: const Color(0xFF1ABC9C),
-          maxWidth: 480,
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: _availableChildren.map((child) {
-              final isCurrent = child.id == _activeChild?.id;
-              return ListTile(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                tileColor: isCurrent ? const Color(0xFF1ABC9C).withOpacity(0.12) : null,
-                leading: Icon(
-                  child.isUnder24Months ? Icons.child_friendly_rounded : Icons.face_rounded,
-                  color: isCurrent ? const Color(0xFF1ABC9C) : Colors.grey,
+        return StatefulBuilder(
+          builder: (dialogCtx, setModalState) {
+            final filteredChildren = modalSearchQuery.isEmpty
+                ? _availableChildren
+                : _availableChildren.where((c) {
+                    final q = modalSearchQuery.toLowerCase();
+                    return c.name.toLowerCase().contains(q) ||
+                        c.nik.toLowerCase().contains(q) ||
+                        c.parentName.toLowerCase().contains(q);
+                  }).toList();
+
+            return CustomDialog(
+              title: 'Daftar Sasaran Balita Terdaftar (${_availableChildren.length})',
+              icon: Icons.people_rounded,
+              iconColor: const Color(0xFF1ABC9C),
+              maxWidth: 520,
+              content: SizedBox(
+                width: double.maxFinite,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      decoration: InputDecoration(
+                        hintText: 'Cari Nama, NIK, atau Nama Orang Tua...',
+                        hintStyle: GoogleFonts.outfit(fontSize: 11.5),
+                        prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Color(0xFF1ABC9C)),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: Colors.grey.withOpacity(0.3)),
+                        ),
+                      ),
+                      style: GoogleFonts.outfit(fontSize: 12),
+                      onChanged: (v) {
+                        setModalState(() {
+                          modalSearchQuery = v.trim();
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 360),
+                      child: filteredChildren.isEmpty
+                          ? Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: Text(
+                                'Tidak ada sasaran balita yang cocok dengan "$modalSearchQuery".',
+                                style: GoogleFonts.outfit(fontSize: 12, color: Colors.grey),
+                              ),
+                            )
+                          : ListView.separated(
+                              shrinkWrap: true,
+                              itemCount: filteredChildren.length,
+                              separatorBuilder: (_, __) => const Divider(height: 6),
+                              itemBuilder: (ctx, idx) {
+                                final child = filteredChildren[idx];
+                                final isCurrent = child.id == _activeChild?.id;
+                                return ListTile(
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  tileColor: isCurrent ? const Color(0xFF1ABC9C).withOpacity(0.12) : null,
+                                  leading: Icon(
+                                    child.isUnder24Months ? Icons.child_friendly_rounded : Icons.face_rounded,
+                                    color: isCurrent ? const Color(0xFF1ABC9C) : Colors.grey,
+                                  ),
+                                  title: Text(
+                                    child.name,
+                                    style: GoogleFonts.outfit(
+                                      fontWeight: isCurrent ? FontWeight.bold : FontWeight.w600,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    'NIK: ${child.nik} • Usia: ${child.ageLabel} • Wali: ${child.parentName}',
+                                    style: GoogleFonts.outfit(fontSize: 10.5),
+                                  ),
+                                  trailing: StatusBadge(
+                                    label: child.isUnder24Months ? 'PB (TELENTANG)' : 'TB (BERDIRI)',
+                                    color: child.isUnder24Months ? const Color(0xFF3498DB) : const Color(0xFFE67E22),
+                                    fontSize: 8,
+                                  ),
+                                  onTap: () {
+                                    _selectChild(child);
+                                    Navigator.pop(ctx);
+                                  },
+                                );
+                              },
+                            ),
+                    ),
+                  ],
                 ),
-                title: Text(
-                  child.name,
-                  style: GoogleFonts.outfit(
-                    fontWeight: isCurrent ? FontWeight.bold : FontWeight.w600,
-                    fontSize: 13,
-                  ),
-                ),
-                subtitle: Text(
-                  'NIK: ${child.nik} • Usia: ${child.ageLabel}',
-                  style: GoogleFonts.outfit(fontSize: 10.5),
-                ),
-                trailing: StatusBadge(
-                  label: child.isUnder24Months ? 'PB (TELENTANG)' : 'TB (BERDIRI)',
-                  color: child.isUnder24Months ? const Color(0xFF3498DB) : const Color(0xFFE67E22),
-                  fontSize: 8,
-                ),
-                onTap: () {
-                  _selectChild(child);
-                  Navigator.pop(ctx);
-                },
-              );
-            }).toList(),
-          ),
+              ),
+            );
+          },
         );
       },
     );
@@ -1802,6 +1976,8 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
             // KONTEN TAB 1: PERANGKAT IOT & KAMERA CV (EXISTING)
             // =================================================================
             else if (_activeTab == 1) ...[
+              _buildMqttStatusBar(cardBgColor, borderColor, textColor, subtitleColor),
+              const SizedBox(height: 18),
               if (session == null)
                 EmptyStateWidget(
                   icon: Icons.person_search_rounded,
@@ -2365,81 +2541,56 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                 ),
               )
             else ...[
-              // Prompt to select patient
+              // Panduan: Belum ada pasien dipilih, pengguna perlu melakukan pencarian pasien terdaftar
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 decoration: BoxDecoration(
-                  color: Colors.amber.withOpacity(0.08),
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xFF161924)
+                      : const Color(0xFFF8FAFC),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                  border: Border.all(color: border),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.touch_app_rounded, size: 18, color: Colors.amber),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Pilih salah satu sasaran balita terdaftar di bawah ini untuk memulai skrining terarah:',
-                        style: GoogleFonts.outfit(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: text,
-                        ),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1ABC9C).withOpacity(0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.search_rounded,
+                        size: 20,
+                        color: Color(0xFF1ABC9C),
                       ),
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _availableChildren.map((c) {
-                  return InkWell(
-                    onTap: () => _selectChild(c),
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? const Color(0xFF1E2130)
-                            : const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: border),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(
-                            c.isUnder24Months
-                                ? Icons.child_friendly_rounded
-                                : Icons.face_rounded,
-                            size: 16,
-                            color: const Color(0xFF1ABC9C),
-                          ),
-                          const SizedBox(width: 8),
                           Text(
-                            c.name,
+                            'Pencarian Sasaran Balita Terdaftar',
                             style: GoogleFonts.outfit(
-                              fontSize: 11.5,
+                              fontSize: 12.5,
                               fontWeight: FontWeight.bold,
                               color: text,
                             ),
                           ),
-                          const SizedBox(width: 6),
-                          StatusBadge(
-                            label: c.ageLabel,
-                            color: c.isUnder24Months
-                                ? const Color(0xFF3498DB)
-                                : const Color(0xFFE67E22),
-                            fontSize: 8.5,
-                            showDot: false,
+                          const SizedBox(height: 2),
+                          Text(
+                            'Ketik nama anak, NIK (16-Digit), atau nama orang tua pada kolom pencarian di atas untuk memilih sasaran skrining.',
+                            style: GoogleFonts.outfit(
+                              fontSize: 10.5,
+                              color: sub,
+                            ),
                           ),
                         ],
                       ),
                     ),
-                  );
-                }).toList(),
+                  ],
+                ),
               ),
             ],
           ],
@@ -2512,6 +2663,269 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // MQTT IOT GATEWAY STATUS BAR (HC-SR04 & HX711)
+  // ===========================================================================
+  Widget _buildMqttStatusBar(Color cardBg, Color border, Color text, Color sub) {
+    final isConnected = _mqttService.isConnected;
+    final statusColor = isConnected
+        ? const Color(0xFF27AE60)
+        : (_isMqttConnecting ? const Color(0xFFF39C12) : const Color(0xFF95A5A6));
+
+    final lastWeight = _lastMqttTelemetry?['weight']?['val_kg'] as num?;
+    final isStable = _lastMqttTelemetry?['weight']?['is_stable'] == true;
+    final lastHeight = _lastMqttTelemetry?['height']?['val_cm'] as num?;
+    final battery = _lastMqttTelemetry?['battery']?['percentage'] as num?;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isConnected ? const Color(0xFF27AE60).withOpacity(0.4) : border,
+          width: isConnected ? 1.5 : 1.0,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.sensors_rounded,
+                  color: statusColor,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'GATEWAY IOT ESP32 VITASCALE',
+                          style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                            color: text,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1ABC9C).withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFF1ABC9C).withOpacity(0.35)),
+                          ),
+                          child: Text(
+                            'mapotechiotmqtt.vercel.app',
+                            style: GoogleFonts.outfit(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF1ABC9C),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: statusColor.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: statusColor.withOpacity(0.4)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  color: statusColor,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                isConnected
+                                    ? 'LIVE STREAM'
+                                    : (_isMqttConnecting ? 'MENGHUBUNGKAN...' : 'TERPUTUS'),
+                                style: GoogleFonts.outfit(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  color: statusColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Broker: ${_mqttService.broker}:${_mqttService.port} (WSS) • Gateway: ${_mqttService.cloudGatewayUrl} • Topik: mapotech/${_mqttService.faskesId}/vitascale/${_mqttService.deviceId}',
+                      style: GoogleFonts.outfit(fontSize: 10.5, color: sub),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  CustomButton(
+                    text: 'Nol-kan (Tare)',
+                    icon: Icons.scale_rounded,
+                    height: 34,
+                    primaryColor: const Color(0xFF3498DB),
+                    isSecondary: true,
+                    onPressed: isConnected ? _sendMqttTare : null,
+                  ),
+                  CustomButton(
+                    text: _isMqttConnecting
+                        ? 'Menghubungkan...'
+                        : (isConnected ? 'Putuskan' : 'Hubungkan MQTT'),
+                    icon: isConnected ? Icons.link_off_rounded : Icons.link_rounded,
+                    height: 34,
+                    primaryColor: isConnected ? const Color(0xFFE74C3C) : const Color(0xFF1ABC9C),
+                    isSecondary: isConnected,
+                    onPressed: _isMqttConnecting ? null : _toggleMqttConnection,
+                  ),
+                ],
+              ),
+            ],
+          ),
+          if (isConnected) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF27AE60).withOpacity(0.06),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF27AE60).withOpacity(0.2)),
+              ),
+              child: Row(
+                children: [
+                  // Sensor TB Ultrasonik
+                  Expanded(
+                    child: Row(
+                      children: [
+                        const Icon(Icons.straighten_rounded, size: 18, color: Color(0xFF16A085)),
+                        const SizedBox(width: 8),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Sensor TB (HC-SR04)',
+                              style: GoogleFonts.outfit(fontSize: 10, color: sub, fontWeight: FontWeight.w600),
+                            ),
+                            Text(
+                              lastHeight != null ? '${lastHeight.toStringAsFixed(1)} cm' : '-- cm',
+                              style: GoogleFonts.outfit(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: text,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(height: 28, width: 1, color: border),
+                  const SizedBox(width: 14),
+                  // Sensor BB Load Cell HX711
+                  Expanded(
+                    child: Row(
+                      children: [
+                        const Icon(Icons.monitor_weight_rounded, size: 18, color: Color(0xFF2980B9)),
+                        const SizedBox(width: 8),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  'Sensor BB (HX711)',
+                                  style: GoogleFonts.outfit(fontSize: 10, color: sub, fontWeight: FontWeight.w600),
+                                ),
+                                if (isStable) ...[
+                                  const SizedBox(width: 4),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF27AE60).withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      'STABIL',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 8,
+                                        fontWeight: FontWeight.w800,
+                                        color: const Color(0xFF27AE60),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            Text(
+                              lastWeight != null ? '${lastWeight.toStringAsFixed(2)} kg' : '-- kg',
+                              style: GoogleFonts.outfit(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: text,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (battery != null) ...[
+                    Container(height: 28, width: 1, color: border),
+                    const SizedBox(width: 14),
+                    Row(
+                      children: [
+                        Icon(
+                          battery > 20 ? Icons.battery_full_rounded : Icons.battery_alert_rounded,
+                          size: 18,
+                          color: battery > 20 ? const Color(0xFF27AE60) : const Color(0xFFE74C3C),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '${battery.toInt()}%',
+                          style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: text,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

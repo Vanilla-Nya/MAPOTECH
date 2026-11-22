@@ -277,9 +277,25 @@ class VitaScaleRepository implements IVitaScaleRepository {
 
   static final List<ScreeningSession> _mockHistory = [];
 
+  // Pool gabungan seluruh pasien balita terdaftar hardcode (sample faskes + katalog master Mapotech)
+  static List<ChildProfile> get _allRegisteredChildren {
+    final Map<String, ChildProfile> map = {};
+    for (final c in _sampleChildren) {
+      final key = c.nik.isNotEmpty && c.nik != '-' ? c.nik : c.id;
+      map[key] = c;
+    }
+    for (final c in _mapotechMasterBalita) {
+      final key = c.nik.isNotEmpty && c.nik != '-' ? c.nik : c.id;
+      if (!map.containsKey(key)) {
+        map[key] = c;
+      }
+    }
+    return map.values.toList();
+  }
+
   @override
   bool isChildRegisteredInPuskesmas(ChildProfile child) {
-    return _sampleChildren.any(
+    return _allRegisteredChildren.any(
       (c) => c.id == child.id || (child.nik != '-' && c.nik == child.nik),
     );
   }
@@ -334,9 +350,9 @@ class VitaScaleRepository implements IVitaScaleRepository {
         }
 
         if (dbResults.isNotEmpty) {
-          // Merge with sample children deduplicated
+          // Merge with registered children deduplicated
           final Map<String, ChildProfile> merged = {};
-          for (final c in _sampleChildren) {
+          for (final c in _allRegisteredChildren) {
             merged[c.nik.isNotEmpty && c.nik != '-' ? c.nik : c.id] = c;
           }
           for (final c in dbResults) {
@@ -354,12 +370,13 @@ class VitaScaleRepository implements IVitaScaleRepository {
       }
     }
 
-    // 2. Filter dari master sample
+    // 2. Filter dari master sample hardcode
+    final pool = _allRegisteredChildren;
     if (cleanQ.isEmpty) {
-      return List.from(_sampleChildren);
+      return List.from(pool);
     }
 
-    return _sampleChildren.where((c) {
+    return pool.where((c) {
       return c.name.toLowerCase().contains(cleanQ) ||
           c.nik.contains(cleanQ) ||
           c.id.toLowerCase().contains(cleanQ) ||
