@@ -1,8 +1,14 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/satusehat_service.dart';
 import 'package:mapotech/shared/widgets/ui.dart';
@@ -88,6 +94,30 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
   VitaScaleReasoningResult? _reasoningResult;
   int _activeReasoningTab = 0;
   int _reasoningPromptCount = 0;
+
+  // ===========================================================================
+  // STATE PCV COMPUTER VISION CLOUD API (https://pcvmapotechs5.vercel.app/)
+  // ===========================================================================
+  int _pcvInputMode = 0; // 0 = File Lokal, 1 = Link / URL, 2 = Kamera
+  Uint8List? _pcvSelectedImageBytes;
+  String? _pcvSelectedImageName;
+  final TextEditingController _pcvUrlController = TextEditingController();
+  final TextEditingController _pcvCustomScaleController = TextEditingController(text: '11.00');
+  double _pcvSelectedScale = 11.00; // Default 11.00 px/cm (Dataset Boneka & Infantometer standar)
+  bool _pcvUseRoi = false; // Default false (Full Frame agar tidak memotong tubuh/kaki)
+  bool _pcvUseK1 = false; // Koreksi distorsi lensa
+  bool _isLoadingPcvImage = false;
+  bool _isMeasuringPcv = false;
+  double _pcvProgress = 0.0;
+  Timer? _pcvProgressTimer;
+  Map<String, dynamic>? _pcvResultData;
+  double? _pcvTinggiCm;
+  double? _pcvPanjangPx;
+  double? _pcvSkalaEfektif;
+  String? _pcvAnnotatedImageBase64;
+  String? _pcvMessage;
+  String? _pcvErrorMessage;
+  bool _pcvShowAnnotated = true;
 
   @override
   void initState() {
@@ -188,6 +218,8 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
 
   @override
   void dispose() {
+    _pcvProgressTimer?.cancel();
+    _pcvUrlController.dispose();
     _simulator.dispose();
     _notesController.dispose();
     _topSearchController.dispose();
@@ -1437,6 +1469,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
     final subtitleColor = notifier.getBodyTextColor();
     final borderColor = notifier.getBorderColor();
     final isMobile = MediaQuery.of(context).size.width < 900;
+    const themeAccent = Color(0xFF1ABC9C);
 
     final issues = _validateScreeningForm();
     final redErrors = issues.where((i) => i['isError'] == true).toList();
@@ -1606,37 +1639,76 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
             const SizedBox(height: 16),
 
             // =================================================================
-            // TAB SELECTOR: Mode Input Manual (Uji Ukur) vs Hardware IoT
+            // TAB SELECTOR: Mode Input Manual vs Hardware IoT vs Cloud PCV
             // =================================================================
             Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                color: borderColor.withOpacity(0.15),
+                color: borderColor.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: borderColor),
               ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _buildTabButton(
-                      index: 0,
-                      label: 'Uji Ukur Manual & Reasoning AI',
-                      icon: Icons.tune_rounded,
-                      badge: 'Tersedia Sekarang (Tanpa IoT Fisik)',
-                      badgeColor: const Color(0xFF1ABC9C),
+              child: isMobile
+                  ? Column(
+                      children: [
+                        _buildTabButton(
+                          index: 0,
+                          label: 'Uji Ukur Manual & Reasoning AI',
+                          icon: Icons.tune_rounded,
+                          badge: 'Tersedia Sekarang (Tanpa IoT Fisik)',
+                          badgeColor: const Color(0xFF1ABC9C),
+                        ),
+                        const SizedBox(height: 4),
+                        _buildTabButton(
+                          index: 1,
+                          label: 'Perangkat IoT & Kamera CV',
+                          icon: Icons.sensors_rounded,
+                          badge: 'ESP32 + Webcam',
+                          badgeColor: const Color(0xFF3498DB),
+                        ),
+                        const SizedBox(height: 4),
+                        _buildTabButton(
+                          index: 2,
+                          label: 'Ukur Tinggi via Foto AI (PCV API)',
+                          icon: Icons.photo_camera_rounded,
+                          badge: 'pcvmapotechs5.vercel.app',
+                          badgeColor: const Color(0xFFE91E63),
+                        ),
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        Expanded(
+                          child: _buildTabButton(
+                            index: 0,
+                            label: 'Uji Ukur Manual & AI',
+                            icon: Icons.tune_rounded,
+                            badge: 'Tanpa IoT Fisik',
+                            badgeColor: const Color(0xFF1ABC9C),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: _buildTabButton(
+                            index: 1,
+                            label: 'Perangkat IoT & CV',
+                            icon: Icons.sensors_rounded,
+                            badge: 'ESP32 + Webcam',
+                            badgeColor: const Color(0xFF3498DB),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: _buildTabButton(
+                            index: 2,
+                            label: 'Ukur Tinggi via Foto (PCV)',
+                            icon: Icons.photo_camera_rounded,
+                            badge: 'OpenCV Cloud API',
+                            badgeColor: const Color(0xFFE91E63),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  Expanded(
-                    child: _buildTabButton(
-                      index: 1,
-                      label: 'Perangkat IoT & Kamera CV',
-                      icon: Icons.sensors_rounded,
-                      badge: 'ESP32 + Webcam',
-                      badgeColor: const Color(0xFF3498DB),
-                    ),
-                  ),
-                ],
-              ),
             ),
 
             const SizedBox(height: 18),
@@ -1729,7 +1801,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
             // =================================================================
             // KONTEN TAB 1: PERANGKAT IOT & KAMERA CV (EXISTING)
             // =================================================================
-            else ...[
+            else if (_activeTab == 1) ...[
               if (session == null)
                 EmptyStateWidget(
                   icon: Icons.person_search_rounded,
@@ -1868,6 +1940,23 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   ],
                 ),
               ],
+            ]
+
+            // =================================================================
+            // KONTEN TAB 2: UKUR TINGGI VIA FOTO AI (PCV API CLOUD)
+            // =================================================================
+            else if (_activeTab == 2) ...[
+              _buildTab2PcvCloudSection(
+                cardBgColor: cardBgColor,
+                borderColor: borderColor,
+                textColor: textColor,
+                subtitleColor: subtitleColor,
+                themeAccent: themeAccent,
+                isDark: isDark,
+                isMobile: isMobile,
+                redErrors: redErrors,
+                yellowWarnings: yellowWarnings,
+              ),
             ],
           ],
         ),
@@ -2959,6 +3048,31 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (_pcvTinggiCm != null)
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 5),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1ABC9C).withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: const Color(0xFF1ABC9C).withOpacity(0.35)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.auto_awesome_rounded, size: 12, color: Color(0xFF1ABC9C)),
+                            const SizedBox(width: 5),
+                            Text(
+                              'Otomatis Terisi via Foto AI PCV (${_pcvTinggiCm!.toStringAsFixed(1)} cm)',
+                              style: GoogleFonts.outfit(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFF1ABC9C),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -5059,5 +5173,1300 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
           ),
         );
     }
+  }
+
+  // ===========================================================================
+  // METODE HELPER OPERASI PCV COMPUTER VISION CLOUD (https://pcvmapotechs5.vercel.app/)
+  // ===========================================================================
+
+  /// 1. Pilih gambar dari penyimpanan lokal perangkat via FilePicker
+  Future<void> _pickLocalPcvImage() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        withData: true,
+      );
+      if (result != null && result.files.isNotEmpty) {
+        final file = result.files.first;
+        if (file.bytes != null) {
+          setState(() {
+            _pcvSelectedImageBytes = file.bytes;
+            _pcvSelectedImageName = file.name;
+            _pcvResultData = null;
+            _pcvTinggiCm = null;
+            _pcvPanjangPx = null;
+            _pcvSkalaEfektif = null;
+            _pcvAnnotatedImageBase64 = null;
+            _pcvErrorMessage = null;
+            _pcvMessage = null;
+          });
+          if (mounted) {
+            CustomSnackbar.success(
+              context,
+              'Foto "${file.name}" (${(file.bytes!.lengthInBytes / 1024).toStringAsFixed(1)} KB) berhasil dipilih.',
+              title: 'File Gambar Dipilih',
+            );
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[PCV] _pickLocalPcvImage error: $e');
+      if (mounted) {
+        CustomSnackbar.error(context, 'Gagal memilih file: $e', title: 'File Picker Gagal');
+      }
+    }
+  }
+
+  /// 2. Unduh citra balita via Link / URL Web
+  Future<void> _fetchPcvImageFromUrl(String url) async {
+    final cleanUrl = url.trim();
+    if (cleanUrl.isEmpty) {
+      CustomSnackbar.warning(context, 'Masukkan link URL gambar balita yang valid.', title: 'URL Kosong');
+      return;
+    }
+    if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
+      CustomSnackbar.warning(context, 'URL harus diawali dengan http:// atau https://', title: 'URL Tidak Valid');
+      return;
+    }
+
+    setState(() {
+      _isLoadingPcvImage = true;
+      _pcvProgress = 0.15;
+      _pcvErrorMessage = null;
+    });
+
+    _pcvProgressTimer?.cancel();
+    _pcvProgressTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
+      if (_pcvProgress < 0.85) {
+        setState(() => _pcvProgress += 0.08);
+      }
+    });
+
+    try {
+      final uri = Uri.parse(cleanUrl);
+      final response = await http.get(uri).timeout(const Duration(seconds: 15));
+      _pcvProgressTimer?.cancel();
+
+      if (response.statusCode == 200) {
+        final bytes = response.bodyBytes;
+        String fileName = uri.pathSegments.isNotEmpty ? uri.pathSegments.last : 'citra_web.jpg';
+        if (!fileName.contains('.')) fileName = '$fileName.jpg';
+
+        setState(() {
+          _pcvSelectedImageBytes = bytes;
+          _pcvSelectedImageName = fileName;
+          _isLoadingPcvImage = false;
+          _pcvProgress = 1.0;
+          _pcvResultData = null;
+          _pcvTinggiCm = null;
+          _pcvPanjangPx = null;
+          _pcvSkalaEfektif = null;
+          _pcvAnnotatedImageBase64 = null;
+          _pcvErrorMessage = null;
+          _pcvMessage = null;
+        });
+
+        if (mounted) {
+          CustomSnackbar.success(
+            context,
+            'Gambar berhasil diunduh dari URL (${(bytes.lengthInBytes / 1024).toStringAsFixed(1)} KB).',
+            title: 'Gambar Berhasil Dimuat',
+          );
+        }
+      } else {
+        setState(() {
+          _isLoadingPcvImage = false;
+          _pcvErrorMessage = 'Gagal mengunduh gambar (HTTP ${response.statusCode})';
+        });
+        if (mounted) {
+          CustomSnackbar.error(context, 'Server mengembalikan kode HTTP ${response.statusCode}', title: 'Unduh Gagal');
+        }
+      }
+    } catch (e) {
+      _pcvProgressTimer?.cancel();
+      setState(() {
+        _isLoadingPcvImage = false;
+        _pcvErrorMessage = 'Gagal memuat URL: $e';
+      });
+      if (mounted) {
+        CustomSnackbar.error(context, 'Koneksi gagal atau URL tidak dapat diakses: $e', title: 'Gagal Memuat Gambar');
+      }
+    }
+  }
+
+  /// 3. Ambil snapshot langsung dari Kamera / Webcam
+  Future<void> _captureCameraPcvImage() async {
+    try {
+      final picker = ImagePicker();
+      final photo = await picker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 92,
+      );
+
+      if (photo != null) {
+        final bytes = await photo.readAsBytes();
+        setState(() {
+          _pcvSelectedImageBytes = bytes;
+          _pcvSelectedImageName = photo.name.isNotEmpty ? photo.name : 'kamera_${DateTime.now().millisecondsSinceEpoch}.jpg';
+          _pcvResultData = null;
+          _pcvTinggiCm = null;
+          _pcvPanjangPx = null;
+          _pcvSkalaEfektif = null;
+          _pcvAnnotatedImageBase64 = null;
+          _pcvErrorMessage = null;
+          _pcvMessage = null;
+        });
+        if (mounted) {
+          CustomSnackbar.success(
+            context,
+            'Snapshot kamera berhasil diambil (${(bytes.lengthInBytes / 1024).toStringAsFixed(1)} KB).',
+            title: 'Foto Kamera Siap',
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('[PCV] _captureCameraPcvImage error: $e');
+      if (mounted) {
+        CustomSnackbar.warning(
+          context,
+          'Kamera perangkat tidak dapat diakses langsung ($e). Silakan gunakan mode "File Lokal" atau "Link URL".',
+          title: 'Kamera Tidak Tersedia',
+        );
+      }
+    }
+  }
+
+  /// 4. Muat citra sampel klinis bawaan
+  Future<void> _loadSampleLocalPcvImage() async {
+    try {
+      final byteData = await rootBundle.load('assets/images/anc_home_visit_evidence.png');
+      final bytes = byteData.buffer.asUint8List();
+      setState(() {
+        _pcvSelectedImageBytes = bytes;
+        _pcvSelectedImageName = 'anc_home_visit_evidence.png (Sampel Klinis)';
+        _pcvResultData = null;
+        _pcvTinggiCm = null;
+        _pcvPanjangPx = null;
+        _pcvSkalaEfektif = null;
+        _pcvAnnotatedImageBase64 = null;
+        _pcvErrorMessage = null;
+        _pcvMessage = null;
+      });
+      if (mounted) {
+        CustomSnackbar.info(
+          context,
+          'Foto sampel klinis balita berhasil dimuat (${(bytes.lengthInBytes / 1024).toStringAsFixed(1)} KB). Klik "Ukur Tinggi Badan" untuk memproses.',
+          title: 'Sampel Dimuat',
+        );
+      }
+    } catch (e) {
+      debugPrint('[PCV] _loadSampleLocalPcvImage error: $e');
+      if (mounted) {
+        CustomSnackbar.error(context, 'Gagal memuat sampel bawaan: $e', title: 'Gagal Memuat');
+      }
+    }
+  }
+
+  /// 4b. Muat citra sampel Boneka uji validasi (Ground Truth: 47.2 cm, 519.0 px)
+  Future<void> _loadBonekaSampleImage() async {
+    try {
+      final byteData = await rootBundle.load('assets/images/boneka_sample.jpg');
+      final bytes = byteData.buffer.asUint8List();
+      setState(() {
+        _pcvSelectedImageBytes = bytes;
+        _pcvSelectedImageName = 'Boneka.jpg (Ground Truth 47.2 cm, 519.0 px)';
+        _pcvSelectedScale = 11.00;
+        _pcvCustomScaleController.text = '11.00';
+        _pcvUseRoi = false;
+        _pcvResultData = null;
+        _pcvTinggiCm = null;
+        _pcvPanjangPx = null;
+        _pcvSkalaEfektif = null;
+        _pcvAnnotatedImageBase64 = null;
+        _pcvErrorMessage = null;
+        _pcvMessage = null;
+      });
+      if (mounted) {
+        CustomSnackbar.info(
+          context,
+          'Sampel Boneka.jpg berhasil dimuat. Skala kalibrasi 11.00 px/cm aktif. Klik "Ukur Tinggi Badan" untuk memproses.',
+          title: 'Sampel Boneka Siap',
+        );
+      }
+    } catch (e) {
+      debugPrint('[PCV] _loadBonekaSampleImage error: $e');
+      if (mounted) {
+        CustomSnackbar.error(context, 'Gagal memuat sampel boneka: $e', title: 'Gagal Memuat');
+      }
+    }
+  }
+
+  /// 5. Kirim citra ke API https://pcvmapotechs5.vercel.app/measure
+  Future<void> _measurePcvHeight() async {
+    if (_pcvSelectedImageBytes == null) {
+      CustomSnackbar.warning(context, 'Pilih atau unggah foto balita terlebih dahulu.', title: 'Foto Belum Ada');
+      return;
+    }
+
+    setState(() {
+      _isMeasuringPcv = true;
+      _pcvProgress = 0.08;
+      _pcvErrorMessage = null;
+      _pcvMessage = null;
+    });
+
+    _pcvProgressTimer?.cancel();
+    _pcvProgressTimer = Timer.periodic(const Duration(milliseconds: 140), (timer) {
+      if (_pcvProgress < 0.90) {
+        setState(() => _pcvProgress += 0.05);
+      }
+    });
+
+    try {
+      final base64Str = base64Encode(_pcvSelectedImageBytes!);
+      final res = await VitaScaleApiService.ukurTinggiObjek(
+        base64Image: base64Str,
+        skala: _pcvSelectedScale,
+        useRoi: _pcvUseRoi,
+        useK1: _pcvUseK1,
+        preset: _pcvSelectedScale == 11.0 ? 'boneka' : null,
+      );
+
+      _pcvProgressTimer?.cancel();
+
+      if (res['status'] == 'ok' || res.containsKey('tinggi_cm')) {
+        final tinggi = (res['tinggi_cm'] as num).toDouble();
+        final px = (res['panjang_px'] as num?)?.toDouble();
+        final skala = (res['skala_efektif'] as num?)?.toDouble() ?? 9.09;
+        final annotated = res['annotated_image'] as String?;
+        final msg = res['message'] as String? ?? 'Pengukuran berhasil';
+
+        setState(() {
+          _isMeasuringPcv = false;
+          _pcvProgress = 1.0;
+          _pcvResultData = res;
+          _pcvTinggiCm = tinggi;
+          _pcvPanjangPx = px;
+          _pcvSkalaEfektif = skala;
+          _pcvAnnotatedImageBase64 = annotated;
+          _pcvMessage = msg;
+          _pcvShowAnnotated = true;
+
+          // Isi otomatis ke kontroler Tinggi Badan
+          _heightController.text = tinggi.toStringAsFixed(1);
+
+          // Tentukan PB vs TB
+          if ((_activeChild?.isUnder24Months ?? (tinggi < 85.0))) {
+            _measurementMethod = 'PB';
+          } else {
+            _measurementMethod = 'TB';
+          }
+
+          // Reset hasil klasifikasi agar user memperbarui
+          _smartGrowthResult = null;
+          _reasoningResult = null;
+        });
+
+        if (mounted) {
+          CustomSnackbar.success(
+            context,
+            'Panjang/Tinggi terdeteksi: ${tinggi.toStringAsFixed(1)} cm ($px px). Otomatis diisikan ke Formulir Antropometri.',
+            title: 'PCV Berhasil',
+          );
+        }
+      } else {
+        final errMsg = res['message'] ?? 'Gagal memproses citra pada OpenCV server.';
+        setState(() {
+          _isMeasuringPcv = false;
+          _pcvProgress = 0.0;
+          _pcvErrorMessage = errMsg;
+        });
+        if (mounted) {
+          CustomSnackbar.error(context, errMsg, title: 'PCV Gagal');
+        }
+      }
+    } catch (e) {
+      _pcvProgressTimer?.cancel();
+      setState(() {
+        _isMeasuringPcv = false;
+        _pcvProgress = 0.0;
+        _pcvErrorMessage = 'Terjadi kesalahan saat memproses citra: $e';
+      });
+      if (mounted) {
+        CustomSnackbar.error(context, 'Kesalahan: $e', title: 'Gagal Mengukur');
+      }
+    }
+  }
+
+  /// 6. Parse annotated image base64
+  Uint8List? _getAnnotatedBytes(String raw) {
+    try {
+      String clean = raw.trim();
+      if (clean.contains(',')) {
+        clean = clean.split(',').last;
+      }
+      return base64Decode(clean);
+    } catch (e) {
+      debugPrint('[PCV] _getAnnotatedBytes error: $e');
+      return null;
+    }
+  }
+
+  // ===========================================================================
+  // KONTEN TAB 2: PENGUKURAN TINGGI VIA FOTO AI (PCV CLOUD API)
+  // ===========================================================================
+  Widget _buildTab2PcvCloudSection({
+    required Color cardBgColor,
+    required Color borderColor,
+    required Color textColor,
+    required Color subtitleColor,
+    required Color themeAccent,
+    required bool isDark,
+    required bool isMobile,
+    required List<Map<String, dynamic>> redErrors,
+    required List<Map<String, dynamic>> yellowWarnings,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // 1. Status Banner PCV API Hosting
+        _buildPcvServerBanner(cardBgColor, borderColor, textColor, subtitleColor, isDark),
+
+        const SizedBox(height: 16),
+
+        // 2. Studio Unggah Citra & Pengukuran PCV
+        _buildPcvImageStudioCard(cardBgColor, borderColor, textColor, subtitleColor, themeAccent, isDark, isMobile),
+
+        const SizedBox(height: 20),
+
+        // 3. Custom Form Stepper (1 Card Per Step - Identik dengan Manual)
+        CustomFormStepper(
+          steps: [
+            FormStepItem(
+              step: 1,
+              label: '1. Identitas Balita',
+              icon: Icons.badge_rounded,
+              hasError: redErrors.any((e) => e['step'] == 1),
+              hasWarning: yellowWarnings.any((w) => w['step'] == 1),
+              isCompleted: _nikController.text.trim().length == 16 && _nameController.text.trim().isNotEmpty && _ageMonths > 0,
+            ),
+            FormStepItem(
+              step: 2,
+              label: '2. Antropometri (Tinggi Foto PCV)',
+              icon: Icons.straighten_rounded,
+              hasError: redErrors.any((e) => e['step'] == 2),
+              hasWarning: yellowWarnings.any((w) => w['step'] == 2),
+              isCompleted: double.tryParse(_weightController.text.trim()) != null && double.tryParse(_heightController.text.trim()) != null,
+            ),
+            FormStepItem(
+              step: 3,
+              label: '3. Reasoning AI',
+              icon: Icons.psychology_rounded,
+              hasError: redErrors.any((e) => e['step'] == 3),
+              hasWarning: yellowWarnings.any((w) => w['step'] == 3),
+              isCompleted: _smartGrowthResult != null,
+            ),
+            FormStepItem(
+              step: 4,
+              label: '4. SATUSEHAT & Simpan',
+              icon: Icons.cloud_sync_rounded,
+              hasError: false,
+              hasWarning: false,
+              isCompleted: _satuSehatSyncResult != null,
+            ),
+          ],
+          currentStep: _formStep,
+          onStepTapped: (step) {
+            setState(() => _formStep = step);
+            if (step == 3) {
+              _checkAndAutoRunMlp();
+            }
+          },
+          themeAccent: const Color(0xFF1ABC9C),
+          textColor: textColor,
+          subtitleColor: subtitleColor,
+          borderColor: borderColor,
+          cardBgColor: cardBgColor,
+          isDark: isDark,
+        ),
+
+        const SizedBox(height: 16),
+
+        // 4. Tampilan 1 Kartu Form Aktif Sesuai Step
+        if (_formStep == 1)
+          _buildStep1ChildIdentity(cardBgColor, borderColor, textColor, subtitleColor, isMobile)
+        else if (_formStep == 2)
+          _buildStep2Anthropometry(cardBgColor, borderColor, textColor, subtitleColor, isMobile)
+        else if (_formStep == 3)
+          _buildStep3ReasoningAndAi(cardBgColor, borderColor, textColor, subtitleColor, isMobile)
+        else if (_formStep == 4)
+          _buildStep4SatuSehatAndSave(cardBgColor, borderColor, textColor, subtitleColor, isMobile),
+
+        const SizedBox(height: 16),
+
+        // 5. Stepper Navigation Footer & Real-Time Validation Pill
+        _buildScreeningStepperFooter(
+          cardBgColor: cardBgColor,
+          borderColor: borderColor,
+          textColor: textColor,
+          subtitleColor: subtitleColor,
+          isMobile: isMobile,
+          redErrors: redErrors,
+          yellowWarnings: yellowWarnings,
+        ),
+
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+
+  // ===========================================================================
+  // WIDGET: BANNER STATUS SERVER PCV CLOUD VERCEL
+  // ===========================================================================
+  Widget _buildPcvServerBanner(Color cardBg, Color border, Color text, Color sub, bool isDark) {
+    return CustomCard(
+      color: cardBg,
+      borderColor: border,
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1ABC9C).withOpacity(0.12),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.cloud_done_rounded, size: 22, color: Color(0xFF1ABC9C)),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    Text(
+                      'PCV Computer Vision Cloud API',
+                      style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w800, color: text),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2ECC71).withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFF2ECC71).withOpacity(0.4)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: const BoxDecoration(color: Color(0xFF2ECC71), shape: BoxShape.circle),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'ONLINE (Vercel Serverless)',
+                            style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.bold, color: const Color(0xFF2ECC71)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Endpoint: https://pcvmapotechs5.vercel.app/measure • Classical OpenCV 7-Tahap (Undistort, Otsu, Morfologi Elips, minAreaRect, Skala 9.09 px/cm)',
+                  style: GoogleFonts.outfit(fontSize: 10, color: sub),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // WIDGET: STUDIO INPUT CITRA & PENGUKURAN TINGGI BADAN (PCV API)
+  // ===========================================================================
+  Widget _buildPcvImageStudioCard(
+    Color cardBg,
+    Color border,
+    Color text,
+    Color sub,
+    Color themeAccent,
+    bool isDark,
+    bool isMobile,
+  ) {
+    return CustomCard(
+      color: cardBg,
+      borderColor: border,
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Header Card Studio PCV
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1ABC9C).withOpacity(0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.camera_enhance_rounded, size: 20, color: Color(0xFF1ABC9C)),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Studio Pengukuran Tinggi Badan via Citra Foto (PCV AI)',
+                      style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w800, color: text),
+                    ),
+                    Text(
+                      'Pilih sumber foto balita (File Lokal, Link URL, atau Kamera). OpenCV akan menghitung panjang badan dan mengisi formulir antropometri secara otomatis.',
+                      style: GoogleFonts.outfit(fontSize: 10.5, color: sub),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const Divider(height: 24),
+
+          // Pilihan Mode Sumber Citra: 3 Tab Mode (File Lokal, Link URL, Kamera)
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E2130) : const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: border),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _buildPcvModeTabBtn(
+                    index: 0,
+                    icon: Icons.folder_open_rounded,
+                    label: 'File Lokal',
+                    sublabel: 'PNG/JPG',
+                    isDark: isDark,
+                    text: text,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: _buildPcvModeTabBtn(
+                    index: 1,
+                    icon: Icons.link_rounded,
+                    label: 'Link / URL',
+                    sublabel: 'Web Image',
+                    isDark: isDark,
+                    text: text,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: _buildPcvModeTabBtn(
+                    index: 2,
+                    icon: Icons.photo_camera_rounded,
+                    label: 'Kamera',
+                    sublabel: 'Snapshot',
+                    isDark: isDark,
+                    text: text,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Konten Berdasarkan Mode yang Dipilih
+          if (_pcvInputMode == 0) ...[
+            // Mode 0: File Lokal
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF161924) : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      CustomButton(
+                        text: 'Pilih Foto dari Perangkat',
+                        icon: Icons.file_upload_outlined,
+                        onPressed: _pickLocalPcvImage,
+                      ),
+                      CustomButton(
+                        text: '🧸 Sampel Boneka (Ground Truth 47.2 cm)',
+                        icon: Icons.smart_toy_rounded,
+                        isSecondary: true,
+                        onPressed: _loadBonekaSampleImage,
+                      ),
+                      CustomButton(
+                        text: 'Gunakan Sampel Klinis Uji',
+                        icon: Icons.science_rounded,
+                        isSecondary: true,
+                        onPressed: _loadSampleLocalPcvImage,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Pilih file foto bayi/balita di atas papan ukur stadiometer (format .jpg, .png, .jpeg, .webp).',
+                    style: GoogleFonts.outfit(fontSize: 10, color: sub),
+                  ),
+                ],
+              ),
+            ),
+          ] else if (_pcvInputMode == 1) ...[
+            // Mode 1: Link URL
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF161924) : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: CustomTextField(
+                          label: 'Link / URL Gambar Balita',
+                          hintText: 'https://example.com/foto_balita.jpg',
+                          controller: _pcvUrlController,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 24),
+                        child: CustomButton(
+                          text: 'Muat dari URL',
+                          icon: Icons.cloud_download_rounded,
+                          onPressed: () => _fetchPcvImageFromUrl(_pcvUrlController.text),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text('Preset Cepat:', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: sub)),
+                      InkWell(
+                        onTap: () {
+                          _loadBonekaSampleImage();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE67E22).withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFFE67E22).withOpacity(0.3)),
+                          ),
+                          child: Text(
+                            '🧸 Sampel Boneka (47.2 cm)',
+                            style: GoogleFonts.outfit(fontSize: 9.5, fontWeight: FontWeight.w600, color: const Color(0xFFE67E22)),
+                          ),
+                        ),
+                      ),
+                      InkWell(
+                        onTap: () {
+                          _pcvUrlController.text = 'https://images.unsplash.com/photo-1519689680058-324335c77eba?w=800';
+                          _fetchPcvImageFromUrl(_pcvUrlController.text);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF3498DB).withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFF3498DB).withOpacity(0.3)),
+                          ),
+                          child: Text(
+                            '🔗 Demo Bayi Online (Unsplash)',
+                            style: GoogleFonts.outfit(fontSize: 9.5, fontWeight: FontWeight.w600, color: const Color(0xFF3498DB)),
+                          ),
+                        ),
+                      ),
+                      InkWell(
+                        onTap: () {
+                          _loadSampleLocalPcvImage();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1ABC9C).withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFF1ABC9C).withOpacity(0.3)),
+                          ),
+                          child: Text(
+                            '🔗 Sampel Validasi PCV (72 cm)',
+                            style: GoogleFonts.outfit(fontSize: 9.5, fontWeight: FontWeight.w600, color: const Color(0xFF1ABC9C)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            // Mode 2: Kamera
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF161924) : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      CustomButton(
+                        text: 'Buka Kamera / Ambil Snapshot',
+                        icon: Icons.photo_camera_rounded,
+                        onPressed: _captureCameraPcvImage,
+                      ),
+                      const SizedBox(width: 10),
+                      CustomButton(
+                        text: 'Gunakan Sampel Klinis',
+                        icon: Icons.science_rounded,
+                        isSecondary: true,
+                        onPressed: _loadSampleLocalPcvImage,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Ambil foto bayi tidur telentang lurus di atas infantometer dengan kamera/webcam.',
+                    style: GoogleFonts.outfit(fontSize: 10, color: sub),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          // Loading Progress Bar saat mengunduh gambar dari internet
+          if (_isLoadingPcvImage) ...[
+            const SizedBox(height: 14),
+            CustomProgressBar(
+              value: _pcvProgress,
+              label: 'Mengunduh citra dari link web...',
+              sublabel: '${(_pcvProgress * 100).toInt()}%',
+              primaryColor: const Color(0xFF3498DB),
+              height: 6,
+            ),
+          ],
+
+          // Preview Citra yang Dipilih
+          if (_pcvSelectedImageBytes != null) ...[
+            const SizedBox(height: 16),
+            Container(
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF12141D) : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: border),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Top Toolbar Preview Citra
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    color: isDark ? const Color(0xFF1E2130) : const Color(0xFFEEF2F6),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _pcvShowAnnotated && _pcvAnnotatedImageBase64 != null
+                              ? Icons.auto_awesome_rounded
+                              : Icons.image_rounded,
+                          size: 16,
+                          color: const Color(0xFF1ABC9C),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '${_pcvSelectedImageName ?? "Citra Balita"} (${(_pcvSelectedImageBytes!.lengthInBytes / 1024).toStringAsFixed(1)} KB)',
+                            style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: text),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (_pcvAnnotatedImageBase64 != null) ...[
+                          InkWell(
+                            onTap: () => setState(() => _pcvShowAnnotated = !_pcvShowAnnotated),
+                            borderRadius: BorderRadius.circular(6),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: _pcvShowAnnotated ? const Color(0xFF1ABC9C) : Colors.transparent,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: const Color(0xFF1ABC9C)),
+                              ),
+                              child: Text(
+                                _pcvShowAnnotated ? '🎯 Deteksi OpenCV' : '📸 Citra Asli',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: _pcvShowAnnotated ? Colors.white : const Color(0xFF1ABC9C),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                        InkWell(
+                          onTap: () => setState(() {
+                            _pcvSelectedImageBytes = null;
+                            _pcvSelectedImageName = null;
+                            _pcvResultData = null;
+                            _pcvTinggiCm = null;
+                            _pcvPanjangPx = null;
+                            _pcvAnnotatedImageBase64 = null;
+                            _pcvErrorMessage = null;
+                            _pcvMessage = null;
+                          }),
+                          borderRadius: BorderRadius.circular(6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE74C3C).withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFFE74C3C).withOpacity(0.4)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.close_rounded, size: 12, color: Color(0xFFE74C3C)),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Hapus',
+                                  style: GoogleFonts.outfit(fontSize: 9.5, fontWeight: FontWeight.bold, color: const Color(0xFFE74C3C)),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Area Gambar Citra
+                  Container(
+                    height: 280,
+                    width: double.infinity,
+                    color: Colors.black,
+                    alignment: Alignment.center,
+                    child: Builder(
+                      builder: (context) {
+                        if (_pcvShowAnnotated && _pcvAnnotatedImageBase64 != null) {
+                          final annotatedBytes = _getAnnotatedBytes(_pcvAnnotatedImageBase64!);
+                          if (annotatedBytes != null) {
+                            return Image.memory(annotatedBytes, fit: BoxFit.contain);
+                          }
+                        }
+                        return Image.memory(_pcvSelectedImageBytes!, fit: BoxFit.contain);
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 14),
+
+            // Konfigurasi Kalibrasi Skala & ROI Pengukuran
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF161924) : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.tune_rounded, size: 16, color: Color(0xFF1ABC9C)),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Pengaturan Kalibrasi Skala & Area ROI',
+                        style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: text),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      // Preset 11.00 px/cm
+                      ChoiceChip(
+                        label: Text(
+                          '🧸 11.00 px/cm (Boneka & Infantometer Standar)',
+                          style: GoogleFonts.outfit(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w600,
+                            color: (_pcvSelectedScale - 11.0).abs() < 0.01 ? const Color(0xFF1ABC9C) : text,
+                          ),
+                        ),
+                        selected: (_pcvSelectedScale - 11.0).abs() < 0.01,
+                        selectedColor: const Color(0xFF1ABC9C).withOpacity(0.18),
+                        backgroundColor: isDark ? const Color(0xFF1E2130) : Colors.white,
+                        side: BorderSide(
+                          color: (_pcvSelectedScale - 11.0).abs() < 0.01 ? const Color(0xFF1ABC9C) : border,
+                        ),
+                        onSelected: (val) {
+                          if (val) {
+                            setState(() {
+                              _pcvSelectedScale = 11.00;
+                              _pcvCustomScaleController.text = '11.00';
+                            });
+                          }
+                        },
+                      ),
+                      // Preset 9.09 px/cm
+                      ChoiceChip(
+                        label: Text(
+                          '📐 9.09 px/cm (Stadiometer H=170cm)',
+                          style: GoogleFonts.outfit(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w600,
+                            color: (_pcvSelectedScale - 9.09).abs() < 0.01 ? const Color(0xFF1ABC9C) : text,
+                          ),
+                        ),
+                        selected: (_pcvSelectedScale - 9.09).abs() < 0.01,
+                        selectedColor: const Color(0xFF1ABC9C).withOpacity(0.18),
+                        backgroundColor: isDark ? const Color(0xFF1E2130) : Colors.white,
+                        side: BorderSide(
+                          color: (_pcvSelectedScale - 9.09).abs() < 0.01 ? const Color(0xFF1ABC9C) : border,
+                        ),
+                        onSelected: (val) {
+                          if (val) {
+                            setState(() {
+                              _pcvSelectedScale = 9.09;
+                              _pcvCustomScaleController.text = '9.09';
+                            });
+                          }
+                        },
+                      ),
+                      // Toggle ROI Full Frame vs Crop
+                      FilterChip(
+                        avatar: Icon(
+                          !_pcvUseRoi ? Icons.fullscreen_rounded : Icons.crop_rounded,
+                          size: 14,
+                          color: !_pcvUseRoi ? const Color(0xFF2ECC71) : const Color(0xFFF39C12),
+                        ),
+                        label: Text(
+                          !_pcvUseRoi ? 'Mode: Full Frame (Kaki & Kepala Utuh)' : 'Mode: Crop ROI Kuning',
+                          style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.w600, color: text),
+                        ),
+                        selected: !_pcvUseRoi,
+                        selectedColor: const Color(0xFF2ECC71).withOpacity(0.18),
+                        backgroundColor: isDark ? const Color(0xFF1E2130) : Colors.white,
+                        side: BorderSide(color: !_pcvUseRoi ? const Color(0xFF2ECC71) : border),
+                        onSelected: (val) {
+                          setState(() {
+                            _pcvUseRoi = !val;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 14),
+
+            // Tombol Eksekusi Pengukuran
+            CustomButton(
+              text: _isMeasuringPcv
+                  ? 'Sedang Memproses OpenCV 7-Tahap...'
+                  : '🚀 Ukur Tinggi Badan via PCV API (https://pcvmapotechs5.vercel.app)',
+              icon: Icons.straighten_rounded,
+              onPressed: _isMeasuringPcv ? null : _measurePcvHeight,
+              width: double.infinity,
+            ),
+          ],
+
+          // Progress Bar Pengukuran PCV (Rule.md Section 8)
+          if (_isMeasuringPcv) ...[
+            const SizedBox(height: 14),
+            Builder(
+              builder: (context) {
+                String stageText = 'Mengunggah citra ke cloud serverless...';
+                if (_pcvProgress > 0.3) stageText = 'Tahap 1-2: Grayscale & Segmentasi Biner (Otsu)...';
+                if (_pcvProgress > 0.6) stageText = 'Tahap 3-5: Morfologi Elips & Kontur minAreaRect...';
+                if (_pcvProgress > 0.85) stageText = 'Tahap 6-7: Kalkulasi Skala ${_pcvSelectedScale.toStringAsFixed(2)} px/cm & Anotasi Garis Hijau...';
+
+                return CustomProgressBar(
+                  value: _pcvProgress,
+                  label: stageText,
+                  sublabel: '${(_pcvProgress * 100).toInt()}%',
+                  primaryColor: const Color(0xFF1ABC9C),
+                  height: 8,
+                );
+              },
+            ),
+          ],
+
+          // Pesan Error jika terjadi kegagalan
+          if (_pcvErrorMessage != null) ...[
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE74C3C).withOpacity(0.08),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFE74C3C).withOpacity(0.35)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.error_outline_rounded, color: Color(0xFFE74C3C), size: 18),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _pcvErrorMessage!,
+                      style: GoogleFonts.outfit(fontSize: 11, color: const Color(0xFFE74C3C)),
+                    ),
+                  ),
+                  InkWell(
+                    onTap: _measurePcvHeight,
+                    child: Text(
+                      'Coba Lagi',
+                      style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.bold, color: const Color(0xFFE74C3C), decoration: TextDecoration.underline),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          // Hasil Pengukuran Sukses PCV
+          if (_pcvResultData != null && _pcvTinggiCm != null) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1ABC9C).withOpacity(0.07),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF1ABC9C).withOpacity(0.4)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF1ABC9C),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.check_rounded, size: 16, color: Colors.white),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Pengukuran Panjang/Tinggi Badan Berhasil!',
+                              style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w800, color: text),
+                            ),
+                            Text(
+                              _pcvMessage ?? 'Data telah disinkronkan otomatis ke Formulir Antropometri di bawah.',
+                              style: GoogleFonts.outfit(fontSize: 10, color: sub),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF1A1D27) : Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: border),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Tinggi / Panjang Badan', style: GoogleFonts.outfit(fontSize: 9.5, color: sub)),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${_pcvTinggiCm!.toStringAsFixed(1)} cm',
+                                style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w900, color: const Color(0xFF1ABC9C)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF1A1D27) : Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: border),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Metode Standar KIA', style: GoogleFonts.outfit(fontSize: 9.5, color: sub)),
+                              const SizedBox(height: 2),
+                              Text(
+                                _measurementMethod == 'PB' ? 'PB Telentang' : 'TB Berdiri',
+                                style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w800, color: const Color(0xFF3498DB)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF1A1D27) : Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: border),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Panjang Piksel Kontur', style: GoogleFonts.outfit(fontSize: 9.5, color: sub)),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${_pcvPanjangPx?.toStringAsFixed(1) ?? "-"} px',
+                                style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w800, color: text),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF1A1D27) : Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: border),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Skala Kalibrasi', style: GoogleFonts.outfit(fontSize: 9.5, color: sub)),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${_pcvSkalaEfektif?.toStringAsFixed(2) ?? "9.09"} px/cm',
+                                style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w800, color: text),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // WIDGET HELPER: TOMBOL TAB SUMBER CITRA PCV
+  // ===========================================================================
+  Widget _buildPcvModeTabBtn({
+    required int index,
+    required IconData icon,
+    required String label,
+    required String sublabel,
+    required bool isDark,
+    required Color text,
+  }) {
+    final isSelected = _pcvInputMode == index;
+    return InkWell(
+      onTap: () => setState(() => _pcvInputMode = index),
+      borderRadius: BorderRadius.circular(8),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF1ABC9C) : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isSelected ? Colors.white : Colors.grey,
+            ),
+            const SizedBox(width: 6),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: GoogleFonts.outfit(
+                    fontSize: 11,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                    color: isSelected ? Colors.white : text,
+                  ),
+                ),
+                Text(
+                  sublabel,
+                  style: GoogleFonts.outfit(
+                    fontSize: 8.5,
+                    color: isSelected ? Colors.white.withOpacity(0.85) : Colors.grey,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

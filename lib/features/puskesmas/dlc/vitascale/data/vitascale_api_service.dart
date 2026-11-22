@@ -377,6 +377,10 @@ class VitaScaleApiService {
     double? ppm100,
     double? t,
     double? k1,
+    double? skala,
+    bool? useRoi,
+    bool? useK1,
+    String? preset,
   }) async {
     final targetUrl = VitaScaleApiConfig.pcvBaseUrl.isNotEmpty
         ? '${VitaScaleApiConfig.pcvBaseUrl}${VitaScaleApiConfig.measureEndpoint}'
@@ -390,6 +394,10 @@ class VitaScaleApiService {
         if (ppm100 != null) 'PPM100': ppm100,
         if (t != null) 't': t,
         if (k1 != null) 'k1': k1,
+        if (skala != null) 'skala': skala,
+        if (useRoi != null) 'use_roi': useRoi,
+        if (useK1 != null) 'use_k1': useK1,
+        if (preset != null) 'preset': preset,
       };
 
       final response = await _client
@@ -398,7 +406,7 @@ class VitaScaleApiService {
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode(payload),
           )
-          .timeout(const Duration(seconds: 20));
+          .timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -414,7 +422,7 @@ class VitaScaleApiService {
       debugPrint('[VitaScaleApi] ukurTinggiObjek error: $e');
       return {
         'status': 'error',
-        'message': 'Gagal menghubungi server pengukuran di ${VitaScaleApiConfig.baseUrl}: $e',
+        'message': 'Gagal menghubungi server pengukuran di $targetUrl: $e',
       };
     }
   }
