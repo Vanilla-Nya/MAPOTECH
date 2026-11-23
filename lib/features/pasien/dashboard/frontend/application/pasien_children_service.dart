@@ -58,6 +58,28 @@ class PasienChildModel {
 
   bool get isMale => gender == 'Laki-laki';
 
+  bool get isMother {
+    final rel = hubungan.toLowerCase();
+    return rel.contains('ibu') || rel.contains('istri') || rel.contains('bunda');
+  }
+
+  bool get isFather {
+    final rel = hubungan.toLowerCase();
+    return rel.contains('ayah') || rel.contains('suami') || rel.contains('kepala keluarga');
+  }
+
+  bool get isChild {
+    final rel = hubungan.toLowerCase();
+    return rel.contains('anak') ||
+        rel.contains('bayi') ||
+        rel.contains('balita') ||
+        rel.contains('putra') ||
+        rel.contains('putri') ||
+        rel.contains('cucu');
+  }
+
+  bool get isAdult => !isChild;
+
   String get ageLabel {
     if (vitascaleProfile != null) {
       return vitascaleProfile!.ageLabel;
@@ -330,5 +352,168 @@ class PasienChildrenService {
       childNik: user['nik']?.toString(),
       isSelf: true,
     );
+  }
+
+  /// Membuat ActiveChildContext untuk seluruh anggota keluarga dalam 1 KK
+  static ActiveChildContext createAllFamilyContext(
+    Map<String, dynamic>? user,
+    List<PasienChildModel> familyMembers, {
+    bool isEn = false,
+  }) {
+    final noKk = (user?['no_kk'] as String? ?? '').trim();
+    final count = familyMembers.length;
+    final childCount = familyMembers.where((m) => m.isChild).length;
+    final balitaCount = familyMembers.where((m) => m.isBalita).length;
+
+    return ActiveChildContext(
+      childName: isEn ? 'Entire Family (1 KK Household)' : 'Semua Anggota Keluarga (1 KK)',
+      age: isEn
+          ? '$count Members ($balitaCount Toddlers, $childCount Children)'
+          : '$count Anggota ($balitaCount Balita, $childCount Anak)',
+      bb: isEn ? 'Comprehensive Health' : 'Kesehatan Komprehensif',
+      tb: isEn ? 'Family Wellness' : 'Keluarga Sehat',
+      statusGizi: isEn ? 'Holistic Family Assessment' : 'Evaluasi Terpadu 1 Rumah Tangga',
+      nutritionPlan: isEn
+          ? 'Holistic assessment covering maternal health, toddler growth (0-59 mo), adult wellness, and shared nutritional balance.'
+          : 'Analisis menyeluruh mencakup tumbuh kembang balita (0–59 bulan), gizi keluarga, status ANC ibu hamil, dan kesehatan umum orang tua.',
+      childId: 'all_family_kk',
+      childNik: noKk.isNotEmpty ? noKk : null,
+      isSelf: false,
+    );
+  }
+
+  /// Mengambil SELURUH anggota keluarga dalam 1 KK (Ayah, Ibu, Balita, Anak)
+  static Future<List<PasienChildModel>> fetchFullFamilyMembersForUser(
+    Map<String, dynamic>? user,
+  ) async {
+    if (user == null) return [];
+
+    final userId = user['id']?.toString() ?? '';
+    final userName = (user['name'] as String? ?? user['nama_lengkap'] as String? ?? '').trim();
+    final userNik = (user['nik'] as String? ?? '').trim();
+    final userKk = (user['no_kk'] as String? ?? '').trim();
+    final userGender = (user['gender'] as String? ?? user['jenis_kelamin'] as String? ?? 'L').toUpperCase();
+
+    try {
+      // 1. Ambil data semua anggota dari tabel patient_family_members
+      List<Map<String, dynamic>> rawMembers = [];
+      if (userId.isNotEmpty) {
+        rawMembers = await _db.fetchAllFamilyMembersForUser(userId);
+      }
+
+      final List<PasienChildModel> fullList = [];
+      final Set<String> processedNiks = {};
+
+      // 2. Tambahkan user akun utama jika belum ada di list (sebagai Kepala Keluarga / Ibu)
+      final userRole = userGender.startsWith('P') ? 'Ibu' : 'Kepala Keluarga (Ayah)';
+      fullList.add(PasienChildModel(
+        familyMember: {
+          'id': userId,
+          'nama': userName.isNotEmpty ? userName : 'Akun Utama',
+          'nik': userNik,
+          'hubungan': userRole,
+          'gender': userGender.startsWith('P') ? 'Perempuan' : 'Laki-laki',
+          'usia': user['usia']?.toString() ?? 'Dewasa',
+          'no_kk': userKk,
+          'gol_darah': user['gol_darah']?.toString() ?? 'O+',
+          'no_bpjs': user['no_bpjs']?.toString() ?? 'Aktif',
+        },
+      ));
+      if (userNik.isNotEmpty) processedNiks.add(userNik);
+
+      // 3. Ambil data master anak VitaScale untuk pencocokan data balita
+      final vitascaleChildren = await _vitaRepo.searchChildren();
+
+      // 4. Masukkan seluruh anggota keluarga yang terdaftar
+      for (final m in rawMembers) {
+        final mNik = ((m['nik'] as String?) ?? '').trim();
+        final mName = ((m['nama'] as String?) ?? (m['name'] as String?) ?? '').trim();
+
+        if (mNik.isNotEmpty && processedNiks.contains(mNik)) continue;
+        if (mName.isNotEmpty && mName.toLowerCase() == userName.toLowerCase()) continue;
+
+        final rel = ((m['hubungan'] as String?) ?? '').toLowerCase();
+        final isChildMember = rel.contains('anak') ||
+            rel.contains('bayi') ||
+            rel.contains('balita') ||
+            rel.contains('putra') ||
+            rel.contains('putri') ||
+            rel.contains('cucu');
+
+        if (isChildMember) {
+          ChildProfile? matched;
+          if (mNik.isNotEmpty) {
+            try {
+              matched = vitascaleChildren.firstWhere((c) => c.nik == mNik);
+            } catch (_) {}
+          }
+          if (matched == null && mName.isNotEmpty) {
+            try {
+              matched = vitascaleChildren.firstWhere((c) => c.name.toLowerCase() == mName.toLowerCase());
+            } catch (_) {}
+          }
+
+          final effective = matched ?? createProfileFromFamily(m, userName, userKk);
+          final visits = generateVisitsForChild(effective);
+          final last = visits.isNotEmpty ? visits.first : null;
+
+          if (mNik.isNotEmpty) processedNiks.add(mNik);
+
+          fullList.add(PasienChildModel(
+            familyMember: m,
+            vitascaleProfile: effective,
+            visitHistory: visits,
+            lastVisit: last,
+          ));
+        } else {
+          // Anggota Dewasa (Istri / Suami / Kakek / Nenek)
+          if (mNik.isNotEmpty) processedNiks.add(mNik);
+          fullList.add(PasienChildModel(
+            familyMember: m,
+          ));
+        }
+      }
+
+      // 5. Tambahkan anak-anak dari master data VitaScale yang terhubung dengan KK ini
+      for (final vc in vitascaleChildren) {
+        if (processedNiks.contains(vc.nik)) continue;
+
+        bool isMatched = false;
+        if (userKk.isNotEmpty && vc.noKk != null && vc.noKk == userKk) {
+          isMatched = true;
+        } else if (userNik.isNotEmpty && vc.parentName.contains(userNik)) {
+          isMatched = true;
+        } else if (userName.isNotEmpty && vc.parentName.toLowerCase().contains(userName.toLowerCase())) {
+          isMatched = true;
+        }
+
+        if (isMatched) {
+          processedNiks.add(vc.nik);
+          final visits = generateVisitsForChild(vc);
+          fullList.add(PasienChildModel(
+            familyMember: {
+              'nama': vc.name,
+              'nik': vc.nik,
+              'hubungan': vc.isUnder24Months
+                  ? 'Bayi'
+                  : (vc.isBalita ? 'Balita' : 'Anak Kandung'),
+              'gender': vc.gender == 'L' ? 'Laki-laki' : 'Perempuan',
+              'usia': vc.ageLabel,
+              'no_kk': vc.noKk ?? userKk,
+              'gol_darah': 'O+',
+              'no_bpjs': '0001239874561 (Aktif)',
+            },
+            vitascaleProfile: vc,
+            visitHistory: visits,
+            lastVisit: visits.isNotEmpty ? visits.first : null,
+          ));
+        }
+      }
+
+      return fullList;
+    } catch (e) {
+      debugPrint('[PasienChildrenService] Error fetching full family members: $e');
+      return [];
+    }
   }
 }

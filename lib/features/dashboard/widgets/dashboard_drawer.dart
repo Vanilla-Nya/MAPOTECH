@@ -349,6 +349,13 @@ List<DrawerMenuItem> getMenuItemsForRole(
       ),
     ];
   } else {
+    final gender = (state?.loggedInUser?['gender'] as String?)?.trim().toLowerCase();
+    final isFemale = gender != null &&
+        (gender == 'p' ||
+            gender == 'perempuan' ||
+            gender == 'female' ||
+            gender == 'wanita');
+
     items = [
       DrawerMenuItem(
         id: 'dashboard',
@@ -395,10 +402,17 @@ List<DrawerMenuItem> getMenuItemsForRole(
         label: isEn ? 'Prescriptions' : 'Resep Obat',
         icon: Icons.medication_rounded,
       ),
+      // Menu Khusus Ibu Hamil (MomiCare) — Hanya muncul jika profil berjenis kelamin Wanita
+      if (isFemale)
+        DrawerMenuItem(
+          id: 'momicare_pregnancy',
+          label: isEn ? 'MomiCare (Pregnancy)' : 'Pantau Kandungan (MomiCare)',
+          icon: Icons.pregnant_woman_rounded,
+        ),
       DrawerMenuItem(
-        id: 'children',
-        label: isEn ? 'My Children' : 'Data Anak',
-        icon: Icons.child_care_rounded,
+        id: 'my_family',
+        label: isEn ? 'My Family' : 'Keluarga Saya',
+        icon: Icons.family_restroom_rounded,
       ),
       DrawerMenuItem(
         id: 'profile',

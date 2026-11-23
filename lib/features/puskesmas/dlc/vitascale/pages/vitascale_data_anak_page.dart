@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/widgets/ui.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../data/vitascale_models.dart';
 import '../data/vitascale_repository.dart';
 import '../vitascale_dlc_gate.dart';
@@ -21,7 +22,8 @@ class VitaScaleDataAnakPage extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<VitaScaleDataAnakPage> createState() => _VitaScaleDataAnakPageState();
+  ConsumerState<VitaScaleDataAnakPage> createState() =>
+      _VitaScaleDataAnakPageState();
 }
 
 class _VitaScaleDataAnakPageState extends ConsumerState<VitaScaleDataAnakPage> {
@@ -60,7 +62,11 @@ class _VitaScaleDataAnakPageState extends ConsumerState<VitaScaleDataAnakPage> {
           _repository.registerChild(newChild);
           setState(() {
             // Hapus duplikat bila ada, lalu sisipkan di posisi teratas
-            _children.removeWhere((c) => c.id == newChild.id || (newChild.nik != '-' && c.nik == newChild.nik));
+            _children.removeWhere(
+              (c) =>
+                  c.id == newChild.id ||
+                  (newChild.nik != '-' && c.nik == newChild.nik),
+            );
             _children.insert(0, newChild);
           });
           CustomSnackbar.success(
@@ -69,6 +75,115 @@ class _VitaScaleDataAnakPageState extends ConsumerState<VitaScaleDataAnakPage> {
           );
         },
       ),
+    );
+  }
+
+  void _contactParent(ChildProfile child) {
+    final phone = (child.phone ?? '').replaceAll(RegExp(r'[^0-9]'), '');
+    if (phone.isEmpty) return;
+
+    final formattedPhone = phone.startsWith('0') ? '62${phone.substring(1)}' : phone;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF27AE60).withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.phone_in_talk_rounded, color: Color(0xFF27AE60), size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Hubungi Orang Tua / Wali Balita',
+                          style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          'Pasien: ${child.name} • Wali: ${child.parentName} (${child.phone})',
+                          style: GoogleFonts.outfit(fontSize: 11, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                tileColor: const Color(0xFF25D366).withValues(alpha: 0.08),
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF25D366).withValues(alpha: 0.18),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.chat_rounded, color: Color(0xFF25D366), size: 18),
+                ),
+                title: Text('Kirim Pengingat WhatsApp', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13)),
+                subtitle: Text('Kirim pesan otomatis jadwal posyandu & imunisasi balita', style: GoogleFonts.outfit(fontSize: 10.5)),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final msg = Uri.encodeComponent(
+                    'Halo Bapak/Ibu ${child.parentName}, kami dari Puskesmas mengingatkan jadwal pemeriksaan antropometri dan tumbuh kembang ananda ${child.name} (${child.ageLabel}). Mohon kehadirannya di Posyandu/Puskesmas. Terima kasih.',
+                  );
+                  final waUri = Uri.parse('https://wa.me/$formattedPhone?text=$msg');
+                  if (await canLaunchUrl(waUri)) {
+                    await launchUrl(waUri, mode: LaunchMode.externalApplication);
+                  }
+                },
+              ),
+              const SizedBox(height: 8),
+              ListTile(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                tileColor: const Color(0xFF2980B9).withValues(alpha: 0.08),
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2980B9).withValues(alpha: 0.18),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.phone_rounded, color: Color(0xFF2980B9), size: 18),
+                ),
+                title: Text('Panggilan Telepon Langsung', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13)),
+                subtitle: Text('Hubungi via jaringan seluler ke nomor ${child.phone}', style: GoogleFonts.outfit(fontSize: 10.5)),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final telUri = Uri.parse('tel:$phone');
+                  if (await canLaunchUrl(telUri)) {
+                    await launchUrl(telUri);
+                  }
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _openHomeVisitMap(ChildProfile child) {
+    CustomSnackbar.info(
+      context,
+      'Pasien ${child.name} tidak memiliki nomor kontak. Petugas kesehatan/kader dapat melakukan Home Visit ke: ${child.address} (Koordinat: ${child.latitude}, ${child.longitude}).',
+      title: 'Tugaskan Kunjungan Rumah (Home Visit)',
     );
   }
 
@@ -141,7 +256,11 @@ class _VitaScaleDataAnakPageState extends ConsumerState<VitaScaleDataAnakPage> {
                       shape: BoxShape.circle,
                     ),
                     alignment: Alignment.center,
-                    child: const Icon(Icons.child_care_rounded, size: 30, color: Color(0xFF1ABC9C)),
+                    child: const Icon(
+                      Icons.child_care_rounded,
+                      size: 30,
+                      color: Color(0xFF1ABC9C),
+                    ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -151,9 +270,14 @@ class _VitaScaleDataAnakPageState extends ConsumerState<VitaScaleDataAnakPage> {
                         Row(
                           children: [
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF1ABC9C).withValues(alpha: 0.15),
+                                color: const Color(
+                                  0xFF1ABC9C,
+                                ).withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(100),
                               ),
                               child: Text(
@@ -187,7 +311,10 @@ class _VitaScaleDataAnakPageState extends ConsumerState<VitaScaleDataAnakPage> {
                         ),
                         Text(
                           'Pusat data sasaran pengukuran antropometri berkala balita & anak faskes Puskesmas.',
-                          style: GoogleFonts.outfit(fontSize: 10.5, color: subtitleColor),
+                          style: GoogleFonts.outfit(
+                            fontSize: 10.5,
+                            color: subtitleColor,
+                          ),
                         ),
                       ],
                     ),
@@ -201,7 +328,8 @@ class _VitaScaleDataAnakPageState extends ConsumerState<VitaScaleDataAnakPage> {
             // Collapsible Summary Metric Cards (4 Cards - Default Closed saat Page Awal Dibuka)
             CustomCollapsibleCard(
               title: 'Ringkasan Statistik & Indikator Pasien',
-              subtitle: '4 Metrik Sasaran: Total Pasien Anak, Bayi PB, Anak TB, dan Kesiapan Skrining',
+              subtitle:
+                  '4 Metrik Sasaran: Total Pasien Anak, Bayi PB, Anak TB, dan Kesiapan Skrining',
               icon: Icons.analytics_rounded,
               iconColor: const Color(0xFF1ABC9C),
               cardBgColor: cardBgColor,
@@ -209,13 +337,19 @@ class _VitaScaleDataAnakPageState extends ConsumerState<VitaScaleDataAnakPage> {
               textColor: textColor,
               subtitleColor: subtitleColor,
               accentColor: const Color(0xFF1ABC9C),
-              initiallyExpanded: false, // WAKTU PAGE AWAL DIBUKA COLLAPSIBLE CARDNYA TERTUTUP
+              initiallyExpanded:
+                  false, // WAKTU PAGE AWAL DIBUKA COLLAPSIBLE CARDNYA TERTUTUP
               previewBadge: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFF1ABC9C).withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(100),
-                  border: Border.all(color: const Color(0xFF1ABC9C).withValues(alpha: 0.3)),
+                  border: Border.all(
+                    color: const Color(0xFF1ABC9C).withValues(alpha: 0.3),
+                  ),
                 ),
                 child: Text(
                   '${_children.length} Anak • 4 Metrik',
@@ -240,25 +374,33 @@ class _VitaScaleDataAnakPageState extends ConsumerState<VitaScaleDataAnakPage> {
                     count: '${_children.length} Anak ($balitaCount Balita)',
                     subtitleColor: subtitleColor,
                     countColor: textColor,
-                    cardBgColor: isDark ? const Color(0xFF1B1B26) : const Color(0xFFF8FAFC),
+                    cardBgColor: isDark
+                        ? const Color(0xFF1B1B26)
+                        : const Color(0xFFF8FAFC),
                     borderColor: borderColor,
                   ),
                   MetricCard(
                     icon: Icons.crib_rounded,
                     label: 'BAYI < 24 BULAN (PB)',
-                    count: '${_children.where((c) => c.isUnder24Months).length} Bayi',
+                    count:
+                        '${_children.where((c) => c.isUnder24Months).length} Bayi',
                     subtitleColor: subtitleColor,
                     countColor: const Color(0xFF3498DB),
-                    cardBgColor: isDark ? const Color(0xFF1B1B26) : const Color(0xFFF8FAFC),
+                    cardBgColor: isDark
+                        ? const Color(0xFF1B1B26)
+                        : const Color(0xFFF8FAFC),
                     borderColor: borderColor,
                   ),
                   MetricCard(
                     icon: Icons.accessibility_new_rounded,
                     label: 'ANAK ≥ 24 BULAN (TB)',
-                    count: '${_children.where((c) => !c.isUnder24Months).length} Anak',
+                    count:
+                        '${_children.where((c) => !c.isUnder24Months).length} Anak',
                     subtitleColor: subtitleColor,
                     countColor: const Color(0xFFE67E22),
-                    cardBgColor: isDark ? const Color(0xFF1B1B26) : const Color(0xFFF8FAFC),
+                    cardBgColor: isDark
+                        ? const Color(0xFF1B1B26)
+                        : const Color(0xFFF8FAFC),
                     borderColor: borderColor,
                   ),
                   MetricCard(
@@ -267,7 +409,9 @@ class _VitaScaleDataAnakPageState extends ConsumerState<VitaScaleDataAnakPage> {
                     count: '100%',
                     subtitleColor: subtitleColor,
                     countColor: const Color(0xFF2ECC71),
-                    cardBgColor: isDark ? const Color(0xFF1B1B26) : const Color(0xFFF8FAFC),
+                    cardBgColor: isDark
+                        ? const Color(0xFF1B1B26)
+                        : const Color(0xFFF8FAFC),
                     borderColor: borderColor,
                   ),
                 ],
@@ -319,12 +463,26 @@ class _VitaScaleDataAnakPageState extends ConsumerState<VitaScaleDataAnakPage> {
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
                       value: _selectedFilter,
-                      icon: const Icon(Icons.filter_list_rounded, size: 18, color: Color(0xFF1ABC9C)),
-                      style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: textColor),
+                      icon: const Icon(
+                        Icons.filter_list_rounded,
+                        size: 18,
+                        color: Color(0xFF1ABC9C),
+                      ),
+                      style: GoogleFonts.outfit(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: textColor,
+                      ),
                       dropdownColor: cardBgColor,
-                      items: ['Semua', 'Balita < 5 Thn', 'Bayi < 24 Bln', 'Anak ≥ 24 Bln'].map((f) {
-                        return DropdownMenuItem(value: f, child: Text(f));
-                      }).toList(),
+                      items:
+                          [
+                            'Semua',
+                            'Balita < 5 Thn',
+                            'Bayi < 24 Bln',
+                            'Anak ≥ 24 Bln',
+                          ].map((f) {
+                            return DropdownMenuItem(value: f, child: Text(f));
+                          }).toList(),
                       onChanged: (v) {
                         if (v != null) setState(() => _selectedFilter = v);
                       },
@@ -355,7 +513,9 @@ class _VitaScaleDataAnakPageState extends ConsumerState<VitaScaleDataAnakPage> {
             else if (filtered.isEmpty)
               EmptyStateWidget(
                 icon: Icons.child_care_rounded,
-                title: _searchQuery.isNotEmpty ? 'Tidak Ditemukan Pasien Anak' : 'Belum Ada Data Pasien Anak',
+                title: _searchQuery.isNotEmpty
+                    ? 'Tidak Ditemukan Pasien Anak'
+                    : 'Belum Ada Data Pasien Anak',
                 subtitle: _searchQuery.isNotEmpty
                     ? 'Tidak ada anak dengan NIK atau Nama "$_searchQuery" pada filter $_selectedFilter.'
                     : 'Gunakan tombol "+ Daftar Anak Baru" untuk menambahkan sasaran dari Mapotech atau input manual.',
@@ -369,7 +529,8 @@ class _VitaScaleDataAnakPageState extends ConsumerState<VitaScaleDataAnakPage> {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: filtered.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 12),
+                separatorBuilder: (context, index) =>
+                    const SizedBox(height: 12),
                 itemBuilder: (context, index) {
                   final child = filtered[index];
                   final isUnder24 = child.isUnder24Months;
@@ -382,9 +543,8 @@ class _VitaScaleDataAnakPageState extends ConsumerState<VitaScaleDataAnakPage> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => VitaScaleChildHistoryPage(
-                            child: child,
-                          ),
+                          builder: (_) =>
+                              VitaScaleChildHistoryPage(child: child),
                         ),
                       );
                     },
@@ -395,14 +555,21 @@ class _VitaScaleDataAnakPageState extends ConsumerState<VitaScaleDataAnakPage> {
                           width: 44,
                           height: 44,
                           decoration: BoxDecoration(
-                            color: (child.gender == 'L' ? const Color(0xFF3498DB) : const Color(0xFFE91E63))
-                                .withValues(alpha: 0.12),
+                            color:
+                                (child.gender == 'L'
+                                        ? const Color(0xFF3498DB)
+                                        : const Color(0xFFE91E63))
+                                    .withValues(alpha: 0.12),
                             shape: BoxShape.circle,
                           ),
                           alignment: Alignment.center,
                           child: Icon(
-                            isUnder24 ? Icons.child_friendly_rounded : Icons.face_rounded,
-                            color: child.gender == 'L' ? const Color(0xFF3498DB) : const Color(0xFFE91E63),
+                            isUnder24
+                                ? Icons.child_friendly_rounded
+                                : Icons.face_rounded,
+                            color: child.gender == 'L'
+                                ? const Color(0xFF3498DB)
+                                : const Color(0xFFE91E63),
                             size: 22,
                           ),
                         ),
@@ -446,8 +613,12 @@ class _VitaScaleDataAnakPageState extends ConsumerState<VitaScaleDataAnakPage> {
                                       ),
                                     ),
                                   StatusBadge(
-                                    label: isUnder24 ? 'PB (TELENTANG)' : 'TB (BERDIRI)',
-                                    color: isUnder24 ? const Color(0xFF3498DB) : const Color(0xFFE67E22),
+                                    label: isUnder24
+                                        ? 'PB (TELENTANG)'
+                                        : 'TB (BERDIRI)',
+                                    color: isUnder24
+                                        ? const Color(0xFF3498DB)
+                                        : const Color(0xFFE67E22),
                                     fontSize: 9,
                                   ),
                                 ],
@@ -455,7 +626,10 @@ class _VitaScaleDataAnakPageState extends ConsumerState<VitaScaleDataAnakPage> {
                               const SizedBox(height: 4),
                               Text(
                                 'NIK: ${child.nik} • Usia: ${child.ageLabel} (${child.ageInMonths} Bulan) • Wali: ${child.parentName}',
-                                style: GoogleFonts.outfit(fontSize: 10.5, color: subtitleColor),
+                                style: GoogleFonts.outfit(
+                                  fontSize: 10.5,
+                                  color: subtitleColor,
+                                ),
                               ),
                               Text(
                                 'Alamat: ${child.address} • Telp: ${child.phone?.isNotEmpty == true ? child.phone : "-"}',
@@ -468,17 +642,41 @@ class _VitaScaleDataAnakPageState extends ConsumerState<VitaScaleDataAnakPage> {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        // Tombol Pemeriksaan / Kunjungan
-                        CustomButton(
-                          text: 'Pemeriksaan / Kunjungan',
-                          icon: Icons.assignment_outlined,
-                          height: 38,
-                          primaryColor: const Color(0xFF1ABC9C),
-                          onPressed: () {
-                            setState(() {
-                              _selectedChildForHistory = child;
-                            });
-                          },
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            if (child.phone != null && child.phone!.trim().isNotEmpty && child.phone != '-')
+                              CustomButton(
+                                text: 'Hubungi WA',
+                                icon: Icons.chat_rounded,
+                                height: 38,
+                                primaryColor: const Color(0xFF27AE60),
+                                isSecondary: true,
+                                onPressed: () => _contactParent(child),
+                              )
+                            else
+                              CustomButton(
+                                text: 'Peta (Home Visit)',
+                                icon: Icons.pin_drop_rounded,
+                                height: 38,
+                                primaryColor: const Color(0xFF2980B9),
+                                isSecondary: true,
+                                onPressed: () => _openHomeVisitMap(child),
+                              ),
+                            // Tombol Pemeriksaan / Kunjungan
+                            CustomButton(
+                              text: 'Pemeriksaan / Kunjungan',
+                              icon: Icons.assignment_outlined,
+                              height: 38,
+                              primaryColor: const Color(0xFF1ABC9C),
+                              onPressed: () {
+                                setState(() {
+                                  _selectedChildForHistory = child;
+                                });
+                              },
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -508,10 +706,12 @@ class _AddChildRegistrationDialog extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<_AddChildRegistrationDialog> createState() => _AddChildRegistrationDialogState();
+  ConsumerState<_AddChildRegistrationDialog> createState() =>
+      _AddChildRegistrationDialogState();
 }
 
-class _AddChildRegistrationDialogState extends ConsumerState<_AddChildRegistrationDialog> {
+class _AddChildRegistrationDialogState
+    extends ConsumerState<_AddChildRegistrationDialog> {
   int _activeTab = 0; // 0 = Cari Balita Mapotech, 1 = Input Manual Baru
 
   // Controller Pencarian Mapotech
@@ -527,7 +727,9 @@ class _AddChildRegistrationDialogState extends ConsumerState<_AddChildRegistrati
   final TextEditingController _parentCtrl = TextEditingController();
   final TextEditingController _addressCtrl = TextEditingController();
   final TextEditingController _phoneCtrl = TextEditingController();
-  DateTime _selectedBirthDate = DateTime.now().subtract(const Duration(days: 365));
+  DateTime _selectedBirthDate = DateTime.now().subtract(
+    const Duration(days: 365),
+  );
   String _selectedGender = 'L';
 
   final List<String> _ageFilterOptions = const [
@@ -596,33 +798,53 @@ class _AddChildRegistrationDialogState extends ConsumerState<_AddChildRegistrati
       }
 
       // Cek apakah balita sudah terdaftar di daftar puskesmas ini
-      final alreadyRegistered = widget.existingChildren.any((c) => c.nik == nik);
+      final alreadyRegistered = widget.existingChildren.any(
+        (c) => c.nik == nik,
+      );
       if (alreadyRegistered) {
-        CustomSnackbar.error(context, 'Balita dengan NIK $nik sudah terdaftar di faskes Puskesmas ini.');
+        CustomSnackbar.error(
+          context,
+          'Balita dengan NIK $nik sudah terdaftar di faskes Puskesmas ini.',
+        );
         return;
       }
     }
 
     final phone = _phoneCtrl.text.trim();
     if (phone.isNotEmpty) {
-      if (phone.length < 10 || phone.length > 13 || !RegExp(r'^\d{10,13}$').hasMatch(phone)) {
-        CustomSnackbar.error(context, 'Nomor telepon harus angka numerik antara 10 - 13 digit.');
+      if (phone.length < 10 ||
+          phone.length > 13 ||
+          !RegExp(r'^\d{10,13}$').hasMatch(phone)) {
+        CustomSnackbar.error(
+          context,
+          'Nomor telepon harus angka numerik antara 10 - 13 digit.',
+        );
         return;
       }
     }
 
     final newChild = ChildProfile(
-      id: _selectedBalita?.id ?? 'ANK-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
+      id:
+          _selectedBalita?.id ??
+          'ANK-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
       name: name,
       nik: nik.isEmpty ? '-' : nik,
       birthDate: _selectedBirthDate,
       gender: _selectedGender,
-      parentName: _parentCtrl.text.trim().isEmpty ? 'Wali Terdaftar' : _parentCtrl.text.trim(),
-      address: _addressCtrl.text.trim().isEmpty ? 'Puskesmas' : _addressCtrl.text.trim(),
+      parentName: _parentCtrl.text.trim().isEmpty
+          ? 'Wali Terdaftar'
+          : _parentCtrl.text.trim(),
+      address: _addressCtrl.text.trim().isEmpty
+          ? 'Puskesmas'
+          : _addressCtrl.text.trim(),
       phone: phone,
       noKk: _selectedBalita?.noKk,
-      latitude: _selectedBalita?.latitude ?? (-7.9580 + (DateTime.now().second * 0.0002)),
-      longitude: _selectedBalita?.longitude ?? (113.9120 + (DateTime.now().second * 0.0002)),
+      latitude:
+          _selectedBalita?.latitude ??
+          (-7.9580 + (DateTime.now().second * 0.0002)),
+      longitude:
+          _selectedBalita?.longitude ??
+          (113.9120 + (DateTime.now().second * 0.0002)),
     );
 
     widget.onChildRegistered(newChild);
@@ -638,7 +860,8 @@ class _AddChildRegistrationDialogState extends ConsumerState<_AddChildRegistrati
     final borderColor = notifier.getBorderColor();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final isUnder24 = DateTime.now().difference(_selectedBirthDate).inDays < 730;
+    final isUnder24 =
+        DateTime.now().difference(_selectedBirthDate).inDays < 730;
 
     return CustomDialog(
       title: 'Pendaftaran Sasaran Balita & Anak',
@@ -657,7 +880,9 @@ class _AddChildRegistrationDialogState extends ConsumerState<_AddChildRegistrati
               Container(
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF22222E) : const Color(0xFFF1F5F9),
+                  color: isDark
+                      ? const Color(0xFF22222E)
+                      : const Color(0xFFF1F5F9),
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: borderColor),
                 ),
@@ -677,7 +902,9 @@ class _AddChildRegistrationDialogState extends ConsumerState<_AddChildRegistrati
                       child: _buildTabButton(
                         index: 1,
                         title: 'Input Manual Baru',
-                        subtitle: _selectedBalita != null ? 'Data Terisi' : 'Pasien Belum Ada',
+                        subtitle: _selectedBalita != null
+                            ? 'Data Terisi'
+                            : 'Pasien Belum Ada',
                         icon: Icons.edit_note_rounded,
                         isSelected: _activeTab == 1,
                       ),
@@ -694,15 +921,24 @@ class _AddChildRegistrationDialogState extends ConsumerState<_AddChildRegistrati
               if (_activeTab == 0) ...[
                 // Info Box
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF1ABC9C).withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFF1ABC9C).withValues(alpha: 0.2)),
+                    border: Border.all(
+                      color: const Color(0xFF1ABC9C).withValues(alpha: 0.2),
+                    ),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.verified_user_rounded, size: 16, color: Color(0xFF1ABC9C)),
+                      const Icon(
+                        Icons.verified_user_rounded,
+                        size: 16,
+                        color: Color(0xFF1ABC9C),
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -749,14 +985,21 @@ class _AddChildRegistrationDialogState extends ConsumerState<_AddChildRegistrati
                           borderRadius: BorderRadius.circular(10),
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 180),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 7,
+                            ),
                             decoration: BoxDecoration(
                               color: isSelected
                                   ? const Color(0xFF1ABC9C)
-                                  : (isDark ? const Color(0xFF22222E) : const Color(0xFFF1F5F9)),
+                                  : (isDark
+                                        ? const Color(0xFF22222E)
+                                        : const Color(0xFFF1F5F9)),
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
-                                color: isSelected ? const Color(0xFF1ABC9C) : borderColor,
+                                color: isSelected
+                                    ? const Color(0xFF1ABC9C)
+                                    : borderColor,
                               ),
                             ),
                             child: Row(
@@ -766,18 +1009,24 @@ class _AddChildRegistrationDialogState extends ConsumerState<_AddChildRegistrati
                                   f.contains('Bayi')
                                       ? Icons.crib_rounded
                                       : f.contains('Balita')
-                                          ? Icons.child_care_rounded
-                                          : Icons.people_outline_rounded,
+                                      ? Icons.child_care_rounded
+                                      : Icons.people_outline_rounded,
                                   size: 13,
-                                  color: isSelected ? Colors.white : subtitleColor,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : subtitleColor,
                                 ),
                                 const SizedBox(width: 6),
                                 Text(
                                   f,
                                   style: GoogleFonts.outfit(
                                     fontSize: 10.5,
-                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                                    color: isSelected ? Colors.white : textColor,
+                                    fontWeight: isSelected
+                                        ? FontWeight.bold
+                                        : FontWeight.w500,
+                                    color: isSelected
+                                        ? Colors.white
+                                        : textColor,
                                   ),
                                 ),
                               ],
@@ -806,183 +1055,213 @@ class _AddChildRegistrationDialogState extends ConsumerState<_AddChildRegistrati
                 Container(
                   height: 220,
                   decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF1A1A24) : const Color(0xFFF8FAFC),
+                    color: isDark
+                        ? const Color(0xFF1A1A24)
+                        : const Color(0xFFF8FAFC),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: borderColor),
                   ),
                   child: _isSearching
                       ? const Center(
-                          child: CircularProgressIndicator(color: Color(0xFF1ABC9C)),
+                          child: CircularProgressIndicator(
+                            color: Color(0xFF1ABC9C),
+                          ),
                         )
                       : _mapotechCandidates.isEmpty
-                          ? Center(
-                              child: Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.search_off_rounded, size: 36, color: subtitleColor),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      'Tidak Ditemukan Balita Terdaftar',
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        color: textColor,
-                                      ),
-                                    ),
-                                    Text(
-                                      'Coba cari dengan NIK lain atau beralih ke tab "Input Manual Baru".',
-                                      style: GoogleFonts.outfit(fontSize: 10.5, color: subtitleColor),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ],
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.search_off_rounded,
+                                  size: 36,
+                                  color: subtitleColor,
                                 ),
-                              ),
-                            )
-                          : ListView.separated(
-                              padding: const EdgeInsets.all(8),
-                              itemCount: _mapotechCandidates.length,
-                              separatorBuilder: (_, index) => const SizedBox(height: 6),
-                              itemBuilder: (ctx, i) {
-                                final child = _mapotechCandidates[i];
-                                final isSelected = _selectedBalita?.nik == child.nik && child.nik != '-';
-                                final isAlreadyInFaskes = widget.existingChildren.any(
-                                  (c) => c.nik != '-' && c.nik == child.nik,
-                                );
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Tidak Ditemukan Balita Terdaftar',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: textColor,
+                                  ),
+                                ),
+                                Text(
+                                  'Coba cari dengan NIK lain atau beralih ke tab "Input Manual Baru".',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 10.5,
+                                    color: subtitleColor,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : ListView.separated(
+                          padding: const EdgeInsets.all(8),
+                          itemCount: _mapotechCandidates.length,
+                          separatorBuilder: (_, index) =>
+                              const SizedBox(height: 6),
+                          itemBuilder: (ctx, i) {
+                            final child = _mapotechCandidates[i];
+                            final isSelected =
+                                _selectedBalita?.nik == child.nik &&
+                                child.nik != '-';
+                            final isAlreadyInFaskes = widget.existingChildren
+                                .any((c) => c.nik != '-' && c.nik == child.nik);
 
-                                return InkWell(
-                                  onTap: () => _onSelectBalita(child),
+                            return InkWell(
+                              onTap: () => _onSelectBalita(child),
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? const Color(
+                                          0xFF1ABC9C,
+                                        ).withValues(alpha: 0.12)
+                                      : cardBgColor,
                                   borderRadius: BorderRadius.circular(10),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(
-                                      color: isSelected
-                                          ? const Color(0xFF1ABC9C).withValues(alpha: 0.12)
-                                          : cardBgColor,
-                                      borderRadius: BorderRadius.circular(10),
-                                      border: Border.all(
-                                        color: isSelected
-                                            ? const Color(0xFF1ABC9C)
-                                            : borderColor,
-                                        width: isSelected ? 1.5 : 1,
-                                      ),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        // Gender Avatar
-                                        Container(
-                                          width: 38,
-                                          height: 38,
-                                          decoration: BoxDecoration(
-                                            color: (child.gender == 'L'
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? const Color(0xFF1ABC9C)
+                                        : borderColor,
+                                    width: isSelected ? 1.5 : 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    // Gender Avatar
+                                    Container(
+                                      width: 38,
+                                      height: 38,
+                                      decoration: BoxDecoration(
+                                        color:
+                                            (child.gender == 'L'
                                                     ? const Color(0xFF3498DB)
                                                     : const Color(0xFFE91E63))
                                                 .withValues(alpha: 0.12),
-                                            shape: BoxShape.circle,
-                                          ),
-                                          alignment: Alignment.center,
-                                          child: Icon(
-                                            child.isUnder24Months
-                                                ? Icons.child_friendly_rounded
-                                                : Icons.face_rounded,
-                                            size: 18,
-                                            color: child.gender == 'L'
-                                                ? const Color(0xFF3498DB)
-                                                : const Color(0xFFE91E63),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Icon(
+                                        child.isUnder24Months
+                                            ? Icons.child_friendly_rounded
+                                            : Icons.face_rounded,
+                                        size: 18,
+                                        color: child.gender == 'L'
+                                            ? const Color(0xFF3498DB)
+                                            : const Color(0xFFE91E63),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
                                             children: [
-                                              Row(
-                                                children: [
-                                                  Flexible(
-                                                    child: Text(
-                                                      child.name,
-                                                      style: GoogleFonts.outfit(
-                                                        fontSize: 12.5,
-                                                        fontWeight: FontWeight.bold,
-                                                        color: textColor,
-                                                      ),
-                                                      overflow: TextOverflow.ellipsis,
-                                                    ),
+                                              Flexible(
+                                                child: Text(
+                                                  child.name,
+                                                  style: GoogleFonts.outfit(
+                                                    fontSize: 12.5,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: textColor,
                                                   ),
-                                                  const SizedBox(width: 6),
-                                                  StatusBadge(
-                                                    label: child.gender == 'L' ? 'L' : 'P',
-                                                    color: child.gender == 'L'
-                                                        ? const Color(0xFF3498DB)
-                                                        : const Color(0xFFE91E63),
-                                                    fontSize: 8,
-                                                    showDot: false,
-                                                  ),
-                                                  const SizedBox(width: 4),
-                                                  StatusBadge(
-                                                    label: child.ageLabel,
-                                                    color: child.isUnder24Months
-                                                        ? const Color(0xFF3498DB)
-                                                        : const Color(0xFFE67E22),
-                                                    fontSize: 8,
-                                                    showDot: false,
-                                                  ),
-                                                ],
-                                              ),
-                                              const SizedBox(height: 2),
-                                              Text(
-                                                'NIK: ${child.nik} • Wali: ${child.parentName}',
-                                                style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
-                                              ),
-                                              Text(
-                                                child.address,
-                                                style: GoogleFonts.outfit(
-                                                  fontSize: 9.5,
-                                                  color: subtitleColor.withValues(alpha: 0.8),
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
                                                 ),
-                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              const SizedBox(width: 6),
+                                              StatusBadge(
+                                                label: child.gender == 'L'
+                                                    ? 'L'
+                                                    : 'P',
+                                                color: child.gender == 'L'
+                                                    ? const Color(0xFF3498DB)
+                                                    : const Color(0xFFE91E63),
+                                                fontSize: 8,
+                                                showDot: false,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              StatusBadge(
+                                                label: child.ageLabel,
+                                                color: child.isUnder24Months
+                                                    ? const Color(0xFF3498DB)
+                                                    : const Color(0xFFE67E22),
+                                                fontSize: 8,
+                                                showDot: false,
                                               ),
                                             ],
                                           ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        if (isAlreadyInFaskes)
-                                          StatusBadge(
-                                            label: 'Sudah di Faskes',
-                                            color: Colors.grey,
-                                            fontSize: 8.5,
-                                            showDot: false,
-                                          )
-                                        else if (isSelected)
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFF1ABC9C),
-                                              borderRadius: BorderRadius.circular(8),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            'NIK: ${child.nik} • Wali: ${child.parentName}',
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 10,
+                                              color: subtitleColor,
                                             ),
-                                            child: Text(
-                                              'Terpilih ✓',
-                                              style: GoogleFonts.outfit(
-                                                fontSize: 9.5,
-                                                fontWeight: FontWeight.bold,
-                                                color: Colors.white,
+                                          ),
+                                          Text(
+                                            child.address,
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 9.5,
+                                              color: subtitleColor.withValues(
+                                                alpha: 0.8,
                                               ),
                                             ),
-                                          )
-                                        else
-                                          CustomButton(
-                                            text: 'Pilih',
-                                            height: 28,
-                                            isSecondary: true,
-                                            onPressed: () => _onSelectBalita(child),
+                                            overflow: TextOverflow.ellipsis,
                                           ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                );
-                              },
-                            ),
+                                    const SizedBox(width: 8),
+                                    if (isAlreadyInFaskes)
+                                      StatusBadge(
+                                        label: 'Sudah di Faskes',
+                                        color: Colors.grey,
+                                        fontSize: 8.5,
+                                        showDot: false,
+                                      )
+                                    else if (isSelected)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 5,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF1ABC9C),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          'Terpilih ✓',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 9.5,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      )
+                                    else
+                                      CustomButton(
+                                        text: 'Pilih',
+                                        height: 28,
+                                        isSecondary: true,
+                                        onPressed: () => _onSelectBalita(child),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
                 ),
 
                 // Info Box Balita Terpilih
@@ -1000,7 +1279,11 @@ class _AddChildRegistrationDialogState extends ConsumerState<_AddChildRegistrati
                       children: [
                         Row(
                           children: [
-                            const Icon(Icons.check_circle_rounded, size: 18, color: Color(0xFF1ABC9C)),
+                            const Icon(
+                              Icons.check_circle_rounded,
+                              size: 18,
+                              color: Color(0xFF1ABC9C),
+                            ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
@@ -1026,11 +1309,17 @@ class _AddChildRegistrationDialogState extends ConsumerState<_AddChildRegistrati
                         const SizedBox(height: 4),
                         Text(
                           'NIK: ${_selectedBalita!.nik} • Usia: ${_selectedBalita!.ageLabel} (${_selectedBalita!.ageInMonths} Bulan) • Wali: ${_selectedBalita!.parentName}',
-                          style: GoogleFonts.outfit(fontSize: 10.5, color: subtitleColor),
+                          style: GoogleFonts.outfit(
+                            fontSize: 10.5,
+                            color: subtitleColor,
+                          ),
                         ),
                         Text(
                           'Domisili: ${_selectedBalita!.address} • Telp: ${_selectedBalita!.phone?.isNotEmpty == true ? _selectedBalita!.phone : "-"}',
-                          style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
+                          style: GoogleFonts.outfit(
+                            fontSize: 10,
+                            color: subtitleColor,
+                          ),
                         ),
                         const SizedBox(height: 8),
                         Row(
@@ -1067,20 +1356,32 @@ class _AddChildRegistrationDialogState extends ConsumerState<_AddChildRegistrati
                 if (_selectedBalita != null)
                   Container(
                     margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF1ABC9C).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFF1ABC9C).withValues(alpha: 0.2)),
+                      border: Border.all(
+                        color: const Color(0xFF1ABC9C).withValues(alpha: 0.2),
+                      ),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.sync_rounded, size: 16, color: Color(0xFF1ABC9C)),
+                        const Icon(
+                          Icons.sync_rounded,
+                          size: 16,
+                          color: Color(0xFF1ABC9C),
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             'Form telah terisi otomatis dari pasien Mapotech. Anda dapat melengkapi informasi jika diperlukan.',
-                            style: GoogleFonts.outfit(fontSize: 10, color: const Color(0xFF1ABC9C)),
+                            style: GoogleFonts.outfit(
+                              fontSize: 10,
+                              color: const Color(0xFF1ABC9C),
+                            ),
                           ),
                         ),
                       ],
@@ -1114,8 +1415,14 @@ class _AddChildRegistrationDialogState extends ConsumerState<_AddChildRegistrati
                         label: 'Jenis Kelamin',
                         value: _selectedGender,
                         items: const [
-                          CustomDropdownItem(value: 'L', label: 'Laki-laki (L)'),
-                          CustomDropdownItem(value: 'P', label: 'Perempuan (P)'),
+                          CustomDropdownItem(
+                            value: 'L',
+                            label: 'Laki-laki (L)',
+                          ),
+                          CustomDropdownItem(
+                            value: 'P',
+                            label: 'Perempuan (P)',
+                          ),
                         ],
                         onChanged: (v) {
                           if (v != null) setState(() => _selectedGender = v);
@@ -1128,11 +1435,15 @@ class _AddChildRegistrationDialogState extends ConsumerState<_AddChildRegistrati
                 CustomDateField(
                   label: 'Tanggal Lahir',
                   selectedDate: _selectedBirthDate,
-                  onDateSelected: (d) => setState(() => _selectedBirthDate = d ?? DateTime.now()),
+                  onDateSelected: (d) =>
+                      setState(() => _selectedBirthDate = d ?? DateTime.now()),
                 ),
                 const SizedBox(height: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF1ABC9C).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
@@ -1234,7 +1545,9 @@ class _AddChildRegistrationDialogState extends ConsumerState<_AddChildRegistrati
                     title,
                     style: GoogleFonts.outfit(
                       fontSize: 11.5,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.w600,
                       color: isSelected ? Colors.white : null,
                     ),
                     overflow: TextOverflow.ellipsis,
@@ -1243,7 +1556,9 @@ class _AddChildRegistrationDialogState extends ConsumerState<_AddChildRegistrati
                     subtitle,
                     style: GoogleFonts.outfit(
                       fontSize: 8.5,
-                      color: isSelected ? Colors.white.withValues(alpha: 0.9) : const Color(0xFF94A3B8),
+                      color: isSelected
+                          ? Colors.white.withValues(alpha: 0.9)
+                          : const Color(0xFF94A3B8),
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),

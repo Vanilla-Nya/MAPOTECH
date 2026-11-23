@@ -41,7 +41,7 @@ class _PasienChildrenState extends ConsumerState<PasienChildren> {
 
     try {
       final user = ref.read(landingPageProvider).loggedInUser;
-      final enriched = await PasienChildrenService.fetchFamilyChildrenForUser(user);
+      final enriched = await PasienChildrenService.fetchFullFamilyMembersForUser(user);
 
       if (mounted) {
         setState(() {
@@ -91,11 +91,17 @@ class _PasienChildrenState extends ConsumerState<PasienChildren> {
     final borderColor = notifier.getBorderColor();
     final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
 
+    final user = state.loggedInUser;
+    final noKk = (user?['no_kk'] as String? ?? '').trim();
+    final hasKk = noKk.isNotEmpty;
+
     // Filter list
     final filteredChildren = _allChildren.where((c) {
       // Filter kategori
       if (_selectedCategoryFilter == 'Balita' && !c.isBalita) return false;
       if (_selectedCategoryFilter == 'Bayi' && !c.isUnder24Months) return false;
+      if (_selectedCategoryFilter == 'Anak' && (!c.isChild || c.isBalita)) return false;
+      if (_selectedCategoryFilter == 'Dewasa' && !c.isAdult) return false;
 
       // Filter pencarian
       if (_searchQuery.isNotEmpty) {
@@ -109,7 +115,7 @@ class _PasienChildrenState extends ConsumerState<PasienChildren> {
 
     return CustomLazyLoader(
       isLoading: _isLoading,
-      loadingText: isEn ? 'Loading children health records...' : 'Memuat data rekam medis anak...',
+      loadingText: isEn ? 'Loading family health records...' : 'Memuat data rekam medis keluarga...',
       loadingSubtext: isEn
           ? 'Syncing with SatuSehat & Family Card records...'
           : 'Sinkronisasi data Buku KIA & Kartu Keluarga...',
@@ -127,9 +133,38 @@ class _PasienChildrenState extends ConsumerState<PasienChildren> {
             bodyText: bodyText,
             cardBg: cardBg,
             borderColor: borderColor,
+            noKk: noKk,
+            hasKk: hasKk,
           ),
 
           const SizedBox(height: 18),
+
+          // ── KK Check Warning if user has NO KK ──────────────────
+          if (!hasKk) ...[
+            _buildNoKkWarningCard(
+              isEn: isEn,
+              isDark: isDark,
+              themeAccent: themeAccent,
+              textColor: textColor,
+              bodyText: bodyText,
+              cardBg: cardBg,
+              borderColor: borderColor,
+            ),
+            const SizedBox(height: 16),
+          ] else ...[
+            // ── AI Consultation for Entire Family (1 KK) ───────────
+            _buildAiFamilyBanner(
+              isEn: isEn,
+              isDark: isDark,
+              themeAccent: themeAccent,
+              textColor: textColor,
+              bodyText: bodyText,
+              cardBg: cardBg,
+              borderColor: borderColor,
+              user: user,
+            ),
+            const SizedBox(height: 16),
+          ],
 
           // ── Search & Category Filter Chips ──────────────────────
           _buildControls(
@@ -161,7 +196,7 @@ class _PasienChildrenState extends ConsumerState<PasienChildren> {
             const SizedBox(height: 16),
           ],
 
-          // ── List of Children Cards or Empty State ───────────────
+          // ── List of Family Cards or Empty State ─────────────────
           if (filteredChildren.isEmpty)
             _buildEmptyState(
               isEn: isEn,
@@ -177,9 +212,25 @@ class _PasienChildrenState extends ConsumerState<PasienChildren> {
               itemCount: filteredChildren.length,
               separatorBuilder: (_, _) => const SizedBox(height: 18),
               itemBuilder: (context, index) {
-                final childData = filteredChildren[index];
+                final member = filteredChildren[index];
+                if (member.isAdult) {
+                  return _AdultMemberCardItem(
+                    member: member,
+                    isEn: isEn,
+                    isDark: isDark,
+                    isRev: isRev,
+                    lang: lang,
+                    themeAccent: themeAccent,
+                    cardBg: cardBg,
+                    textColor: textColor,
+                    bodyText: bodyText,
+                    borderColor: borderColor,
+                    avatarColor: _getAvatarColor(member.name),
+                    onNavigate: widget.onNavigate,
+                  );
+                }
                 return _ChildCardItem(
-                  child: childData,
+                  child: member,
                   isEn: isEn,
                   isDark: isDark,
                   isRev: isRev,
@@ -189,7 +240,7 @@ class _PasienChildrenState extends ConsumerState<PasienChildren> {
                   textColor: textColor,
                   bodyText: bodyText,
                   borderColor: borderColor,
-                  avatarColor: _getAvatarColor(childData.name),
+                  avatarColor: _getAvatarColor(member.name),
                   onNavigate: widget.onNavigate,
                 );
               },
@@ -210,6 +261,8 @@ class _PasienChildrenState extends ConsumerState<PasienChildren> {
     required Color bodyText,
     required Color cardBg,
     required Color borderColor,
+    required String noKk,
+    required bool hasKk,
   }) {
     return Container(
       margin: EdgeInsets.zero,
@@ -238,7 +291,7 @@ class _PasienChildrenState extends ConsumerState<PasienChildren> {
                   color: themeAccent.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(Icons.child_care_rounded, color: themeAccent, size: 24),
+                child: Icon(Icons.family_restroom_rounded, color: themeAccent, size: 24),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -248,7 +301,7 @@ class _PasienChildrenState extends ConsumerState<PasienChildren> {
                     Row(
                       children: [
                         Text(
-                          isEn ? 'Children Health & Checkup' : 'Data Kesehatan Anak & Balita',
+                          isEn ? 'My Family (Family Records)' : 'My Family (Keluarga Saya)',
                           style: GoogleFonts.outfit(
                             fontSize: 18,
                             fontWeight: FontWeight.w900,
@@ -264,7 +317,7 @@ class _PasienChildrenState extends ConsumerState<PasienChildren> {
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
-                            isEn ? 'LIVE KIA' : 'BUKU KIA',
+                            isEn ? 'FAMILY CARD' : 'KARTU KELUARGA',
                             style: GoogleFonts.outfit(
                               fontSize: 9.5,
                               fontWeight: FontWeight.w800,
@@ -278,8 +331,8 @@ class _PasienChildrenState extends ConsumerState<PasienChildren> {
                     const SizedBox(height: 4),
                     Text(
                       isEn
-                          ? 'Monitored via VitaScale Puskesmas with AI clinical reasoning & parent recommendations'
-                          : 'Terhubung dengan VitaScale Puskesmas terintegrasi SATUSEHAT & rekomendasi AI untuk orang tua',
+                          ? 'Holistic health inspection for entire family, maternal care (MomiCare), and toddler growth (VitaScale 0-59 mo)'
+                          : 'Pemantauan terpadu seluruh anggota keluarga, pemantauan kehamilan (MomiCare), dan tumbuh kembang balita (VitaScale 0–59 bulan)',
                       style: GoogleFonts.outfit(
                         fontSize: 11.5,
                         color: bodyText,
@@ -311,16 +364,20 @@ class _PasienChildrenState extends ConsumerState<PasienChildren> {
             ),
             child: Row(
               children: [
-                Icon(Icons.family_restroom_rounded, color: themeAccent, size: 18),
+                Icon(Icons.badge_rounded, color: themeAccent, size: 18),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    isEn
-                        ? 'Children list is synced with your Family Card (KK) registered in Profile.'
-                        : 'Daftar anak disinkronkan otomatis dari anggota Kartu Keluarga (KK) di Profil Anda.',
+                    hasKk
+                        ? (isEn
+                            ? 'Family Card No: $noKk • ${_allChildren.length} Registered Members'
+                            : 'No. Kartu Keluarga: $noKk • Terdaftar ${_allChildren.length} Anggota Keluarga')
+                        : (isEn
+                            ? 'No Family Card (KK) connected yet. Connect your KK to access family records.'
+                            : 'Nomor Kartu Keluarga (KK) belum terhubung. Daftarkan KK untuk membuka akses keluarga.'),
                     style: GoogleFonts.outfit(
                       fontSize: 11,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w600,
                       color: textColor,
                     ),
                   ),
@@ -332,7 +389,7 @@ class _PasienChildrenState extends ConsumerState<PasienChildren> {
                     foregroundColor: themeAccent,
                   ),
                   child: Text(
-                    isEn ? 'Manage KK' : 'Kelola KK',
+                    hasKk ? (isEn ? 'Manage KK' : 'Kelola KK') : (isEn ? 'Connect KK' : 'Hubungkan KK'),
                     style: GoogleFonts.outfit(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
@@ -340,6 +397,181 @@ class _PasienChildrenState extends ConsumerState<PasienChildren> {
                   ),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── No KK Warning Card ────────────────────────────────────────────────────
+  Widget _buildNoKkWarningCard({
+    required bool isEn,
+    required bool isDark,
+    required Color themeAccent,
+    required Color textColor,
+    required Color bodyText,
+    required Color cardBg,
+    required Color borderColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE67E22).withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE67E22).withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE67E22).withValues(alpha: 0.2),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.assignment_ind_rounded, color: Color(0xFFE67E22), size: 24),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isEn ? 'Family Card (KK) Required' : 'Kartu Keluarga (KK) Diperlukan',
+                  style: GoogleFonts.outfit(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFFE67E22),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  isEn
+                      ? 'To inspect all family members and toddler records (0-59 months), please complete your KK number in Profile.'
+                      : 'Untuk mengakses seluruh data keluarga dan rekam medis balita (0–59 bulan), silakan lengkapi nomor Kartu Keluarga di Profil.',
+                  style: GoogleFonts.outfit(fontSize: 11, color: textColor.withValues(alpha: 0.8)),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          ElevatedButton(
+            onPressed: () => widget.onNavigate?.call('profile'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFE67E22),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: Text(
+              isEn ? 'Update KK' : 'Lengkapi KK',
+              style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── AI Family Consultation Banner ─────────────────────────────────────────
+  Widget _buildAiFamilyBanner({
+    required bool isEn,
+    required bool isDark,
+    required Color themeAccent,
+    required Color textColor,
+    required Color bodyText,
+    required Color cardBg,
+    required Color borderColor,
+    required Map<String, dynamic>? user,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFF8E44AD).withValues(alpha: 0.12),
+            themeAccent.withValues(alpha: 0.08),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF8E44AD).withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF8E44AD).withValues(alpha: 0.18),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.auto_awesome_rounded, color: Color(0xFF8E44AD), size: 22),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      isEn ? 'Ask Mapotech AI for Entire Family' : 'Tanya Mapotech AI untuk Seluruh Keluarga',
+                      style: GoogleFonts.outfit(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                        color: textColor,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF8E44AD).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        '1 KK',
+                        style: GoogleFonts.outfit(
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF8E44AD),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  isEn
+                      ? 'Consult holistic nutrition, toddler milestones, and maternal health for all members in your Family Card.'
+                      : 'Konsultasikan gizi balita, jadwal kontrol ibu hamil, dan gaya hidup sehat untuk seluruh anggota di 1 KK.',
+                  style: GoogleFonts.outfit(fontSize: 11, color: bodyText),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          ElevatedButton.icon(
+            onPressed: () {
+              final allCtx = PasienChildrenService.createAllFamilyContext(user, _allChildren, isEn: isEn);
+              final ownerName = (user?['name'] as String?) ??
+                  (user?['nama_lengkap'] as String?) ??
+                  (isEn ? 'Parent' : 'Bunda/Ayah');
+              ref.read(aiChatProvider.notifier).selectChildContext(
+                    childContext: allCtx,
+                    accountOwnerName: ownerName,
+                  );
+              widget.onNavigate?.call('ai_assistant');
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF8E44AD),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            icon: const Icon(Icons.forum_rounded, size: 15),
+            label: Text(
+              isEn ? 'Ask AI (All)' : 'Tanya AI (Semua)',
+              style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -381,7 +613,7 @@ class _PasienChildrenState extends ConsumerState<PasienChildren> {
                           onChanged: (val) => setState(() => _searchQuery = val.trim()),
                           style: GoogleFonts.outfit(fontSize: 12, color: textColor),
                           decoration: InputDecoration(
-                            hintText: isEn ? 'Search child name or NIK...' : 'Cari nama anak atau NIK...',
+                            hintText: isEn ? 'Search family member name or NIK...' : 'Cari nama anggota keluarga atau NIK...',
                             hintStyle: GoogleFonts.outfit(fontSize: 12, color: bodyText.withValues(alpha: 0.6)),
                             border: InputBorder.none,
                             isDense: true,
@@ -394,7 +626,7 @@ class _PasienChildrenState extends ConsumerState<PasienChildren> {
               ),
               const SizedBox(width: 10),
               CustomButton(
-                text: isEn ? 'Add Child' : 'Tambah Anak',
+                text: isEn ? 'Add Member' : 'Tambah Anggota',
                 icon: Icons.person_add_alt_1_rounded,
                 primaryColor: themeAccent,
                 textColor: Colors.white,
@@ -405,14 +637,21 @@ class _PasienChildrenState extends ConsumerState<PasienChildren> {
           ),
           const SizedBox(height: 12),
           // Category chips
-          Row(
-            children: [
-              _buildFilterChip('Semua', isEn ? 'All Children' : 'Semua Anak', themeAccent, textColor),
-              const SizedBox(width: 8),
-              _buildFilterChip('Balita', isEn ? 'Toddlers (< 5 Yrs)' : 'Balita (< 5 Thn)', themeAccent, textColor),
-              const SizedBox(width: 8),
-              _buildFilterChip('Bayi', isEn ? 'Infants (< 24 Mo)' : 'Bayi (< 24 Bln)', themeAccent, textColor),
-            ],
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildFilterChip('Semua', isEn ? 'All Members (${_allChildren.length})' : 'Semua Anggota (${_allChildren.length})', themeAccent, textColor),
+                const SizedBox(width: 8),
+                _buildFilterChip('Balita', isEn ? 'Toddlers (0-59 Mo)' : 'Balita (0-59 Bln)', themeAccent, textColor),
+                const SizedBox(width: 8),
+                _buildFilterChip('Bayi', isEn ? 'Infants (< 24 Mo)' : 'Bayi (< 24 Bln)', themeAccent, textColor),
+                const SizedBox(width: 8),
+                _buildFilterChip('Anak', isEn ? 'Children' : 'Anak', themeAccent, textColor),
+                const SizedBox(width: 8),
+                _buildFilterChip('Dewasa', isEn ? 'Adults / Parents' : 'Orang Tua / Dewasa', themeAccent, textColor),
+              ],
+            ),
           ),
         ],
       ),
@@ -504,6 +743,275 @@ class _PasienChildrenState extends ConsumerState<PasienChildren> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── Adult Family Member Card Item ───────────────────────────────────────────
+
+class _AdultMemberCardItem extends ConsumerStatefulWidget {
+  final PasienChildModel member;
+  final bool isEn;
+  final bool isDark;
+  final bool isRev;
+  final String lang;
+  final Color themeAccent;
+  final Color cardBg;
+  final Color textColor;
+  final Color bodyText;
+  final Color borderColor;
+  final Color avatarColor;
+  final Function(String menu)? onNavigate;
+
+  const _AdultMemberCardItem({
+    required this.member,
+    required this.isEn,
+    required this.isDark,
+    required this.isRev,
+    required this.lang,
+    required this.themeAccent,
+    required this.cardBg,
+    required this.textColor,
+    required this.bodyText,
+    required this.borderColor,
+    required this.avatarColor,
+    this.onNavigate,
+  });
+
+  @override
+  ConsumerState<_AdultMemberCardItem> createState() => _AdultMemberCardItemState();
+}
+
+class _AdultMemberCardItemState extends ConsumerState<_AdultMemberCardItem> {
+  bool _showFullNik = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final m = widget.member;
+    final isEn = widget.isEn;
+    final isMother = m.isMother;
+    final isFather = m.isFather;
+
+    final roleColor = isMother
+        ? const Color(0xFFE91E63)
+        : (isFather ? const Color(0xFF2980B9) : const Color(0xFF8E44AD));
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: widget.cardBg,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: widget.borderColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: widget.isDark ? 0.25 : 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Row
+          Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: widget.avatarColor.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: widget.avatarColor.withValues(alpha: 0.4), width: 1.5),
+                ),
+                child: Center(
+                  child: Icon(
+                    isMother
+                        ? Icons.female_rounded
+                        : (isFather ? Icons.male_rounded : Icons.person_rounded),
+                    color: widget.avatarColor,
+                    size: 28,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            m.name,
+                            style: GoogleFonts.outfit(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: widget.textColor,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: roleColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: roleColor.withValues(alpha: 0.3)),
+                          ),
+                          child: Text(
+                            m.hubungan.toUpperCase(),
+                            style: GoogleFonts.outfit(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w800,
+                              color: roleColor,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        InkWell(
+                          onTap: () => setState(() => _showFullNik = !_showFullNik),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'NIK: ${_showFullNik ? m.nik : m.maskedNik}',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 11,
+                                  color: widget.bodyText,
+                                  fontFeatures: const [FontFeature.tabularFigures()],
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(
+                                _showFullNik ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                                size: 12,
+                                color: widget.bodyText.withValues(alpha: 0.7),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Text('•', style: TextStyle(color: widget.bodyText, fontSize: 10)),
+                        const SizedBox(width: 10),
+                        Text(
+                          '${m.gender} • ${m.ageLabel}',
+                          style: GoogleFonts.outfit(fontSize: 11, color: widget.bodyText),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // Info Chips Row
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: widget.isDark
+                  ? const Color(0xFF1E1E24)
+                  : const Color(0xFFF9FAFB),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: widget.borderColor),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Row(
+                    children: [
+                      Icon(Icons.bloodtype_rounded, size: 16, color: Colors.red.shade400),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Gol. Darah: ${m.bloodType}',
+                        style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600, color: widget.textColor),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(height: 18, width: 1, color: widget.borderColor),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Row(
+                    children: [
+                      const Icon(Icons.verified_user_rounded, size: 16, color: Color(0xFF27AE60)),
+                      const SizedBox(width: 6),
+                      Text(
+                        'BPJS: ${m.bpjsNumber}',
+                        style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600, color: widget.textColor),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Action Buttons
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              if (isMother)
+                ElevatedButton.icon(
+                  onPressed: () => widget.onNavigate?.call('momicare_pregnancy'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFE91E63),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  icon: const Icon(Icons.pregnant_woman_rounded, size: 16),
+                  label: Text(
+                    isEn ? 'Maternal Care (MomiCare)' : 'Pantau Kandungan (MomiCare)',
+                    style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              OutlinedButton.icon(
+                onPressed: () {
+                  final adultCtx = ActiveChildContext(
+                    childName: m.name,
+                    age: m.ageLabel,
+                    bb: '65 kg',
+                    tb: '168 cm',
+                    statusGizi: isEn ? 'Adult Health Profile' : 'Profil Kesehatan Dewasa (${m.hubungan})',
+                    nutritionPlan: isEn
+                        ? 'Adult balanced lifestyle, periodic checkups, and routine hydration.'
+                        : 'Pola hidup seimbang, pemeriksaan berkala, dan nutrisi keluarga.',
+                    childNik: m.nik,
+                    isSelf: false,
+                  );
+                  final user = ref.read(landingPageProvider).loggedInUser;
+                  final ownerName = (user?['name'] as String?) ?? (isEn ? 'Parent' : 'Bunda/Ayah');
+                  ref.read(aiChatProvider.notifier).selectChildContext(
+                        childContext: adultCtx,
+                        accountOwnerName: ownerName,
+                      );
+                  widget.onNavigate?.call('ai_assistant');
+                },
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: widget.themeAccent,
+                  side: BorderSide(color: widget.themeAccent.withValues(alpha: 0.4)),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                icon: const Icon(Icons.chat_bubble_outline_rounded, size: 15),
+                label: Text(
+                  isEn ? 'Ask AI About ${m.name}' : 'Tanya AI Tentang ${m.name}',
+                  style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

@@ -17,6 +17,7 @@ import 'package:mapotech/features/pasien/dashboard/frontend/pasien_apotek_search
 import 'package:mapotech/features/pasien/dashboard/frontend/pasien_history.dart';
 import 'package:mapotech/features/pasien/dashboard/frontend/pasien_prescription.dart';
 import 'package:mapotech/features/pasien/dashboard/frontend/pasien_children.dart';
+import 'package:mapotech/features/pasien/dashboard/frontend/pasien_momicare_view.dart';
 import 'package:mapotech/features/pasien/dashboard/frontend/pasien_profile.dart';
 import 'package:mapotech/features/pasien/dashboard/frontend/pasien_settings.dart';
 import 'package:mapotech/features/pasien/dashboard/frontend/pasien_qr_scanner_page.dart';
@@ -982,6 +983,15 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
           return const PasienHistory();
         case 'prescription':
           return const PasienPrescription();
+        case 'momicare_pregnancy':
+          return PasienMomicareView(
+            onNavigate: (menu) {
+              setState(() {
+                _activeMenu = menu;
+              });
+            },
+          );
+        case 'my_family':
         case 'children':
           return PasienChildren(
             onNavigate: (menu) {

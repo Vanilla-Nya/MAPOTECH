@@ -820,19 +820,31 @@ class _PasienAiAssistantViewState extends ConsumerState<PasienAiAssistantView> {
     required bool isEn,
   }) {
     if (activeChild != null) {
+      final isAllFamily = activeChild.childId == 'all_family_kk' ||
+          activeChild.childName.toLowerCase().contains('semua anggota keluarga') ||
+          activeChild.childName.toLowerCase().contains('entire family');
+
+      final contextIcon = isAllFamily
+          ? Icons.family_restroom_rounded
+          : (activeChild.isSelf ? Icons.person_rounded : Icons.child_care_rounded);
+
+      final contextColor = isAllFamily
+          ? const Color(0xFF9B59B6)
+          : (activeChild.isSelf ? const Color(0xFF3498DB) : const Color(0xFF1ABC9C));
+
       return Container(
         margin: const EdgeInsets.fromLTRB(20, 10, 20, 0),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: const Color(0xFF1ABC9C).withOpacity(isDark ? 0.12 : 0.08),
+          color: contextColor.withOpacity(isDark ? 0.12 : 0.08),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: const Color(0xFF1ABC9C).withOpacity(0.35),
+            color: contextColor.withOpacity(0.35),
             width: 1.2,
           ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF1ABC9C).withOpacity(isDark ? 0.15 : 0.05),
+              color: contextColor.withOpacity(isDark ? 0.15 : 0.05),
               blurRadius: 10,
               offset: const Offset(0, 3),
             ),
@@ -843,20 +855,13 @@ class _PasienAiAssistantViewState extends ConsumerState<PasienAiAssistantView> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: (activeChild.isSelf
-                        ? const Color(0xFF3498DB)
-                        : const Color(0xFF1ABC9C))
-                    .withOpacity(0.2),
+                color: contextColor.withOpacity(0.2),
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                activeChild.isSelf
-                    ? Icons.person_rounded
-                    : Icons.child_care_rounded,
+                contextIcon,
                 size: 20,
-                color: activeChild.isSelf
-                    ? const Color(0xFF3498DB)
-                    : const Color(0xFF1ABC9C),
+                color: contextColor,
               ),
             ),
             const SizedBox(width: 12),
@@ -872,7 +877,7 @@ class _PasienAiAssistantViewState extends ConsumerState<PasienAiAssistantView> {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF1ABC9C),
+                          color: contextColor,
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Row(
@@ -888,9 +893,9 @@ class _PasienAiAssistantViewState extends ConsumerState<PasienAiAssistantView> {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              isEn
-                                  ? 'ACTIVE PROMPT CONTEXT'
-                                  : 'KONTEKS DATA TERPILIH',
+                              isAllFamily
+                                  ? (isEn ? 'ALL FAMILY CONTEXT' : 'KONTEKS 1 KK LENGKAP')
+                                  : (isEn ? 'ACTIVE PROMPT CONTEXT' : 'KONTEKS DATA TERPILIH'),
                               style: GoogleFonts.outfit(
                                 fontSize: 8.5,
                                 fontWeight: FontWeight.w900,
@@ -902,12 +907,15 @@ class _PasienAiAssistantViewState extends ConsumerState<PasienAiAssistantView> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Text(
-                        activeChild.childName,
-                        style: GoogleFonts.outfit(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w800,
-                          color: textColor,
+                      Flexible(
+                        child: Text(
+                          activeChild.childName,
+                          style: GoogleFonts.outfit(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w800,
+                            color: textColor,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
@@ -1189,6 +1197,126 @@ class _PasienAiAssistantViewState extends ConsumerState<PasienAiAssistantView> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // 0. OPSI KONSULTASI SELURUH ANGGOTA KELUARGA (1 KK)
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 14),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              const Color(0xFF9B59B6).withValues(alpha: 0.12),
+                              const Color(0xFF1ABC9C).withValues(alpha: 0.12),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: const Color(0xFF9B59B6).withValues(alpha: 0.4),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: InkWell(
+                          onTap: () {
+                            Navigator.pop(ctx);
+                            final allCtx = PasienChildrenService.createAllFamilyContext(
+                              user,
+                              familyChildren,
+                              isEn: isEn,
+                            );
+                            final ownerName = (user?['name'] as String?) ??
+                                (user?['nama_lengkap'] as String?) ??
+                                (isEn ? 'Parent' : 'Bunda/Ayah');
+                            ref.read(aiChatProvider.notifier).selectChildContext(
+                                  childContext: allCtx,
+                                  accountOwnerName: ownerName,
+                                );
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  isEn
+                                      ? 'Active prompt context set to Entire Family (1 KK).'
+                                      : 'Konteks prompt AI beralih ke Semua Anggota Keluarga (1 KK).',
+                                ),
+                                backgroundColor: const Color(0xFF9B59B6),
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(14),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF9B59B6).withValues(alpha: 0.2),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.family_restroom_rounded,
+                                    size: 22,
+                                    color: Color(0xFF9B59B6),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Flexible(
+                                            child: Text(
+                                              isEn
+                                                  ? 'Entire Family (All Members)'
+                                                  : 'Semua Anggota Keluarga (1 KK)',
+                                              style: GoogleFonts.outfit(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w800,
+                                                color: textColor,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 6,
+                                              vertical: 1.5,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF9B59B6).withValues(alpha: 0.15),
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              isEn ? 'ALL' : 'SEMUA',
+                                              style: GoogleFonts.outfit(
+                                                fontSize: 8.5,
+                                                fontWeight: FontWeight.bold,
+                                                color: const Color(0xFF9B59B6),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        isEn
+                                            ? 'Holistic consultation covering maternal health, toddler nutrition, and whole household'
+                                            : 'Konsultasi kesehatan holistik untuk Ayah, Ibu, Balita, dan seluruh anggota keluarga',
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 10.5,
+                                          color: textColor.withValues(alpha: 0.7),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                       // 1. Jika ADA anak yang terdaftar di keluarga
                       if (familyChildren.isNotEmpty) ...[
                         Padding(

@@ -383,11 +383,24 @@ class AIChatNotifier extends StateNotifier<AIChatState> {
     String promptForAi = trimmed;
     if (state.activeChildContext != null) {
       final c = state.activeChildContext!;
-      final isSelf = c.isSelf ||
+      final isAllFamily = c.childId == 'all_family_kk' ||
+          c.childName.toLowerCase().contains('semua anggota keluarga') ||
+          c.childName.toLowerCase().contains('entire family');
+      final isSelf = !isAllFamily && (c.isSelf ||
           c.childName.toLowerCase().contains('(self)') ||
-          c.childName.toLowerCase().contains('(saya)');
+          c.childName.toLowerCase().contains('(saya)'));
 
-      if (isSelf) {
+      if (isAllFamily) {
+        promptForAi = isEn
+            ? "User consulting regarding the ENTIRE FAMILY HOUSEHOLD (Family Card / KK):\n"
+              "- Context: ${c.childName} (${c.age})\n"
+              "- Health Scope: ${c.nutritionPlan}\n\n"
+              "User query: $trimmed"
+            : "Pasien berkonsultasi mengenai KELUARGA LENGKAP (1 Kartu Keluarga / KK):\n"
+              "- Konteks: ${c.childName} (${c.age})\n"
+              "- Ruang Lingkup Kesehatan: ${c.nutritionPlan}\n\n"
+              "Pertanyaan keluarga: $trimmed";
+      } else if (isSelf) {
         promptForAi = isEn
             ? "User consulting regarding personal health:\n"
               "- Name: ${c.childName}\n"
@@ -562,57 +575,107 @@ class AIChatNotifier extends StateNotifier<AIChatState> {
         ? accountOwnerName.trim()
         : (isEn ? 'there' : 'Bunda/Ayah');
 
-    final isSelf = childContext.isSelf ||
+    final isAllFamily = childContext.childId == 'all_family_kk' ||
+        childContext.childName.toLowerCase().contains('semua anggota keluarga') ||
+        childContext.childName.toLowerCase().contains('entire family');
+
+    final isSelf = !isAllFamily && (childContext.isSelf ||
         childContext.childName.toLowerCase().contains('(self)') ||
-        childContext.childName.toLowerCase().contains('(saya)');
+        childContext.childName.toLowerCase().contains('(saya)'));
 
     // 1. Context-specific quick actions
-    final List<String> quickActions = isSelf
+    final List<String> quickActions = isAllFamily
         ? (isEn
             ? [
-                'Daily balanced nutrition guide',
-                'Tips for maintaining ideal weight & BP',
-                'Consult health symptoms & complaints',
-                'Daily hydration & physical activity needs',
-                'Find Nearby Healthcare Clinic',
+                'Family nutritional balance guide',
+                'Toddler & maternal care priorities',
+                'Posyandu & immunization schedule',
+                'Healthy lifestyle for 1 household',
+                'Find Community Health Center (Puskesmas)',
               ]
             : [
-                'Panduan pola makan gizi seimbang harian',
-                'Tips menjaga berat badan & tekanan darah ideal',
-                'Konsultasi keluhan gejala kesehatan',
-                'Kebutuhan cairan & aktivitas fisik harian',
-                'Cari Fasilitas Kesehatan terdekat',
+                'Panduan gizi seimbang 1 keluarga',
+                'Prioritas gizi balita & ibu hamil',
+                'Jadwal posyandu & imunisasi balita',
+                'Gaya hidup sehat 1 rumah tangga',
+                'Cari Puskesmas / Faskes Terdekat',
               ])
-        : (isEn
-            ? [
-                'Daily meal plan for ${childContext.childName}',
-                'Tips for appetite & picky eating (GTM)',
-                'Meal texture & portion for age ${childContext.age}',
-                'Healthy weight gain snacks for ${childContext.childName}',
-                'Find Pediatrician nearby',
-              ]
-            : [
-                'Menu gizi seimbang untuk ${childContext.childName}',
-                'Cara mengatasi anak susah makan (GTM)',
-                'Tekstur & porsi makan usia ${childContext.age}',
-                'Cemilan sehat penambah berat badan',
-                'Cari Dokter Anak terdekat',
-              ]);
+        : isSelf
+            ? (isEn
+                ? [
+                    'Daily balanced nutrition guide',
+                    'Tips for maintaining ideal weight & BP',
+                    'Consult health symptoms & complaints',
+                    'Daily hydration & physical activity needs',
+                    'Find Nearby Healthcare Clinic',
+                  ]
+                : [
+                    'Panduan pola makan gizi seimbang harian',
+                    'Tips menjaga berat badan & tekanan darah ideal',
+                    'Konsultasi keluhan gejala kesehatan',
+                    'Kebutuhan cairan & aktivitas fisik harian',
+                    'Cari Fasilitas Kesehatan terdekat',
+                  ])
+            : (isEn
+                ? [
+                    'Daily meal plan for ${childContext.childName}',
+                    'Tips for appetite & picky eating (GTM)',
+                    'Meal texture & portion for age ${childContext.age}',
+                    'Healthy weight gain snacks for ${childContext.childName}',
+                    'Find Pediatrician nearby',
+                  ]
+                : [
+                    'Menu gizi seimbang untuk ${childContext.childName}',
+                    'Cara mengatasi anak susah makan (GTM)',
+                    'Tekstur & porsi makan usia ${childContext.age}',
+                    'Cemilan sehat penambah berat badan',
+                    'Cari Dokter Anak terdekat',
+                  ]);
 
     // 2. Local template greeting (ZERO GEMINI TOKENS USED!)
-    final String greetingText = isSelf
+    final String greetingText = isAllFamily
         ? (isEn
-            ? "Hello $owner!\n\nYou are currently in **Personal Health Consultation Mode** (Weight: ${childContext.bb}, Height: ${childContext.tb}, Health Status: ${childContext.statusGizi}).\n\nWhat health questions, symptoms, or medical guidance would you like to consult with AI today? Feel free to type your question below or pick a suggested topic."
-            : "Halo $owner!\n\nAnda saat ini berada dalam **Mode Konsultasi Kesehatan Pribadi** (BB: ${childContext.bb}, TB: ${childContext.tb}, Status: ${childContext.statusGizi}).\n\nAda keluhan, gejala kesehatan, atau informasi medis apa yang ingin Anda tanyakan ke AI hari ini? Silakan ketik pertanyaan Anda di bawah atau pilih rekomendasi topik yang tersedia.")
-        : (isEn
-            ? "Hello $owner!\n\nYou have selected health records for **${childContext.childName}** (Age: ${childContext.age}, Weight: ${childContext.bb}, Height: ${childContext.tb}, Nutritional Status: ${childContext.statusGizi}).\n\nWhat would you like to ask or consult about **${childContext.childName}** today? You can ask about meal planning, protein intake, picky eating (GTM), or any symptoms."
-            : "Halo $owner!\n\nAnda telah memilih data rekam medis anak: **${childContext.childName}** (Usia: ${childContext.age}, BB: ${childContext.bb}, TB: ${childContext.tb}, Status Gizi: ${childContext.statusGizi}).\n\nApa yang ingin Anda tanyakan atau konsultasikan mengenai gizi, makanan, atau tumbuh kembang **${childContext.childName}** hari ini? Silakan ketik pertanyaan Anda di bawah atau pilih salah satu rekomendasi topik.");
+            ? "Hello $owner!\n\nYou are in **Entire Family Health Consultation Mode** (${childContext.age}).\n\nWhat would you like to consult regarding your family's overall health, toddler growth, maternal care, or household nutrition today?"
+            : "Halo $owner!\n\nAnda saat ini berada dalam **Mode Konsultasi Kesehatan Seluruh Keluarga (1 KK)** (${childContext.age}).\n\nApa yang ingin Anda tanyakan atau konsultasikan mengenai kesehatan keluarga, tumbuh kembang balita, pemantauan kehamilan, atau pemenuhan gizi rumah tangga hari ini?")
+        : isSelf
+            ? (isEn
+                ? "Hello $owner!\n\nYou are currently in **Personal Health Consultation Mode** (Weight: ${childContext.bb}, Height: ${childContext.tb}, Health Status: ${childContext.statusGizi}).\n\nWhat health questions, symptoms, or medical guidance would you like to consult with AI today? Feel free to type your question below or pick a suggested topic."
+                : "Halo $owner!\n\nAnda saat ini berada dalam **Mode Konsultasi Kesehatan Pribadi** (BB: ${childContext.bb}, TB: ${childContext.tb}, Status: ${childContext.statusGizi}).\n\nAda keluhan, gejala kesehatan, atau informasi medis apa yang ingin Anda tanyakan ke AI hari ini? Silakan ketik pertanyaan Anda di bawah atau pilih rekomendasi topik yang tersedia.")
+            : (isEn
+                ? "Hello $owner!\n\nYou have selected health records for **${childContext.childName}** (Age: ${childContext.age}, Weight: ${childContext.bb}, Height: ${childContext.tb}, Nutritional Status: ${childContext.statusGizi}).\n\nWhat would you like to ask or consult about **${childContext.childName}** today? You can ask about meal planning, protein intake, picky eating (GTM), or any symptoms."
+                : "Halo $owner!\n\nAnda telah memilih data rekam medis anak: **${childContext.childName}** (Usia: ${childContext.age}, BB: ${childContext.bb}, TB: ${childContext.tb}, Status Gizi: ${childContext.statusGizi}).\n\nApa yang ingin Anda tanyakan atau konsultasikan mengenai gizi, makanan, atau tumbuh kembang **${childContext.childName}** hari ini? Silakan ketik pertanyaan Anda di bawah atau pilih salah satu rekomendasi topik.");
 
     final templateMessage = AIChatMessage(
       text: greetingText,
       sender: MessageSender.ai,
       timestamp: DateTime.now(),
-      actions: isSelf
+      actions: isAllFamily
+          ? (isEn
+              ? const [
+                  AIChatAction(
+                    label: 'My Family',
+                    icon: 'family_restroom',
+                    menuId: 'my_family',
+                  ),
+                  AIChatAction(
+                    label: 'Find Puskesmas',
+                    icon: 'local_hospital',
+                    menuId: 'puskesmas_search',
+                  ),
+                ]
+              : const [
+                  AIChatAction(
+                    label: 'Keluarga Saya',
+                    icon: 'family_restroom',
+                    menuId: 'my_family',
+                  ),
+                  AIChatAction(
+                    label: 'Cari Puskesmas',
+                    icon: 'local_hospital',
+                    menuId: 'puskesmas_search',
+                  ),
+                ])
+          : isSelf
           ? (isEn
               ? const [
                   AIChatAction(

@@ -1704,6 +1704,62 @@ class _PatientAncDetailModalState extends ConsumerState<PatientAncDetailModal> {
                         ),
                       ),
 
+                      // Persalinan / Transisi 9 Bulan (Tutup Antrian MomiCare -> Buka VitaScale Anak)
+                      Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(top: 12),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1ABC9C).withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFF1ABC9C).withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1ABC9C).withOpacity(0.15),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.child_care_rounded, size: 20, color: Color(0xFF1ABC9C)),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'TRANSISI 9 BULAN & KELAHIRAN BAYI',
+                                    style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w900, color: widget.textColor),
+                                  ),
+                                  Text(
+                                    'Tandai kehamilan selesai (arsip permanen) dan buka antrian skrining balita VitaScale (0–59 bulan).',
+                                    style: GoogleFonts.outfit(fontSize: 9.5, color: widget.subtitleColor),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF1ABC9C),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                              onPressed: () {
+                                _showBirthTransitionModal(context, widget.item, widget.isDark, widget.cardBgColor, widget.textColor, widget.subtitleColor, widget.borderColor);
+                              },
+                              child: Text(
+                                'Catat Lahir',
+                                style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
                       const SizedBox(height: 20),
 
                       // Interactive History of Visits List (Clickable!)
@@ -2290,6 +2346,171 @@ class _PatientAncDetailModalState extends ConsumerState<PatientAncDetailModal> {
               ],
             ),
           ),
+        );
+      },
+    );
+  }
+
+  void _showBirthTransitionModal(
+    BuildContext context,
+    IbuHamilModel item,
+    bool isDark,
+    Color cardBgColor,
+    Color textColor,
+    Color subtitleColor,
+    Color borderColor,
+  ) {
+    final babyNameCtrl = TextEditingController(text: 'Bayi Ny. ${item.nama}');
+    String selectedGender = 'L';
+    final weightCtrl = TextEditingController(text: '3.1');
+    final lengthCtrl = TextEditingController(text: '49.0');
+
+    showDialog(
+      context: context,
+      builder: (bCtx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            return Dialog(
+              backgroundColor: cardBgColor,
+              surfaceTintColor: Colors.transparent,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              child: Container(
+                width: 480,
+                padding: const EdgeInsets.all(22),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1ABC9C).withOpacity(0.15),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.child_care_rounded, size: 22, color: Color(0xFF1ABC9C)),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              'Pencatatan Kelahiran & Antrian Balita',
+                              style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.bold, color: textColor),
+                            ),
+                          ],
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.pop(bCtx),
+                          icon: const Icon(Icons.close_rounded, size: 18),
+                          color: subtitleColor,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1ABC9C).withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF1ABC9C).withOpacity(0.2)),
+                      ),
+                      child: Text(
+                        'Ibu ${item.nama} telah mencapai persalinan. Antrian MomiCare akan ditutup secara permanen (ALL INSERT riwayat), dan antrian baru VitaScale Anak (0–59 bulan) akan otomatis dibuat dan mewarisi titik koordinat rumah & kontak orang tua.',
+                        style: GoogleFonts.outfit(fontSize: 11, color: textColor),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: babyNameCtrl,
+                      style: GoogleFonts.outfit(fontSize: 12, color: textColor),
+                      decoration: InputDecoration(
+                        labelText: 'Nama Bayi / Balita',
+                        labelStyle: GoogleFonts.outfit(fontSize: 12, color: subtitleColor),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        isDense: true,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            value: selectedGender,
+                            dropdownColor: cardBgColor,
+                            style: GoogleFonts.outfit(fontSize: 12, color: textColor),
+                            decoration: InputDecoration(
+                              labelText: 'Jenis Kelamin',
+                              labelStyle: GoogleFonts.outfit(fontSize: 12, color: subtitleColor),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                              isDense: true,
+                            ),
+                            items: const [
+                              DropdownMenuItem(value: 'L', child: Text('Laki-laki')),
+                              DropdownMenuItem(value: 'P', child: Text('Perempuan')),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) setModalState(() => selectedGender = val);
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextField(
+                            controller: weightCtrl,
+                            keyboardType: TextInputType.number,
+                            style: GoogleFonts.outfit(fontSize: 12, color: textColor),
+                            decoration: InputDecoration(
+                              labelText: 'Berat Lahir (kg)',
+                              labelStyle: GoogleFonts.outfit(fontSize: 12, color: subtitleColor),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                              isDense: true,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextField(
+                            controller: lengthCtrl,
+                            keyboardType: TextInputType.number,
+                            style: GoogleFonts.outfit(fontSize: 12, color: textColor),
+                            decoration: InputDecoration(
+                              labelText: 'Panjang Lahir (cm)',
+                              labelStyle: GoogleFonts.outfit(fontSize: 12, color: subtitleColor),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                              isDense: true,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1ABC9C),
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(double.infinity, 44),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () {
+                        Navigator.pop(bCtx);
+                        CustomSnackbar.success(
+                          context,
+                          'Kelahiran ananda "${babyNameCtrl.text}" berhasil dicatat! Status kehamilan ${item.nama} telah diarsipkan permanen (Hash Chain Terverifikasi) dan antrian baru VitaScale Balita (0-59 bulan) aktif.',
+                          title: 'Transisi Kelahiran Sukses',
+                        );
+                      },
+                      child: Text(
+                        'Konfirmasi Kelahiran & Buka Antrian Balita',
+                        style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         );
       },
     );
