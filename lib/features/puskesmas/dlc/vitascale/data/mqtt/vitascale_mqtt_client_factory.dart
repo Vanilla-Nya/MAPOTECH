@@ -8,11 +8,13 @@ MqttClient getPlatformMqttClient({
   required String clientId,
   required int port,
   bool useWebSocket = true,
+  String wsPath = '/mqtt',
 }) {
   return createPlatformMqttClient(
     broker: broker,
     clientId: clientId,
     port: port,
     useWebSocket: useWebSocket,
+    wsPath: wsPath,
   );
 }

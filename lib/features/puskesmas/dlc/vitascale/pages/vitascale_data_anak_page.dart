@@ -190,20 +190,32 @@ class _VitaScaleDataAnakPageState extends ConsumerState<VitaScaleDataAnakPage> {
   @override
   Widget build(BuildContext context) {
     if (_selectedChildForHistory != null) {
-      return VitaScaleChildHistoryPage(
-        child: _selectedChildForHistory!,
-        onBack: () {
+      return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) return;
           setState(() {
             _selectedChildForHistory = null;
           });
         },
-        onStartScreening: (child) {
-          if (widget.onNavigateWithChild != null) {
-            widget.onNavigateWithChild!('dlc_vitascale_screening', child);
-          } else if (widget.onNavigateToMenu != null) {
-            widget.onNavigateToMenu!('dlc_vitascale_screening');
-          }
-        },
+        child: VitaScaleChildHistoryPage(
+          child: _selectedChildForHistory!,
+          onBack: () {
+            setState(() {
+              _selectedChildForHistory = null;
+            });
+          },
+          onStartScreening: (child) {
+            setState(() {
+              _selectedChildForHistory = null;
+            });
+            if (widget.onNavigateWithChild != null) {
+              widget.onNavigateWithChild!('dlc_vitascale_screening', child);
+            } else if (widget.onNavigateToMenu != null) {
+              widget.onNavigateToMenu!('dlc_vitascale_screening');
+            }
+          },
+        ),
       );
     }
 
@@ -540,13 +552,9 @@ class _VitaScaleDataAnakPageState extends ConsumerState<VitaScaleDataAnakPage> {
                     borderColor: borderColor,
                     padding: const EdgeInsets.all(18),
                     onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              VitaScaleChildHistoryPage(child: child),
-                        ),
-                      );
+                      setState(() {
+                        _selectedChildForHistory = child;
+                      });
                     },
                     child: Row(
                       children: [
