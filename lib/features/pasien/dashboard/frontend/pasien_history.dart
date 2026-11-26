@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:mapotech/shared/widgets/skeleton_loading.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
-import 'package:mapotech/shared/widgets/empty_state_widget.dart';
+import 'package:mapotech/shared/widgets/ui.dart';
+import 'package:mapotech/shared/letter_models.dart';
 import 'package:mapotech/shared/supabase_service.dart';
 import 'package:mapotech/shared/thousands_formatter.dart';
 
@@ -11,6 +11,7 @@ import 'package:mapotech/shared/thousands_formatter.dart';
 
 class RiwayatDokterEntry {
   final String id;
+  final String? encounterId;
   final String date;
   final String time;
   final String doctorName;
@@ -28,6 +29,7 @@ class RiwayatDokterEntry {
 
   const RiwayatDokterEntry({
     required this.id,
+    this.encounterId,
     required this.date,
     required this.time,
     required this.doctorName,
@@ -376,6 +378,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
 
           loadedDokter.add(RiwayatDokterEntry(
             id: qId,
+            encounterId: encounterId,
             date: dateFormatted,
             time: timeStr,
             doctorName: doctorName,
@@ -1084,6 +1087,9 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                               '${isEn ? "Referred To" : "Dirujuk Ke"}: ${rd.suratRujukan!.namaRs}',
                             ],
                             fileName: 'surat_rujukan_${rd.suratRujukan!.noSurat}.pdf',
+                            encounterId: rd.encounterId,
+                            letterType: MedicalLetterType.rujukan,
+                            isEn: isEn,
                           ),
                         ],
 
@@ -1101,6 +1107,9 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                                 '${isEn ? "Diagnosis/History" : "Diagnosis/Riwayat"}: ${rd.suratSakit!.riwayatPenyakit}',
                             ],
                             fileName: 'surat_keterangan_sakit_${rd.id}.pdf',
+                            encounterId: rd.encounterId,
+                            letterType: MedicalLetterType.suratSakit,
+                            isEn: isEn,
                           ),
                         ],
 
@@ -1116,6 +1125,9 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                               '${isEn ? "Purpose" : "Keperluan"}: ${rd.suratSehat!.keperluan}',
                             ],
                             fileName: 'surat_keterangan_sehat_${rd.id}.pdf',
+                            encounterId: rd.encounterId,
+                            letterType: MedicalLetterType.suratSehat,
+                            isEn: isEn,
                           ),
                         ],
                       ],
@@ -1335,6 +1347,9 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
     required IconData icon,
     required List<String> details,
     required String fileName,
+    String? encounterId,
+    MedicalLetterType? letterType,
+    bool isEn = false,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
@@ -1370,30 +1385,28 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
             ),
           )),
           const SizedBox(height: 12),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: color,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            icon: const Icon(Icons.download_rounded, size: 16),
-            label: Text(
-              'Unduh Dokumen Resmi (PDF)',
-              style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold),
-            ),
+          CustomButton(
+            text: isEn
+                ? 'View & Print Official Letter (QR)'
+                : 'Lihat & Cetak Surat Resmi (QR)',
+            icon: Icons.print_rounded,
+            primaryColor: color,
+            height: 40,
             onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  behavior: SnackBarBehavior.floating,
-                  backgroundColor: color,
-                  content: Text(
-                    'Berhasil Mengunduh $fileName',
-                    style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
-                  ),
-                ),
-              );
+              if (encounterId != null && encounterId.isNotEmpty) {
+                MedicalLetterPreviewDialog.show(
+                  context,
+                  encounterId: encounterId,
+                  preferredType: letterType,
+                );
+              } else {
+                CustomSnackbar.info(
+                  context,
+                  isEn
+                      ? 'Document $fileName is only available for saved encounters.'
+                      : 'Dokumen $fileName tersedia untuk pemeriksaan yang tersimpan di server.',
+                );
+              }
             },
           ),
         ],

@@ -30,4 +30,6 @@ export 'custom_qris_dialog.dart';
 export 'custom_collapsible_card.dart';
 export 'custom_form_stepper.dart';
 export 'formatted_markdown_text.dart';
+export 'medical_letter_preview_dialog.dart';
+export 'letter_verification_page.dart';
 export 'package:mapotech/shared/l10n/app_translations.dart';

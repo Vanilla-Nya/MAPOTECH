@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/apotek/dashboard/frontend/widgets/web_qr_scanner.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
+import 'package:mapotech/shared/letter_models.dart';
 import 'package:mapotech/shared/supabase_service.dart';
+import 'package:mapotech/shared/widgets/letter_verification_page.dart';
 
 /// Modal dialog for patients to scan QR codes for Doctor Registration or Apotek POS
 class PasienQrScannerDialog extends ConsumerStatefulWidget {
@@ -69,6 +71,40 @@ class _PasienQrScannerDialogState extends ConsumerState<PasienQrScannerDialog>
     });
 
     try {
+      // 0. Check if scanned QR is a Digital Letter Verification URL
+      final parsedUri = Uri.tryParse(payload);
+      final verifyReq = parsedUri != null
+          ? MedicalLetterVerificationRequest.parseUri(parsedUri)
+          : null;
+      if (verifyReq != null) {
+        if (mounted) {
+          final navContext = Navigator.of(context, rootNavigator: true).context;
+          Navigator.pop(context);
+          showDialog<void>(
+            context: navContext,
+            barrierColor: Colors.black.withValues(alpha: 0.6),
+            builder: (dCtx) => Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding: const EdgeInsets.all(20),
+              child: SizedBox(
+                width: 1060,
+                height: MediaQuery.of(dCtx).size.height * 0.9,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: LetterVerificationPage(
+                    encounterId: verifyReq.encounterId,
+                    expectedType: verifyReq.expectedType,
+                    isEmbeddedModal: true,
+                    onBackToPortal: () => Navigator.of(dCtx).pop(),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
       // 1. Analyze payload format
       // Production URL: https://mapotek.relvastudio.com/...
       // Or local/kemenkes links: https://mapotech.kemenkes.go.id/..., https://mapotech.id/...

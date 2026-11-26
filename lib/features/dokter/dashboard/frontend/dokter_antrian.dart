@@ -1,10 +1,10 @@
-import 'dart:math';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/shared/widgets/ui.dart';
+import 'package:mapotech/shared/letter_models.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/features/dokter/dashboard/frontend/dokter_pasien.dart'; // To access registered patients
 import 'package:mapotech/shared/supabase_service.dart';
@@ -3040,11 +3040,24 @@ class _PatientQueueDetailDialogState
     extends ConsumerState<PatientQueueDetailDialog> {
   bool _isRegistering = false;
   late String _selectedType;
+  Map<String, dynamic>? _encounterSummary;
 
   @override
   void initState() {
     super.initState();
     _selectedType = widget.queue.tipe.isNotEmpty ? widget.queue.tipe : 'Umum';
+    if (widget.queue.status == 'Selesai' ||
+        widget.queue.status == 'Pembayaran') {
+      _loadEncounterSummary();
+    }
+  }
+
+  Future<void> _loadEncounterSummary() async {
+    final summary =
+        await SupabaseService().fetchEncounterSummaryByQueueId(widget.queue.id);
+    if (mounted && summary != null) {
+      setState(() => _encounterSummary = summary);
+    }
   }
 
   int _calculateAge(DateTime? dob) {
@@ -3645,6 +3658,52 @@ class _PatientQueueDetailDialogState
                     ],
                   ),
                 ] else ...[
+                  if (_encounterSummary != null &&
+                      (_encounterSummary!['is_rujukan'] == true ||
+                          _encounterSummary!['surat_keterangan_type'] !=
+                              null)) ...[
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      alignment: WrapAlignment.end,
+                      children: [
+                        if (_encounterSummary!['is_rujukan'] == true)
+                          CustomButton(
+                            text: 'Surat Rujukan',
+                            icon: Icons.send_rounded,
+                            primaryColor: Colors.blueAccent,
+                            height: 38,
+                            onPressed: () => MedicalLetterPreviewDialog.show(
+                              context,
+                              encounterId:
+                                  _encounterSummary!['id']?.toString(),
+                              preferredType: MedicalLetterType.rujukan,
+                            ),
+                          ),
+                        if (_encounterSummary!['surat_keterangan_type'] != null)
+                          CustomButton(
+                            text: _encounterSummary!['surat_keterangan_type'] ==
+                                    'sehat'
+                                ? 'Surat Sehat'
+                                : 'Surat Sakit',
+                            icon: Icons.description_rounded,
+                            primaryColor: Colors.teal,
+                            height: 38,
+                            onPressed: () => MedicalLetterPreviewDialog.show(
+                              context,
+                              encounterId:
+                                  _encounterSummary!['id']?.toString(),
+                              preferredType:
+                                  _encounterSummary!['surat_keterangan_type'] ==
+                                          'sehat'
+                                      ? MedicalLetterType.suratSehat
+                                      : MedicalLetterType.suratSakit,
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
@@ -3738,7 +3797,7 @@ class _CashierPaymentDialogState extends ConsumerState<CashierPaymentDialog> {
           .schema('private_doctor')
           .from('clinical_encounters')
           .select(
-            'id, total_price, doctor_price, is_rujukan, rujukan_rumah_sakit, rujukan_poli, rujukan_nomor, rujukan_catatan, surat_keterangan_type, surat_keperluan, surat_riwayat_penyakit, surat_sakit_hari, surat_sakit_mulai, surat_sakit_selesai',
+            'id, created_at, total_price, doctor_price, is_rujukan, rujukan_rumah_sakit, rujukan_poli, rujukan_nomor, rujukan_catatan, surat_keterangan_type, surat_keperluan, surat_riwayat_penyakit, surat_sakit_hari, surat_sakit_mulai, surat_sakit_selesai',
           )
           .eq('id_queue', widget.queue.id)
           .maybeSingle();
@@ -5059,41 +5118,16 @@ class _CashierPaymentDialogState extends ConsumerState<CashierPaymentDialog> {
     );
   }
 
-  // --- Start of Medical Certificate & Referral Helpers for Cashier ---
-  void _showRujukanPreviewDialog(
-    Color textCol,
-    Color subtitleCol,
-    Color borderCol,
-    Color inputBg,
-    Color purple,
-    Color activeGreen,
-  ) {
-    final now = DateTime.now();
-    final dayName = [
-      'Minggu',
-      'Senin',
-      'Selasa',
-      'Rabu',
-      'Kamis',
-      'Jumat',
-      'Sabtu',
-    ][now.weekday % 7];
-    final monthName = [
-      '',
-      'Januari',
-      'Februari',
-      'Maret',
-      'April',
-      'Mei',
-      'Juni',
-      'Juli',
-      'Agustus',
-      'September',
-      'Oktober',
-      'November',
-      'Desember',
-    ][now.month];
-    final formattedDate = '$dayName, ${now.day} $monthName ${now.year}';
+  // --- Medical Certificate & Referral Previews (Unified Template + QR Verification) ---
+  void _openMedicalLetter(MedicalLetterType type) {
+    if (_encounterId != null && _encounterId!.isNotEmpty) {
+      MedicalLetterPreviewDialog.show(
+        context,
+        encounterId: _encounterId,
+        preferredType: type,
+      );
+      return;
+    }
 
     final patients = ref.read(dokterPasienListProvider);
     final patient = patients.firstWhere(
@@ -5109,430 +5143,64 @@ class _CashierPaymentDialogState extends ConsumerState<CashierPaymentDialog> {
         tempatLahir: 'Bondowoso',
         tanggalLahir: '08 / 12 / 2000',
         jenisKelamin: 'Laki-laki',
-        telepon: '08XXXXXXXXXX',
-        alamat:
-            widget.queue.guestAddress ??
-            'Kel. KEJAYAN, Kec. PUJER, KABUPATEN BONDOWOSO',
+        telepon: widget.queue.guestPhone ?? '-',
+        alamat: widget.queue.guestAddress ?? '-',
         umur: widget.queue.guestBirthDate != null
             ? '${DateTime.now().year - widget.queue.guestBirthDate!.year} tahun'
-            : '25 tahun',
+            : '-',
         avatarBg: widget.queue.avatarBg,
         history: const [],
       ),
     );
 
-    // Doctor details
-    String doctorName =
-        ref.read(landingPageProvider).loggedInUser?['name']?.toString() ??
-        'dr. Agoes Soetanto';
+    final userState = ref.read(landingPageProvider);
+    final userMap = userState.loggedInUser;
+    String doctorName = userMap?['name']?.toString() ?? 'dr. Agoes Soetanto';
     if (!doctorName.toLowerCase().startsWith('dr.')) {
       doctorName = 'dr. $doctorName';
     }
-
-    String doctorSip = ref.read(landingPageProvider).loggedInUser?['sip']?.toString() ?? '503/446/430.10.2/2026';
-    if (!doctorSip.toLowerCase().startsWith('sip')) {
-      doctorSip = 'SIP: $doctorSip';
-    }
-
-    String docLocation = 'Pujer';
-    final userMap = ref.read(landingPageProvider).loggedInUser;
-    if (userMap != null && userMap['sub_district'] != null) {
-      final rawSub = userMap['sub_district'].toString();
-      if (rawSub.isNotEmpty) {
-        docLocation = rawSub[0].toUpperCase() + rawSub.substring(1).toLowerCase();
-      }
-    }
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.symmetric(
-            horizontal: 40,
-            vertical: 24,
-          ),
-          child: Container(
-            width: 720,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Top Control Bar
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(16),
-                      topRight: Radius.circular(16),
-                    ),
-                    border: Border(bottom: BorderSide(color: borderCol)),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: activeGreen.withValues(alpha: 0.08),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.assignment_rounded,
-                          color: activeGreen,
-                          size: 16,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        'Surat Rujukan — ${patient.nama}',
-                        style: GoogleFonts.outfit(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w900,
-                          color: textCol,
-                        ),
-                      ),
-                      const Spacer(),
-                      ElevatedButton.icon(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Mencetak Surat Rujukan...'),
-                              backgroundColor: Colors.teal,
-                            ),
-                          );
-                        },
-                        icon: const Icon(
-                          Icons.print_rounded,
-                          size: 14,
-                          color: Colors.white,
-                        ),
-                        label: Text(
-                          'Cetak Surat Rujukan',
-                          style: GoogleFonts.outfit(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: activeGreen,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 10,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        icon: const Icon(Icons.close_rounded, size: 18),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Paper Preview Area
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24),
-                    child: Center(
-                      child: Container(
-                        width: 640,
-                        padding: const EdgeInsets.all(40),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.05),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Kop Surat / Header
-                            Row(
-                              children: [
-                                Container(
-                                  width: 60,
-                                  height: 60,
-                                  decoration: BoxDecoration(
-                                    color: activeGreen.withValues(alpha: 0.08),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  alignment: Alignment.center,
-                                  child: Icon(
-                                    Icons.local_hospital_rounded,
-                                    color: activeGreen,
-                                    size: 32,
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        'DOKTER PRAKTEK MANDIRI ${doctorName.toUpperCase()}',
-                                        style: GoogleFonts.outfit(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w900,
-                                          color: const Color(0xFF1B0C3C),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        'Jl. Diponegoro No. 123, Bondowoso',
-                                        style: GoogleFonts.outfit(
-                                          fontSize: 8.5,
-                                          fontWeight: FontWeight.bold,
-                                          color: subtitleCol,
-                                        ),
-                                      ),
-                                      Text(
-                                        'Telepon: 085259930755',
-                                        style: GoogleFonts.outfit(
-                                          fontSize: 8.5,
-                                          fontWeight: FontWeight.bold,
-                                          color: subtitleCol,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 60),
-                              ],
-                            ),
-
-                            // Double Separator
-                            const SizedBox(height: 12),
-                            Column(
-                              children: [
-                                const Divider(
-                                  color: Colors.black,
-                                  height: 1,
-                                  thickness: 1.5,
-                                ),
-                                const SizedBox(height: 2),
-                                const Divider(
-                                  color: Colors.black,
-                                  height: 1,
-                                  thickness: 0.5,
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-
-                            // Title Section
-                            Center(
-                              child: Column(
-                                children: [
-                                  Text(
-                                    'SURAT RUJUKAN PASIEN',
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w900,
-                                      color: const Color(0xFF1B0C3C),
-                                      decoration: TextDecoration.underline,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Nomor: ${_rujukanNo ?? "REF/PREVIEW/MOCK"}',
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.bold,
-                                      color: subtitleCol,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-
-                            // Recipient Info
-                            _rujukanPreviewRow(
-                              'Kepada Yth. Sejawat Dokter Di',
-                              _rujukanRs ?? '—',
-                              true,
-                            ),
-                            const SizedBox(height: 6),
-                            _rujukanPreviewRow(
-                              'Poli / Bagian',
-                              _rujukanPoli ?? '—',
-                              false,
-                            ),
-
-                            const SizedBox(height: 16),
-                            Text(
-                              'Mohon pemeriksaan dan penanganan lebih lanjut terhadap pasien berikut:',
-                              style: GoogleFonts.outfit(
-                                fontSize: 9.5,
-                                color: textCol,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-
-                            const SizedBox(height: 14),
-                            // Identitas Pasien
-                            _rujukanSectionTitle(
-                              'Identitas Pasien',
-                              activeGreen,
-                            ),
-                            const SizedBox(height: 8),
-                            _rujukanPreviewRow(
-                              'Nama Pasien',
-                              patient.nama,
-                              true,
-                            ),
-                            _rujukanPreviewRow(
-                              'Nomor Rekam Medis (RM)',
-                              patient.id,
-                              false,
-                            ),
-                            _rujukanPreviewRow(
-                              'Nomor NIK',
-                              patient.nik.isNotEmpty ? patient.nik : '—',
-                              false,
-                            ),
-                            _rujukanPreviewRow(
-                              'Tempat, Tanggal Lahir',
-                              '${patient.tempatLahir}, ${patient.tanggalLahir}',
-                              false,
-                            ),
-                            _rujukanPreviewRow(
-                              'Jenis Kelamin',
-                              patient.jenisKelamin,
-                              false,
-                            ),
-                            _rujukanPreviewRow('Alamat', patient.alamat, false),
-
-                            const SizedBox(height: 16),
-                            _rujukanSectionTitle(
-                              'Pemeriksaan Fisik & Klinis',
-                              activeGreen,
-                            ),
-                            const SizedBox(height: 8),
-                            _rujukanPreviewRow(
-                              'Tensi / Tekanan Darah',
-                              _bloodPressure ?? '—',
-                              false,
-                            ),
-                            _rujukanPreviewRow(
-                              'Nadi',
-                              _heartRate != null ? '$_heartRate x/menit' : '—',
-                              false,
-                            ),
-
-                            if (_rujukanCatatan != null &&
-                                _rujukanCatatan!.isNotEmpty) ...[
-                              const SizedBox(height: 16),
-                              _rujukanSectionTitle(
-                                'Catatan Tambahan Dokter',
-                                activeGreen,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                _rujukanCatatan!,
-                                style: GoogleFonts.outfit(
-                                  fontSize: 9.5,
-                                  color: textCol,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-
-                            const SizedBox(height: 24),
-                            Text(
-                              'Demikian surat rujukan ini kami sampaikan, atas kerja samanya kami ucapkan terima kasih.',
-                              style: GoogleFonts.outfit(
-                                fontSize: 9.5,
-                                color: textCol,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-
-                            const SizedBox(height: 32),
-                            // Signature area
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: SizedBox(
-                                width: 200,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      '$docLocation, $formattedDate',
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 9.5,
-                                        fontWeight: FontWeight.bold,
-                                        color: textCol,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Container(
-                                      padding: const EdgeInsets.all(4),
-                                      decoration: BoxDecoration(
-                                        border: Border.all(
-                                          color: const Color(0xFFECEEF2),
-                                        ),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: Image.network(
-                                        'https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=https%3A%2F%2Fmapotech.kemenkes.go.id%2Frujukan%2Fpreview',
-                                        width: 50,
-                                        height: 50,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      doctorName,
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 9.5,
-                                        fontWeight: FontWeight.w900,
-                                        color: textCol,
-                                        decoration: TextDecoration.underline,
-                                      ),
-                                    ),
-                                    Text(
-                                      doctorSip,
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 8,
-                                        fontWeight: FontWeight.bold,
-                                        color: subtitleCol,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+    final now = DateTime.now();
+    final draft = MedicalLetterData(
+      encounterId: null,
+      type: type,
+      letterNumber: type == MedicalLetterType.rujukan
+          ? (_rujukanNo ?? 'REF/DRAFT')
+          : MedicalLetterData.generateDeterministicCertNumber(type, null, now),
+      signedAt: now,
+      isDraft: true,
+      rujukanRumahSakit: _rujukanRs ?? '',
+      rujukanPoli: _rujukanPoli ?? '',
+      rujukanCatatan: _rujukanCatatan ?? '',
+      suratKeperluan: _suratKeperluan ?? '',
+      suratRiwayatPenyakit: _suratRiwayatPenyakit ?? '',
+      suratSakitHari: _suratSakitHari ?? 3,
+      suratSakitMulai: _suratSakitMulai,
+      suratSakitSelesai: _suratSakitSelesai,
+      patientId: patient.id,
+      patientName: patient.nama,
+      patientNik: patient.nik,
+      patientGender: patient.jenisKelamin,
+      patientBirthDate: patient.tanggalLahir,
+      patientAgeLabel: patient.umur,
+      patientAddress: patient.alamat,
+      bloodPressure: _bloodPressure ?? '',
+      heartRate: _heartRate ?? '',
+      doctorId: userState.activeDoctorId ?? '',
+      doctorName: doctorName,
+      doctorAvatarUrl: userMap?['avatar_url']?.toString(),
     );
+    MedicalLetterPreviewDialog.show(context, initialData: draft);
+  }
+
+  void _showRujukanPreviewDialog(
+    Color textCol,
+    Color subtitleCol,
+    Color borderCol,
+    Color inputBg,
+    Color purple,
+    Color activeGreen,
+  ) {
+    _openMedicalLetter(MedicalLetterType.rujukan);
   }
 
   void _showSuratKeteranganPreviewDialog(
@@ -5543,572 +5211,10 @@ class _CashierPaymentDialogState extends ConsumerState<CashierPaymentDialog> {
     Color purple,
     Color activeGreen,
   ) {
-    final now = DateTime.now();
-    final dayName = [
-      'Minggu',
-      'Senin',
-      'Selasa',
-      'Rabu',
-      'Kamis',
-      'Jumat',
-      'Sabtu',
-    ][now.weekday % 7];
-    final monthName = [
-      '',
-      'Januari',
-      'Februari',
-      'Maret',
-      'April',
-      'Mei',
-      'Juni',
-      'Juli',
-      'Agustus',
-      'September',
-      'Oktober',
-      'November',
-      'Desember',
-    ][now.month];
-    final formattedDate = '$dayName, ${now.day} $monthName ${now.year}';
-    final simpleDate = '${now.day} $monthName ${now.year}';
-
-    final patients = ref.read(dokterPasienListProvider);
-    final patient = patients.firstWhere(
-      (p) =>
-          p.nik == widget.queue.nik ||
-          p.nama.toLowerCase() == widget.queue.nama.toLowerCase(),
-      orElse: () => PasienModel(
-        id: 'PAS-${widget.queue.no.split('-').last}',
-        nama: widget.queue.nama,
-        email:
-            '${widget.queue.nama.toLowerCase().replaceAll(' ', '')}@gmail.com',
-        nik: widget.queue.nik,
-        tempatLahir: 'Bondowoso',
-        tanggalLahir: '08 / 12 / 2000',
-        jenisKelamin: 'Laki-laki',
-        telepon: '08XXXXXXXXXX',
-        alamat:
-            widget.queue.guestAddress ??
-            'Kel. KEJAYAN, Kec. PUJER, KABUPATEN BONDOWOSO',
-        umur: widget.queue.guestBirthDate != null
-            ? '${DateTime.now().year - widget.queue.guestBirthDate!.year} tahun'
-            : '25 tahun',
-        avatarBg: widget.queue.avatarBg,
-        history: const [],
-      ),
-    );
-
-    // Doctor details
-    String doctorName =
-        ref.read(landingPageProvider).loggedInUser?['name']?.toString() ??
-        'dr. Agoes Soetanto';
-    if (!doctorName.toLowerCase().startsWith('dr.')) {
-      doctorName = 'dr. $doctorName';
-    }
-
-    String doctorSip = ref.read(landingPageProvider).loggedInUser?['sip']?.toString() ?? '503/446/430.10.2/2026';
-    if (!doctorSip.toLowerCase().startsWith('sip')) {
-      doctorSip = 'SIP: $doctorSip';
-    }
-
-    String docLocation = 'Pujer';
-    final userMap = ref.read(landingPageProvider).loggedInUser;
-    if (userMap != null && userMap['sub_district'] != null) {
-      final rawSub = userMap['sub_district'].toString();
-      if (rawSub.isNotEmpty) {
-        docLocation = rawSub[0].toUpperCase() + rawSub.substring(1).toLowerCase();
-      }
-    }
-
-    final isSehat = _suratKeteranganType == 'sehat';
-    final title = isSehat ? 'SURAT KETERANGAN SEHAT' : 'SURAT KETERANGAN SAKIT';
-
-    String startStr = '—';
-    String endStr = '—';
-    const monthsIndo = [
-      "Januari",
-      "Februari",
-      "Maret",
-      "April",
-      "Mei",
-      "Juni",
-      "Juli",
-      "Agustus",
-      "September",
-      "Oktober",
-      "November",
-      "Desember",
-    ];
-    if (_suratSakitMulai != null) {
-      startStr =
-          '${_suratSakitMulai!.day} ${monthsIndo[_suratSakitMulai!.month - 1]} ${_suratSakitMulai!.year}';
-    }
-    if (_suratSakitSelesai != null) {
-      endStr =
-          '${_suratSakitSelesai!.day} ${monthsIndo[_suratSakitSelesai!.month - 1]} ${_suratSakitSelesai!.year}';
-    }
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.symmetric(
-            horizontal: 40,
-            vertical: 24,
-          ),
-          child: Container(
-            width: 720,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Top Control Bar
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(16),
-                      topRight: Radius.circular(16),
-                    ),
-                    border: Border(bottom: BorderSide(color: borderCol)),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: activeGreen.withValues(alpha: 0.08),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.assignment_rounded,
-                          color: activeGreen,
-                          size: 16,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        '$title — ${patient.nama}',
-                        style: GoogleFonts.outfit(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w900,
-                          color: textCol,
-                        ),
-                      ),
-                      const Spacer(),
-                      ElevatedButton.icon(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Mencetak ${isSehat ? "Surat Sehat" : "Surat Sakit"}...',
-                              ),
-                              backgroundColor: Colors.teal,
-                            ),
-                          );
-                        },
-                        icon: const Icon(
-                          Icons.print_rounded,
-                          size: 14,
-                          color: Colors.white,
-                        ),
-                        label: Text(
-                          'Cetak Surat',
-                          style: GoogleFonts.outfit(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: activeGreen,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 10,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        icon: const Icon(Icons.close_rounded, size: 18),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Paper Preview Area
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24),
-                    child: Center(
-                      child: Container(
-                        width: 640,
-                        padding: const EdgeInsets.all(40),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.05),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Kop Surat / Header
-                            Row(
-                              children: [
-                                Container(
-                                  width: 60,
-                                  height: 60,
-                                  decoration: BoxDecoration(
-                                    color: activeGreen.withValues(alpha: 0.08),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  alignment: Alignment.center,
-                                  child: Icon(
-                                    Icons.local_hospital_rounded,
-                                    color: activeGreen,
-                                    size: 32,
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        'DOKTER PRAKTEK MANDIRI ${doctorName.toUpperCase()}',
-                                        style: GoogleFonts.outfit(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w900,
-                                          color: const Color(0xFF1B0C3C),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        'Jl. Diponegoro No. 123, Bondowoso',
-                                        style: GoogleFonts.outfit(
-                                          fontSize: 8.5,
-                                          fontWeight: FontWeight.bold,
-                                          color: subtitleCol,
-                                        ),
-                                      ),
-                                      Text(
-                                        'Telepon: 085259930755',
-                                        style: GoogleFonts.outfit(
-                                          fontSize: 8.5,
-                                          fontWeight: FontWeight.bold,
-                                          color: subtitleCol,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 60),
-                              ],
-                            ),
-
-                            // Double Separator
-                            const SizedBox(height: 12),
-                            Column(
-                              children: [
-                                const Divider(
-                                  color: Colors.black,
-                                  height: 1,
-                                  thickness: 1.5,
-                                ),
-                                const SizedBox(height: 2),
-                                const Divider(
-                                  color: Colors.black,
-                                  height: 1,
-                                  thickness: 0.5,
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-
-                            // Title Section
-                            Center(
-                              child: Column(
-                                children: [
-                                  Text(
-                                    title,
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w900,
-                                      color: const Color(0xFF1B0C3C),
-                                      decoration: TextDecoration.underline,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    isSehat
-                                        ? 'Nomor: SK-SEHAT/${now.year}/${100 + Random().nextInt(900)}'
-                                        : 'Nomor: SK-SAKIT/${now.year}/${100 + Random().nextInt(900)}',
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.bold,
-                                      color: subtitleCol,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-
-                            // Introductory
-                            Text(
-                              'Yang bertanda tangan dibawah ini :',
-                              style: GoogleFonts.outfit(
-                                fontSize: 9.5,
-                                color: textCol,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-
-                            // Doctor details
-                            _rujukanPreviewRow('Nama Dokter', doctorName, true),
-                            _rujukanPreviewRow(
-                              'Jabatan / Status',
-                              'Dokter Praktek Umum Swasta',
-                              false,
-                            ),
-
-                            const SizedBox(height: 16),
-                            Text(
-                              'Menerangkan dengan sesungguhnya bahwa, penderita dengan :',
-                              style: GoogleFonts.outfit(
-                                fontSize: 9.5,
-                                color: textCol,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-
-                            // Patient details
-                            _rujukanPreviewRow(
-                              'Nama Pasien',
-                              patient.nama,
-                              true,
-                            ),
-                            _rujukanPreviewRow(
-                              'Umur',
-                              patient.umur,
-                              false,
-                            ),
-                            _rujukanPreviewRow('Alamat', patient.alamat, false),
-
-                            const SizedBox(height: 16),
-                            // Certificate details
-                            if (isSehat) ...[
-                              Text(
-                                'Pada tanggal : $formattedDate telah diperiksa kesehatannya dan dinyatakan berbadan sehat baik jasmani maupun rohaninya.',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 9.5,
-                                  color: textCol,
-                                  height: 1.5,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ] else ...[
-                              Text(
-                                'Pada tanggal : $formattedDate telah diperiksa kesehatannya dan dinyatakan dalam keadaan kurang sehat / sakit sehingga memerlukan istirahat selama ${_suratSakitHari ?? 3} hari, terhitung mulai tanggal $startStr s/d $endStr .',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 9.5,
-                                  color: textCol,
-                                  height: 1.5,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                            const SizedBox(height: 8),
-                            _rujukanPreviewRow(
-                              'Keperluan',
-                              _suratKeperluan?.isNotEmpty == true
-                                  ? _suratKeperluan!
-                                  : '—',
-                              false,
-                            ),
-
-                            const SizedBox(height: 16),
-                            _rujukanSectionTitle(
-                              'Pemeriksaan Fisik & Klinis',
-                              activeGreen,
-                            ),
-                            const SizedBox(height: 8),
-                            _rujukanPreviewRow(
-                              'Tensi / Tekanan Darah',
-                              _bloodPressure?.isNotEmpty == true
-                                  ? '$_bloodPressure mmHg'
-                                  : '—',
-                              false,
-                            ),
-                            _rujukanPreviewRow(
-                              'Nadi',
-                              _heartRate?.isNotEmpty == true
-                                  ? '$_heartRate x/menit'
-                                  : '—',
-                              false,
-                            ),
-                            _rujukanPreviewRow(
-                              'Riwayat Penyakit Dahulu',
-                              _suratRiwayatPenyakit?.isNotEmpty == true
-                                  ? _suratRiwayatPenyakit!
-                                  : 'Tidak Ada',
-                              false,
-                            ),
-
-                            const SizedBox(height: 24),
-                            Text(
-                              'Demikian surat keterangan ini dibuat untuk digunakan sebagaimana mestinya.',
-                              style: GoogleFonts.outfit(
-                                fontSize: 9.5,
-                                color: textCol,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-
-                            const SizedBox(height: 32),
-                            // Signature area
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: SizedBox(
-                                width: 200,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      '$docLocation, $simpleDate',
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 9.5,
-                                        fontWeight: FontWeight.bold,
-                                        color: textCol,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Container(
-                                      padding: const EdgeInsets.all(4),
-                                      decoration: BoxDecoration(
-                                        border: Border.all(
-                                          color: const Color(0xFFECEEF2),
-                                        ),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: Image.network(
-                                        'https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=https%3A%2F%2Fmapotech.kemenkes.go.id%2F${isSehat ? "surat-sehat" : "surat-sakit"}%2Fpreview',
-                                        width: 50,
-                                        height: 50,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      doctorName,
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 9.5,
-                                        fontWeight: FontWeight.w900,
-                                        color: textCol,
-                                        decoration: TextDecoration.underline,
-                                      ),
-                                    ),
-                                    Text(
-                                      doctorSip,
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 8,
-                                        fontWeight: FontWeight.bold,
-                                        color: subtitleCol,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _rujukanSectionTitle(String title, Color activeGreen) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: activeGreen.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(4),
-        border: Border(left: BorderSide(color: activeGreen, width: 3)),
-      ),
-      child: Text(
-        title.toUpperCase(),
-        style: GoogleFonts.outfit(
-          fontSize: 8.5,
-          fontWeight: FontWeight.w900,
-          color: activeGreen,
-        ),
-      ),
-    );
-  }
-
-  Widget _rujukanPreviewRow(String label, String value, bool isBoldVal) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 180,
-          child: Text(
-            label,
-            style: GoogleFonts.outfit(
-              fontSize: 9,
-              fontWeight: FontWeight.w900,
-              color: const Color(0xFF6F6A8A),
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          ': ',
-          style: GoogleFonts.outfit(
-            fontSize: 9,
-            color: const Color(0xFF6F6A8A),
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: GoogleFonts.outfit(
-              fontSize: 9,
-              fontWeight: isBoldVal ? FontWeight.w900 : FontWeight.bold,
-              color: const Color(0xFF1B0C3C),
-            ),
-          ),
-        ),
-      ],
+    _openMedicalLetter(
+      _suratKeteranganType == 'sehat'
+          ? MedicalLetterType.suratSehat
+          : MedicalLetterType.suratSakit,
     );
   }
 }

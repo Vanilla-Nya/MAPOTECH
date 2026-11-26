@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:bcrypt/bcrypt.dart';
+import 'package:mapotech/shared/letter_models.dart';
 
 class SupabaseService {
   static String get _baseUrl {
@@ -3844,6 +3845,502 @@ class SupabaseService {
       debugPrint('Error toggling status pustu/ponkesdes: $e');
       return false;
     }
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  // MEDICAL LETTERS (SURAT RUJUKAN / SEHAT / SAKIT) & PUBLIC VERIFICATION
+  // ─────────────────────────────────────────────────────────────────
+
+  /// Fetches the doctor's public profile & facility metadata for letter headers.
+  Future<Map<String, dynamic>?> fetchDoctorPublicHeader(String doctorId) async {
+    final clean = doctorId.trim();
+    if (clean.isEmpty) return null;
+    try {
+      final doc = await fetchDoctorByQrTokenOrId(clean);
+      if (doc != null) return doc;
+    } catch (_) {}
+    try {
+      final user = await fetchUserById(clean);
+      if (user != null) {
+        return {
+          'id': clean,
+          'name': user['name'] ?? 'Dokter',
+          'avatar_url': user['avatar_url'],
+          'nama_faskes': 'Praktik Dokter Mandiri',
+          'profession': 'Dokter Praktik Mandiri',
+          'whatsapp_number': user['phone_number'] ?? '',
+          'address': user['address'] ?? '',
+          'province': user['province'] ?? '',
+          'district': user['district'] ?? '',
+          'sub_district': user['sub_district'] ?? '',
+          'village': user['village'] ?? '',
+          'practice_licenses': const <String>[],
+          'google_maps_link': '',
+          'qr_token': '',
+        };
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Fetches the clinical encounter summary for a queue entry (including created_at).
+  Future<Map<String, dynamic>?> fetchEncounterSummaryByQueueId(
+    String queueId,
+  ) async {
+    final cleanQueueId = queueId.trim();
+    if (cleanQueueId.isEmpty) return null;
+    try {
+      final res = await client
+          .schema('private_doctor')
+          .from('clinical_encounters')
+          .select('*')
+          .eq('id_queue', cleanQueueId)
+          .maybeSingle();
+      if (res != null) return Map<String, dynamic>.from(res);
+    } catch (_) {}
+    return null;
+  }
+
+  String _formatDateIdDisplay(String? rawDate) {
+    if (rawDate == null || rawDate.trim().isEmpty) return '-';
+    final parsed = DateTime.tryParse(rawDate.trim());
+    if (parsed == null) return rawDate.trim();
+    const months = [
+      '',
+      'Januari',
+      'Februari',
+      'Maret',
+      'April',
+      'Mei',
+      'Juni',
+      'Juli',
+      'Agustus',
+      'September',
+      'Oktober',
+      'November',
+      'Desember',
+    ];
+    return '${parsed.day} ${months[parsed.month]} ${parsed.year}';
+  }
+
+  String _calculateAgeDisplay(String? rawBirthDate) {
+    if (rawBirthDate == null || rawBirthDate.trim().isEmpty) return '-';
+    final birth = DateTime.tryParse(rawBirthDate.trim());
+    if (birth == null) return '-';
+    final now = DateTime.now();
+    int age = now.year - birth.year;
+    if (now.month < birth.month ||
+        (now.month == birth.month && now.day < birth.day)) {
+      age--;
+    }
+    return '${age < 0 ? 0 : age} tahun';
+  }
+
+  String _formatFullDoctorAddress(Map<String, dynamic> docMap) {
+    final parts = <String>[];
+    void addPart(dynamic v, {String prefix = ''}) {
+      final s = (v ?? '').toString().trim();
+      if (s.isNotEmpty && !parts.contains(s)) {
+        parts.add('$prefix$s');
+      }
+    }
+
+    addPart(docMap['alamat_faskes']);
+    if (parts.isEmpty) addPart(docMap['address']);
+    addPart(docMap['village']);
+    addPart(docMap['sub_district'], prefix: 'Kec. ');
+    addPart(docMap['district']);
+    addPart(docMap['province']);
+    return parts.isEmpty ? '-' : parts.join(', ');
+  }
+
+  /// Fetches all data needed to render or verify a signed Medical Letter
+  /// (Surat Rujukan, Surat Keterangan Sehat, or Surat Keterangan Sakit).
+  /// When [forPublicVerification] is true, prefers the hardened
+  /// `get_medical_letter_verification` SECURITY DEFINER RPC (returning masked NIK
+  /// and safe doctor public headers) with graceful fallback if not deployed yet.
+  Future<MedicalLetterData?> fetchMedicalLetterByEncounterId(
+    String encounterId, {
+    MedicalLetterType? preferredType,
+    bool forPublicVerification = false,
+  }) async {
+    final cleanId = encounterId.trim();
+    if (cleanId.isEmpty) return null;
+
+    if (forPublicVerification) {
+      final viaRpc = await _fetchMedicalLetterViaRpc(
+        cleanId,
+        preferredType: preferredType,
+      );
+      if (viaRpc != null) return viaRpc;
+    }
+
+    try {
+      final ceRaw = await client
+          .schema('private_doctor')
+          .from('clinical_encounters')
+          .select('*')
+          .eq('id', cleanId)
+          .maybeSingle();
+      if (ceRaw == null) {
+        if (!forPublicVerification) {
+          return _fetchMedicalLetterViaRpc(
+            cleanId,
+            preferredType: preferredType,
+          );
+        }
+        return null;
+      }
+      final ce = Map<String, dynamic>.from(ceRaw);
+
+      final queueId = ce['id_queue']?.toString() ?? '';
+      Map<String, dynamic>? queueRow;
+      Map<String, dynamic>? queueDetailView;
+
+      if (queueId.isNotEmpty) {
+        try {
+          final qRaw = await client
+              .schema('private_doctor')
+              .from('queue')
+              .select('*')
+              .eq('id', queueId)
+              .maybeSingle();
+          if (qRaw != null) queueRow = Map<String, dynamic>.from(qRaw);
+        } catch (_) {}
+
+        try {
+          final viewRows = await _get(
+            'v_doctor_queue_details?select=*&id=eq.${Uri.encodeComponent(queueId)}',
+            schema: 'public',
+          );
+          if (viewRows.isNotEmpty && viewRows.first is Map) {
+            queueDetailView = Map<String, dynamic>.from(viewRows.first as Map);
+          }
+        } catch (_) {}
+      }
+
+      // Fetch clinical sub-records in parallel
+      final clinicalFutures = await Future.wait<dynamic>([
+        fetchEncounterVitals(cleanId),
+        fetchEncounterAnamnesis(cleanId),
+        fetchClinicalEncounterDiagnoses(cleanId),
+      ]);
+      final vitals = clinicalFutures[0] as Map<String, dynamic>?;
+      final anamnesis = clinicalFutures[1] as Map<String, dynamic>?;
+      final diagnosesRaw =
+          (clinicalFutures[2] as List<Map<String, dynamic>>?) ?? const [];
+
+      final doctorId =
+          (queueRow?['id_doctor'] ?? queueDetailView?['id_doctor'] ?? '')
+              .toString();
+      final patientId =
+          (queueRow?['id_patient'] ?? queueDetailView?['id_patient'])
+              ?.toString();
+      final guestPatientId = (queueRow?['id_guest_patient'] ??
+              queueDetailView?['id_guest_patient'])
+          ?.toString();
+
+      Map<String, dynamic>? doctorProfile;
+      List<Map<String, dynamic>> doctorSchedules = const [];
+      Map<String, dynamic>? patientUser;
+      Map<String, dynamic>? guestPatient;
+
+      final lookupFutures = <Future<void>>[];
+      if (doctorId.isNotEmpty) {
+        lookupFutures.add(
+          fetchDoctorPublicHeader(doctorId).then((v) => doctorProfile = v),
+        );
+        lookupFutures.add(
+          fetchDoctorSchedules(doctorId)
+              .then((v) => doctorSchedules = v)
+              .catchError((_) => <Map<String, dynamic>>[]),
+        );
+      }
+      if (patientId != null && patientId.isNotEmpty) {
+        lookupFutures.add(
+          fetchUserById(patientId).then((v) => patientUser = v),
+        );
+      } else if (guestPatientId != null && guestPatientId.isNotEmpty) {
+        lookupFutures.add(
+          client
+              .schema('private_doctor')
+              .from('guest_patients')
+              .select('*')
+              .eq('id', guestPatientId)
+              .maybeSingle()
+              .then((v) {
+                if (v != null) guestPatient = Map<String, dynamic>.from(v);
+              })
+              .catchError((_) {}),
+        );
+      }
+      await Future.wait(lookupFutures);
+
+      final patientInfo = <String, dynamic>{
+        'id': patientUser?['id'] ??
+            guestPatient?['id'] ??
+            patientId ??
+            guestPatientId ??
+            '-',
+        'name': patientUser?['name'] ??
+            guestPatient?['name'] ??
+            queueDetailView?['patient_name'] ??
+            'Pasien',
+        'nik': patientUser?['nik'] ??
+            guestPatient?['nik'] ??
+            queueDetailView?['patient_nik'] ??
+            '-',
+        'gender': patientUser?['gender'] ??
+            guestPatient?['gender'] ??
+            queueDetailView?['patient_gender'] ??
+            '-',
+        'birth_date': patientUser?['birth_date'] ??
+            guestPatient?['birth_date'] ??
+            queueDetailView?['patient_birth_date'] ??
+            '',
+        'birth_place':
+            patientUser?['birth_place'] ?? guestPatient?['birth_place'] ?? '',
+        'address': patientUser?['address'] ??
+            guestPatient?['address'] ??
+            queueDetailView?['patient_address'] ??
+            '-',
+      };
+
+      return _buildMedicalLetterData(
+        encounterId: cleanId,
+        ce: ce,
+        vitals: vitals,
+        anamnesis: anamnesis,
+        diagnosesRaw: diagnosesRaw,
+        patientInfo: patientInfo,
+        doctorId: doctorId,
+        doctorProfile: doctorProfile,
+        doctorSchedules: doctorSchedules,
+        preferredType: preferredType,
+      );
+    } catch (e) {
+      debugPrint('Error fetching medical letter $encounterId: $e');
+      if (!forPublicVerification) {
+        return _fetchMedicalLetterViaRpc(
+          cleanId,
+          preferredType: preferredType,
+        );
+      }
+      return null;
+    }
+  }
+
+  Future<MedicalLetterData?> _fetchMedicalLetterViaRpc(
+    String encounterId, {
+    MedicalLetterType? preferredType,
+  }) async {
+    try {
+      final raw = await client.rpc(
+        'get_medical_letter_verification',
+        params: {'p_encounter_id': encounterId},
+      );
+      if (raw is! Map || raw['encounter'] is! Map) return null;
+
+      final payload = Map<String, dynamic>.from(raw);
+      final ce = Map<String, dynamic>.from(payload['encounter'] as Map);
+      final vitals = payload['vitals'] is Map
+          ? Map<String, dynamic>.from(payload['vitals'] as Map)
+          : null;
+      final anamnesis = payload['anamnesis'] is Map
+          ? Map<String, dynamic>.from(payload['anamnesis'] as Map)
+          : null;
+      final diagnosesRaw = payload['diagnoses'] is List
+          ? List<Map<String, dynamic>>.from(
+              (payload['diagnoses'] as List).whereType<Map>().map(
+                    (e) => Map<String, dynamic>.from(e),
+                  ),
+            )
+          : const <Map<String, dynamic>>[];
+      final patientInfo = payload['patient'] is Map
+          ? Map<String, dynamic>.from(payload['patient'] as Map)
+          : const <String, dynamic>{};
+      final doctorProfile = payload['doctor'] is Map
+          ? Map<String, dynamic>.from(payload['doctor'] as Map)
+          : null;
+      final doctorSchedules = payload['doctor_schedules'] is List
+          ? List<Map<String, dynamic>>.from(
+              (payload['doctor_schedules'] as List).whereType<Map>().map(
+                    (e) => Map<String, dynamic>.from(e),
+                  ),
+            )
+          : const <Map<String, dynamic>>[];
+      final queueMap = payload['queue'] is Map
+          ? Map<String, dynamic>.from(payload['queue'] as Map)
+          : null;
+      final doctorId =
+          (doctorProfile?['id'] ?? queueMap?['id_doctor'] ?? '').toString();
+
+      return _buildMedicalLetterData(
+        encounterId: encounterId,
+        ce: ce,
+        vitals: vitals,
+        anamnesis: anamnesis,
+        diagnosesRaw: diagnosesRaw,
+        patientInfo: patientInfo,
+        doctorId: doctorId,
+        doctorProfile: doctorProfile,
+        doctorSchedules: doctorSchedules,
+        preferredType: preferredType,
+      );
+    } catch (e) {
+      debugPrint('Info RPC get_medical_letter_verification ($encounterId): $e');
+      return null;
+    }
+  }
+
+  MedicalLetterData _buildMedicalLetterData({
+    required String encounterId,
+    required Map<String, dynamic> ce,
+    required Map<String, dynamic>? vitals,
+    required Map<String, dynamic>? anamnesis,
+    required List<Map<String, dynamic>> diagnosesRaw,
+    required Map<String, dynamic> patientInfo,
+    required String doctorId,
+    required Map<String, dynamic>? doctorProfile,
+    required List<Map<String, dynamic>> doctorSchedules,
+    MedicalLetterType? preferredType,
+  }) {
+    final isRujukan = ce['is_rujukan'] == true;
+    final certTypeRaw =
+        (ce['surat_keterangan_type'] ?? '').toString().trim().toLowerCase();
+    MedicalLetterType resolvedType;
+    if (preferredType != null) {
+      if (preferredType == MedicalLetterType.rujukan && isRujukan) {
+        resolvedType = MedicalLetterType.rujukan;
+      } else if (preferredType == MedicalLetterType.suratSehat &&
+          certTypeRaw == 'sehat') {
+        resolvedType = MedicalLetterType.suratSehat;
+      } else if (preferredType == MedicalLetterType.suratSakit &&
+          certTypeRaw == 'sakit') {
+        resolvedType = MedicalLetterType.suratSakit;
+      } else if (isRujukan) {
+        resolvedType = MedicalLetterType.rujukan;
+      } else if (certTypeRaw == 'sakit') {
+        resolvedType = MedicalLetterType.suratSakit;
+      } else {
+        resolvedType = MedicalLetterType.suratSehat;
+      }
+    } else if (isRujukan) {
+      resolvedType = MedicalLetterType.rujukan;
+    } else if (certTypeRaw == 'sakit') {
+      resolvedType = MedicalLetterType.suratSakit;
+    } else if (certTypeRaw == 'sehat') {
+      resolvedType = MedicalLetterType.suratSehat;
+    } else {
+      resolvedType = MedicalLetterType.rujukan;
+    }
+
+    final signedAt = DateTime.tryParse(ce['created_at']?.toString() ?? '') ??
+        DateTime.now();
+
+    final currentHash = ce['current_hash']?.toString();
+    final previousHash = ce['previous_hash']?.toString();
+    bool isHashVerified =
+        currentHash != null && currentHash.trim().length >= 32;
+    if (isHashVerified && previousHash != null) {
+      try {
+        final recomputed = _computeBlockchainHash(ce, previousHash);
+        if (recomputed == currentHash) {
+          isHashVerified = true;
+        }
+      } catch (_) {}
+    }
+
+    final patientName = (patientInfo['name'] ?? 'Pasien').toString();
+    final patientNik =
+        (patientInfo['nik_masked'] ?? patientInfo['nik'] ?? '-').toString();
+    final patientGender = (patientInfo['gender'] ?? '-').toString();
+    final rawBirth = (patientInfo['birth_date'] ?? '').toString();
+    final patientBirthPlace = (patientInfo['birth_place'] ?? '').toString();
+    final patientAddress = (patientInfo['address'] ?? '-').toString();
+    final resolvedPatientId = (patientInfo['id'] ?? '-').toString();
+
+    final letterNo = resolvedType == MedicalLetterType.rujukan
+        ? ((ce['rujukan_nomor']?.toString().trim().isNotEmpty ?? false)
+            ? ce['rujukan_nomor'].toString().trim()
+            : 'REF/${signedAt.year}/${encounterId.substring(0, 4).toUpperCase()}')
+        : MedicalLetterData.generateDeterministicCertNumber(
+            resolvedType,
+            encounterId,
+            signedAt,
+          );
+
+    final diagnoses = diagnosesRaw
+        .map((d) => {
+              'code': (d['icdx_code'] ?? d['code'] ?? '').toString(),
+              'description':
+                  (d['description'] ?? d['label'] ?? '').toString(),
+            })
+        .where((d) =>
+            d['code']!.isNotEmpty || d['description']!.isNotEmpty)
+        .toList();
+
+    final docMap = doctorProfile ?? const <String, dynamic>{};
+    final licenses =
+        MedicalLetterData.parseLicenses(docMap['practice_licenses']);
+
+    return MedicalLetterData(
+      encounterId: encounterId,
+      type: resolvedType,
+      letterNumber: letterNo,
+      signedAt: signedAt,
+      isDraft: false,
+      currentHash: currentHash,
+      previousHash: previousHash,
+      isHashVerified: isHashVerified,
+      rujukanRumahSakit: ce['rujukan_rumah_sakit']?.toString() ?? '',
+      rujukanPoli: ce['rujukan_poli']?.toString() ?? '',
+      rujukanCatatan: ce['rujukan_catatan']?.toString() ?? '',
+      suratKeperluan: ce['surat_keperluan']?.toString() ?? '',
+      suratRiwayatPenyakit: ce['surat_riwayat_penyakit']?.toString() ?? '',
+      suratSakitHari:
+          int.tryParse(ce['surat_sakit_hari']?.toString() ?? '') ?? 3,
+      suratSakitMulai:
+          DateTime.tryParse(ce['surat_sakit_mulai']?.toString() ?? ''),
+      suratSakitSelesai:
+          DateTime.tryParse(ce['surat_sakit_selesai']?.toString() ?? ''),
+      patientId: resolvedPatientId,
+      patientName: patientName,
+      patientNik: patientNik,
+      patientGender: patientGender,
+      patientBirthDate: _formatDateIdDisplay(rawBirth),
+      patientBirthPlace: patientBirthPlace,
+      patientAgeLabel: _calculateAgeDisplay(rawBirth),
+      patientAddress: patientAddress,
+      complaint: anamnesis?['main_complaint']?.toString() ?? '-',
+      anamnesis: anamnesis?['anamnesis']?.toString() ?? '-',
+      bloodPressure: vitals?['blood_pressure']?.toString() ?? '',
+      temperature: vitals?['body_temperature']?.toString() ?? '',
+      heartRate: vitals?['heart_rate']?.toString() ?? '',
+      respiration: vitals?['respiratory_rate']?.toString() ?? '',
+      weight: vitals?['body_weight']?.toString() ?? '',
+      height: vitals?['body_height']?.toString() ?? '',
+      spo2: vitals?['oxygen_saturation']?.toString() ?? '',
+      diagnoses: diagnoses,
+      doctorId: doctorId,
+      doctorName: (docMap['name'] ?? 'Dokter').toString(),
+      doctorAvatarUrl: docMap['avatar_url']?.toString(),
+      doctorProfession:
+          (docMap['profession'] ?? 'Dokter Praktik Mandiri').toString(),
+      doctorFaskesName:
+          (docMap['nama_faskes'] ?? 'Praktik Dokter Mandiri').toString(),
+      doctorFaskesAddress: _formatFullDoctorAddress(docMap),
+      doctorAddress: (docMap['address'] ?? '').toString(),
+      doctorPhone: (docMap['whatsapp_number'] ?? '-').toString(),
+      doctorWhatsapp: (docMap['whatsapp_number'] ?? '').toString(),
+      doctorAbout: (docMap['about'] ?? '').toString(),
+      doctorMapsLink: (docMap['google_maps_link'] ?? '').toString(),
+      doctorLatitude: docMap['latitude'],
+      doctorLongitude: docMap['longitude'],
+      doctorQrToken: (docMap['qr_token'] ?? '').toString(),
+      doctorLicenses: licenses,
+      doctorSchedules: doctorSchedules,
+    );
   }
 }
 

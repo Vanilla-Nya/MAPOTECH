@@ -928,4 +928,231 @@ class CommunityHealthCenterService {
       debugPrint('[VitaScale Wi-Fi] Info delete cloud: $e');
     }
   }
+
+  static String _userMqttCfgCacheKey(String scopeKey) =>
+      'vitascale_user_mqtt_cfg_${scopeKey.trim()}';
+
+  /// Mengambil konfigurasi MQTT Puskesmas langsung berdasarkan `public.user.id`
+  /// (`facilityId`) beserta verifikasi akun di `public.user` & `user_detail_public_health_center`.
+  Future<Map<String, dynamic>?> fetchMqttDeviceConfigForUser({
+    String? facilityId,
+    String? fallbackFaskesCode,
+    String? fallbackDeviceId,
+  }) async {
+    final cleanFacilityId = facilityId?.trim();
+    final hasValidUuid = _isValidUuid(cleanFacilityId);
+    final normalizedFallbackCode =
+        (fallbackFaskesCode != null && fallbackFaskesCode.trim().isNotEmpty)
+            ? fallbackFaskesCode.trim()
+            : 'PUSKESMAS-001';
+    final normalizedFallbackDevice =
+        (fallbackDeviceId != null && fallbackDeviceId.trim().isNotEmpty)
+            ? fallbackDeviceId.trim()
+            : 'timbangan-01';
+    final cacheScope = hasValidUuid ? cleanFacilityId! : normalizedFallbackCode;
+
+    if (hasValidUuid) {
+      try {
+        final rpcRes = await SupabaseService.client.rpc(
+          'get_puskesmas_mqtt_config',
+          params: {
+            'p_user_id': cleanFacilityId,
+            if (fallbackDeviceId != null && fallbackDeviceId.trim().isNotEmpty)
+              'p_device_id': fallbackDeviceId.trim(),
+          },
+        );
+        if (rpcRes is Map && rpcRes.isNotEmpty) {
+          final map = Map<String, dynamic>.from(rpcRes);
+          _writeLocalJsonList(_userMqttCfgCacheKey(cacheScope), [map]);
+          return map;
+        }
+      } catch (e) {
+        debugPrint('[VitaScale MQTT] Info RPC get_puskesmas_mqtt_config: $e');
+      }
+
+      try {
+        final client = SupabaseService.client;
+        final userRows = await client
+            .schema('public')
+            .from('user')
+            .select('id, name, role, username')
+            .eq('id', cleanFacilityId!)
+            .limit(1);
+        final detailRows = await client
+            .schema('public')
+            .from('user_detail_public_health_center')
+            .select('id, nama_faskes')
+            .eq('id', cleanFacilityId)
+            .limit(1);
+        final deviceRows = await client
+            .schema(schemaName)
+            .from('vitascale_iot_devices')
+            .select()
+            .eq('facility_id', cleanFacilityId)
+            .order('updated_at', ascending: false)
+            .limit(1);
+
+        final userMap = userRows.isNotEmpty
+            ? Map<String, dynamic>.from(userRows.first)
+            : null;
+        final detailMap = detailRows.isNotEmpty
+            ? Map<String, dynamic>.from(detailRows.first)
+            : null;
+
+        if (deviceRows.isNotEmpty) {
+          final deviceMap = Map<String, dynamic>.from(deviceRows.first);
+          if (userMap != null) {
+            deviceMap['user_name'] ??= userMap['name'];
+            deviceMap['user_role'] ??= userMap['role'];
+          }
+          if (detailMap != null) {
+            deviceMap['facility_name'] ??= detailMap['nama_faskes'];
+          }
+          _writeLocalJsonList(_userMqttCfgCacheKey(cacheScope), [deviceMap]);
+          return deviceMap;
+        }
+
+        // Jika belum ada row device di cloud tapi cache lokal user sudah ada, gunakan cache lokal user
+        final localUserCfg = _readLocalJsonList(_userMqttCfgCacheKey(cacheScope));
+        if (localUserCfg.isNotEmpty) {
+          return {
+            ...localUserCfg.first,
+            if (userMap != null) 'user_name': userMap['name'],
+            if (userMap != null) 'user_role': userMap['role'],
+            if (detailMap != null) 'facility_name': detailMap['nama_faskes'],
+          };
+        }
+
+        if (userMap != null || detailMap != null) {
+          return {
+            'facility_id': cleanFacilityId,
+            'faskes_code': normalizedFallbackCode,
+            'device_id': normalizedFallbackDevice,
+            'user_name': userMap?['name'],
+            'user_role': userMap?['role'],
+            'facility_name': detailMap?['nama_faskes'] ?? userMap?['name'],
+          };
+        }
+      } catch (e) {
+        debugPrint('[VitaScale MQTT] Error query user MQTT config: $e');
+      }
+    }
+
+    final localCfg = _readLocalJsonList(_userMqttCfgCacheKey(cacheScope));
+    if (localCfg.isNotEmpty) return localCfg.first;
+
+    final legacyCfg = _readLocalJsonList(
+      _deviceCfgCacheKey(normalizedFallbackCode, normalizedFallbackDevice),
+    );
+    return legacyCfg.isNotEmpty ? legacyCfg.first : null;
+  }
+
+  /// Menyimpan pengaturan MQTT Puskesmas (`broker`, `port`, `ws_path`, `faskes_code`,
+  /// `device_id`, `cloud_gateway_url`, `tripod_height_cm`, `use_wildcard`) ke cache lokal
+  /// dan Supabase dengan `facility_id` mengarah langsung ke `public.user.id`.
+  Future<bool> saveMqttDeviceConfig({
+    String? facilityId,
+    required String faskesCode,
+    required String deviceId,
+    required String brokerHost,
+    required int brokerPort,
+    String wsPath = '/mqtt',
+    String cloudGatewayUrl = 'https://mapotechiotmqtt.vercel.app',
+    required double tripodHeightCm,
+    bool useWildcard = true,
+    String? activeWifiSsid,
+  }) async {
+    final cleanFacilityId = facilityId?.trim();
+    final hasValidUuid = _isValidUuid(cleanFacilityId);
+    final cleanCode =
+        faskesCode.trim().isEmpty ? 'PUSKESMAS-001' : faskesCode.trim();
+    final cleanDevice =
+        deviceId.trim().isEmpty ? 'timbangan-01' : deviceId.trim();
+    final cleanBroker =
+        brokerHost.trim().isEmpty ? 'broker.emqx.io' : brokerHost.trim();
+    final cleanWsPath = wsPath.trim().isEmpty ? '/mqtt' : wsPath.trim();
+    final cleanGateway = cloudGatewayUrl.trim().isEmpty
+        ? 'https://mapotechiotmqtt.vercel.app'
+        : cloudGatewayUrl.trim();
+    final nowIso = DateTime.now().toUtc().toIso8601String();
+    final cacheScope = hasValidUuid ? cleanFacilityId! : cleanCode;
+
+    final record = <String, dynamic>{
+      if (hasValidUuid) 'facility_id': cleanFacilityId,
+      'faskes_code': cleanCode,
+      'device_id': cleanDevice,
+      'broker_host': cleanBroker,
+      'broker_port': brokerPort,
+      'ws_path': cleanWsPath,
+      'cloud_gateway_url': cleanGateway,
+      'tripod_height_cm': tripodHeightCm,
+      'use_wildcard': useWildcard,
+      if (activeWifiSsid != null && activeWifiSsid.trim().isNotEmpty)
+        'active_wifi_ssid': activeWifiSsid.trim(),
+      'updated_at': nowIso,
+    };
+
+    _writeLocalJsonList(_userMqttCfgCacheKey(cacheScope), [record]);
+    _writeLocalJsonList(_deviceCfgCacheKey(cleanCode, cleanDevice), [record]);
+
+    if (hasValidUuid) {
+      try {
+        await SupabaseService.client.rpc(
+          'save_puskesmas_mqtt_config',
+          params: {
+            'p_user_id': cleanFacilityId,
+            'p_faskes_code': cleanCode,
+            'p_device_id': cleanDevice,
+            'p_broker_host': cleanBroker,
+            'p_broker_port': brokerPort,
+            'p_ws_path': cleanWsPath,
+            'p_cloud_gateway_url': cleanGateway,
+            'p_tripod_height_cm': tripodHeightCm,
+            'p_use_wildcard': useWildcard,
+            if (activeWifiSsid != null && activeWifiSsid.trim().isNotEmpty)
+              'p_active_wifi_ssid': activeWifiSsid.trim(),
+          },
+        );
+        return true;
+      } catch (e) {
+        debugPrint('[VitaScale MQTT] Info RPC save_puskesmas_mqtt_config: $e');
+      }
+    }
+
+    Future<void> writeDirect(Map<String, dynamic> payload) async {
+      final table =
+          SupabaseService.client.schema(schemaName).from('vitascale_iot_devices');
+      Map<String, dynamic>? existing;
+      if (hasValidUuid) {
+        existing = await table
+            .select('id')
+            .eq('facility_id', cleanFacilityId!)
+            .eq('device_id', cleanDevice)
+            .maybeSingle();
+      }
+      if (existing != null && existing['id'] != null) {
+        await table.update(payload).eq('id', existing['id']);
+      } else {
+        await table.upsert(payload, onConflict: 'faskes_code,device_id');
+      }
+    }
+
+    try {
+      await writeDirect(record);
+      return true;
+    } catch (e) {
+      // Kompatibilitas mundur bila kolom migrasi terbaru belum dijalankan di Supabase
+      try {
+        final legacyRecord = Map<String, dynamic>.from(record)
+          ..remove('ws_path')
+          ..remove('cloud_gateway_url')
+          ..remove('use_wildcard');
+        await writeDirect(legacyRecord);
+        return true;
+      } catch (innerError) {
+        debugPrint('[VitaScale MQTT] Gagal sync ke Supabase: $innerError');
+        return false;
+      }
+    }
+  }
 }

@@ -5,6 +5,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:mapotech/features/landing/landing_page_layout.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
+import 'package:mapotech/shared/letter_models.dart';
+import 'package:mapotech/shared/widgets/letter_verification_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,11 +30,24 @@ void main() async {
   runApp(const ProviderScope(child: MyApp()));
 }
 
-class MyApp extends ConsumerWidget {
+class MyApp extends ConsumerStatefulWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends ConsumerState<MyApp> {
+  MedicalLetterVerificationRequest? _initialVerifyRequest;
+
+  @override
+  void initState() {
+    super.initState();
+    _initialVerifyRequest = MedicalLetterVerificationRequest.parseUri(Uri.base);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(landingPageProvider);
     final notifier = ref.read(landingPageProvider.notifier);
 
@@ -84,7 +99,34 @@ class MyApp extends ConsumerWidget {
           displayColor: textColor,
         ),
       ),
-      home: const LandingPageLayout(),
+      onGenerateRoute: (settings) {
+        final rawName = settings.name ?? '';
+        final parsed = MedicalLetterVerificationRequest.parseUri(
+          Uri.tryParse(rawName) ?? Uri(),
+        );
+        if (parsed != null) {
+          return MaterialPageRoute<void>(
+            settings: settings,
+            builder: (_) => LetterVerificationPage(
+              encounterId: parsed.encounterId,
+              expectedType: parsed.expectedType,
+              onBackToPortal: () {
+                setState(() => _initialVerifyRequest = null);
+              },
+            ),
+          );
+        }
+        return null;
+      },
+      home: _initialVerifyRequest != null
+          ? LetterVerificationPage(
+              encounterId: _initialVerifyRequest!.encounterId,
+              expectedType: _initialVerifyRequest!.expectedType,
+              onBackToPortal: () {
+                setState(() => _initialVerifyRequest = null);
+              },
+            )
+          : const LandingPageLayout(),
     );
   }
 }

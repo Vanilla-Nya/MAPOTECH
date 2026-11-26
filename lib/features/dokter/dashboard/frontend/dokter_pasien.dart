@@ -2,9 +2,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:mapotech/shared/widgets/skeleton_loading.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
-import 'package:mapotech/shared/widgets/custom_button.dart';
+import 'package:mapotech/shared/widgets/ui.dart';
+import 'package:mapotech/shared/letter_models.dart';
 import 'package:mapotech/shared/supabase_service.dart';
 import 'dart:ui' show ImageFilter;
 import 'package:file_picker/file_picker.dart';
@@ -2641,6 +2641,86 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                                         style: GoogleFonts.outfit(fontSize: 10.5, fontStyle: FontStyle.italic, color: textColor),
                                       ),
                                     ],
+                                    const SizedBox(height: 10),
+                                    Align(
+                                      alignment: Alignment.centerRight,
+                                      child: CustomButton(
+                                        text: 'Lihat & Cetak Surat Rujukan',
+                                        icon: Icons.print_rounded,
+                                        primaryColor: Colors.blueAccent,
+                                        height: 36,
+                                        onPressed: () => MedicalLetterPreviewDialog.show(
+                                          ctx,
+                                          encounterId: ce['id']?.toString(),
+                                          preferredType: MedicalLetterType.rujukan,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                            if (ce['surat_keterangan_type'] != null) ...[
+                              const SizedBox(height: 16),
+                              _buildDetailSectionTitle(
+                                ce['surat_keterangan_type'] == 'sehat'
+                                    ? 'Surat Keterangan Sehat'
+                                    : 'Surat Keterangan Sakit',
+                                textColor,
+                              ),
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.teal.withValues(alpha: 0.06),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: Colors.teal.withValues(alpha: 0.18),
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      ce['surat_keterangan_type'] == 'sehat'
+                                          ? 'Status: Sehat Jasmani & Rohani'
+                                          : 'Istirahat Sakit: ${ce['surat_sakit_hari'] ?? 3} Hari',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: textColor,
+                                      ),
+                                    ),
+                                    if ((ce['surat_keperluan'] ?? '')
+                                        .toString()
+                                        .isNotEmpty)
+                                      Text(
+                                        'Keperluan: ${ce['surat_keperluan']}',
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 10,
+                                          color: subtitleColor,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    const SizedBox(height: 10),
+                                    Align(
+                                      alignment: Alignment.centerRight,
+                                      child: CustomButton(
+                                        text: ce['surat_keterangan_type'] == 'sehat'
+                                            ? 'Lihat & Cetak Surat Sehat'
+                                            : 'Lihat & Cetak Surat Sakit',
+                                        icon: Icons.print_rounded,
+                                        primaryColor: Colors.teal,
+                                        height: 36,
+                                        onPressed: () => MedicalLetterPreviewDialog.show(
+                                          ctx,
+                                          encounterId: ce['id']?.toString(),
+                                          preferredType:
+                                              ce['surat_keterangan_type'] == 'sehat'
+                                                  ? MedicalLetterType.suratSehat
+                                                  : MedicalLetterType.suratSakit,
+                                        ),
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),

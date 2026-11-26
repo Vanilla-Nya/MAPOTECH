@@ -411,6 +411,67 @@ class VitaScaleMqttService {
     });
   }
 
+  /// Menerapkan konfigurasi MQTT tersimpan dari profil user/database (Supabase)
+  /// tanpa memaksa koneksi ulang jika parameter koneksi tidak berubah saat online.
+  Future<void> applySavedConfig({
+    String? broker,
+    int? port,
+    String? wsPath,
+    String? faskesId,
+    String? deviceId,
+    String? cloudGatewayUrl,
+    double? poleHeightCm,
+    bool? useWildcard,
+    bool reconnectIfConnected = true,
+  }) async {
+    final nextBroker =
+        (broker != null && broker.trim().isNotEmpty) ? broker.trim() : _broker;
+    final nextPort = (port != null && port > 0) ? port : _port;
+    final nextWsPath =
+        (wsPath != null && wsPath.trim().isNotEmpty) ? wsPath.trim() : _wsPath;
+    final nextFaskes = (faskesId != null && faskesId.trim().isNotEmpty)
+        ? faskesId.trim()
+        : _faskesId;
+    final nextDevice = (deviceId != null && deviceId.trim().isNotEmpty)
+        ? deviceId.trim()
+        : _deviceId;
+    final nextGateway =
+        (cloudGatewayUrl != null && cloudGatewayUrl.trim().isNotEmpty)
+            ? cloudGatewayUrl.trim()
+            : _cloudGatewayUrl;
+    final nextPole =
+        (poleHeightCm != null && poleHeightCm > 0) ? poleHeightCm : _poleHeightCm;
+    final nextWildcard = useWildcard ?? _useWildcard;
+
+    final connectionChanged = nextBroker != _broker ||
+        nextPort != _port ||
+        nextWsPath != _wsPath ||
+        nextFaskes != _faskesId ||
+        nextDevice != _deviceId ||
+        nextWildcard != _useWildcard;
+
+    _broker = nextBroker;
+    _port = nextPort;
+    _wsPath = nextWsPath;
+    _faskesId = nextFaskes;
+    _deviceId = nextDevice;
+    _cloudGatewayUrl = nextGateway;
+    _poleHeightCm = nextPole;
+    _useWildcard = nextWildcard;
+
+    if (reconnectIfConnected && _isConnected && connectionChanged) {
+      await reconnectWithConfig(
+        broker: _broker,
+        port: _port,
+        faskesId: _faskesId,
+        deviceId: _deviceId,
+        cloudGatewayUrl: _cloudGatewayUrl,
+        poleHeightCm: _poleHeightCm,
+        useWildcard: _useWildcard,
+      );
+    }
+  }
+
   /// Memutuskan koneksi MQTT
   void disconnect() {
     _updatesSub?.cancel();

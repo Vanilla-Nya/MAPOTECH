@@ -177,11 +177,30 @@ class _VitaScaleScreeningPageState
     try {
       final synced = await _chcService.syncPendingIotWifiToSupabase();
       final facilityId = ref.read(landingPageProvider).activePuskesmasId;
-      final profile = await _chcService.fetchIotDeviceProfile(
-        faskesCode: _mqttService.faskesId,
-        deviceId: _mqttService.deviceId,
+      final userMqttConfig = await _chcService.fetchMqttDeviceConfigForUser(
         facilityId: facilityId,
+        fallbackFaskesCode: _mqttService.faskesId,
+        fallbackDeviceId: _mqttService.deviceId,
       );
+      if (userMqttConfig != null) {
+        await _mqttService.applySavedConfig(
+          broker: userMqttConfig['broker_host']?.toString(),
+          port: (userMqttConfig['broker_port'] as num?)?.toInt(),
+          wsPath: userMqttConfig['ws_path']?.toString(),
+          faskesId: userMqttConfig['faskes_code']?.toString(),
+          deviceId: userMqttConfig['device_id']?.toString(),
+          cloudGatewayUrl: userMqttConfig['cloud_gateway_url']?.toString(),
+          poleHeightCm: (userMqttConfig['tripod_height_cm'] as num?)?.toDouble(),
+          useWildcard: userMqttConfig['use_wildcard'] as bool?,
+        );
+      }
+      final profile =
+          userMqttConfig ??
+          await _chcService.fetchIotDeviceProfile(
+            faskesCode: _mqttService.faskesId,
+            deviceId: _mqttService.deviceId,
+            facilityId: facilityId,
+          );
       if (!mounted) return;
       setState(() {
         if (profile != null) {
@@ -2173,21 +2192,40 @@ class _VitaScaleScreeningPageState
                         ),
                       ),
                       onPressed: () async {
+                        final newBroker = brokerCtrl.text.trim();
                         final newPort =
                             int.tryParse(portCtrl.text.trim()) ??
                             _mqttService.port;
+                        final newFaskes = faskesCtrl.text.trim();
+                        final newDevice = deviceCtrl.text.trim();
+                        final newGateway = gatewayCtrl.text.trim();
                         final newPole =
                             double.tryParse(poleCtrl.text.trim()) ??
                             _mqttService.poleHeightCm;
                         Navigator.of(ctx).pop();
                         setState(() => _isMqttConnecting = true);
 
+                        final facilityId =
+                            ref.read(landingPageProvider).activePuskesmasId;
+                        await _chcService.saveMqttDeviceConfig(
+                          facilityId: facilityId,
+                          faskesCode: newFaskes,
+                          deviceId: newDevice,
+                          brokerHost: newBroker,
+                          brokerPort: newPort,
+                          wsPath: _mqttService.wsPath,
+                          cloudGatewayUrl: newGateway,
+                          tripodHeightCm: newPole,
+                          useWildcard: useWildcard,
+                          activeWifiSsid: _activeSavedWifiSsid,
+                        );
+
                         final ok = await _mqttService.reconnectWithConfig(
-                          broker: brokerCtrl.text.trim(),
+                          broker: newBroker,
                           port: newPort,
-                          faskesId: faskesCtrl.text.trim(),
-                          deviceId: deviceCtrl.text.trim(),
-                          cloudGatewayUrl: gatewayCtrl.text.trim(),
+                          faskesId: newFaskes,
+                          deviceId: newDevice,
+                          cloudGatewayUrl: newGateway,
                           poleHeightCm: newPole,
                           useWildcard: useWildcard,
                         );

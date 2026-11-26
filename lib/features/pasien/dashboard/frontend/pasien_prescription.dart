@@ -2,9 +2,10 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:mapotech/shared/widgets/skeleton_loading.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
+import 'package:mapotech/shared/letter_models.dart';
 import 'package:mapotech/shared/supabase_service.dart';
+import 'package:mapotech/shared/widgets/ui.dart';
 
 // ─── Data Models ────────────────────────────────────────────────────────────
 
@@ -784,6 +785,21 @@ class _ResepDetailDialog extends ConsumerWidget {
                             '${isEn ? "Specialist / Clinic" : "Spesialis / Poli"}: ${resep.suratRujukan!.poli} • No: ${resep.suratRujukan!.noSurat}',
                             style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
                           ),
+                          const SizedBox(height: 8),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: CustomButton(
+                              text: isEn ? 'View & Print Letter' : 'Lihat & Cetak Surat (QR)',
+                              icon: Icons.print_rounded,
+                              primaryColor: const Color(0xFF3498DB),
+                              height: 34,
+                              onPressed: () => MedicalLetterPreviewDialog.show(
+                                context,
+                                encounterId: resep.id,
+                                preferredType: MedicalLetterType.rujukan,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -824,6 +840,21 @@ class _ResepDetailDialog extends ConsumerWidget {
                                 style: GoogleFonts.outfit(fontSize: 9, color: subtitleColor, fontStyle: FontStyle.italic),
                               ),
                             ),
+                          const SizedBox(height: 8),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: CustomButton(
+                              text: isEn ? 'View & Print Letter' : 'Lihat & Cetak Surat (QR)',
+                              icon: Icons.print_rounded,
+                              primaryColor: Colors.orange,
+                              height: 34,
+                              onPressed: () => MedicalLetterPreviewDialog.show(
+                                context,
+                                encounterId: resep.id,
+                                preferredType: MedicalLetterType.suratSakit,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -853,6 +884,21 @@ class _ResepDetailDialog extends ConsumerWidget {
                           Text(
                             '${isEn ? "Purpose" : "Keperluan"}: ${resep.suratSehat!.keperluan}',
                             style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor),
+                          ),
+                          const SizedBox(height: 8),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: CustomButton(
+                              text: isEn ? 'View & Print Letter' : 'Lihat & Cetak Surat (QR)',
+                              icon: Icons.print_rounded,
+                              primaryColor: Colors.green,
+                              height: 34,
+                              onPressed: () => MedicalLetterPreviewDialog.show(
+                                context,
+                                encounterId: resep.id,
+                                preferredType: MedicalLetterType.suratSehat,
+                              ),
+                            ),
                           ),
                         ],
                       ),
