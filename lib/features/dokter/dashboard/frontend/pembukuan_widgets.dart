@@ -65,7 +65,7 @@ class BukuKasMetricCard extends StatelessWidget {
                     color: (isBadgeRed
                             ? Colors.redAccent
                             : const Color(0xFF48C9B0))
-                        .withOpacity(0.12),
+                        .withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
@@ -80,7 +80,7 @@ class BukuKasMetricCard extends StatelessWidget {
                   ),
                 )
               else
-                Icon(icon, size: 14, color: subCol.withOpacity(0.5)),
+                Icon(icon, size: 14, color: subCol.withValues(alpha: 0.5)),
             ],
           ),
           const SizedBox(height: 8),
@@ -105,11 +105,11 @@ class BukuKasMetricCard extends StatelessWidget {
                   ),
                   decoration: BoxDecoration(
                     color: (isBpjs ? Colors.blueAccent : const Color(0xFF48C9B0))
-                        .withOpacity(0.08),
+                        .withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(4),
                     border: Border.all(
                       color: (isBpjs ? Colors.blueAccent : const Color(0xFF48C9B0))
-                          .withOpacity(0.2),
+                          .withValues(alpha: 0.2),
                     ),
                   ),
                   child: Text(
@@ -305,7 +305,7 @@ class BukuKasFilterChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: isSelected
-              ? activeColor.withOpacity(0.12)
+              ? activeColor.withValues(alpha: 0.12)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
@@ -450,7 +450,7 @@ class CashflowChartPainter extends CustomPainter {
       ..shader = LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: [color.withOpacity(0.18), color.withOpacity(0.0)],
+        colors: [color.withValues(alpha: 0.18), color.withValues(alpha: 0.0)],
       ).createShader(Rect.fromLTWH(35, 0, size.width - 35, size.height))
       ..style = PaintingStyle.fill;
     canvas.drawPath(fillPath, fillPaint);

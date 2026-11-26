@@ -326,7 +326,7 @@ class _ApotekAsistenState extends ConsumerState<ApotekAsisten> {
                           hintText: 'Cari nama, NIK, atau jabatan staff...',
                           hintStyle: GoogleFonts.outfit(
                             fontSize: 11,
-                            color: subtitleColor.withOpacity(0.6),
+                            color: subtitleColor.withValues(alpha: 0.6),
                           ),
                           border: InputBorder.none,
                           isDense: true,
@@ -373,7 +373,7 @@ class _ApotekAsistenState extends ConsumerState<ApotekAsisten> {
                 Icon(
                   Icons.badge_outlined,
                   size: 48,
-                  color: subtitleColor.withOpacity(0.3),
+                  color: subtitleColor.withValues(alpha: 0.3),
                 ),
                 const SizedBox(height: 16),
                 Text(
@@ -449,7 +449,7 @@ class _ApotekAsistenState extends ConsumerState<ApotekAsisten> {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: s.avatarBg.withOpacity(0.12),
+                  color: s.avatarBg.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
@@ -484,7 +484,7 @@ class _ApotekAsistenState extends ConsumerState<ApotekAsisten> {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: roleColor.withOpacity(0.1),
+                        color: roleColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
@@ -542,7 +542,7 @@ class _ApotekAsistenState extends ConsumerState<ApotekAsisten> {
                     vertical: 3,
                   ),
                   decoration: BoxDecoration(
-                    color: subtitle.withOpacity(0.08),
+                    color: subtitle.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(color: border),
                   ),
@@ -550,7 +550,7 @@ class _ApotekAsistenState extends ConsumerState<ApotekAsisten> {
                     p,
                     style: GoogleFonts.outfit(
                       fontSize: 8,
-                      color: text.withOpacity(0.8),
+                      color: text.withValues(alpha: 0.8),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -705,40 +705,42 @@ class _ApotekAsistenState extends ConsumerState<ApotekAsisten> {
                         ),
                       ),
                       const SizedBox(height: 18),
-                      Column(
-                        children: ['Pagi', 'Sore', 'Malam'].map((shiftOpt) {
-                          return RadioListTile<String>(
-                            title: Text(
-                              'Shift $shiftOpt',
-                              style: GoogleFonts.outfit(
-                                fontSize: 12,
-                                color: txtColor,
-                                fontWeight: FontWeight.w600,
+                      RadioGroup<String>(
+                        groupValue: tempShift,
+                        onChanged: (val) {
+                          setModalState(() {
+                            tempShift = val ?? 'Pagi';
+                          });
+                        },
+                        child: Column(
+                          children: ['Pagi', 'Sore', 'Malam'].map((shiftOpt) {
+                            return RadioListTile<String>(
+                              title: Text(
+                                'Shift $shiftOpt',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 12,
+                                  color: txtColor,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
-                            ),
-                            subtitle: Text(
-                              shiftOpt == 'Pagi'
-                                  ? '07:00 - 15:00 WIB'
-                                  : (shiftOpt == 'Sore'
-                                        ? '15:00 - 22:00 WIB'
-                                        : '22:00 - 07:00 WIB'),
-                              style: GoogleFonts.outfit(
-                                fontSize: 10,
-                                color: subColor,
+                              subtitle: Text(
+                                shiftOpt == 'Pagi'
+                                    ? '07:00 - 15:00 WIB'
+                                    : (shiftOpt == 'Sore'
+                                          ? '15:00 - 22:00 WIB'
+                                          : '22:00 - 07:00 WIB'),
+                                style: GoogleFonts.outfit(
+                                  fontSize: 10,
+                                  color: subColor,
+                                ),
                               ),
-                            ),
-                            value: shiftOpt,
-                            groupValue: tempShift,
-                            activeColor: activeAccent,
-                            dense: true,
-                            contentPadding: EdgeInsets.zero,
-                            onChanged: (val) {
-                              setModalState(() {
-                                tempShift = val ?? 'Pagi';
-                              });
-                            },
-                          );
-                        }).toList(),
+                              value: shiftOpt,
+                              activeColor: activeAccent,
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                            );
+                          }).toList(),
+                        ),
                       ),
                       const SizedBox(height: 24),
                       Row(
@@ -1410,7 +1412,7 @@ class _ApotekAsistenState extends ConsumerState<ApotekAsisten> {
         inputFormatters: inputFormatters,
         style: GoogleFonts.outfit(
           fontSize: 12,
-          color: enabled ? text : text.withOpacity(0.4),
+          color: enabled ? text : text.withValues(alpha: 0.4),
           fontWeight: FontWeight.w700,
         ),
         decoration: InputDecoration(
@@ -1418,7 +1420,7 @@ class _ApotekAsistenState extends ConsumerState<ApotekAsisten> {
           counterText: '',
           hintStyle: GoogleFonts.outfit(
             fontSize: 11,
-            color: subtitle.withOpacity(0.5),
+            color: subtitle.withValues(alpha: 0.5),
             fontWeight: FontWeight.w500,
           ),
           border: InputBorder.none,

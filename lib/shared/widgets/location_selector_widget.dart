@@ -18,7 +18,7 @@ class LocationSelectorWidget extends StatefulWidget {
   final Function(String province, String district, String subDistrict, String village) onChanged;
 
   const LocationSelectorWidget({
-    Key? key,
+    super.key,
     this.initialProvince = '',
     this.initialDistrict = '',
     this.initialSubDistrict = '',
@@ -31,7 +31,7 @@ class LocationSelectorWidget extends StatefulWidget {
     this.fontSize = 11,
     this.showVillage = true,
     required this.onChanged,
-  }) : super(key: key);
+  });
 
   @override
   State<LocationSelectorWidget> createState() => _LocationSelectorWidgetState();
@@ -476,7 +476,6 @@ class _SearchableDropdown extends StatefulWidget {
   final ValueChanged<String?> onChanged;
 
   const _SearchableDropdown({
-    Key? key,
     required this.value,
     required this.hint,
     required this.items,
@@ -488,7 +487,7 @@ class _SearchableDropdown extends StatefulWidget {
     required this.dropdownColor,
     required this.fontSize,
     required this.onChanged,
-  }) : super(key: key);
+  });
 
   @override
   State<_SearchableDropdown> createState() => _SearchableDropdownState();
@@ -605,7 +604,7 @@ class _SearchableDropdownState extends State<_SearchableDropdown> {
                           'Tidak ada data ditemukan',
                           style: GoogleFonts.outfit(
                             fontSize: widget.fontSize,
-                            color: widget.textColor.withOpacity(0.6),
+                            color: widget.textColor.withValues(alpha: 0.6),
                           ),
                         ),
                       )
@@ -654,7 +653,7 @@ class _SearchableDropdownState extends State<_SearchableDropdown> {
                                   vertical: 10,
                                 ),
                                 color: isSelected
-                                    ? widget.textColor.withOpacity(0.08)
+                                    ? widget.textColor.withValues(alpha: 0.08)
                                     : Colors.transparent,
                                 child: Text(
                                   item,
@@ -698,7 +697,7 @@ class _SearchableDropdownState extends State<_SearchableDropdown> {
         child: Container(
           height: 40,
           decoration: BoxDecoration(
-            color: widget.enabled ? widget.fieldBg : widget.fieldBg.withOpacity(0.5),
+            color: widget.enabled ? widget.fieldBg : widget.fieldBg.withValues(alpha: 0.5),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: widget.borderColor),
           ),
@@ -720,7 +719,7 @@ class _SearchableDropdownState extends State<_SearchableDropdown> {
                     hintStyle: GoogleFonts.outfit(
                       fontSize: widget.fontSize,
                       fontWeight: FontWeight.w500,
-                      color: widget.textColor.withOpacity(0.5),
+                      color: widget.textColor.withValues(alpha: 0.5),
                     ),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 10),
                     border: InputBorder.none,
@@ -757,7 +756,7 @@ class _SearchableDropdownState extends State<_SearchableDropdown> {
                     child: Icon(
                       Icons.keyboard_arrow_down_rounded,
                       size: 16,
-                      color: widget.textColor.withOpacity(0.6),
+                      color: widget.textColor.withValues(alpha: 0.6),
                     ),
                   ),
                 ),

@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -110,7 +109,7 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
   final TextEditingController _pcvCustomScaleController = TextEditingController(text: '11.00');
   double _pcvSelectedScale = 11.00; // Default 11.00 px/cm (Dataset Boneka & Infantometer standar)
   bool _pcvUseRoi = false; // Default false (Full Frame agar tidak memotong tubuh/kaki)
-  bool _pcvUseK1 = false; // Koreksi distorsi lensa
+  final bool _pcvUseK1 = false; // Koreksi distorsi lensa
   bool _isLoadingPcvImage = false;
   bool _isMeasuringPcv = false;
   double _pcvProgress = 0.0;
@@ -673,7 +672,9 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
         builder: (context, setDialogState) {
           if (!wifiDbInitialized) {
             wifiDbInitialized = true;
-            Future.microtask(() => refreshSavedWifiAndSync(ctx, setDialogState));
+            Future.microtask(() {
+              if (ctx.mounted) refreshSavedWifiAndSync(ctx, setDialogState);
+            });
           }
 
           final pendingCount = _chcService.getPendingWifiSyncCount();
@@ -696,7 +697,7 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1ABC9C).withOpacity(0.12),
+                        color: const Color(0xFF1ABC9C).withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: const Icon(Icons.settings_input_antenna_rounded, color: Color(0xFF1ABC9C), size: 22),
@@ -723,7 +724,7 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                 Container(
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
-                    color: border.withOpacity(0.22),
+                    color: border.withValues(alpha: 0.22),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -738,7 +739,7 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                               color: activeDialogTab == 0 ? cardBg : Colors.transparent,
                               borderRadius: BorderRadius.circular(9),
                               boxShadow: activeDialogTab == 0
-                                  ? [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 4)]
+                                  ? [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 4)]
                                   : null,
                             ),
                             child: Row(
@@ -774,7 +775,7 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                               color: activeDialogTab == 1 ? cardBg : Colors.transparent,
                               borderRadius: BorderRadius.circular(9),
                               boxShadow: activeDialogTab == 1
-                                  ? [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 4)]
+                                  ? [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 4)]
                                   : null,
                             ),
                             child: Row(
@@ -835,7 +836,7 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                               ActionChip(
                                 avatar: const Icon(Icons.hub_rounded, size: 14, color: Color(0xFF1ABC9C)),
                                 label: Text('HiveMQ Public (Port 8884 WSS)', style: GoogleFonts.outfit(fontSize: 11, color: text)),
-                                backgroundColor: border.withOpacity(0.2),
+                                backgroundColor: border.withValues(alpha: 0.2),
                                 onPressed: () {
                                   setDialogState(() {
                                     brokerCtrl.text = 'broker.hivemq.com';
@@ -846,7 +847,7 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                               ActionChip(
                                 avatar: const Icon(Icons.cloud_queue_rounded, size: 14, color: Color(0xFF3498DB)),
                                 label: Text('EMQX Public (Port 8084 WSS)', style: GoogleFonts.outfit(fontSize: 11, color: text)),
-                                backgroundColor: border.withOpacity(0.2),
+                                backgroundColor: border.withValues(alpha: 0.2),
                                 onPressed: () {
                                   setDialogState(() {
                                     brokerCtrl.text = 'broker.emqx.io';
@@ -857,7 +858,7 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                               ActionChip(
                                 avatar: const Icon(Icons.language_rounded, size: 14, color: Color(0xFF9B59B6)),
                                 label: Text('mapotechiotmqtt.vercel.app', style: GoogleFonts.outfit(fontSize: 11, color: text)),
-                                backgroundColor: border.withOpacity(0.2),
+                                backgroundColor: border.withValues(alpha: 0.2),
                                 onPressed: () {
                                   setDialogState(() {
                                     gatewayCtrl.text = 'https://mapotechiotmqtt.vercel.app';
@@ -950,7 +951,7 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                               style: GoogleFonts.outfit(fontSize: 10.5, color: sub),
                             ),
                             value: useWildcard,
-                            activeColor: const Color(0xFF1ABC9C),
+                            activeThumbColor: const Color(0xFF1ABC9C),
                             onChanged: (val) => setDialogState(() => useWildcard = val),
                           ),
 
@@ -1002,9 +1003,9 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                               Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF3498DB).withOpacity(0.08),
+                                  color: const Color(0xFF3498DB).withValues(alpha: 0.08),
                                   borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(color: const Color(0xFF3498DB).withOpacity(0.28)),
+                                  border: Border.all(color: const Color(0xFF3498DB).withValues(alpha: 0.28)),
                                 ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1075,7 +1076,7 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                                           OutlinedButton.icon(
                                             style: OutlinedButton.styleFrom(
                                               foregroundColor: const Color(0xFF3498DB),
-                                              side: BorderSide(color: const Color(0xFF3498DB).withOpacity(0.6)),
+                                              side: BorderSide(color: const Color(0xFF3498DB).withValues(alpha: 0.6)),
                                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
                                             ),
@@ -1140,10 +1141,10 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                                   width: double.infinity,
                                   padding: const EdgeInsets.all(10),
                                   decoration: BoxDecoration(
-                                    color: (espPortalReachable ? const Color(0xFF27AE60) : const Color(0xFFF39C12)).withOpacity(0.1),
+                                    color: (espPortalReachable ? const Color(0xFF27AE60) : const Color(0xFFF39C12)).withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(10),
                                     border: Border.all(
-                                      color: (espPortalReachable ? const Color(0xFF27AE60) : const Color(0xFFF39C12)).withOpacity(0.35),
+                                      color: (espPortalReachable ? const Color(0xFF27AE60) : const Color(0xFFF39C12)).withValues(alpha: 0.35),
                                     ),
                                   ),
                                   child: Text(
@@ -1239,7 +1240,7 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                                                               Container(
                                                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                                                                 decoration: BoxDecoration(
-                                                                  color: const Color(0xFF27AE60).withOpacity(0.15),
+                                                                  color: const Color(0xFF27AE60).withValues(alpha: 0.15),
                                                                   borderRadius: BorderRadius.circular(5),
                                                                 ),
                                                                 child: Text(
@@ -1271,6 +1272,7 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                                                         faskesCode: faskesCtrl.text.trim(),
                                                         ssid: ssid,
                                                       );
+                                                      if (!ctx.mounted) return;
                                                       await refreshSavedWifiAndSync(ctx, setDialogState);
                                                     },
                                                   ),
@@ -1328,7 +1330,7 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                                   width: double.infinity,
                                   padding: const EdgeInsets.all(14),
                                   decoration: BoxDecoration(
-                                    color: border.withOpacity(0.12),
+                                    color: border.withValues(alpha: 0.12),
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(color: border),
                                   ),
@@ -1410,7 +1412,7 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                                                               Container(
                                                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                                                                 decoration: BoxDecoration(
-                                                                  color: const Color(0xFF27AE60).withOpacity(0.15),
+                                                                  color: const Color(0xFF27AE60).withValues(alpha: 0.15),
                                                                   borderRadius: BorderRadius.circular(5),
                                                                 ),
                                                                 child: Text(
@@ -1486,9 +1488,9 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                                       Container(
                                         padding: const EdgeInsets.all(14),
                                         decoration: BoxDecoration(
-                                          color: sig.color.withOpacity(0.08),
+                                          color: sig.color.withValues(alpha: 0.08),
                                           borderRadius: BorderRadius.circular(14),
-                                          border: Border.all(color: sig.color.withOpacity(0.3)),
+                                          border: Border.all(color: sig.color.withValues(alpha: 0.3)),
                                         ),
                                         child: Row(
                                           children: [
@@ -1570,7 +1572,7 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                                             ),
                                             selected: sendMethod == 'ap',
                                             selectedColor: const Color(0xFF3498DB),
-                                            backgroundColor: border.withOpacity(0.18),
+                                            backgroundColor: border.withValues(alpha: 0.18),
                                             onSelected: (_) => setDialogState(() => sendMethod = 'ap'),
                                           ),
                                           ChoiceChip(
@@ -1589,7 +1591,7 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                                             ),
                                             selected: sendMethod == 'mqtt',
                                             selectedColor: const Color(0xFF1ABC9C),
-                                            backgroundColor: border.withOpacity(0.18),
+                                            backgroundColor: border.withValues(alpha: 0.18),
                                             onSelected: _mqttService.isConnected
                                                 ? (_) => setDialogState(() => sendMethod = 'mqtt')
                                                 : null,
@@ -1655,9 +1657,9 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                                   width: double.infinity,
                                   padding: const EdgeInsets.all(10),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFF39C12).withOpacity(0.1),
+                                    color: const Color(0xFFF39C12).withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: const Color(0xFFF39C12).withOpacity(0.35)),
+                                    border: Border.all(color: const Color(0xFFF39C12).withValues(alpha: 0.35)),
                                   ),
                                   child: Text(
                                     espInfoMessage!,
@@ -2803,7 +2805,7 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF39C12).withOpacity(0.12),
+                  color: const Color(0xFFF39C12).withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.warning_amber_rounded, color: Color(0xFFF39C12), size: 22),
@@ -2824,9 +2826,9 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF39C12).withOpacity(0.08),
+                  color: const Color(0xFFF39C12).withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFF39C12).withOpacity(0.3)),
+                  border: Border.all(color: const Color(0xFFF39C12).withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
@@ -2957,9 +2959,9 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: const Color(0xFF1ABC9C).withOpacity(0.12),
+          color: const Color(0xFF1ABC9C).withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFF1ABC9C).withOpacity(0.3)),
+          border: Border.all(color: const Color(0xFF1ABC9C).withValues(alpha: 0.3)),
         ),
         child: Text(
           label,
@@ -3004,7 +3006,7 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                         contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
-                          borderSide: BorderSide(color: Colors.grey.withOpacity(0.3)),
+                          borderSide: BorderSide(color: Colors.grey.withValues(alpha: 0.3)),
                         ),
                       ),
                       style: GoogleFonts.outfit(fontSize: 12),
@@ -3028,13 +3030,13 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                           : ListView.separated(
                               shrinkWrap: true,
                               itemCount: filteredChildren.length,
-                              separatorBuilder: (_, __) => const Divider(height: 6),
+                              separatorBuilder: (_, _) => const Divider(height: 6),
                               itemBuilder: (ctx, idx) {
                                 final child = filteredChildren[idx];
                                 final isCurrent = child.id == _activeChild?.id;
                                 return ListTile(
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                  tileColor: isCurrent ? const Color(0xFF1ABC9C).withOpacity(0.12) : null,
+                                  tileColor: isCurrent ? const Color(0xFF1ABC9C).withValues(alpha: 0.12) : null,
                                   leading: Icon(
                                     child.isUnder24Months ? Icons.child_friendly_rounded : Icons.face_rounded,
                                     color: isCurrent ? const Color(0xFF1ABC9C) : Colors.grey,
@@ -3256,7 +3258,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                     width: 52,
                     height: 52,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1ABC9C).withOpacity(0.12),
+                      color: const Color(0xFF1ABC9C).withValues(alpha: 0.12),
                       shape: BoxShape.circle,
                     ),
                     alignment: Alignment.center,
@@ -3272,7 +3274,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF1ABC9C).withOpacity(0.15),
+                                color: const Color(0xFF1ABC9C).withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(100),
                               ),
                               child: Text(
@@ -3310,7 +3312,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                       decoration: BoxDecoration(
-                        color: borderColor.withOpacity(0.2),
+                        color: borderColor.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(color: borderColor),
                       ),
@@ -3693,7 +3695,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
 
     return CustomCard(
       color: cardBg,
-      borderColor: _activeChild == null ? const Color(0xFF1ABC9C).withOpacity(0.4) : border,
+      borderColor: _activeChild == null ? const Color(0xFF1ABC9C).withValues(alpha: 0.4) : border,
       padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -3704,7 +3706,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1ABC9C).withOpacity(0.12),
+                  color: const Color(0xFF1ABC9C).withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -3798,7 +3800,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                           : 'Cari Nama Balita, NIK (16-Digit), atau Nama Orang Tua...',
                       hintStyle: GoogleFonts.outfit(
                         fontSize: 11.5,
-                        color: sub.withOpacity(0.7),
+                        color: sub.withValues(alpha: 0.7),
                       ),
                       border: InputBorder.none,
                       isDense: true,
@@ -3845,10 +3847,10 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                     ? const Color(0xFF1E2130)
                     : Colors.white,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF1ABC9C).withOpacity(0.4)),
+                border: Border.all(color: const Color(0xFF1ABC9C).withValues(alpha: 0.4)),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
+                    color: Colors.black.withValues(alpha: 0.08),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -3874,7 +3876,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                       shrinkWrap: true,
                       padding: const EdgeInsets.all(8),
                       itemCount: searchMatches.length,
-                      separatorBuilder: (_, __) => const Divider(height: 8),
+                      separatorBuilder: (_, _) => const Divider(height: 8),
                       itemBuilder: (ctx, idx) {
                         final child = searchMatches[idx];
                         return InkWell(
@@ -3883,7 +3885,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF1ABC9C).withOpacity(0.06),
+                              color: const Color(0xFF1ABC9C).withValues(alpha: 0.06),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Row(
@@ -3952,9 +3954,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1ABC9C).withOpacity(0.09),
+                  color: const Color(0xFF1ABC9C).withValues(alpha: 0.09),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFF1ABC9C).withOpacity(0.35)),
+                  border: Border.all(color: const Color(0xFF1ABC9C).withValues(alpha: 0.35)),
                 ),
                 child: Row(
                   children: [
@@ -3962,7 +3964,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1ABC9C).withOpacity(0.15),
+                        color: const Color(0xFF1ABC9C).withValues(alpha: 0.15),
                         shape: BoxShape.circle,
                       ),
                       alignment: Alignment.center,
@@ -4030,7 +4032,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                           ),
                           Text(
                             'Alamat: ${_activeChild!.address} • Telp: ${_activeChild!.phone?.isNotEmpty == true ? _activeChild!.phone : "-"}',
-                            style: GoogleFonts.outfit(fontSize: 10, color: sub.withOpacity(0.8)),
+                            style: GoogleFonts.outfit(fontSize: 10, color: sub.withValues(alpha: 0.8)),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ],
@@ -4087,7 +4089,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1ABC9C).withOpacity(0.12),
+                        color: const Color(0xFF1ABC9C).withValues(alpha: 0.12),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
@@ -4177,7 +4179,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                     decoration: BoxDecoration(
-                      color: isSelected ? Colors.white.withOpacity(0.2) : badgeColor.withOpacity(0.12),
+                      color: isSelected ? Colors.white.withValues(alpha: 0.2) : badgeColor.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
@@ -4293,7 +4295,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
         color: cardBg,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isConnected ? const Color(0xFF27AE60).withOpacity(0.4) : border,
+          color: isConnected ? const Color(0xFF27AE60).withValues(alpha: 0.4) : border,
           width: isConnected ? 1.5 : 1.0,
         ),
       ),
@@ -4310,7 +4312,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.12),
+                      color: statusColor.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(Icons.sensors_rounded, color: statusColor, size: 20),
@@ -4337,9 +4339,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF1ABC9C).withOpacity(0.12),
+                                color: const Color(0xFF1ABC9C).withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: const Color(0xFF1ABC9C).withOpacity(0.35)),
+                                border: Border.all(color: const Color(0xFF1ABC9C).withValues(alpha: 0.35)),
                               ),
                               child: Text(
                                 'mapotechiotmqtt.vercel.app',
@@ -4353,9 +4355,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                               decoration: BoxDecoration(
-                                color: statusColor.withOpacity(0.15),
+                                color: statusColor.withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: statusColor.withOpacity(0.4)),
+                                border: Border.all(color: statusColor.withValues(alpha: 0.4)),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -4402,7 +4404,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                     height: 36,
                     width: 36,
                     decoration: BoxDecoration(
-                      color: border.withOpacity(0.18),
+                      color: border.withValues(alpha: 0.18),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: border),
                     ),
@@ -4416,8 +4418,8 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   foregroundColor: const Color(0xFF3498DB),
                   side: BorderSide(
                     color: isConnected
-                        ? const Color(0xFF3498DB).withOpacity(0.55)
-                        : border.withOpacity(0.6),
+                        ? const Color(0xFF3498DB).withValues(alpha: 0.55)
+                        : border.withValues(alpha: 0.6),
                     width: 1.3,
                   ),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
@@ -4439,7 +4441,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFF9B59B6),
                         side: BorderSide(
-                          color: const Color(0xFF9B59B6).withOpacity(0.55),
+                          color: const Color(0xFF9B59B6).withValues(alpha: 0.55),
                           width: 1.3,
                         ),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
@@ -4462,7 +4464,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFFE74C3C),
                         side: BorderSide(
-                          color: const Color(0xFFE74C3C).withOpacity(0.6),
+                          color: const Color(0xFFE74C3C).withValues(alpha: 0.6),
                           width: 1.3,
                         ),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
@@ -4547,9 +4549,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                color: const Color(0xFF27AE60).withOpacity(0.06),
+                color: const Color(0xFF27AE60).withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF27AE60).withOpacity(0.2)),
+                border: Border.all(color: const Color(0xFF27AE60).withValues(alpha: 0.2)),
               ),
               child: Wrap(
                 spacing: 20,
@@ -4586,7 +4588,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF27AE60).withOpacity(0.2),
+                            color: const Color(0xFF27AE60).withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text('STABIL', style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.w800, color: const Color(0xFF27AE60))),
@@ -4633,7 +4635,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: border.withOpacity(0.12),
+        color: border.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: border),
       ),
@@ -4736,12 +4738,12 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
             color: session != null
-                ? const Color(0xFF1ABC9C).withOpacity(0.08)
-                : border.withOpacity(0.06),
+                ? const Color(0xFF1ABC9C).withValues(alpha: 0.08)
+                : border.withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: session != null
-                  ? const Color(0xFF1ABC9C).withOpacity(0.25)
+                  ? const Color(0xFF1ABC9C).withValues(alpha: 0.25)
                   : border,
             ),
           ),
@@ -4951,7 +4953,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF16A085).withOpacity(0.12),
+                      color: const Color(0xFF16A085).withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(Icons.straighten_rounded, color: Color(0xFF16A085), size: 20),
@@ -4972,7 +4974,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF16A085).withOpacity(0.15),
+                  color: const Color(0xFF16A085).withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
@@ -5003,7 +5005,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: border.withOpacity(0.1),
+              color: border.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Column(
@@ -5023,7 +5025,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   borderRadius: BorderRadius.circular(4),
                   child: LinearProgressIndicator(
                     value: (lastHeight != null && poleHeight > 0) ? (lastHeight / poleHeight).clamp(0.0, 1.0) : 0.0,
-                    backgroundColor: border.withOpacity(0.3),
+                    backgroundColor: border.withValues(alpha: 0.3),
                     valueColor: const AlwaysStoppedAnimation(Color(0xFF16A085)),
                     minHeight: 6,
                   ),
@@ -5090,7 +5092,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF2980B9).withOpacity(0.12),
+                      color: const Color(0xFF2980B9).withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(Icons.monitor_weight_rounded, color: Color(0xFF2980B9), size: 20),
@@ -5111,7 +5113,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: isStable ? const Color(0xFF27AE60).withOpacity(0.15) : const Color(0xFFF39C12).withOpacity(0.15),
+                  color: isStable ? const Color(0xFF27AE60).withValues(alpha: 0.15) : const Color(0xFFF39C12).withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Row(
@@ -5160,7 +5162,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: border.withOpacity(0.1),
+              color: border.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -5237,7 +5239,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: iconColor.withOpacity(0.12),
+            color: iconColor.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(icon, size: 18, color: iconColor),
@@ -5271,10 +5273,10 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: isConnected ? const Color(0xFF1ABC9C).withOpacity(0.08) : border.withOpacity(0.05),
+        color: isConnected ? const Color(0xFF1ABC9C).withValues(alpha: 0.08) : border.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isConnected ? const Color(0xFF1ABC9C).withOpacity(0.3) : border,
+          color: isConnected ? const Color(0xFF1ABC9C).withValues(alpha: 0.3) : border,
         ),
       ),
       child: Row(
@@ -5282,7 +5284,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
           Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: isConnected ? const Color(0xFF1ABC9C).withOpacity(0.15) : border.withOpacity(0.2),
+              color: isConnected ? const Color(0xFF1ABC9C).withValues(alpha: 0.15) : border.withValues(alpha: 0.2),
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -5316,7 +5318,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF27AE60).withOpacity(0.2),
+                            color: const Color(0xFF27AE60).withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text('STABIL', style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.w800, color: const Color(0xFF27AE60))),
@@ -5361,9 +5363,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: statusColor.withOpacity(0.08),
+        color: statusColor.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: statusColor.withOpacity(0.3)),
+        border: Border.all(color: statusColor.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -5445,7 +5447,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1ABC9C).withOpacity(0.12),
+                  color: const Color(0xFF1ABC9C).withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.person_pin_rounded, size: 20, color: Color(0xFF1ABC9C)),
@@ -5521,7 +5523,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF27AE60).withOpacity(0.15),
+                              color: const Color(0xFF27AE60).withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Row(
@@ -5595,7 +5597,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                       height: 44,
                       padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
-                        color: border.withOpacity(0.12),
+                        color: border.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(color: border),
                       ),
@@ -5747,9 +5749,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE67E22).withOpacity(0.1),
+                    color: const Color(0xFFE67E22).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFFE67E22).withOpacity(0.3)),
+                    border: Border.all(color: const Color(0xFFE67E22).withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     children: [
@@ -5791,7 +5793,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1ABC9C).withOpacity(0.12),
+                  color: const Color(0xFF1ABC9C).withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.straighten_rounded, size: 20, color: Color(0xFF1ABC9C)),
@@ -5891,9 +5893,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                         margin: const EdgeInsets.only(bottom: 5),
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF1ABC9C).withOpacity(0.12),
+                          color: const Color(0xFF1ABC9C).withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: const Color(0xFF1ABC9C).withOpacity(0.35)),
+                          border: Border.all(color: const Color(0xFF1ABC9C).withValues(alpha: 0.35)),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -6056,9 +6058,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                 margin: const EdgeInsets.only(top: 8),
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: color.withOpacity(0.3)),
+                  border: Border.all(color: color.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
@@ -6116,7 +6118,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: border.withOpacity(0.08),
+              color: border.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: border),
             ),
@@ -6172,9 +6174,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: const Color(0xFF1ABC9C).withOpacity(0.1),
+          color: const Color(0xFF1ABC9C).withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFF1ABC9C).withOpacity(0.3)),
+          border: Border.all(color: const Color(0xFF1ABC9C).withValues(alpha: 0.3)),
         ),
         child: Text(
           label,
@@ -6227,7 +6229,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
         width: 36,
         height: 36,
         decoration: BoxDecoration(
-          color: const Color(0xFF1ABC9C).withOpacity(0.12),
+          color: const Color(0xFF1ABC9C).withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(8),
         ),
         alignment: Alignment.center,
@@ -6250,10 +6252,10 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF1ABC9C).withOpacity(0.12) : Colors.transparent,
+          color: isSelected ? const Color(0xFF1ABC9C).withValues(alpha: 0.12) : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? const Color(0xFF1ABC9C) : Colors.grey.withOpacity(0.3),
+            color: isSelected ? const Color(0xFF1ABC9C) : Colors.grey.withValues(alpha: 0.3),
             width: isSelected ? 1.5 : 1.0,
           ),
         ),
@@ -6282,7 +6284,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF1ABC9C).withOpacity(0.15),
+                          color: const Color(0xFF1ABC9C).withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
@@ -6311,10 +6313,10 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? color : color.withOpacity(0.08),
+          color: isSelected ? color : color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isSelected ? color : color.withOpacity(0.3),
+            color: isSelected ? color : color.withValues(alpha: 0.3),
             width: isSelected ? 1.5 : 1.0,
           ),
         ),
@@ -6345,9 +6347,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFF1ABC9C).withOpacity(0.08),
+        color: const Color(0xFF1ABC9C).withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF1ABC9C).withOpacity(0.2)),
+        border: Border.all(color: const Color(0xFF1ABC9C).withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -6377,9 +6379,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: const Color(0xFF1ABC9C).withOpacity(0.06),
+        color: const Color(0xFF1ABC9C).withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF1ABC9C).withOpacity(0.25)),
+        border: Border.all(color: const Color(0xFF1ABC9C).withValues(alpha: 0.25)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -6389,7 +6391,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1ABC9C).withOpacity(0.15),
+                  color: const Color(0xFF1ABC9C).withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(icon, size: 20, color: const Color(0xFF1ABC9C)),
@@ -6424,7 +6426,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
             child: SizedBox(
               height: 8,
               child: LinearProgressIndicator(
-                backgroundColor: const Color(0xFF1ABC9C).withOpacity(0.15),
+                backgroundColor: const Color(0xFF1ABC9C).withValues(alpha: 0.15),
                 valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF1ABC9C)),
               ),
             ),
@@ -6441,13 +6443,13 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                     ? const Color(0xFF27AE60)
                     : isCurrent
                         ? const Color(0xFF1ABC9C)
-                        : sub.withOpacity(0.5);
+                        : sub.withValues(alpha: 0.5);
                 return Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: stepColor.withOpacity(0.1),
+                    color: stepColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: stepColor.withOpacity(0.3)),
+                    border: Border.all(color: stepColor.withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -6457,7 +6459,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                       else if (isCurrent)
                         const Icon(Icons.sync_rounded, size: 11, color: Color(0xFF1ABC9C))
                       else
-                        Icon(Icons.circle_outlined, size: 9, color: sub.withOpacity(0.5)),
+                        Icon(Icons.circle_outlined, size: 9, color: sub.withValues(alpha: 0.5)),
                       const SizedBox(width: 4),
                       Text(
                         steps[idx],
@@ -6513,7 +6515,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1ABC9C).withOpacity(0.12),
+                      color: const Color(0xFF1ABC9C).withValues(alpha: 0.12),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(Icons.psychology_rounded, size: 22, color: Color(0xFF1ABC9C)),
@@ -6540,7 +6542,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                                         : (_smartGrowthResult != null
                                             ? const Color(0xFF1ABC9C)
                                             : const Color(0xFFF39C12)))
-                                    .withOpacity(0.15),
+                                    .withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(6),
                                 border: Border.all(
                                   color: (_reasoningResult != null
@@ -6548,7 +6550,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                                           : (_smartGrowthResult != null
                                               ? const Color(0xFF1ABC9C)
                                               : const Color(0xFFF39C12)))
-                                      .withOpacity(0.3),
+                                      .withValues(alpha: 0.3),
                                 ),
                               ),
                               child: Text(
@@ -6635,9 +6637,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE67E22).withOpacity(0.08),
+                    color: const Color(0xFFE67E22).withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFE67E22).withOpacity(0.3)),
+                    border: Border.all(color: const Color(0xFFE67E22).withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     children: [
@@ -6675,9 +6677,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1ABC9C).withOpacity(0.06),
+                    color: const Color(0xFF1ABC9C).withValues(alpha: 0.06),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFF1ABC9C).withOpacity(0.25)),
+                    border: Border.all(color: const Color(0xFF1ABC9C).withValues(alpha: 0.25)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -6687,7 +6689,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                           Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF1ABC9C).withOpacity(0.12),
+                              color: const Color(0xFF1ABC9C).withValues(alpha: 0.12),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(Icons.psychology_alt_rounded, size: 24, color: Color(0xFF1ABC9C)),
@@ -6707,7 +6709,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFFF39C12).withOpacity(0.12),
+                                        color: const Color(0xFFF39C12).withValues(alpha: 0.12),
                                         borderRadius: BorderRadius.circular(5),
                                       ),
                                       child: Text(
@@ -6805,9 +6807,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF27AE60).withOpacity(0.08),
+                    color: const Color(0xFF27AE60).withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF27AE60).withOpacity(0.3)),
+                    border: Border.all(color: const Color(0xFF27AE60).withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     children: [
@@ -6890,7 +6892,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
         // SATUSEHAT FHIR R4 Integration Card (Preview FHIR R4 JSON button removed)
         CustomCard(
           color: cardBg,
-          borderColor: const Color(0xFF009688).withOpacity(0.4),
+          borderColor: const Color(0xFF009688).withValues(alpha: 0.4),
           padding: const EdgeInsets.all(22),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -6900,7 +6902,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF009688).withOpacity(0.12),
+                      color: const Color(0xFF009688).withValues(alpha: 0.12),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(Icons.cloud_sync_rounded, size: 22, color: Color(0xFF009688)),
@@ -6920,7 +6922,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF009688).withOpacity(0.15),
+                                color: const Color(0xFF009688).withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
@@ -6946,7 +6948,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: border.withOpacity(0.08),
+                  color: border.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: border),
                 ),
@@ -6982,9 +6984,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF27AE60).withOpacity(0.1),
+                    color: const Color(0xFF27AE60).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF27AE60).withOpacity(0.3)),
+                    border: Border.all(color: const Color(0xFF27AE60).withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     children: [
@@ -7044,7 +7046,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF27AE60).withOpacity(0.12),
+                      color: const Color(0xFF27AE60).withValues(alpha: 0.12),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(Icons.assignment_turned_in_rounded, size: 20, color: Color(0xFF27AE60)),
@@ -7340,20 +7342,20 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
     final String badgeText;
 
     if (hasRed) {
-      badgeBg = const Color(0xFFE74C3C).withOpacity(0.12);
-      badgeBorder = const Color(0xFFE74C3C).withOpacity(0.4);
+      badgeBg = const Color(0xFFE74C3C).withValues(alpha: 0.12);
+      badgeBorder = const Color(0xFFE74C3C).withValues(alpha: 0.4);
       badgeColor = const Color(0xFFE74C3C);
       badgeIcon = Icons.error_outline_rounded;
       badgeText = '${redErrors.length} Data Wajib Kurang (Klik)';
     } else if (hasYellow) {
-      badgeBg = const Color(0xFFF39C12).withOpacity(0.12);
-      badgeBorder = const Color(0xFFF39C12).withOpacity(0.4);
+      badgeBg = const Color(0xFFF39C12).withValues(alpha: 0.12);
+      badgeBorder = const Color(0xFFF39C12).withValues(alpha: 0.4);
       badgeColor = const Color(0xFFD68910);
       badgeIcon = Icons.info_outline_rounded;
       badgeText = 'Form Lengkap (${yellowWarnings.length} Saran Opsional)';
     } else {
-      badgeBg = const Color(0xFF27AE60).withOpacity(0.12);
-      badgeBorder = const Color(0xFF27AE60).withOpacity(0.4);
+      badgeBg = const Color(0xFF27AE60).withValues(alpha: 0.12);
+      badgeBorder = const Color(0xFF27AE60).withValues(alpha: 0.4);
       badgeColor = const Color(0xFF27AE60);
       badgeIcon = Icons.check_circle_rounded;
       badgeText = '✅ Form Lengkap & Reasoning Selesai';
@@ -7388,9 +7390,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: const Color(0xFF1ABC9C).withOpacity(0.08),
+        color: const Color(0xFF1ABC9C).withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: const Color(0xFF1ABC9C).withOpacity(0.2)),
+        border: Border.all(color: const Color(0xFF1ABC9C).withValues(alpha: 0.2)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -7418,14 +7420,22 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
 
     // Warna status
     Color giziColor = const Color(0xFF27AE60);
-    if (kategoriGizi.contains('Buruk')) giziColor = const Color(0xFFE74C3C);
-    else if (kategoriGizi.contains('Kurang')) giziColor = const Color(0xFFE67E22);
-    else if (kategoriGizi.contains('Lebih') || kategoriGizi.contains('Obesitas')) giziColor = const Color(0xFF9B59B6);
+    if (kategoriGizi.contains('Buruk')) {
+      giziColor = const Color(0xFFE74C3C);
+    } else if (kategoriGizi.contains('Kurang')) {
+      giziColor = const Color(0xFFE67E22);
+    } else if (kategoriGizi.contains('Lebih') || kategoriGizi.contains('Obesitas')) {
+      giziColor = const Color(0xFF9B59B6);
+    }
 
     Color stuntingColor = const Color(0xFF27AE60);
-    if (kategoriStunting.contains('Sangat Pendek')) stuntingColor = const Color(0xFFE74C3C);
-    else if (kategoriStunting.contains('Pendek')) stuntingColor = const Color(0xFFE67E22);
-    else if (kategoriStunting.contains('Tinggi')) stuntingColor = const Color(0xFF3498DB);
+    if (kategoriStunting.contains('Sangat Pendek')) {
+      stuntingColor = const Color(0xFFE74C3C);
+    } else if (kategoriStunting.contains('Pendek')) {
+      stuntingColor = const Color(0xFFE67E22);
+    } else if (kategoriStunting.contains('Tinggi')) {
+      stuntingColor = const Color(0xFF3498DB);
+    }
 
     return CustomCard(
       color: cardBg,
@@ -7440,7 +7450,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF27AE60).withOpacity(0.12),
+                  color: const Color(0xFF27AE60).withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.verified_rounded, size: 22, color: Color(0xFF27AE60)),
@@ -7460,7 +7470,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF27AE60).withOpacity(0.12),
+                            color: const Color(0xFF27AE60).withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
@@ -7494,9 +7504,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: const Color(0xFFE74C3C).withOpacity(0.1),
+                color: const Color(0xFFE74C3C).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFE74C3C).withOpacity(0.4)),
+                border: Border.all(color: const Color(0xFFE74C3C).withValues(alpha: 0.4)),
               ),
               child: Row(
                 children: [
@@ -7531,9 +7541,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: giziColor.withOpacity(0.08),
+                    color: giziColor.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: giziColor.withOpacity(0.3)),
+                    border: Border.all(color: giziColor.withValues(alpha: 0.3)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -7545,7 +7555,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: giziColor.withOpacity(0.15),
+                              color: giziColor.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
@@ -7577,9 +7587,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: stuntingColor.withOpacity(0.08),
+                    color: stuntingColor.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: stuntingColor.withOpacity(0.3)),
+                    border: Border.all(color: stuntingColor.withValues(alpha: 0.3)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -7591,7 +7601,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: stuntingColor.withOpacity(0.15),
+                              color: stuntingColor.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
@@ -7649,9 +7659,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                         child: LinearProgressIndicator(
                           value: entry.value,
                           minHeight: 5,
-                          backgroundColor: border.withOpacity(0.2),
+                          backgroundColor: border.withValues(alpha: 0.2),
                           valueColor: AlwaysStoppedAnimation<Color>(
-                            entry.key == kategoriGizi ? giziColor : Colors.grey.withOpacity(0.4),
+                            entry.key == kategoriGizi ? giziColor : Colors.grey.withValues(alpha: 0.4),
                           ),
                         ),
                       ),
@@ -7696,7 +7706,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
 
     return CustomCard(
       color: cardBg,
-      borderColor: const Color(0xFF1ABC9C).withOpacity(0.5),
+      borderColor: const Color(0xFF1ABC9C).withValues(alpha: 0.5),
       padding: const EdgeInsets.all(22),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -7729,9 +7739,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF1ABC9C).withOpacity(0.12),
+                            color: const Color(0xFF1ABC9C).withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: const Color(0xFF1ABC9C).withOpacity(0.3)),
+                            border: Border.all(color: const Color(0xFF1ABC9C).withValues(alpha: 0.3)),
                           ),
                           child: Text(
                             reasoning.modelUsed,
@@ -7766,9 +7776,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: const Color(0xFF1ABC9C).withOpacity(0.08),
+              color: const Color(0xFF1ABC9C).withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFF1ABC9C).withOpacity(0.2)),
+              border: Border.all(color: const Color(0xFF1ABC9C).withValues(alpha: 0.2)),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -7792,7 +7802,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
           Container(
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: border.withOpacity(0.12),
+              color: border.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -7871,7 +7881,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                     width: 24,
                     height: 24,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1ABC9C).withOpacity(0.15),
+                      color: const Color(0xFF1ABC9C).withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                     ),
                     alignment: Alignment.center,
@@ -7899,9 +7909,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
           key: const ValueKey(1),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.amber.withOpacity(0.06),
+            color: Colors.amber.withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.amber.withOpacity(0.25)),
+            border: Border.all(color: Colors.amber.withValues(alpha: 0.25)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -7928,9 +7938,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
           key: const ValueKey(2),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: const Color(0xFF27AE60).withOpacity(0.06),
+            color: const Color(0xFF27AE60).withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFF27AE60).withOpacity(0.25)),
+            border: Border.all(color: const Color(0xFF27AE60).withValues(alpha: 0.25)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -7957,9 +7967,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
           key: const ValueKey(3),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: const Color(0xFF3498DB).withOpacity(0.06),
+            color: const Color(0xFF3498DB).withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFF3498DB).withOpacity(0.25)),
+            border: Border.all(color: const Color(0xFF3498DB).withValues(alpha: 0.25)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -7987,9 +7997,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
           key: const ValueKey(4),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: const Color(0xFFE91E63).withOpacity(0.06),
+            color: const Color(0xFFE91E63).withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE91E63).withOpacity(0.25)),
+            border: Border.all(color: const Color(0xFFE91E63).withValues(alpha: 0.25)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -8474,7 +8484,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: const Color(0xFF1ABC9C).withOpacity(0.12),
+              color: const Color(0xFF1ABC9C).withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
             child: const Icon(Icons.cloud_done_rounded, size: 22, color: Color(0xFF1ABC9C)),
@@ -8496,9 +8506,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF2ECC71).withOpacity(0.15),
+                        color: const Color(0xFF2ECC71).withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: const Color(0xFF2ECC71).withOpacity(0.4)),
+                        border: Border.all(color: const Color(0xFF2ECC71).withValues(alpha: 0.4)),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -8556,7 +8566,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1ABC9C).withOpacity(0.12),
+                  color: const Color(0xFF1ABC9C).withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.camera_enhance_rounded, size: 20, color: Color(0xFF1ABC9C)),
@@ -8721,9 +8731,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFE67E22).withOpacity(0.12),
+                            color: const Color(0xFFE67E22).withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: const Color(0xFFE67E22).withOpacity(0.3)),
+                            border: Border.all(color: const Color(0xFFE67E22).withValues(alpha: 0.3)),
                           ),
                           child: Text(
                             '🧸 Sampel Boneka (47.2 cm)',
@@ -8739,9 +8749,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF3498DB).withOpacity(0.12),
+                            color: const Color(0xFF3498DB).withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: const Color(0xFF3498DB).withOpacity(0.3)),
+                            border: Border.all(color: const Color(0xFF3498DB).withValues(alpha: 0.3)),
                           ),
                           child: Text(
                             '🔗 Demo Bayi Online (Unsplash)',
@@ -8756,9 +8766,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF1ABC9C).withOpacity(0.12),
+                            color: const Color(0xFF1ABC9C).withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: const Color(0xFF1ABC9C).withOpacity(0.3)),
+                            border: Border.all(color: const Color(0xFF1ABC9C).withValues(alpha: 0.3)),
                           ),
                           child: Text(
                             '🔗 Sampel Validasi PCV (72 cm)',
@@ -8893,9 +8903,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFE74C3C).withOpacity(0.12),
+                              color: const Color(0xFFE74C3C).withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: const Color(0xFFE74C3C).withOpacity(0.4)),
+                              border: Border.all(color: const Color(0xFFE74C3C).withValues(alpha: 0.4)),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -8976,7 +8986,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                           ),
                         ),
                         selected: (_pcvSelectedScale - 11.0).abs() < 0.01,
-                        selectedColor: const Color(0xFF1ABC9C).withOpacity(0.18),
+                        selectedColor: const Color(0xFF1ABC9C).withValues(alpha: 0.18),
                         backgroundColor: isDark ? const Color(0xFF1E2130) : Colors.white,
                         side: BorderSide(
                           color: (_pcvSelectedScale - 11.0).abs() < 0.01 ? const Color(0xFF1ABC9C) : border,
@@ -9001,7 +9011,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                           ),
                         ),
                         selected: (_pcvSelectedScale - 9.09).abs() < 0.01,
-                        selectedColor: const Color(0xFF1ABC9C).withOpacity(0.18),
+                        selectedColor: const Color(0xFF1ABC9C).withValues(alpha: 0.18),
                         backgroundColor: isDark ? const Color(0xFF1E2130) : Colors.white,
                         side: BorderSide(
                           color: (_pcvSelectedScale - 9.09).abs() < 0.01 ? const Color(0xFF1ABC9C) : border,
@@ -9027,7 +9037,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                           style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.w600, color: text),
                         ),
                         selected: !_pcvUseRoi,
-                        selectedColor: const Color(0xFF2ECC71).withOpacity(0.18),
+                        selectedColor: const Color(0xFF2ECC71).withValues(alpha: 0.18),
                         backgroundColor: isDark ? const Color(0xFF1E2130) : Colors.white,
                         side: BorderSide(color: !_pcvUseRoi ? const Color(0xFF2ECC71) : border),
                         onSelected: (val) {
@@ -9082,9 +9092,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFFE74C3C).withOpacity(0.08),
+                color: const Color(0xFFE74C3C).withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFE74C3C).withOpacity(0.35)),
+                border: Border.all(color: const Color(0xFFE74C3C).withValues(alpha: 0.35)),
               ),
               child: Row(
                 children: [
@@ -9114,9 +9124,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFF1ABC9C).withOpacity(0.07),
+                color: const Color(0xFF1ABC9C).withValues(alpha: 0.07),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF1ABC9C).withOpacity(0.4)),
+                border: Border.all(color: const Color(0xFF1ABC9C).withValues(alpha: 0.4)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -9297,7 +9307,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   sublabel,
                   style: GoogleFonts.outfit(
                     fontSize: 8.5,
-                    color: isSelected ? Colors.white.withOpacity(0.85) : Colors.grey,
+                    color: isSelected ? Colors.white.withValues(alpha: 0.85) : Colors.grey,
                   ),
                 ),
               ],

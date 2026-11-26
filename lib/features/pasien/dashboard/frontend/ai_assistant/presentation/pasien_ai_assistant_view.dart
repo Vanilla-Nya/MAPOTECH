@@ -79,9 +79,9 @@ class _PasienAiAssistantViewState extends ConsumerState<PasienAiAssistantView> {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  primaryColor.withOpacity(isDark ? 0.08 : 0.04),
+                  primaryColor.withValues(alpha: isDark ? 0.08 : 0.04),
                   isDark ? const Color(0xFF0F1318) : const Color(0xFFF8FAFC),
-                  const Color(0xFF48C9B0).withOpacity(isDark ? 0.06 : 0.03),
+                  const Color(0xFF48C9B0).withValues(alpha: isDark ? 0.06 : 0.03),
                 ],
               ),
             ),
@@ -95,7 +95,7 @@ class _PasienAiAssistantViewState extends ConsumerState<PasienAiAssistantView> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               decoration: BoxDecoration(
-                color: cardColor.withOpacity(0.85),
+                color: cardColor.withValues(alpha: 0.85),
                 border: Border(bottom: BorderSide(color: borderColor)),
               ),
               child: Row(
@@ -103,7 +103,7 @@ class _PasienAiAssistantViewState extends ConsumerState<PasienAiAssistantView> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: primaryColor.withOpacity(0.12),
+                      color: primaryColor.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
@@ -137,12 +137,12 @@ class _PasienAiAssistantViewState extends ConsumerState<PasienAiAssistantView> {
                               decoration: BoxDecoration(
                                 color: const Color(
                                   0xFF0F9D58,
-                                ).withOpacity(0.15),
+                                ).withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(6),
                                 border: Border.all(
                                   color: const Color(
                                     0xFF0F9D58,
-                                  ).withOpacity(0.3),
+                                  ).withValues(alpha: 0.3),
                                 ),
                               ),
                               child: Row(
@@ -176,7 +176,7 @@ class _PasienAiAssistantViewState extends ConsumerState<PasienAiAssistantView> {
                               : 'Tanya gejala, info resep, cari dokter, klinik & apotek',
                           style: GoogleFonts.outfit(
                             fontSize: 11,
-                            color: textColor.withOpacity(0.6),
+                            color: textColor.withValues(alpha: 0.6),
                           ),
                         ),
                       ],
@@ -187,7 +187,7 @@ class _PasienAiAssistantViewState extends ConsumerState<PasienAiAssistantView> {
                     icon: Icon(
                       Icons.refresh_rounded,
                       size: 20,
-                      color: textColor.withOpacity(0.7),
+                      color: textColor.withValues(alpha: 0.7),
                     ),
                     tooltip: isEn ? 'Reset Conversation' : 'Reset Percakapan',
                     onPressed: () {
@@ -292,7 +292,7 @@ class _PasienAiAssistantViewState extends ConsumerState<PasienAiAssistantView> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [primaryColor, primaryColor.withOpacity(0.8)],
+              colors: [primaryColor, primaryColor.withValues(alpha: 0.8)],
             ),
             borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(14),
@@ -301,7 +301,7 @@ class _PasienAiAssistantViewState extends ConsumerState<PasienAiAssistantView> {
             ),
             boxShadow: [
               BoxShadow(
-                color: primaryColor.withOpacity(0.35),
+                color: primaryColor.withValues(alpha: 0.35),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
@@ -338,20 +338,20 @@ class _PasienAiAssistantViewState extends ConsumerState<PasienAiAssistantView> {
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 color: isDark
-                    ? const Color(0xFF141920).withOpacity(0.92)
-                    : Colors.white.withOpacity(0.95),
+                    ? const Color(0xFF141920).withValues(alpha: 0.92)
+                    : Colors.white.withValues(alpha: 0.95),
                 borderRadius: const BorderRadius.only(
                   bottomLeft: Radius.circular(24),
                   bottomRight: Radius.circular(24),
                   topRight: Radius.circular(24),
                 ),
                 border: Border.all(
-                  color: primaryColor.withOpacity(isDark ? 0.35 : 0.25),
+                  color: primaryColor.withValues(alpha: isDark ? 0.35 : 0.25),
                   width: 1.5,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(isDark ? 0.45 : 0.08),
+                    color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.08),
                     blurRadius: 24,
                     offset: const Offset(0, 10),
                   ),
@@ -369,7 +369,7 @@ class _PasienAiAssistantViewState extends ConsumerState<PasienAiAssistantView> {
                         height: 1.6,
                         fontSize: 16,
                         color: isDark
-                            ? Colors.white.withOpacity(0.95)
+                            ? Colors.white.withValues(alpha: 0.95)
                             : const Color(0xFF1E293B),
                         fontWeight: FontWeight.w500,
                         letterSpacing: 0.2,
@@ -469,7 +469,7 @@ class _PasienAiAssistantViewState extends ConsumerState<PasienAiAssistantView> {
           children: [
             Expanded(
               child: Divider(
-                color: primaryColor.withOpacity(0.2),
+                color: primaryColor.withValues(alpha: 0.2),
                 thickness: 1,
               ),
             ),
@@ -489,7 +489,7 @@ class _PasienAiAssistantViewState extends ConsumerState<PasienAiAssistantView> {
             ),
             Expanded(
               child: Divider(
-                color: primaryColor.withOpacity(0.2),
+                color: primaryColor.withValues(alpha: 0.2),
                 thickness: 1,
               ),
             ),
@@ -523,7 +523,7 @@ class _PasienAiAssistantViewState extends ConsumerState<PasienAiAssistantView> {
           Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: primaryColor.withOpacity(0.15),
+              color: primaryColor.withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
             child: Icon(Icons.smart_toy_rounded, size: 16, color: primaryColor),
@@ -611,10 +611,10 @@ class _PasienAiAssistantViewState extends ConsumerState<PasienAiAssistantView> {
                       ),
                     ),
                     backgroundColor: isDark
-                        ? primaryColor.withOpacity(0.12)
-                        : primaryColor.withOpacity(0.08),
+                        ? primaryColor.withValues(alpha: 0.12)
+                        : primaryColor.withValues(alpha: 0.08),
                     side: BorderSide(
-                      color: primaryColor.withOpacity(0.25),
+                      color: primaryColor.withValues(alpha: 0.25),
                       width: 1,
                     ),
                     shape: RoundedRectangleBorder(
@@ -638,7 +638,7 @@ class _PasienAiAssistantViewState extends ConsumerState<PasienAiAssistantView> {
               border: Border.all(color: borderColor),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(isDark ? 0.3 : 0.04),
+                  color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.04),
                   blurRadius: 16,
                   offset: const Offset(0, 4),
                 ),
@@ -656,7 +656,7 @@ class _PasienAiAssistantViewState extends ConsumerState<PasienAiAssistantView> {
                           : 'Tanyakan gejala, obat, atau cari fasilitas kesehatan...',
                       hintStyle: GoogleFonts.outfit(
                         fontSize: 14,
-                        color: textColor.withOpacity(0.4),
+                        color: textColor.withValues(alpha: 0.4),
                       ),
                       border: InputBorder.none,
                       contentPadding: const EdgeInsets.symmetric(
@@ -677,14 +677,14 @@ class _PasienAiAssistantViewState extends ConsumerState<PasienAiAssistantView> {
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: _messageController.text.trim().isEmpty
-                          ? textColor.withOpacity(0.1)
+                          ? textColor.withValues(alpha: 0.1)
                           : primaryColor,
                       shape: BoxShape.circle,
                       boxShadow: _messageController.text.trim().isEmpty
                           ? []
                           : [
                               BoxShadow(
-                                color: primaryColor.withOpacity(0.4),
+                                color: primaryColor.withValues(alpha: 0.4),
                                 blurRadius: 10,
                                 offset: const Offset(0, 4),
                               ),
@@ -693,7 +693,7 @@ class _PasienAiAssistantViewState extends ConsumerState<PasienAiAssistantView> {
                     child: Icon(
                       Icons.arrow_upward_rounded,
                       color: _messageController.text.trim().isEmpty
-                          ? textColor.withOpacity(0.4)
+                          ? textColor.withValues(alpha: 0.4)
                           : Colors.white,
                       size: 20,
                     ),
@@ -730,7 +730,7 @@ class _PasienAiAssistantViewState extends ConsumerState<PasienAiAssistantView> {
             borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(isDark ? 0.5 : 0.15),
+                color: Colors.black.withValues(alpha: isDark ? 0.5 : 0.15),
                 blurRadius: 20,
                 offset: const Offset(0, -4),
               ),
@@ -743,7 +743,7 @@ class _PasienAiAssistantViewState extends ConsumerState<PasienAiAssistantView> {
                 width: 44,
                 height: 5,
                 decoration: BoxDecoration(
-                  color: textColor.withOpacity(0.2),
+                  color: textColor.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(3),
                 ),
               ),
@@ -772,7 +772,7 @@ class _PasienAiAssistantViewState extends ConsumerState<PasienAiAssistantView> {
                           : '${messages.length} pesan',
                       style: GoogleFonts.outfit(
                         fontSize: 12,
-                        color: textColor.withOpacity(0.6),
+                        color: textColor.withValues(alpha: 0.6),
                       ),
                     ),
                   ],
@@ -836,15 +836,15 @@ class _PasienAiAssistantViewState extends ConsumerState<PasienAiAssistantView> {
         margin: const EdgeInsets.fromLTRB(20, 10, 20, 0),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: contextColor.withOpacity(isDark ? 0.12 : 0.08),
+          color: contextColor.withValues(alpha: isDark ? 0.12 : 0.08),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: contextColor.withOpacity(0.35),
+            color: contextColor.withValues(alpha: 0.35),
             width: 1.2,
           ),
           boxShadow: [
             BoxShadow(
-              color: contextColor.withOpacity(isDark ? 0.15 : 0.05),
+              color: contextColor.withValues(alpha: isDark ? 0.15 : 0.05),
               blurRadius: 10,
               offset: const Offset(0, 3),
             ),
@@ -855,7 +855,7 @@ class _PasienAiAssistantViewState extends ConsumerState<PasienAiAssistantView> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: contextColor.withOpacity(0.2),
+                color: contextColor.withValues(alpha: 0.2),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -942,10 +942,10 @@ class _PasienAiAssistantViewState extends ConsumerState<PasienAiAssistantView> {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF27AE60).withOpacity(0.15),
+                          color: const Color(0xFF27AE60).withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(4),
                           border: Border.all(
-                            color: const Color(0xFF27AE60).withOpacity(0.3),
+                            color: const Color(0xFF27AE60).withValues(alpha: 0.3),
                           ),
                         ),
                         child: Text(
@@ -999,7 +999,7 @@ class _PasienAiAssistantViewState extends ConsumerState<PasienAiAssistantView> {
                 const SizedBox(width: 6),
                 IconButton(
                   icon: const Icon(Icons.close_rounded, size: 16),
-                  color: textColor.withOpacity(0.6),
+                  color: textColor.withValues(alpha: 0.6),
                   tooltip: isEn ? 'Clear context' : 'Lepas konteks pasien',
                   visualDensity: VisualDensity.compact,
                   padding: EdgeInsets.zero,
@@ -1037,9 +1037,9 @@ class _PasienAiAssistantViewState extends ConsumerState<PasienAiAssistantView> {
       margin: const EdgeInsets.fromLTRB(20, 8, 20, 0),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: primaryColor.withOpacity(isDark ? 0.07 : 0.04),
+        color: primaryColor.withValues(alpha: isDark ? 0.07 : 0.04),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: borderColor.withOpacity(0.6)),
+        border: Border.all(color: borderColor.withValues(alpha: 0.6)),
       ),
       child: Row(
         children: [
@@ -1052,7 +1052,7 @@ class _PasienAiAssistantViewState extends ConsumerState<PasienAiAssistantView> {
                   : 'Konsultasi gizi balita? Pilih data anak agar prompt AI otomatis membaca rekam medisnya.',
               style: GoogleFonts.outfit(
                 fontSize: 11,
-                color: textColor.withOpacity(0.75),
+                color: textColor.withValues(alpha: 0.75),
               ),
             ),
           ),
@@ -1082,14 +1082,14 @@ class _PasienAiAssistantViewState extends ConsumerState<PasienAiAssistantView> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
       decoration: BoxDecoration(
-        color: (isDark ? Colors.white : Colors.black).withOpacity(0.06),
+        color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
         text,
         style: GoogleFonts.outfit(
           fontSize: 9.5,
-          color: textColor.withOpacity(0.85),
+          color: textColor.withValues(alpha: 0.85),
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -1931,15 +1931,15 @@ class _AINavigationButton extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [primary, primary.withOpacity(0.75)],
+              colors: [primary, primary.withValues(alpha: 0.75)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 1),
             boxShadow: [
               BoxShadow(
-                color: primary.withOpacity(0.35),
+                color: primary.withValues(alpha: 0.35),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),

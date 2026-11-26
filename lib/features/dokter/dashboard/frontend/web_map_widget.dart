@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'web_map_widget_stub.dart'
-    if (dart.library.js_util) 'web_map_widget_web.dart'
-    if (dart.library.html) 'web_map_widget_web.dart';
+    if (dart.library.js_interop) 'web_map_widget_web.dart';
 
 Widget buildWebMapWidget({
   required String mapUrl,

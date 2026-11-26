@@ -84,7 +84,7 @@ class _PonkesdesDashboardState extends ConsumerState<PonkesdesDashboard> {
                   width: 60,
                   height: 60,
                   decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.12),
+                    color: Colors.green.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
                   alignment: Alignment.center,
@@ -100,7 +100,7 @@ class _PonkesdesDashboardState extends ConsumerState<PonkesdesDashboard> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
-                              color: Colors.green.withOpacity(0.12),
+                              color: Colors.green.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(100),
                             ),
                             child: Text(
@@ -112,9 +112,9 @@ class _PonkesdesDashboardState extends ConsumerState<PonkesdesDashboard> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
-                              color: themeAccent.withOpacity(0.12),
+                              color: themeAccent.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(100),
-                              border: Border.all(color: themeAccent.withOpacity(0.3)),
+                              border: Border.all(color: themeAccent.withValues(alpha: 0.3)),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -160,9 +160,9 @@ class _PonkesdesDashboardState extends ConsumerState<PonkesdesDashboard> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFF27AE60).withOpacity(0.08),
+            color: const Color(0xFF27AE60).withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFF27AE60).withOpacity(0.25)),
+            border: Border.all(color: const Color(0xFF27AE60).withValues(alpha: 0.25)),
           ),
           child: Row(
             children: [
@@ -421,7 +421,7 @@ class _PonkesdesDashboardState extends ConsumerState<PonkesdesDashboard> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
+              color: color.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(100),
             ),
             child: Text(

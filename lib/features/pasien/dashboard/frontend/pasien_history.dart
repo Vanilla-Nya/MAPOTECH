@@ -483,7 +483,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                       boxShadow: _selectedTabIndex == 0
                           ? [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.06),
+                                color: Colors.black.withValues(alpha: 0.06),
                                 blurRadius: 6,
                                 offset: const Offset(0, 2),
                               ),
@@ -520,7 +520,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                       boxShadow: _selectedTabIndex == 1
                           ? [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.06),
+                                color: Colors.black.withValues(alpha: 0.06),
                                 blurRadius: 6,
                                 offset: const Offset(0, 2),
                               ),
@@ -640,7 +640,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                     width: 38,
                     height: 38,
                     decoration: BoxDecoration(
-                      color: purple.withOpacity(0.1),
+                      color: purple.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(Icons.medical_services_outlined, color: purple, size: 18),
@@ -681,13 +681,13 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                 runSpacing: 6,
                 children: [
                   if (rd.obatDiberikan.isNotEmpty)
-                    _cardSmallBadge(isEn ? 'Prescription' : 'Resep Obat', purple.withOpacity(0.08), purple),
+                    _cardSmallBadge(isEn ? 'Prescription' : 'Resep Obat', purple.withValues(alpha: 0.08), purple),
                   if (rd.suratRujukan != null)
-                    _cardSmallBadge(isEn ? 'Referral' : 'Rujukan', const Color(0xFF3498DB).withOpacity(0.08), const Color(0xFF3498DB)),
+                    _cardSmallBadge(isEn ? 'Referral' : 'Rujukan', const Color(0xFF3498DB).withValues(alpha: 0.08), const Color(0xFF3498DB)),
                   if (rd.suratSakit != null)
-                    _cardSmallBadge(isEn ? 'Sick Leave' : 'Surat Sakit', Colors.orange.withOpacity(0.08), Colors.orange),
+                    _cardSmallBadge(isEn ? 'Sick Leave' : 'Surat Sakit', Colors.orange.withValues(alpha: 0.08), Colors.orange),
                   if (rd.suratSehat != null)
-                    _cardSmallBadge(isEn ? 'Health Cert' : 'Surat Sehat', Colors.green.withOpacity(0.08), Colors.green),
+                    _cardSmallBadge(isEn ? 'Health Cert' : 'Surat Sehat', Colors.green.withValues(alpha: 0.08), Colors.green),
                 ],
               ),
             ],
@@ -730,7 +730,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                     width: 38,
                     height: 38,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF27AE60).withOpacity(0.1),
+                      color: const Color(0xFF27AE60).withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(Icons.receipt_long_rounded, color: Color(0xFF27AE60), size: 18),
@@ -760,7 +760,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                         style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w900, color: purple),
                       ),
                       const SizedBox(height: 4),
-                      _cardSmallBadge('${ra.items.length} ${isEn ? "Items" : "Obat"}', const Color(0xFF27AE60).withOpacity(0.08), const Color(0xFF27AE60)),
+                      _cardSmallBadge('${ra.items.length} ${isEn ? "Items" : "Obat"}', const Color(0xFF27AE60).withValues(alpha: 0.08), const Color(0xFF27AE60)),
                     ],
                   ),
                 ],
@@ -806,7 +806,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
   ) {
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.45),
+      barrierColor: Colors.black.withValues(alpha: 0.45),
       builder: (ctx) {
         final cardBg = isDark ? const Color(0xFF161619) : Colors.white;
         final borderColor = isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2);
@@ -816,7 +816,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
           backgroundColor: cardBg,
           clipBehavior: Clip.antiAlias,
-          child: Container(
+          child: SizedBox(
             width: 480,
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -829,7 +829,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                     gradient: LinearGradient(
                       colors: isDark
                           ? const [Color(0xFF3A3A40), Color(0xFF252528)]
-                          : [purpleAccent.withOpacity(0.85), purpleAccent],
+                          : [purpleAccent.withValues(alpha: 0.85), purpleAccent],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -840,7 +840,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                         width: 40,
                         height: 40,
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(Icons.medical_services_outlined, color: Colors.white, size: 18),
@@ -856,7 +856,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                             ),
                             Text(
                               '${rd.date} • ${rd.time}',
-                              style: GoogleFonts.outfit(fontSize: 10, color: Colors.white.withOpacity(0.8)),
+                              style: GoogleFonts.outfit(fontSize: 10, color: Colors.white.withValues(alpha: 0.8)),
                             ),
                           ],
                         ),
@@ -902,7 +902,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                             width: double.infinity,
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: textColor.withOpacity(0.02),
+                              color: textColor.withValues(alpha: 0.02),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(color: borderColor),
                             ),
@@ -979,7 +979,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                             children: rd.diagnoses.map((diag) => Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: textColor.withOpacity(0.05),
+                                color: textColor.withValues(alpha: 0.05),
                                 borderRadius: BorderRadius.circular(6),
                                 border: Border.all(color: borderColor),
                               ),
@@ -1003,7 +1003,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                             margin: const EdgeInsets.only(bottom: 6),
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              color: textColor.withOpacity(0.02),
+                              color: textColor.withValues(alpha: 0.02),
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(color: borderColor),
                             ),
@@ -1029,9 +1029,9 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                           Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                              color: purpleAccent.withOpacity(0.05),
+                              color: purpleAccent.withValues(alpha: 0.05),
                               borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: purpleAccent.withOpacity(0.15)),
+                              border: Border.all(color: purpleAccent.withValues(alpha: 0.15)),
                             ),
                             child: Row(
                               children: [
@@ -1141,7 +1141,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
   ) {
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.45),
+      barrierColor: Colors.black.withValues(alpha: 0.45),
       builder: (ctx) {
         final cardBg = isDark ? const Color(0xFF161619) : Colors.white;
         final borderColor = isDark ? const Color(0xFF252528) : const Color(0xFFECEEF2);
@@ -1150,7 +1150,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
           backgroundColor: cardBg,
           clipBehavior: Clip.antiAlias,
-          child: Container(
+          child: SizedBox(
             width: 480,
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -1174,7 +1174,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                         width: 40,
                         height: 40,
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(Icons.receipt_long_rounded, color: Colors.white, size: 18),
@@ -1190,7 +1190,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                             ),
                             Text(
                               ra.time.isNotEmpty ? '${ra.date} • ${ra.time}' : ra.date,
-                              style: GoogleFonts.outfit(fontSize: 10, color: Colors.white.withOpacity(0.8)),
+                              style: GoogleFonts.outfit(fontSize: 10, color: Colors.white.withValues(alpha: 0.8)),
                             ),
                           ],
                         ),
@@ -1241,7 +1241,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
                           margin: const EdgeInsets.only(bottom: 6),
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: textColor.withOpacity(0.02),
+                            color: textColor.withValues(alpha: 0.02),
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(color: borderColor),
                           ),
@@ -1342,9 +1342,9 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.06),
+        color: color.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.15)),
+        border: Border.all(color: color.withValues(alpha: 0.15)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1417,7 +1417,7 @@ class _PasienHistoryState extends ConsumerState<PasienHistory>
           const SizedBox(width: 4),
           Text(
             '$label: ',
-            style: GoogleFonts.outfit(fontSize: 10, color: textTheme.withOpacity(0.6), fontWeight: FontWeight.bold),
+            style: GoogleFonts.outfit(fontSize: 10, color: textTheme.withValues(alpha: 0.6), fontWeight: FontWeight.bold),
           ),
           Text(
             value,

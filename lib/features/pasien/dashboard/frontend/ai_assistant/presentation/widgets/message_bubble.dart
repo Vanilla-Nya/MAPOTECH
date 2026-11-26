@@ -104,12 +104,12 @@ class MessageBubble extends StatelessWidget {
                       color: isUser
                           ? Colors.transparent
                           : (isDark
-                              ? Colors.white.withOpacity(0.08)
-                              : Colors.black.withOpacity(0.06)),
+                              ? Colors.white.withValues(alpha: 0.08)
+                              : Colors.black.withValues(alpha: 0.06)),
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
+                        color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
                         blurRadius: 8,
                         offset: const Offset(0, 3),
                       ),
@@ -126,7 +126,7 @@ class MessageBubble extends StatelessWidget {
                           color: isUser
                               ? Colors.white
                               : (isDark
-                                  ? Colors.white.withOpacity(0.9)
+                                  ? Colors.white.withValues(alpha: 0.9)
                                   : const Color(0xFF1E293B)),
                         ),
                         boldStyle: GoogleFonts.outfit(
@@ -156,11 +156,11 @@ class MessageBubble extends StatelessWidget {
                                 ),
                                 decoration: BoxDecoration(
                                   color: theme.colorScheme.primary
-                                      .withOpacity(0.15),
+                                      .withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(10),
                                   border: Border.all(
                                     color: theme.colorScheme.primary
-                                        .withOpacity(0.4),
+                                        .withValues(alpha: 0.4),
                                   ),
                                 ),
                                 child: Row(
@@ -219,13 +219,13 @@ class MessageBubble extends StatelessWidget {
       height: 32,
       decoration: BoxDecoration(
         color: isUser
-            ? theme.colorScheme.primary.withOpacity(0.2)
-            : const Color(0xFF48C9B0).withOpacity(0.2),
+            ? theme.colorScheme.primary.withValues(alpha: 0.2)
+            : const Color(0xFF48C9B0).withValues(alpha: 0.2),
         shape: BoxShape.circle,
         border: Border.all(
           color: isUser
-              ? theme.colorScheme.primary.withOpacity(0.4)
-              : const Color(0xFF48C9B0).withOpacity(0.5),
+              ? theme.colorScheme.primary.withValues(alpha: 0.4)
+              : const Color(0xFF48C9B0).withValues(alpha: 0.5),
         ),
       ),
       child: Icon(

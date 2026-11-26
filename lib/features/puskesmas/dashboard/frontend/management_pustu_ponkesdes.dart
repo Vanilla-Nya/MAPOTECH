@@ -2,11 +2,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:latlong2/latlong.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/supabase_service.dart';
 import 'package:mapotech/shared/widgets/ui.dart';
-import 'package:mapotech/shared/widgets/revgeo_wilayah_map_widget.dart';
 
 // ─── Pustu / Ponkesdes Data Model ─────────────────────────────────────────────
 
@@ -404,9 +402,6 @@ class _ManagementPustuPonkesdesWidgetState
     extends ConsumerState<ManagementPustuPonkesdesWidget> {
   String _searchQuery = '';
   String _tipeFilter = 'SEMUA';
-  
-  // Selected map focus unit
-  PustuPonkesdesModel? _selectedMapFocusUnit;
 
   @override
   void initState() {
@@ -477,7 +472,7 @@ class _ManagementPustuPonkesdesWidgetState
                         Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: themeAccent.withOpacity(0.12),
+                            color: themeAccent.withValues(alpha: 0.12),
                             shape: BoxShape.circle,
                           ),
                           child: Icon(Icons.map_rounded, color: themeAccent, size: 20),
@@ -691,7 +686,7 @@ class _ManagementPustuPonkesdesWidgetState
         border: Border.all(color: borderColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -715,7 +710,7 @@ class _ManagementPustuPonkesdesWidgetState
                       width: 48,
                       height: 48,
                       decoration: BoxDecoration(
-                        color: unit.avatarBg.withOpacity(0.15),
+                        color: unit.avatarBg.withValues(alpha: 0.15),
                         shape: BoxShape.circle,
                       ),
                       alignment: Alignment.center,
@@ -751,7 +746,7 @@ class _ManagementPustuPonkesdesWidgetState
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: typeBadgeColor.withOpacity(0.12),
+                                  color: typeBadgeColor.withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(
@@ -784,7 +779,7 @@ class _ManagementPustuPonkesdesWidgetState
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
                           color: (isAktif ? const Color(0xFF2ECC71) : Colors.redAccent)
-                              .withOpacity(0.12),
+                              .withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(100),
                         ),
                         child: Row(
@@ -821,7 +816,6 @@ class _ManagementPustuPonkesdesWidgetState
                   children: [
                     TextButton.icon(
                       onPressed: () {
-                        setState(() => _selectedMapFocusUnit = unit);
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text('Fokus lokasi peta diatur ke ${unit.nama}'),
@@ -858,27 +852,6 @@ class _ManagementPustuPonkesdesWidgetState
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String label, String value, Color textColor, Color subtitleColor) {
-    return Row(
-      children: [
-        Icon(icon, size: 14, color: subtitleColor),
-        const SizedBox(width: 8),
-        Text(
-          '$label: ',
-          style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: subtitleColor),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: GoogleFonts.outfit(fontSize: 11, color: textColor),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
-    );
-  }
-
   // ── Dashed Register Card ────────────────────────────────────────────────────
 
   Widget _buildDashedRegisterCard(
@@ -893,10 +866,10 @@ class _ManagementPustuPonkesdesWidgetState
     return Container(
       height: 280,
       decoration: BoxDecoration(
-        color: cardBgColor.withOpacity(0.5),
+        color: cardBgColor.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: themeAccent.withOpacity(0.4),
+          color: themeAccent.withValues(alpha: 0.4),
           width: 1.5,
           style: BorderStyle.solid,
         ),
@@ -915,7 +888,7 @@ class _ManagementPustuPonkesdesWidgetState
                   width: 52,
                   height: 52,
                   decoration: BoxDecoration(
-                    color: themeAccent.withOpacity(0.12),
+                    color: themeAccent.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(Icons.add_rounded, size: 28, color: themeAccent),
@@ -1283,7 +1256,7 @@ class _ManagementPustuPonkesdesWidgetState
                     return FilterChip(
                       label: Text(perm.replaceAll('_', ' '), style: GoogleFonts.outfit(fontSize: 10)),
                       selected: isChecked,
-                      selectedColor: themeAccent.withOpacity(0.2),
+                      selectedColor: themeAccent.withValues(alpha: 0.2),
                       onSelected: (val) {
                         setModalState(() {
                           if (val) {
@@ -1450,7 +1423,7 @@ class _ManagementPustuPonkesdesWidgetState
                                 scale: 0.7,
                                 child: Switch(
                                   value: isOpen,
-                                  activeColor: Colors.white,
+                                  activeThumbColor: Colors.white,
                                   activeTrackColor: themeAccent,
                                   onChanged: (val) {
                                     setModalState(() {
@@ -1478,7 +1451,7 @@ class _ManagementPustuPonkesdesWidgetState
               Container(
                 width: double.infinity,
                 decoration: BoxDecoration(
-                  color: textColor.withOpacity(0.03),
+                  color: textColor.withValues(alpha: 0.03),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: borderColor),
                 ),
@@ -1510,11 +1483,11 @@ class _ManagementPustuPonkesdesWidgetState
                           height: 100,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: (existingUnit?.avatarBg ?? themeAccent).withOpacity(0.15),
-                            border: Border.all(color: themeAccent.withOpacity(0.4), width: 3),
+                            color: (existingUnit?.avatarBg ?? themeAccent).withValues(alpha: 0.15),
+                            border: Border.all(color: themeAccent.withValues(alpha: 0.4), width: 3),
                             boxShadow: [
                               BoxShadow(
-                                color: themeAccent.withOpacity(0.12),
+                                color: themeAccent.withValues(alpha: 0.12),
                                 blurRadius: 10,
                                 spreadRadius: 2,
                               ),
@@ -1528,7 +1501,7 @@ class _ManagementPustuPonkesdesWidgetState
                                     width: 94,
                                     height: 94,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => Text(
+                                    errorBuilder: (_, _, _) => Text(
                                       namaCtrl.text.isNotEmpty ? namaCtrl.text.substring(0, 2).toUpperCase() : 'PU',
                                       style: GoogleFonts.outfit(fontSize: 26, fontWeight: FontWeight.w900, color: themeAccent),
                                     ),
@@ -1555,7 +1528,7 @@ class _ManagementPustuPonkesdesWidgetState
                               shape: BoxShape.circle,
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.2),
+                                  color: Colors.black.withValues(alpha: 0.2),
                                   blurRadius: 4,
                                 ),
                               ],
@@ -1577,7 +1550,7 @@ class _ManagementPustuPonkesdesWidgetState
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                       decoration: BoxDecoration(
-                        color: (tipeSelected == 'PUSTU' ? const Color(0xFF3498DB) : const Color(0xFF9B59B6)).withOpacity(0.12),
+                        color: (tipeSelected == 'PUSTU' ? const Color(0xFF3498DB) : const Color(0xFF9B59B6)).withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(100),
                       ),
                       child: Text(
@@ -1724,7 +1697,7 @@ class _ManagementPustuPonkesdesWidgetState
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: themeAccent.withOpacity(0.12),
+                    color: themeAccent.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
@@ -1922,47 +1895,6 @@ class _ManagementPustuPonkesdesWidgetState
             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: borderColor)),
             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: borderColor)),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPillTextField(
-    String label,
-    TextEditingController controller,
-    String hint,
-    Color textColor,
-    Color subtitleColor,
-    Color cardBg,
-    Color themeAccent,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.bold, color: subtitleColor)),
-        const SizedBox(height: 6),
-        TextField(
-          controller: controller,
-          style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: textColor),
-          decoration: InputDecoration(
-            hintText: hint,
-            filled: true,
-            fillColor: cardBg,
-            isDense: true,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(20),
-              borderSide: BorderSide(color: themeAccent, width: 1.5),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(20),
-              borderSide: BorderSide(color: themeAccent, width: 1.5),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(20),
-              borderSide: BorderSide(color: themeAccent, width: 2.0),
-            ),
           ),
         ),
       ],

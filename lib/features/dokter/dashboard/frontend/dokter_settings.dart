@@ -345,7 +345,7 @@ class _DokterSettingsState extends ConsumerState<DokterSettings> {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: teal.withOpacity(0.12),
+                        color: teal.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
@@ -437,14 +437,14 @@ class _DokterSettingsState extends ConsumerState<DokterSettings> {
                 width: 52,
                 height: 52,
                 decoration: BoxDecoration(
-                  color: purple.withOpacity(0.08),
+                  color: purple.withValues(alpha: 0.08),
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
                 child: Icon(
                   Icons.help_outline_rounded,
                   size: 26,
-                  color: purple.withOpacity(0.5),
+                  color: purple.withValues(alpha: 0.5),
                 ),
               ),
               const SizedBox(height: 12),

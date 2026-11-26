@@ -20,7 +20,6 @@ class _PasienApotekSearchState extends ConsumerState<PasienApotekSearch> {
   final SupabaseService _db = SupabaseService();
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  bool _isLoading = true;
 
   // List of pharmacies
   List<Map<String, dynamic>> _allApotek = [];
@@ -32,7 +31,6 @@ class _PasienApotekSearchState extends ConsumerState<PasienApotekSearch> {
   }
 
   Future<void> _loadPharmacies() async {
-    setState(() => _isLoading = true);
     try {
       final fetched = await _db.fetchAllPharmacies();
       if (fetched.isNotEmpty) {
@@ -56,7 +54,6 @@ class _PasienApotekSearchState extends ConsumerState<PasienApotekSearch> {
         if (mounted) {
           setState(() {
             _allApotek = list;
-            _isLoading = false;
           });
         }
         return;
@@ -94,7 +91,6 @@ class _PasienApotekSearchState extends ConsumerState<PasienApotekSearch> {
             'avatarBg': const Color(0xFFE74C3C),
           },
         ];
-        _isLoading = false;
       });
     }
   }
@@ -104,7 +100,7 @@ class _PasienApotekSearchState extends ConsumerState<PasienApotekSearch> {
     final isDark = state.appearance == 'dark';
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.55),
+      barrierColor: Colors.black.withValues(alpha: 0.55),
       builder: (ctx) => PasienQrScannerDialog(
         onApotekScanned: (apotek) {
           _showApotekPos(context, apotek);
@@ -112,7 +108,7 @@ class _PasienApotekSearchState extends ConsumerState<PasienApotekSearch> {
         onDoctorScanned: (doctor) {
           showDialog(
             context: context,
-            barrierColor: Colors.black.withOpacity(0.45),
+            barrierColor: Colors.black.withValues(alpha: 0.45),
             builder: (dCtx) => DoctorDetailDialog(
               dokter: doctor,
               isDark: isDark,
@@ -129,7 +125,7 @@ class _PasienApotekSearchState extends ConsumerState<PasienApotekSearch> {
     final isDark = state.appearance == 'dark';
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.55),
+      barrierColor: Colors.black.withValues(alpha: 0.55),
       builder: (ctx) => PasienApotekPosDialog(
         pharmacy: apotek['raw'] ?? apotek,
         isDark: isDark,
@@ -158,16 +154,12 @@ class _PasienApotekSearchState extends ConsumerState<PasienApotekSearch> {
     final isEn = state.language == 'en';
 
     final isDark = state.appearance == 'dark';
-    final isRev = state.appearance == 'rev';
     final notifier = ref.read(landingPageProvider.notifier);
-    final bgColor = notifier.getBackgroundColor();
     final cardBgColor = notifier.getCardColor();
     final textColor = notifier.getTextColor();
     final subtitleColor = notifier.getBodyTextColor();
     final borderColor = notifier.getBorderColor();
-    final inputBg = isDark ? const Color(0xFF1E1E22) : const Color(0xFFF8FAFD);
     final themeAccent = notifier.getPrimaryColor();
-    final purpleAccent = notifier.getPrimaryColor();
 
     final isMobile = MediaQuery.of(context).size.width < 768;
 
@@ -195,7 +187,7 @@ class _PasienApotekSearchState extends ConsumerState<PasienApotekSearch> {
                 width: 56,
                 height: 56,
                 decoration: BoxDecoration(
-                  color: themeAccent.withOpacity(0.12),
+                  color: themeAccent.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
@@ -261,7 +253,7 @@ class _PasienApotekSearchState extends ConsumerState<PasienApotekSearch> {
             border: Border.all(color: borderColor),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
@@ -273,7 +265,7 @@ class _PasienApotekSearchState extends ConsumerState<PasienApotekSearch> {
               Icon(
                 Icons.search_rounded,
                 size: 22,
-                color: subtitleColor.withOpacity(0.7),
+                color: subtitleColor.withValues(alpha: 0.7),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -290,7 +282,7 @@ class _PasienApotekSearchState extends ConsumerState<PasienApotekSearch> {
                         : 'Cari nama apotek, jalan, atau daerah...',
                     hintStyle: GoogleFonts.outfit(
                       fontSize: 13,
-                      color: subtitleColor.withOpacity(0.5),
+                      color: subtitleColor.withValues(alpha: 0.5),
                     ),
                     border: InputBorder.none,
                   ),
@@ -307,7 +299,7 @@ class _PasienApotekSearchState extends ConsumerState<PasienApotekSearch> {
                     width: 26,
                     height: 26,
                     decoration: BoxDecoration(
-                      color: subtitleColor.withOpacity(0.1),
+                      color: subtitleColor.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
                     alignment: Alignment.center,
@@ -418,7 +410,7 @@ class _PasienApotekSearchState extends ConsumerState<PasienApotekSearch> {
             border: Border.all(color: border),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.03),
+                color: Colors.black.withValues(alpha: 0.03),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -539,10 +531,10 @@ class _PasienApotekSearchState extends ConsumerState<PasienApotekSearch> {
                           vertical: 3,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF27AE60).withOpacity(0.08),
+                          color: const Color(0xFF27AE60).withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(100),
                           border: Border.all(
-                            color: const Color(0xFF27AE60).withOpacity(0.2),
+                            color: const Color(0xFF27AE60).withValues(alpha: 0.2),
                           ),
                         ),
                         child: Row(

@@ -50,11 +50,11 @@ class ApotekPortal extends ConsumerWidget {
             color: cardColor,
             borderRadius: BorderRadius.circular(100),
             border: Border.all(
-              color: activeColor.withOpacity(0.2),
+              color: activeColor.withValues(alpha: 0.2),
             ),
             boxShadow: [
               BoxShadow(
-                color: activeColor.withOpacity(0.04),
+                color: activeColor.withValues(alpha: 0.04),
                 blurRadius: 10,
                 offset: const Offset(0, 2),
               ),
@@ -75,7 +75,7 @@ class ApotekPortal extends ConsumerWidget {
                   fontSize: 10,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 1.5,
-                  color: textColor.withOpacity(0.7),
+                  color: textColor.withValues(alpha: 0.7),
                 ),
               ),
             ],
@@ -173,7 +173,7 @@ class ApotekPortal extends ConsumerWidget {
       height: 480,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: darkGreenColor.withOpacity(0.03),
+        color: darkGreenColor.withValues(alpha: 0.03),
         borderRadius: BorderRadius.circular(40),
         border: Border.all(color: borderColor),
       ),
@@ -186,7 +186,7 @@ class ApotekPortal extends ConsumerWidget {
             borderRadius: BorderRadius.circular(36),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(isDark ? 0.4 : 0.2),
+                color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.2),
                 blurRadius: 30,
                 offset: const Offset(0, 15),
               ),
@@ -272,7 +272,7 @@ class ApotekPortal extends ConsumerWidget {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: activeColor.withOpacity(0.08),
+                          color: activeColor.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: Row(
@@ -355,7 +355,7 @@ class ApotekPortal extends ConsumerWidget {
                           borderRadius: BorderRadius.circular(20),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
+                              color: Colors.black.withValues(alpha: 0.05),
                               blurRadius: 10,
                             ),
                           ],
@@ -419,7 +419,7 @@ class ApotekPortal extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: activeColor.withOpacity(0.15),
+              color: activeColor.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(icon, size: 12, color: textColor),
@@ -557,8 +557,8 @@ class ApotekPortal extends ConsumerWidget {
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: isFeature
-                        ? activeColor.withOpacity(0.12)
-                        : Colors.orange.withOpacity(0.12),
+                        ? activeColor.withValues(alpha: 0.12)
+                        : Colors.orange.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(

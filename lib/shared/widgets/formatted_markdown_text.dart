@@ -201,7 +201,7 @@ class FormattedMarkdownText extends StatelessWidget {
             style: GoogleFonts.firaCode(
               fontSize: (baseStyle.fontSize ?? 13.0) * 0.9,
               color: boldStyle.color,
-              backgroundColor: Colors.black.withOpacity(0.06),
+              backgroundColor: Colors.black.withValues(alpha: 0.06),
             ),
           ),
         );

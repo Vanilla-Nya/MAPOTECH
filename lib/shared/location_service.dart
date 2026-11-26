@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 class Region {
@@ -35,7 +36,7 @@ class LocationService {
       }
       throw Exception('Failed to load provinces');
     } catch (e) {
-      print('Error loading provinces: $e');
+      debugPrint('Error loading provinces: $e');
       return [];
     }
   }
@@ -50,7 +51,7 @@ class LocationService {
       }
       throw Exception('Failed to load regencies');
     } catch (e) {
-      print('Error loading regencies for province $provinceId: $e');
+      debugPrint('Error loading regencies for province $provinceId: $e');
       return [];
     }
   }
@@ -65,7 +66,7 @@ class LocationService {
       }
       throw Exception('Failed to load districts');
     } catch (e) {
-      print('Error loading districts for regency $regencyId: $e');
+      debugPrint('Error loading districts for regency $regencyId: $e');
       return [];
     }
   }
@@ -80,7 +81,7 @@ class LocationService {
       }
       throw Exception('Failed to load villages');
     } catch (e) {
-      print('Error loading villages for district $districtId: $e');
+      debugPrint('Error loading villages for district $districtId: $e');
       return [];
     }
   }

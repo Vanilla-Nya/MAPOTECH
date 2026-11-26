@@ -33,8 +33,6 @@ class _PasienQrScannerDialogState extends ConsumerState<PasienQrScannerDialog>
   bool _isProcessing = false;
   bool _isFrontCamera = false;
   bool _isTorchOn = false;
-  bool _isCameraReady = false;
-  String? _cameraStatusMessage;
   String? _scanErrorMessage;
 
   @override
@@ -158,12 +156,9 @@ class _PasienQrScannerDialogState extends ConsumerState<PasienQrScannerDialog>
         }
       }
 
-      if (matchedDoctor == null) {
-        // Direct database lookup by token or ID (for unlisted/private practice tokens)
-        matchedDoctor = await _db.fetchDoctorByQrTokenOrId(
+      matchedDoctor ??= await _db.fetchDoctorByQrTokenOrId(
           targetIdentifier.isNotEmpty ? targetIdentifier : payload,
         );
-      }
 
       if (matchedDoctor != null) {
         if (mounted) {
@@ -388,14 +383,7 @@ class _PasienQrScannerDialogState extends ConsumerState<PasienQrScannerDialog>
                                   },
                                   isFrontCamera: _isFrontCamera,
                                   isTorchOn: _isTorchOn,
-                                  onCameraStatusChanged: (isReady, msg) {
-                                    if (mounted) {
-                                      setState(() {
-                                        _isCameraReady = isReady;
-                                        _cameraStatusMessage = msg;
-                                      });
-                                    }
-                                  },
+                                  onCameraStatusChanged: (isReady, msg) {},
                                   onCameraSwitch: () {
                                     setState(() {
                                       _isFrontCamera = !_isFrontCamera;

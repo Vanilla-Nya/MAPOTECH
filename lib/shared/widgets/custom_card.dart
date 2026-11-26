@@ -48,7 +48,7 @@ class _CustomCardState extends State<CustomCard> {
             padding: widget.padding,
             decoration: BoxDecoration(
               color: widget.isGlassmorphic
-                  ? defaultBgColor.withOpacity(0.85)
+                  ? defaultBgColor.withValues(alpha: 0.85)
                   : (widget.gradientColors == null ? defaultBgColor : null),
               gradient: widget.gradientColors != null
                   ? LinearGradient(
@@ -60,13 +60,13 @@ class _CustomCardState extends State<CustomCard> {
               borderRadius: BorderRadius.circular(widget.borderRadius),
               border: Border.all(
                 color: widget.isGlassmorphic
-                    ? defaultBorderColor.withOpacity(0.4)
+                    ? defaultBorderColor.withValues(alpha: 0.4)
                     : defaultBorderColor,
                 width: 1.5,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(_isHovered ? 0.08 : 0.04),
+                  color: Colors.black.withValues(alpha: _isHovered ? 0.08 : 0.04),
                   blurRadius: _isHovered ? 24 : 12,
                   offset: Offset(0, _isHovered ? 12 : 6),
                 ),

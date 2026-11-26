@@ -49,11 +49,11 @@ class MasyarakatPortal extends ConsumerWidget {
             color: cardColor,
             borderRadius: BorderRadius.circular(100),
             border: Border.all(
-              color: activeColor.withOpacity(0.2),
+              color: activeColor.withValues(alpha: 0.2),
             ),
             boxShadow: [
               BoxShadow(
-                color: activeColor.withOpacity(0.04),
+                color: activeColor.withValues(alpha: 0.04),
                 blurRadius: 10,
                 offset: const Offset(0, 2),
               ),
@@ -74,7 +74,7 @@ class MasyarakatPortal extends ConsumerWidget {
                   fontSize: 10,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 1.5,
-                  color: textColor.withOpacity(0.7),
+                  color: textColor.withValues(alpha: 0.7),
                 ),
               ),
             ],
@@ -219,7 +219,7 @@ class MasyarakatPortal extends ConsumerWidget {
       height: 480,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: darkGreenColor.withOpacity(0.03),
+        color: darkGreenColor.withValues(alpha: 0.03),
         borderRadius: BorderRadius.circular(40),
         border: Border.all(color: borderColor),
       ),
@@ -235,7 +235,7 @@ class MasyarakatPortal extends ConsumerWidget {
               border: Border.all(color: borderColor, width: 1.5),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(isDark ? 0.3 : 0.08),
+                  color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
                   blurRadius: 30,
                   offset: const Offset(0, 15),
                 ),
@@ -267,7 +267,7 @@ class MasyarakatPortal extends ConsumerWidget {
                           decoration: BoxDecoration(
                             color: isDark ? const Color(0xFF222222) : Colors.white,
                             borderRadius: BorderRadius.circular(100),
-                            border: Border.all(color: borderColor.withOpacity(0.5)),
+                            border: Border.all(color: borderColor.withValues(alpha: 0.5)),
                           ),
                           alignment: Alignment.center,
                           child: Text(
@@ -523,7 +523,7 @@ class MasyarakatPortal extends ConsumerWidget {
                                                 children: [
                                                   CircleAvatar(
                                                     radius: 10,
-                                                    backgroundColor: activeColor.withOpacity(0.15),
+                                                    backgroundColor: activeColor.withValues(alpha: 0.15),
                                                     child: Icon(Icons.person_rounded, size: 10, color: activeColor),
                                                   ),
                                                   const SizedBox(width: 6),
@@ -562,7 +562,7 @@ class MasyarakatPortal extends ConsumerWidget {
                                           children: [
                                             Positioned.fill(
                                               child: CustomPaint(
-                                                painter: MapGridPainter(color: borderColor.withOpacity(isDark ? 0.3 : 0.7)),
+                                                painter: MapGridPainter(color: borderColor.withValues(alpha: isDark ? 0.3 : 0.7)),
                                               ),
                                             ),
                                             Positioned(
@@ -671,7 +671,7 @@ class MasyarakatPortal extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: themeColor.withOpacity(0.12),
+              color: themeColor.withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, size: 12, color: themeColor),
@@ -837,7 +837,7 @@ class MasyarakatPortal extends ConsumerWidget {
         border: Border.all(color: borderColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -1035,7 +1035,7 @@ class MasyarakatPortal extends ConsumerWidget {
         color: const Color(0xFFF3EEFC),
         borderRadius: BorderRadius.circular(100),
         border: Border.all(
-          color: const Color(0xFFE2C4F9).withOpacity(0.4),
+          color: const Color(0xFFE2C4F9).withValues(alpha: 0.4),
         ),
       ),
       child: Row(
@@ -1070,7 +1070,7 @@ class MasyarakatPortal extends ConsumerWidget {
         border: Border.all(color: borderColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -1108,7 +1108,7 @@ class MasyarakatPortal extends ConsumerWidget {
             decoration: BoxDecoration(
               color: const Color(0xFFF3EEFC),
               shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFFE2C4F9).withOpacity(0.5)),
+              border: Border.all(color: const Color(0xFFE2C4F9).withValues(alpha: 0.5)),
             ),
             child: const Icon(
               Icons.rocket_launch_rounded,
@@ -1143,7 +1143,7 @@ class MasyarakatPortal extends ConsumerWidget {
         border: Border.all(color: borderColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -1159,7 +1159,7 @@ class MasyarakatPortal extends ConsumerWidget {
               decoration: BoxDecoration(
                 color: const Color(0xFFF3EEFC),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE2C4F9).withOpacity(0.4)),
+                border: Border.all(color: const Color(0xFFE2C4F9).withValues(alpha: 0.4)),
               ),
               child: const Icon(
                 Icons.star_rounded,
@@ -1188,7 +1188,7 @@ class MasyarakatPortal extends ConsumerWidget {
                     decoration: BoxDecoration(
                       color: const Color(0xFFE8F8F5),
                       borderRadius: BorderRadius.circular(100),
-                      border: Border.all(color: const Color(0xFF48C9B0).withOpacity(0.3)),
+                      border: Border.all(color: const Color(0xFF48C9B0).withValues(alpha: 0.3)),
                     ),
                     child: Text(
                       'FITUR BARU',
@@ -1287,7 +1287,7 @@ class MasyarakatPortal extends ConsumerWidget {
               border: Border.all(color: Colors.white, width: 3),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF48C9B0).withOpacity(0.4),
+                  color: const Color(0xFF48C9B0).withValues(alpha: 0.4),
                   blurRadius: 6,
                 ),
               ],
@@ -1312,7 +1312,7 @@ class MasyarakatPortal extends ConsumerWidget {
         border: Border.all(color: borderColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),

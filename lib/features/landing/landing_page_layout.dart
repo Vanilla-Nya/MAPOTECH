@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/layouts/responsive_layout.dart';
-import 'package:mapotech/shared/widgets/custom_button.dart';
 import 'package:mapotech/shared/widgets/floating_settings.dart';
 import 'package:mapotech/shared/widgets/ui.dart';
 
@@ -19,7 +18,6 @@ import 'package:mapotech/features/landing/portals/puskesmas_portal.dart';
 import 'package:mapotech/features/landing/portals/rumah_sakit_portal.dart';
 import 'package:mapotech/features/landing/portals/ponkesdes_portal.dart';
 import 'package:mapotech/features/landing/portals/posyandu_portal.dart';
-import 'package:mapotech/shared/widgets/animated_portal_switcher.dart';
 import 'package:mapotech/shared/widgets/auth_modals.dart';
 import 'package:mapotech/features/dashboard/dashboard_shell.dart';
 import 'package:mapotech/features/landing/widgets/achievements_section.dart';
@@ -136,7 +134,7 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
                 height: 500,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: activeColor.withOpacity(0.08),
+                  color: activeColor.withValues(alpha: 0.08),
                 ),
               ),
             ),
@@ -149,7 +147,7 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
                 height: 600,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: darkGreenColor.withOpacity(0.04),
+                  color: darkGreenColor.withValues(alpha: 0.04),
                 ),
               ),
             ),
@@ -289,12 +287,12 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
                             color: isSelected
-                                ? const Color(0xFF48C9B0).withOpacity(0.15)
+                                ? const Color(0xFF48C9B0).withValues(alpha: 0.15)
                                 : itemBg,
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
                               color: isSelected
-                                  ? const Color(0xFF48C9B0).withOpacity(0.4)
+                                  ? const Color(0xFF48C9B0).withValues(alpha: 0.4)
                                   : (isDark ? const Color(0xFF2C2C2C) : Colors.transparent),
                             ),
                           ),
@@ -328,7 +326,7 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
                                   decoration: BoxDecoration(
                                     color: const Color(
                                       0xFF48C9B0,
-                                    ).withOpacity(0.15),
+                                    ).withValues(alpha: 0.15),
                                     borderRadius: BorderRadius.circular(4),
                                   ),
                                   child: Text(
@@ -377,7 +375,7 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: accent.withOpacity(0.3),
+                            color: accent.withValues(alpha: 0.3),
                             blurRadius: 12,
                             offset: const Offset(0, 4),
                           ),
@@ -443,7 +441,7 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
                                     vertical: 2,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.2),
+                                    color: Colors.white.withValues(alpha: 0.2),
                                     borderRadius: BorderRadius.circular(20),
                                   ),
                                   child: Text(
@@ -517,10 +515,10 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
     final activeColor = notifier.getPrimaryColor();
 
     final navBgColor = state.appearance == 'dark'
-        ? const Color(0xFF161616).withOpacity(0.9)
+        ? const Color(0xFF161616).withValues(alpha: 0.9)
         : (state.appearance == 'rev'
-              ? const Color(0xFFF0F5FA).withOpacity(0.9)
-              : Colors.white.withOpacity(0.9));
+              ? const Color(0xFFF0F5FA).withValues(alpha: 0.9)
+              : Colors.white.withValues(alpha: 0.9));
 
     final navBorderColor = state.appearance == 'dark'
         ? const Color(0xFF2C2C2C)
@@ -544,7 +542,7 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
         boxShadow: [
           if (_isScrolled)
             BoxShadow(
-              color: Colors.black.withOpacity(0.03),
+              color: Colors.black.withValues(alpha: 0.03),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -735,12 +733,12 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
       decoration: BoxDecoration(
         color: isDark
             ? const Color(0xFF1E1E1E)
-            : const Color(0xFFF3EEFC).withOpacity(0.4),
+            : const Color(0xFFF3EEFC).withValues(alpha: 0.4),
         borderRadius: BorderRadius.circular(100),
         border: Border.all(
           color: isDark
               ? const Color(0xFF2C2C2C)
-              : const Color(0xFFE2C4F9).withOpacity(0.5),
+              : const Color(0xFFE2C4F9).withValues(alpha: 0.5),
           width: 1,
         ),
       ),
@@ -766,7 +764,7 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
           } else {
             bgColor = Colors.transparent;
             textColor = isDark ? Colors.grey[400]! : Colors.grey[700]!;
-            iconColor = textColor.withOpacity(0.7);
+            iconColor = textColor.withValues(alpha: 0.7);
             fontWeight = FontWeight.w600;
           }
 
@@ -789,7 +787,7 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
                   boxShadow: [
                     if (isSelected)
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
+                        color: Colors.black.withValues(alpha: 0.04),
                         blurRadius: 4,
                         offset: const Offset(0, 2),
                       ),
@@ -816,7 +814,7 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
                           vertical: 1.5,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF48C9B0).withOpacity(0.15),
+                          color: const Color(0xFF48C9B0).withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
@@ -1039,7 +1037,7 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
                 style: GoogleFonts.outfit(
                   fontSize: 10,
                   fontWeight: FontWeight.w900,
-                  color: textColor.withOpacity(0.5),
+                  color: textColor.withValues(alpha: 0.5),
                   letterSpacing: 1.0,
                 ),
               ),
@@ -1088,7 +1086,7 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
                     style: GoogleFonts.outfit(
                       fontSize: 8,
                       fontWeight: FontWeight.w900,
-                      color: bodyTextColor.withOpacity(0.6),
+                      color: bodyTextColor.withValues(alpha: 0.6),
                       letterSpacing: 0.5,
                     ),
                   ),
@@ -1112,7 +1110,7 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
                         style: GoogleFonts.outfit(
                           fontSize: 8,
                           fontWeight: FontWeight.w900,
-                          color: bodyTextColor.withOpacity(0.6),
+                          color: bodyTextColor.withValues(alpha: 0.6),
                           letterSpacing: 0.5,
                         ),
                       ),
@@ -1130,7 +1128,7 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
                     style: GoogleFonts.outfit(
                       fontSize: 8,
                       fontWeight: FontWeight.w900,
-                      color: bodyTextColor.withOpacity(0.6),
+                      color: bodyTextColor.withValues(alpha: 0.6),
                       letterSpacing: 0.5,
                     ),
                   ),
@@ -1152,7 +1150,7 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
                         style: GoogleFonts.outfit(
                           fontSize: 8,
                           fontWeight: FontWeight.w900,
-                          color: bodyTextColor.withOpacity(0.6),
+                          color: bodyTextColor.withValues(alpha: 0.6),
                           letterSpacing: 0.5,
                         ),
                       ),

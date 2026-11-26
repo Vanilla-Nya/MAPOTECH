@@ -166,9 +166,7 @@ class _WebPlatformQrScannerWidgetState extends State<WebPlatformQrScannerWidget>
 
         setState(() {
           _videoDevices = parsedDevices;
-          if (_selectedDeviceId == null) {
-            _selectedDeviceId = preferred?.deviceId ?? parsedDevices.first.deviceId;
-          }
+          _selectedDeviceId ??= preferred?.deviceId ?? parsedDevices.first.deviceId;
         });
       }
     } catch (_) {}

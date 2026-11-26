@@ -27,7 +27,7 @@ class PageTutorialDialog extends ConsumerWidget {
   }) {
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.55),
+      barrierColor: Colors.black.withValues(alpha: 0.55),
       builder: (context) => Dialog(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(24),
@@ -64,7 +64,7 @@ class PageTutorialDialog extends ConsumerWidget {
     final secondaryTextColor = notifier.getBodyTextColor();
     final cardBg = isDark ? const Color(0xFF252528) : (isRev ? const Color(0xFFF7F2FE) : const Color(0xFFF8FAFC));
     final borderColor = notifier.getBorderColor();
-    final shadowColor = isDark ? Colors.black.withOpacity(0.4) : Colors.black.withOpacity(0.06);
+    final shadowColor = isDark ? Colors.black.withValues(alpha: 0.4) : Colors.black.withValues(alpha: 0.06);
 
     // Responsive design flag
     final screenWidth = MediaQuery.of(context).size.width;
@@ -128,7 +128,7 @@ class PageTutorialDialog extends ConsumerWidget {
                       fontSize: 10,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 1.5,
-                      color: secondaryTextColor.withOpacity(0.5),
+                      color: secondaryTextColor.withValues(alpha: 0.5),
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -138,7 +138,7 @@ class PageTutorialDialog extends ConsumerWidget {
                       fontSize: 8,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 2.0,
-                      color: secondaryTextColor.withOpacity(0.3),
+                      color: secondaryTextColor.withValues(alpha: 0.3),
                     ),
                   ),
                 ],
@@ -149,11 +149,11 @@ class PageTutorialDialog extends ConsumerWidget {
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                color: isDark ? Colors.black.withOpacity(0.5) : Colors.white,
+                color: isDark ? Colors.black.withValues(alpha: 0.5) : Colors.white,
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.15),
+                    color: Colors.black.withValues(alpha: 0.15),
                     blurRadius: 12,
                     spreadRadius: 2,
                     offset: const Offset(0, 4),
@@ -201,11 +201,11 @@ class PageTutorialDialog extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
               color: isDark
-                  ? themeAccent.withOpacity(0.12)
-                  : themeAccent.withOpacity(0.08),
+                  ? themeAccent.withValues(alpha: 0.12)
+                  : themeAccent.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(6),
               border: Border.all(
-                color: themeAccent.withOpacity(0.3),
+                color: themeAccent.withValues(alpha: 0.3),
                 width: 1,
               ),
             ),
@@ -343,7 +343,7 @@ class PageTutorialDialog extends ConsumerWidget {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: isDark ? themeAccent : const Color(0xFF0F0F11),
                         foregroundColor: Colors.white,
-                        shadowColor: Colors.black.withOpacity(0.15),
+                        shadowColor: Colors.black.withValues(alpha: 0.15),
                         elevation: 4,
                         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                         shape: RoundedRectangleBorder(
@@ -364,7 +364,7 @@ class PageTutorialDialog extends ConsumerWidget {
                             style: GoogleFonts.outfit(
                               fontSize: 12,
                               fontWeight: FontWeight.w800,
-                              color: isDark ? Colors.white.withOpacity(0.7) : const Color(0xFF1B0C3C).withOpacity(0.7),
+                              color: isDark ? Colors.white.withValues(alpha: 0.7) : const Color(0xFF1B0C3C).withValues(alpha: 0.7),
                               letterSpacing: 0.5,
                             ),
                           ),
@@ -372,7 +372,7 @@ class PageTutorialDialog extends ConsumerWidget {
                           Icon(
                             Icons.arrow_forward_rounded,
                             size: 14,
-                            color: isDark ? Colors.white.withOpacity(0.7) : const Color(0xFF1B0C3C).withOpacity(0.7),
+                            color: isDark ? Colors.white.withValues(alpha: 0.7) : const Color(0xFF1B0C3C).withValues(alpha: 0.7),
                           ),
                         ],
                       ),
@@ -393,7 +393,7 @@ class PageTutorialDialog extends ConsumerWidget {
             right: 0,
             top: 0,
             child: IconButton(
-              icon: Icon(Icons.close_rounded, color: textColor.withOpacity(0.5)),
+              icon: Icon(Icons.close_rounded, color: textColor.withValues(alpha: 0.5)),
               onPressed: () => Navigator.of(context).pop(),
             ),
           ),

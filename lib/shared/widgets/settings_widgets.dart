@@ -70,7 +70,7 @@ class SettingsChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final Color activeColor = isDark ? teal : purple;
     final Color bg = isSelected
-        ? activeColor.withOpacity(0.12)
+        ? activeColor.withValues(alpha: 0.12)
         : (isDark ? const Color(0xFF1E1E22) : Colors.white);
     final Color fg = isSelected ? activeColor : (isDark ? Colors.grey[400]! : const Color(0xFF6F6A8A));
 

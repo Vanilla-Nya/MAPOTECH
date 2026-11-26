@@ -185,7 +185,7 @@ class ReusablePagination extends StatelessWidget {
           height: 32,
           decoration: BoxDecoration(
             border: Border.all(
-              color: isEnabled ? borderColor : borderColor.withOpacity(0.4),
+              color: isEnabled ? borderColor : borderColor.withValues(alpha: 0.4),
             ),
             borderRadius: BorderRadius.circular(8),
             color: Colors.transparent,
@@ -193,7 +193,7 @@ class ReusablePagination extends StatelessWidget {
           child: Icon(
             icon,
             size: 16,
-            color: isEnabled ? textColor : subtitleColor.withOpacity(0.4),
+            color: isEnabled ? textColor : subtitleColor.withValues(alpha: 0.4),
           ),
         ),
       ),

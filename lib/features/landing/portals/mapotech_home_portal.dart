@@ -85,10 +85,10 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
           decoration: BoxDecoration(
             color: cardColor,
             borderRadius: BorderRadius.circular(100),
-            border: Border.all(color: activeColor.withOpacity(0.2)),
+            border: Border.all(color: activeColor.withValues(alpha: 0.2)),
             boxShadow: [
               BoxShadow(
-                color: activeColor.withOpacity(0.04),
+                color: activeColor.withValues(alpha: 0.04),
                 blurRadius: 10,
                 offset: const Offset(0, 2),
               ),
@@ -105,7 +105,7 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
                   fontSize: 10,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 1.5,
-                  color: textColor.withOpacity(0.7),
+                  color: textColor.withValues(alpha: 0.7),
                 ),
               ),
             ],
@@ -224,7 +224,7 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
       height: 480,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: darkGreenColor.withOpacity(0.03),
+        color: darkGreenColor.withValues(alpha: 0.03),
         borderRadius: BorderRadius.circular(40),
         border: Border.all(color: borderColor),
       ),
@@ -238,7 +238,7 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
                 borderRadius: BorderRadius.circular(32),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(isDark ? 0.4 : 0.1),
+                    color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.1),
                     blurRadius: 30,
                     offset: const Offset(0, 15),
                   ),
@@ -287,7 +287,7 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
                   border: Border.all(color: borderColor),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
+                      color: Colors.black.withValues(alpha: 0.08),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -316,7 +316,7 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
                   border: Border.all(color: borderColor),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
+                      color: Colors.black.withValues(alpha: 0.08),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -416,7 +416,7 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
           border: Border.all(color: containerBorder, width: 1.5),
           boxShadow: [
             BoxShadow(
-              color: themeColor.withOpacity(0.04),
+              color: themeColor.withValues(alpha: 0.04),
               blurRadius: 20,
               offset: const Offset(0, 8),
             ),
@@ -430,7 +430,7 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: themeColor.withOpacity(0.12),
+                    color: themeColor.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Icon(icon, color: themeColor, size: 24),
@@ -463,7 +463,7 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
+                            color: Colors.black.withValues(alpha: 0.05),
                             blurRadius: 4,
                           ),
                         ],
@@ -568,10 +568,10 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
 
     final providerBorder = isDark
         ? const Color(0xFF372C4C)
-        : const Color(0xFFE2C4F9).withOpacity(0.6);
+        : const Color(0xFFE2C4F9).withValues(alpha: 0.6);
     final communityBorder = isDark
         ? const Color(0xFF4C2C39)
-        : const Color(0xFFF9C4E2).withOpacity(0.6);
+        : const Color(0xFFF9C4E2).withValues(alpha: 0.6);
 
     const purpleThemeColor = Color(0xFFB577F2); // purple
     const pinkThemeColor = Color(0xFFFF8BCC); // pink
@@ -1033,7 +1033,7 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
                   transform: Matrix4.identity()
                     ..setEntry(3, 2, 0.001)
                     ..rotateY(0.25)
-                    ..translate(0.0, float * 0.3),
+                    ..translateByDouble(0.0, float * 0.3, 0.0, 1.0),
                   child: Opacity(
                     opacity: _selectedPlatformIndex == 2 ? 1.0 : 0.55,
                     child: _buildMonitor3D(activeColor),
@@ -1051,7 +1051,7 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
                   transform: Matrix4.identity()
                     ..setEntry(3, 2, 0.001)
                     ..rotateY(-0.20)
-                    ..translate(0.0, float * 0.4),
+                    ..translateByDouble(0.0, float * 0.4, 0.0, 1.0),
                   child: Opacity(
                     opacity: _selectedPlatformIndex == 1 ? 1.0 : 0.5,
                     child: _buildLaptop3D(activeColor),
@@ -1065,7 +1065,7 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
               transform: Matrix4.identity()
                 ..setEntry(3, 2, 0.001)
                 ..rotateX(-0.04)
-                ..translate(0.0, float),
+                ..translateByDouble(0.0, float, 0.0, 1.0),
               child: AnimatedScale(
                 duration: const Duration(milliseconds: 300),
                 scale: _selectedPlatformIndex == 0
@@ -1575,7 +1575,7 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
         border: Border.all(color: const Color(0xFF222225), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.4),
+            color: Colors.black.withValues(alpha: 0.4),
             blurRadius: 30,
             offset: const Offset(0, 15),
           ),
@@ -1588,7 +1588,7 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
           Positioned.fill(
             child: CustomPaint(
               painter: CapsuleGridPainter(
-                color: Colors.white.withOpacity(isDark ? 0.02 : 0.015),
+                color: Colors.white.withValues(alpha: isDark ? 0.02 : 0.015),
               ),
             ),
           ),
@@ -1608,10 +1608,10 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
                     vertical: 8,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.04),
+                    color: Colors.white.withValues(alpha: 0.04),
                     borderRadius: BorderRadius.circular(100),
                     border: Border.all(
-                      color: Colors.white.withOpacity(0.08),
+                      color: Colors.white.withValues(alpha: 0.08),
                       width: 1.0,
                     ),
                   ),
@@ -1859,7 +1859,7 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
       decoration: BoxDecoration(
         color: const Color(0xFFF3EEFC),
         borderRadius: BorderRadius.circular(100),
-        border: Border.all(color: const Color(0xFFE2C4F9).withOpacity(0.4)),
+        border: Border.all(color: const Color(0xFFE2C4F9).withValues(alpha: 0.4)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1894,7 +1894,7 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
         border: Border.all(color: borderColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -1933,7 +1933,7 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
               color: const Color(0xFFF3EEFC),
               shape: BoxShape.circle,
               border: Border.all(
-                color: const Color(0xFFE2C4F9).withOpacity(0.5),
+                color: const Color(0xFFE2C4F9).withValues(alpha: 0.5),
               ),
             ),
             child: const Icon(
@@ -1969,7 +1969,7 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
         border: Border.all(color: borderColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -1986,7 +1986,7 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
                 color: const Color(0xFFF3EEFC),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: const Color(0xFFE2C4F9).withOpacity(0.4),
+                  color: const Color(0xFFE2C4F9).withValues(alpha: 0.4),
                 ),
               ),
               child: const Icon(
@@ -2020,7 +2020,7 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
                       color: const Color(0xFFE8F8F5),
                       borderRadius: BorderRadius.circular(100),
                       border: Border.all(
-                        color: const Color(0xFF48C9B0).withOpacity(0.3),
+                        color: const Color(0xFF48C9B0).withValues(alpha: 0.3),
                       ),
                     ),
                     child: Text(
@@ -2120,7 +2120,7 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
               border: Border.all(color: Colors.white, width: 3),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF48C9B0).withOpacity(0.4),
+                  color: const Color(0xFF48C9B0).withValues(alpha: 0.4),
                   blurRadius: 6,
                 ),
               ],
@@ -2150,7 +2150,7 @@ class _MapotechHomePortalState extends ConsumerState<MapotechHomePortal>
         border: Border.all(color: borderColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),

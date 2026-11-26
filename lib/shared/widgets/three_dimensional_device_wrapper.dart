@@ -99,7 +99,7 @@ class _ThreeDimensionalDeviceWrapperState
                     borderRadius: BorderRadius.circular(40),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(
+                        color: Colors.black.withValues(alpha:
                           _isHovered ? 0.22 : 0.14,
                         ),
                         blurRadius: 36 * shadowBlurMultiplier,

@@ -479,10 +479,10 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
               isDark,
               themeAccent,
               textColor,
-              textColor.withOpacity(0.65),
+              textColor.withValues(alpha: 0.65),
               notifier.getCardColor(),
               borderColor,
-              Colors.black.withOpacity(isDark ? 0.4 : 0.08),
+              Colors.black.withValues(alpha: isDark ? 0.4 : 0.08),
             ),
         ],
       ),
@@ -575,10 +575,10 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                   blendMode: BlendMode.dstIn,
                   child: Container(
                     color: isDark
-                        ? Colors.black.withOpacity(0.4)
+                        ? Colors.black.withValues(alpha: 0.4)
                         : (state.appearance == 'rev'
-                              ? const Color(0xFFB577F2).withOpacity(0.08)
-                              : const Color(0xFF48C9B0).withOpacity(0.08)),
+                              ? const Color(0xFFB577F2).withValues(alpha: 0.08)
+                              : const Color(0xFF48C9B0).withValues(alpha: 0.08)),
                   ),
                 ),
               ),
@@ -604,7 +604,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                             state.drawerSize == 0
                                 ? Icons.menu_open_rounded
                                 : Icons.menu_rounded,
-                            color: textColor.withOpacity(0.7),
+                            color: textColor.withValues(alpha: 0.7),
                           ),
                           onPressed: () {
                             notifier.toggleDrawerSize();
@@ -655,7 +655,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                             icon: Icon(
                               Icons.qr_code_scanner_rounded,
                               size: 20,
-                              color: textColor.withOpacity(0.8),
+                              color: textColor.withValues(alpha: 0.8),
                             ),
                             tooltip: state.language == 'en' ? 'Scan Doctor / Pharmacy QR' : 'Scan QR Dokter / Apotek',
                             onPressed: () {
@@ -672,7 +672,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                           icon: Icon(
                             Icons.help_outline_rounded,
                             size: 20,
-                            color: textColor.withOpacity(0.6),
+                            color: textColor.withValues(alpha: 0.6),
                           ),
                           onPressed: () {
                             final role = state.loggedInRole ?? 'pasien';
@@ -721,7 +721,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                         width: 32,
                         height: 32,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFB577F2).withOpacity(0.12),
+                          color: const Color(0xFFB577F2).withValues(alpha: 0.12),
                           shape: BoxShape.circle,
                         ),
                         child: ClipOval(
@@ -1067,12 +1067,12 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
             color: ref
                 .read(landingPageProvider.notifier)
                 .getCardColor()
-                .withOpacity(0.95),
+                .withValues(alpha: 0.95),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: themeAccent.withOpacity(0.5), width: 1.5),
+            border: Border.all(color: themeAccent.withValues(alpha: 0.5), width: 1.5),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.15),
+                color: Colors.black.withValues(alpha: 0.15),
                 blurRadius: 20,
                 offset: const Offset(0, 8),
               ),
@@ -1112,7 +1112,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                           icon: Icon(
                             Icons.close_rounded,
                             size: 18,
-                            color: textColor.withOpacity(0.5),
+                            color: textColor.withValues(alpha: 0.5),
                           ),
                           onPressed: () {
                             setState(() {
@@ -1316,7 +1316,7 @@ class _PulsingTargetState extends State<_PulsingTarget>
               width: 24 + (56 * _controller.value),
               height: 24 + (56 * _controller.value),
               decoration: BoxDecoration(
-                color: widget.color.withOpacity(1.0 - _controller.value),
+                color: widget.color.withValues(alpha: 1.0 - _controller.value),
                 shape: BoxShape.circle,
               ),
             ),
@@ -1329,7 +1329,7 @@ class _PulsingTargetState extends State<_PulsingTarget>
                 border: Border.all(color: Colors.white, width: 2),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
+                    color: Colors.black.withValues(alpha: 0.2),
                     blurRadius: 6,
                     spreadRadius: 1,
                   ),

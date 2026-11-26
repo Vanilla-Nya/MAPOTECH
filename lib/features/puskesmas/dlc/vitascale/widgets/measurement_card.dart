@@ -45,7 +45,7 @@ class MeasurementCard extends StatelessWidget {
       borderColor: item.status == MeasurementStatus.failed
           ? const Color(0xFFE74C3C)
           : (item.status == MeasurementStatus.stable
-                ? const Color(0xFF27AE60).withOpacity(0.5)
+                ? const Color(0xFF27AE60).withValues(alpha: 0.5)
                 : borderColor),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Column(
@@ -60,7 +60,7 @@ class MeasurementCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(7),
                     decoration: BoxDecoration(
-                      color: themeAccent.withOpacity(0.12),
+                      color: themeAccent.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(icon, size: 16, color: themeAccent),
@@ -135,7 +135,7 @@ class MeasurementCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: const Color(0xFFE74C3C).withOpacity(0.1),
+                color: const Color(0xFFE74C3C).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -183,7 +183,7 @@ class MeasurementCard extends StatelessWidget {
                   visualDensity: VisualDensity.compact,
                   foregroundColor: hasVal
                       ? textColor
-                      : subtitleColor.withOpacity(0.4),
+                      : subtitleColor.withValues(alpha: 0.4),
                 ),
               ),
               if (onSimulate != null)
@@ -193,7 +193,7 @@ class MeasurementCard extends StatelessWidget {
                   height: 30,
                   icon: Icons.play_arrow_rounded,
                   textColor: themeAccent,
-                  borderColor: themeAccent.withOpacity(0.3),
+                  borderColor: themeAccent.withValues(alpha: 0.3),
                   onPressed: onSimulate!,
                 ),
             ],

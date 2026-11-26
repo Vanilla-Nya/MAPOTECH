@@ -48,18 +48,22 @@ class ManualLedgerEntry {
   static LedgerCategory parseCategory(String? cat) {
     if (cat == null) return LedgerCategory.other;
     final lower = cat.toLowerCase();
-    if (lower.contains('operasional') || lower.contains('operational'))
+    if (lower.contains('operasional') || lower.contains('operational')) {
       return LedgerCategory.operational;
-    if (lower.contains('gaji') || lower.contains('salary'))
+    }
+    if (lower.contains('gaji') || lower.contains('salary')) {
       return LedgerCategory.salary;
+    }
     if (lower.contains('listrik') ||
         lower.contains('utility') ||
-        lower.contains('utilities'))
+        lower.contains('utilities')) {
       return LedgerCategory.utilities;
+    }
     if (lower.contains('procurement') ||
         lower.contains('inventory') ||
-        lower.contains('obat'))
+        lower.contains('obat')) {
       return LedgerCategory.procurement;
+    }
     return LedgerCategory.other;
   }
 }
@@ -533,8 +537,9 @@ class _ApotekLaporanState extends ConsumerState<ApotekLaporan> {
                                     ),
                                   ],
                                   onChanged: (v) {
-                                    if (v != null)
+                                    if (v != null) {
                                       setModalState(() => selectedType = v);
+                                    }
                                   },
                                 ),
                               ),
@@ -593,8 +598,9 @@ class _ApotekLaporanState extends ConsumerState<ApotekLaporan> {
                                     ),
                                   ],
                                   onChanged: (v) {
-                                    if (v != null)
+                                    if (v != null) {
                                       setModalState(() => selectedCategory = v);
+                                    }
                                   },
                                 ),
                               ),
@@ -1240,8 +1246,9 @@ class _ApotekLaporanState extends ConsumerState<ApotekLaporan> {
                                 ),
                               ],
                               onChanged: (v) {
-                                if (v != null)
+                                if (v != null) {
                                   setState(() => _breakdownMode = v);
+                                }
                               },
                             ),
                           ),

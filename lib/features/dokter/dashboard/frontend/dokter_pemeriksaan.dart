@@ -80,11 +80,8 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
   final List<Map<String, dynamic>> _manualPrescriptions = [];
   String? _selectedApotek;
   final _serviceFeeController = TextEditingController();
-  ObatModel? _selectedDrug;
   final _qtyController = TextEditingController(text: '1');
   final _instructionController = TextEditingController();
-  final bool _showDrugDropdown = false;
-  final String _drugSearchQuery = '';
   int _step5TabIndex = 0; // 0=Resep Katalog, 1=Resep Manual+Apotek, 2=Rujukan
   bool _queueCardExpanded = true; // collapsible queue sidebar card
 
@@ -1089,9 +1086,11 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
         suratSakitSelesai: _wantSuratKeterangan && _suratKeteranganType == 'sakit' && _suratSakitEndDate != null ? _suratSakitEndDate!.toUtc().toIso8601String() : null,
       );
 
+      if (!mounted) return false;
       Navigator.pop(context);
       return true;
     } catch (e) {
+      if (!mounted) return false;
       Navigator.pop(context);
       _showWarningDialog('Gagal Menyimpan EMR', e.toString());
       return false;
@@ -1662,7 +1661,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                     width: 38,
                     height: 38,
                     decoration: BoxDecoration(
-                      color: purple.withOpacity(0.12),
+                      color: purple.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     alignment: Alignment.center,
@@ -1812,7 +1811,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
             width: 80,
             height: 80,
             decoration: BoxDecoration(
-              color: purple.withOpacity(0.08),
+              color: purple.withValues(alpha: 0.08),
               shape: BoxShape.circle,
             ),
             alignment: Alignment.center,
@@ -1878,7 +1877,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
-                color: subtitle.withOpacity(0.06),
+                color: subtitle.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
@@ -1923,7 +1922,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
         border: Border.all(color: border),
         boxShadow: [
           BoxShadow(
-            color: purple.withOpacity(0.06),
+            color: purple.withValues(alpha: 0.06),
             blurRadius: 12,
             offset: const Offset(0, 2),
           ),
@@ -1936,7 +1935,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
             width: 42,
             height: 42,
             decoration: BoxDecoration(
-              color: patient.avatarBg.withOpacity(0.15),
+              color: patient.avatarBg.withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
             alignment: Alignment.center,
@@ -1981,7 +1980,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                             (patient.id.startsWith('PAS-SS-')
                                     ? activeGreen
                                     : Colors.amber)
-                                .withOpacity(0.12),
+                                .withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(100),
                       ),
                       child: Row(
@@ -2067,7 +2066,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                             width: 28,
                             height: 28,
                             decoration: BoxDecoration(
-                              color: q.avatarBg.withOpacity(0.15),
+                              color: q.avatarBg.withValues(alpha: 0.15),
                               shape: BoxShape.circle,
                             ),
                             alignment: Alignment.center,
@@ -2117,9 +2116,9 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: purple.withOpacity(0.08),
+                  color: purple.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: purple.withOpacity(0.2)),
+                  border: Border.all(color: purple.withValues(alpha: 0.2)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -2205,7 +2204,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFFC0392B).withOpacity(0.2),
+                    color: const Color(0xFFC0392B).withValues(alpha: 0.2),
                     blurRadius: 8,
                     offset: const Offset(0, 4),
                   ),
@@ -2294,7 +2293,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
       decoration: BoxDecoration(
-        color: borderCol.withOpacity(0.02),
+        color: borderCol.withValues(alpha: 0.02),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: borderCol),
       ),
@@ -2317,8 +2316,8 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                     color: isDone
                         ? purple
                         : (isActive
-                              ? purple.withOpacity(0.12)
-                              : borderCol.withOpacity(0.05)),
+                              ? purple.withValues(alpha: 0.12)
+                              : borderCol.withValues(alpha: 0.05)),
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: isDone || isActive ? purple : borderCol,
@@ -2560,7 +2559,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
 
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.4),
+      barrierColor: Colors.black.withValues(alpha: 0.4),
       builder: (ctx) {
         return Dialog(
           shape: RoundedRectangleBorder(
@@ -2675,7 +2674,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                             width: 38,
                             height: 38,
                             decoration: BoxDecoration(
-                              color: themeAccent.withOpacity(0.12),
+                              color: themeAccent.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             alignment: Alignment.center,
@@ -2735,7 +2734,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                                     width: 32,
                                     height: 32,
                                     decoration: BoxDecoration(
-                                      color: themeAccent.withOpacity(0.12),
+                                      color: themeAccent.withValues(alpha: 0.12),
                                       shape: BoxShape.circle,
                                     ),
                                     child: Icon(Icons.person_rounded, color: themeAccent, size: 16),
@@ -2757,7 +2756,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                                           'Dokter Pemeriksa',
                                           style: GoogleFonts.outfit(
                                             fontSize: 9,
-                                            color: subtitleColor.withOpacity(0.8),
+                                            color: subtitleColor.withValues(alpha: 0.8),
                                           ),
                                         ),
                                       ],
@@ -2847,7 +2846,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                           decoration: BoxDecoration(
-                                            color: Colors.redAccent.withOpacity(0.12),
+                                            color: Colors.redAccent.withValues(alpha: 0.12),
                                             borderRadius: BorderRadius.circular(4),
                                           ),
                                           child: Text(
@@ -2905,9 +2904,9 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                               Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: Colors.blueAccent.withOpacity(0.06),
+                                  color: Colors.blueAccent.withValues(alpha: 0.06),
                                   borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: Colors.blueAccent.withOpacity(0.15)),
+                                  border: Border.all(color: Colors.blueAccent.withValues(alpha: 0.15)),
                                 ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -2968,7 +2967,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
         style: GoogleFonts.outfit(
           fontSize: 8.5,
           fontWeight: FontWeight.w900,
-          color: textColor.withOpacity(0.5),
+          color: textColor.withValues(alpha: 0.5),
           letterSpacing: 0.5,
         ),
       ),
@@ -3020,8 +3019,8 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: patient.id.startsWith('PAS-SS-')
-                ? activeGreen.withOpacity(0.08)
-                : Colors.amber.withOpacity(0.08),
+                ? activeGreen.withValues(alpha: 0.08)
+                : Colors.amber.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: patient.id.startsWith('PAS-SS-')
@@ -3115,7 +3114,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: borderCol.withOpacity(0.02),
+            color: borderCol.withValues(alpha: 0.02),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: borderCol),
           ),
@@ -3184,14 +3183,14 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                 style: GoogleFonts.outfit(
                   fontSize: 10,
                   fontWeight: FontWeight.w900,
-                  color: textCol.withOpacity(0.5),
+                  color: textCol.withValues(alpha: 0.5),
                   letterSpacing: 0.5,
                 ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: purple.withOpacity(0.12),
+                  color: purple.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
@@ -3308,7 +3307,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                     .tr(state),
             hintStyle: GoogleFonts.outfit(
               fontSize: 11,
-              color: subtitleCol.withOpacity(0.5),
+              color: subtitleCol.withValues(alpha: 0.5),
             ),
             contentPadding: const EdgeInsets.all(14),
             filled: true,
@@ -3353,7 +3352,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                     .tr(state),
             hintStyle: GoogleFonts.outfit(
               fontSize: 11,
-              color: subtitleCol.withOpacity(0.5),
+              color: subtitleCol.withValues(alpha: 0.5),
             ),
             contentPadding: const EdgeInsets.all(14),
             filled: true,
@@ -3517,7 +3516,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                   'Tulis jenis antibiotik (misal: Penisilin, Amoksisilin...)',
               hintStyle: GoogleFonts.outfit(
                 fontSize: 10,
-                color: subtitleCol.withOpacity(0.5),
+                color: subtitleCol.withValues(alpha: 0.5),
               ),
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 12,
@@ -3564,7 +3563,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                       hintText: 'Terapi farmakologis...',
                       hintStyle: GoogleFonts.outfit(
                         fontSize: 10,
-                        color: subtitleCol.withOpacity(0.5),
+                        color: subtitleCol.withValues(alpha: 0.5),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 12,
@@ -3610,7 +3609,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                       hintText: 'Edukasi / fisioterapi...',
                       hintStyle: GoogleFonts.outfit(
                         fontSize: 10,
-                        color: subtitleCol.withOpacity(0.5),
+                        color: subtitleCol.withValues(alpha: 0.5),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 12,
@@ -3693,7 +3692,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                       hintText: 'Detail spuit, kassa...',
                       hintStyle: GoogleFonts.outfit(
                         fontSize: 10,
-                        color: subtitleCol.withOpacity(0.5),
+                        color: subtitleCol.withValues(alpha: 0.5),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 12,
@@ -3784,7 +3783,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: purple.withOpacity(0.08),
+                  color: purple.withValues(alpha: 0.08),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(Icons.favorite_rounded, color: purple, size: 16),
@@ -3896,9 +3895,9 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                       decoration: BoxDecoration(
-                        color: purple.withOpacity(0.12),
+                        color: purple.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: purple.withOpacity(0.35)),
+                        border: Border.all(color: purple.withValues(alpha: 0.35)),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -4037,7 +4036,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                   hintText: 'Sys',
                   hintStyle: GoogleFonts.outfit(
                     fontSize: 12,
-                    color: subtitleCol.withOpacity(0.4),
+                    color: subtitleCol.withValues(alpha: 0.4),
                   ),
                   border: InputBorder.none,
                   isDense: true,
@@ -4080,7 +4079,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                   hintText: 'Dia',
                   hintStyle: GoogleFonts.outfit(
                     fontSize: 12,
-                    color: subtitleCol.withOpacity(0.4),
+                    color: subtitleCol.withValues(alpha: 0.4),
                   ),
                   border: InputBorder.none,
                   isDense: true,
@@ -4207,7 +4206,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                   hintText: hintText,
                   hintStyle: GoogleFonts.outfit(
                     fontSize: 12,
-                    color: subtitleCol.withOpacity(0.5),
+                    color: subtitleCol.withValues(alpha: 0.5),
                   ),
                   border: InputBorder.none,
                   isDense: true,
@@ -4269,7 +4268,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: inputBg.withOpacity(0.3),
+        color: inputBg.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: borderCol),
       ),
@@ -4381,7 +4380,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
             style: GoogleFonts.outfit(
               fontSize: 9.5,
               fontWeight: isActive ? FontWeight.w900 : FontWeight.bold,
-              color: isActive ? color : color.withOpacity(0.7),
+              color: isActive ? color : color.withValues(alpha: 0.7),
             ),
           ),
         ],
@@ -4443,7 +4442,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                       hintText: 'Search ICD-10 code...',
                       hintStyle: GoogleFonts.outfit(
                         fontSize: 11,
-                        color: subtitleCol.withOpacity(0.5),
+                        color: subtitleCol.withValues(alpha: 0.5),
                         fontWeight: FontWeight.normal,
                       ),
                       prefixIcon: Icon(
@@ -4499,7 +4498,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                         border: Border.all(color: borderCol),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.08),
+                            color: Colors.black.withValues(alpha: 0.08),
                             blurRadius: 8,
                             offset: const Offset(0, 3),
                           ),
@@ -4538,7 +4537,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                                       color: subtitleCol,
                                     ),
                                   ),
-                                  hoverColor: purple.withOpacity(0.08),
+                                  hoverColor: purple.withValues(alpha: 0.08),
                                   onTap: () {
                                     if (!_selectedDiagnoses.any(
                                       (element) => element.code == diag.code,
@@ -4592,7 +4591,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                       hintText: 'Search ICD-9 code...',
                       hintStyle: GoogleFonts.outfit(
                         fontSize: 11,
-                        color: subtitleCol.withOpacity(0.5),
+                        color: subtitleCol.withValues(alpha: 0.5),
                         fontWeight: FontWeight.normal,
                       ),
                       prefixIcon: Icon(
@@ -4649,7 +4648,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                         border: Border.all(color: borderCol),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.08),
+                            color: Colors.black.withValues(alpha: 0.08),
                             blurRadius: 8,
                             offset: const Offset(0, 3),
                           ),
@@ -4688,7 +4687,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                                       color: subtitleCol,
                                     ),
                                   ),
-                                  hoverColor: purple.withOpacity(0.08),
+                                  hoverColor: purple.withValues(alpha: 0.08),
                                   onTap: () {
                                     if (!_selectedDiagnoses.any(
                                       (element) => element.code == diag.code,
@@ -4771,9 +4770,9 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: chipThemeColor.withOpacity(0.08),
+                  color: chipThemeColor.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: chipThemeColor.withOpacity(0.3)),
+                  border: Border.all(color: chipThemeColor.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -4784,7 +4783,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: chipThemeColor.withOpacity(0.15),
+                        color: chipThemeColor.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
@@ -4804,8 +4803,8 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                       ),
                       decoration: BoxDecoration(
                         color: type == 'Primary'
-                            ? activeGreen.withOpacity(0.15)
-                            : subtitleCol.withOpacity(0.15),
+                            ? activeGreen.withValues(alpha: 0.15)
+                            : subtitleCol.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
@@ -4902,10 +4901,6 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
       (sum, item) =>
           sum + ((item["obat"] as ObatModel).hargaSatuan * item["jumlah"]),
     );
-    final double serviceFee = _serviceFeeController.text.isEmpty
-        ? ref.read(landingPageProvider).defaultServiceFee
-        : parseFormattedPrice(_serviceFeeController.text);
-    final double totalBill = serviceFee + subtotalObat;
 
     final tabs = [
       {'icon': Icons.medication_rounded, 'label': 'Resep Katalog'},
@@ -4920,7 +4915,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
         // ── Tab Bar ──
         Container(
           decoration: BoxDecoration(
-            color: borderCol.withOpacity(0.04),
+            color: borderCol.withValues(alpha: 0.04),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: borderCol),
           ),
@@ -4943,7 +4938,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                       boxShadow: isActive
                           ? [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.06),
+                                color: Colors.black.withValues(alpha: 0.06),
                                 blurRadius: 6,
                                 offset: const Offset(0, 2),
                               ),
@@ -5263,9 +5258,9 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                     vertical: 8,
                   ),
                   decoration: BoxDecoration(
-                    color: activeGreen.withOpacity(0.04),
+                    color: activeGreen.withValues(alpha: 0.04),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: activeGreen.withOpacity(0.15)),
+                    border: Border.all(color: activeGreen.withValues(alpha: 0.15)),
                   ),
                   child: Row(
                     children: [
@@ -5327,7 +5322,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                                   Icon(
                                     Icons.note_alt_outlined,
                                     size: 24,
-                                    color: subtitleCol.withOpacity(0.5),
+                                    color: subtitleCol.withValues(alpha: 0.5),
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
@@ -5342,7 +5337,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                                     'Klik "Add Prescription" untuk menambah resep manual',
                                     style: GoogleFonts.outfit(
                                       fontSize: 9.5,
-                                      color: subtitleCol.withOpacity(0.7),
+                                      color: subtitleCol.withValues(alpha: 0.7),
                                     ),
                                   ),
                                 ],
@@ -5407,7 +5402,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: activeGreen.withOpacity(0.08),
+                    color: activeGreen.withValues(alpha: 0.08),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
@@ -5618,7 +5613,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                                 hintText: 'Contoh: RSUD Dr. Soetomo',
                                 hintStyle: GoogleFonts.outfit(
                                   fontSize: 11,
-                                  color: subtitleCol.withOpacity(0.5),
+                                  color: subtitleCol.withValues(alpha: 0.5),
                                 ),
                                 contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 10,
@@ -5664,7 +5659,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                                     'Contoh: Poli Jantung / Penyakit Dalam',
                                 hintStyle: GoogleFonts.outfit(
                                   fontSize: 11,
-                                  color: subtitleCol.withOpacity(0.5),
+                                  color: subtitleCol.withValues(alpha: 0.5),
                                 ),
                                 contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 10,
@@ -5710,7 +5705,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                           'Catatan tambahan dokter untuk rumah sakit rujukan...',
                       hintStyle: GoogleFonts.outfit(
                         fontSize: 9.5,
-                        color: subtitleCol.withOpacity(0.5),
+                        color: subtitleCol.withValues(alpha: 0.5),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
@@ -5799,7 +5794,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
         border: Border.all(color: borderCol),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -5950,7 +5945,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
           boxShadow: isActive
               ? [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   ),
@@ -6045,7 +6040,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                         hintText: 'Cari nama obat...',
                         hintStyle: GoogleFonts.outfit(
                           fontSize: 11,
-                          color: subtitleCol.withOpacity(0.5),
+                          color: subtitleCol.withValues(alpha: 0.5),
                         ),
                         prefixIcon: const Icon(Icons.search, size: 16),
                         contentPadding: const EdgeInsets.symmetric(
@@ -6090,7 +6085,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                                   return ListTile(
                                     dense: true,
                                     tileColor: isSelected
-                                        ? activeGreen.withOpacity(0.06)
+                                        ? activeGreen.withValues(alpha: 0.06)
                                         : null,
                                     title: Text(
                                       d.nama,
@@ -6148,10 +6143,10 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                           vertical: 10,
                         ),
                         decoration: BoxDecoration(
-                          color: activeGreen.withOpacity(0.08),
+                          color: activeGreen.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                            color: activeGreen.withOpacity(0.25),
+                            color: activeGreen.withValues(alpha: 0.25),
                           ),
                         ),
                         child: Row(
@@ -6236,7 +6231,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                                       : 'mis: 3×1 sesudah makan',
                                   hintStyle: GoogleFonts.outfit(
                                     fontSize: 11,
-                                    color: subtitleCol.withOpacity(0.5),
+                                    color: subtitleCol.withValues(alpha: 0.5),
                                   ),
                                   contentPadding: const EdgeInsets.symmetric(
                                     horizontal: 10,
@@ -6314,8 +6309,8 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: isValid
                             ? activeGreen
-                            : activeGreen.withOpacity(0.3),
-                        disabledBackgroundColor: activeGreen.withOpacity(0.3),
+                            : activeGreen.withValues(alpha: 0.3),
+                        disabledBackgroundColor: activeGreen.withValues(alpha: 0.3),
                         foregroundColor: Colors.white,
                         minimumSize: const Size(double.infinity, 44),
                         shape: RoundedRectangleBorder(
@@ -6419,7 +6414,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                                   boxShadow: selectedTab == 0
                                       ? [
                                           BoxShadow(
-                                            color: Colors.black.withOpacity(0.05),
+                                            color: Colors.black.withValues(alpha: 0.05),
                                             blurRadius: 4,
                                             offset: const Offset(0, 2),
                                           )
@@ -6459,7 +6454,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                                   boxShadow: selectedTab == 1
                                       ? [
                                           BoxShadow(
-                                            color: Colors.black.withOpacity(0.05),
+                                            color: Colors.black.withValues(alpha: 0.05),
                                             blurRadius: 4,
                                             offset: const Offset(0, 2),
                                           )
@@ -6509,8 +6504,8 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                             ),
                           ),
                           style: OutlinedButton.styleFrom(
-                            side: BorderSide(color: activeGreen.withOpacity(0.5)),
-                            backgroundColor: activeGreen.withOpacity(0.05),
+                            side: BorderSide(color: activeGreen.withValues(alpha: 0.5)),
+                            backgroundColor: activeGreen.withValues(alpha: 0.05),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             padding: const EdgeInsets.symmetric(vertical: 14),
                           ),
@@ -6533,9 +6528,9 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           decoration: BoxDecoration(
-                            color: activeGreen.withOpacity(0.08),
+                            color: activeGreen.withValues(alpha: 0.08),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: activeGreen.withOpacity(0.3)),
+                            border: Border.all(color: activeGreen.withValues(alpha: 0.3)),
                           ),
                           child: Row(
                             children: [
@@ -6580,7 +6575,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                           hintText: 'cth. Paracetamol 500mg (Tulis manual)...',
                           hintStyle: GoogleFonts.outfit(
                             fontSize: 11,
-                            color: subtitleCol.withOpacity(0.4),
+                            color: subtitleCol.withValues(alpha: 0.4),
                           ),
                           prefixIcon: const Icon(
                             Icons.medication_outlined,
@@ -6620,7 +6615,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                         hintText: 'mis: 3×1 sesudah makan',
                         hintStyle: GoogleFonts.outfit(
                           fontSize: 11,
-                          color: subtitleCol.withOpacity(0.5),
+                          color: subtitleCol.withValues(alpha: 0.5),
                         ),
                         contentPadding: const EdgeInsets.all(10),
                         isDense: true,
@@ -6678,8 +6673,8 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: isValid
                             ? activeGreen
-                            : activeGreen.withOpacity(0.3),
-                        disabledBackgroundColor: activeGreen.withOpacity(0.3),
+                            : activeGreen.withValues(alpha: 0.3),
+                        disabledBackgroundColor: activeGreen.withValues(alpha: 0.3),
                         foregroundColor: Colors.white,
                         minimumSize: const Size(double.infinity, 44),
                         shape: RoundedRectangleBorder(
@@ -6786,7 +6781,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                         hintText: 'Cari nama apotek...',
                         hintStyle: GoogleFonts.outfit(
                           fontSize: 11,
-                          color: subtitleCol.withOpacity(0.5),
+                          color: subtitleCol.withValues(alpha: 0.5),
                         ),
                         prefixIcon: const Icon(Icons.search, size: 16),
                         contentPadding: const EdgeInsets.symmetric(vertical: 8),
@@ -7111,93 +7106,6 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
     );
   }
 
-  Widget _sectionTitle(String title, Color color) {
-    return Text(
-      title,
-      style: GoogleFonts.outfit(
-        fontSize: 10,
-        fontWeight: FontWeight.w900,
-        color: color,
-        letterSpacing: 0.5,
-      ),
-    );
-  }
-
-  Widget _buildVitalInput(
-    String label,
-    String unit,
-    TextEditingController controller,
-    IconData icon,
-    Color bg,
-    Color text,
-    Color subtitle,
-    Color border,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 11, color: subtitle),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  label.toUpperCase(),
-                  style: GoogleFonts.outfit(
-                    fontSize: 7.5,
-                    fontWeight: FontWeight.w900,
-                    color: subtitle,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: controller,
-                    textAlign: TextAlign.start,
-                    style: GoogleFonts.outfit(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w900,
-                      color: text,
-                    ),
-                    decoration: const InputDecoration(
-                      isDense: true,
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                  ),
-                ),
-                Text(
-                  unit,
-                  style: GoogleFonts.outfit(
-                    fontSize: 8.5,
-                    fontWeight: FontWeight.bold,
-                    color: subtitle,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   // ─── Component: Right Sidebar (Antrian Pasien) ─────────────────────────────
 
   Widget _buildQueueSidebar(
@@ -7256,8 +7164,8 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: isCurrentActive
-                            ? purple.withOpacity(0.06)
-                            : border.withOpacity(0.04),
+                            ? purple.withValues(alpha: 0.06)
+                            : border.withValues(alpha: 0.04),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
                           color: isCurrentActive ? purple : border,
@@ -7287,7 +7195,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                                       (q.status == 'Menunggu'
                                               ? Colors.amber
                                               : purple)
-                                          .withOpacity(0.12),
+                                          .withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(100),
                                 ),
                                 child: Text(
@@ -7343,7 +7251,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                             ElevatedButton(
                               onPressed: () => _loadPatientFromQueue(q),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: border.withOpacity(0.08),
+                                backgroundColor: border.withValues(alpha: 0.08),
                                 foregroundColor: text,
                                 elevation: 0,
                                 padding: const EdgeInsets.symmetric(
@@ -7387,7 +7295,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
   ) {
     return Positioned.fill(
       child: Container(
-        color: Colors.black.withOpacity(0.4),
+        color: Colors.black.withValues(alpha: 0.4),
         alignment: Alignment.center,
         child: Container(
           width: 480,
@@ -7398,7 +7306,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
             border: Border.all(color: border),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.3),
+                color: Colors.black.withValues(alpha: 0.3),
                 blurRadius: 30,
                 offset: const Offset(0, 15),
               ),
@@ -7465,7 +7373,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                           width: 60,
                           height: 60,
                           decoration: BoxDecoration(
-                            color: activeGreen.withOpacity(0.12),
+                            color: activeGreen.withValues(alpha: 0.12),
                             shape: BoxShape.circle,
                           ),
                           alignment: Alignment.center,
@@ -7503,7 +7411,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                       Container(
                         padding: const EdgeInsets.all(18),
                         decoration: BoxDecoration(
-                          color: border.withOpacity(0.04),
+                          color: border.withValues(alpha: 0.04),
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(color: border),
                         ),
@@ -7789,7 +7697,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                       Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: activeGreen.withOpacity(0.08),
+                          color: activeGreen.withValues(alpha: 0.08),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
@@ -7864,7 +7772,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                           borderRadius: BorderRadius.circular(8),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
+                              color: Colors.black.withValues(alpha: 0.05),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             ),
@@ -7880,7 +7788,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                                   width: 60,
                                   height: 60,
                                   decoration: BoxDecoration(
-                                    color: activeGreen.withOpacity(0.08),
+                                    color: activeGreen.withValues(alpha: 0.08),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   alignment: Alignment.center,
@@ -8356,7 +8264,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                         hintText: isSehat ? 'Contoh: Melamar Pekerjaan' : 'Contoh: Izin Kerja / Izin Sekolah',
                         hintStyle: GoogleFonts.outfit(
                           fontSize: 11,
-                          color: subtitleCol.withOpacity(0.5),
+                          color: subtitleCol.withValues(alpha: 0.5),
                         ),
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 10,
@@ -8406,7 +8314,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                         hintText: 'Contoh: Hipertensi, Asma (jika ada)',
                         hintStyle: GoogleFonts.outfit(
                           fontSize: 11,
-                          color: subtitleCol.withOpacity(0.5),
+                          color: subtitleCol.withValues(alpha: 0.5),
                         ),
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 10,
@@ -8586,7 +8494,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                           style: GoogleFonts.outfit(
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
-                            color: textCol.withOpacity(0.8),
+                            color: textCol.withValues(alpha: 0.8),
                           ),
                         ),
                       ),
@@ -8777,7 +8685,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                       Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: activeGreen.withOpacity(0.08),
+                          color: activeGreen.withValues(alpha: 0.08),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
@@ -8852,7 +8760,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                           borderRadius: BorderRadius.circular(8),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
+                              color: Colors.black.withValues(alpha: 0.05),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             ),
@@ -8868,7 +8776,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                                   width: 60,
                                   height: 60,
                                   decoration: BoxDecoration(
-                                    color: activeGreen.withOpacity(0.08),
+                                    color: activeGreen.withValues(alpha: 0.08),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   alignment: Alignment.center,
@@ -8991,7 +8899,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
 
                             // Patient details
                             _rujukanPreviewRow('Nama Pasien', patient.nama, true),
-                            _rujukanPreviewRow('Umur', '${patient.umur}', false),
+                            _rujukanPreviewRow('Umur', patient.umur, false),
                             _rujukanPreviewRow('Alamat', patient.alamat, false),
 
                             const SizedBox(height: 16),
@@ -9008,7 +8916,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                               ),
                             ] else ...[
                               Text(
-                                'Pada tanggal : $formattedDate telah diperiksa kesehatannya dan dinyatakan dalam keadaan kurang sehat / sakit sehingga memerlukan istirahat selama ${_suratSakitHariController.text} hari, terhitung mulai tanggal ${_suratSakitStartDate != null ? "${_suratSakitStartDate!.day} " + ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"][_suratSakitStartDate!.month - 1] + " ${_suratSakitStartDate!.year}" : "-"} s/d ${_suratSakitEndDate != null ? "${_suratSakitEndDate!.day} " + ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"][_suratSakitEndDate!.month - 1] + " ${_suratSakitEndDate!.year}" : "-"} .',
+                                'Pada tanggal : $formattedDate telah diperiksa kesehatannya dan dinyatakan dalam keadaan kurang sehat / sakit sehingga memerlukan istirahat selama ${_suratSakitHariController.text} hari, terhitung mulai tanggal ${_suratSakitStartDate != null ? "${_suratSakitStartDate!.day} ${["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"][_suratSakitStartDate!.month - 1]} ${_suratSakitStartDate!.year}" : "-"} s/d ${_suratSakitEndDate != null ? "${_suratSakitEndDate!.day} ${["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"][_suratSakitEndDate!.month - 1]} ${_suratSakitEndDate!.year}" : "-"} .',
                                 style: GoogleFonts.outfit(
                                   fontSize: 9.5,
                                   color: textCol,
@@ -9134,7 +9042,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: activeGreen.withOpacity(0.08),
+        color: activeGreen.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(4),
         border: Border(left: BorderSide(color: activeGreen, width: 3)),
       ),
@@ -9249,7 +9157,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
 
     return showDialog<Map<String, dynamic>>(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.5),
+      barrierColor: Colors.black.withValues(alpha: 0.5),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) {
           Future<void> doSearch() async {
@@ -9324,7 +9232,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
+                    color: Colors.black.withValues(alpha: 0.2),
                     blurRadius: 40,
                     offset: const Offset(0, 16),
                   ),
@@ -9340,7 +9248,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [purple.withOpacity(0.12), purple.withOpacity(0.04)],
+                        colors: [purple.withValues(alpha: 0.12), purple.withValues(alpha: 0.04)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
@@ -9351,7 +9259,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                           width: 36,
                           height: 36,
                           decoration: BoxDecoration(
-                            color: purple.withOpacity(0.15),
+                            color: purple.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           alignment: Alignment.center,
@@ -9416,7 +9324,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                                       hintText: 'cth. Paracetamol, Amoxicillin...'.tr(state),
                                       hintStyle: GoogleFonts.outfit(
                                         fontSize: 12,
-                                        color: subtitleColor.withOpacity(0.5),
+                                        color: subtitleColor.withValues(alpha: 0.5),
                                       ),
                                       border: InputBorder.none,
                                       isDense: true,
@@ -9470,7 +9378,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.search_off_rounded, size: 40, color: subtitleColor.withOpacity(0.4)),
+                                Icon(Icons.search_off_rounded, size: 40, color: subtitleColor.withValues(alpha: 0.4)),
                                 const SizedBox(height: 12),
                                 Text(
                                   errorMsg!,
@@ -9486,12 +9394,12 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.medication_liquid_rounded, size: 40, color: subtitleColor.withOpacity(0.25)),
+                                    Icon(Icons.medication_liquid_rounded, size: 40, color: subtitleColor.withValues(alpha: 0.25)),
                                     const SizedBox(height: 12),
                                     Text(
                                       'Ketik nama obat lalu tekan Cari'.tr(state),
                                       textAlign: TextAlign.center,
-                                      style: GoogleFonts.outfit(fontSize: 12, color: subtitleColor.withOpacity(0.6)),
+                                      style: GoogleFonts.outfit(fontSize: 12, color: subtitleColor.withValues(alpha: 0.6)),
                                     ),
                                   ],
                                 ),
@@ -9500,7 +9408,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                                 padding: const EdgeInsets.all(12),
                                 shrinkWrap: true,
                                 itemCount: results.length,
-                                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                                separatorBuilder: (_, _) => const SizedBox(height: 8),
                                 itemBuilder: (_, idx) {
                                   final item = results[idx];
                                   return InkWell(
@@ -9520,7 +9428,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                                             width: 38,
                                             height: 38,
                                             decoration: BoxDecoration(
-                                              color: purple.withOpacity(0.1),
+                                              color: purple.withValues(alpha: 0.1),
                                               borderRadius: BorderRadius.circular(9),
                                             ),
                                             alignment: Alignment.center,
@@ -9542,9 +9450,9 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                                                 const SizedBox(height: 4),
                                                 Row(
                                                   children: [
-                                                    _kfaChip(item['jenis'] ?? '', purple.withOpacity(0.12), purple),
+                                                    _kfaChip(item['jenis'] ?? '', purple.withValues(alpha: 0.12), purple),
                                                     const SizedBox(width: 6),
-                                                    _kfaChip(item['satuan'] ?? '', subtitleColor.withOpacity(0.1), subtitleColor),
+                                                    _kfaChip(item['satuan'] ?? '', subtitleColor.withValues(alpha: 0.1), subtitleColor),
                                                   ],
                                                 ),
                                                 const SizedBox(height: 4),
@@ -9562,7 +9470,7 @@ class _DokterPemeriksaanState extends ConsumerState<DokterPemeriksaan> {
                                           Icon(
                                             Icons.arrow_forward_ios_rounded,
                                             size: 13,
-                                            color: subtitleColor.withOpacity(0.5),
+                                            color: subtitleColor.withValues(alpha: 0.5),
                                           ),
                                         ],
                                       ),
@@ -9912,7 +9820,7 @@ class _WebcamMeasurementDialogState extends State<_WebcamMeasurementDialog> {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: teal.withOpacity(0.15),
+                      color: teal.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(Icons.camera_enhance_rounded, color: teal, size: 22),
@@ -10010,7 +9918,7 @@ class _WebcamMeasurementDialogState extends State<_WebcamMeasurementDialog> {
                               Icon(
                                 Icons.image_search_rounded,
                                 size: 54,
-                                color: Colors.white.withOpacity(0.2),
+                                color: Colors.white.withValues(alpha: 0.2),
                               ),
                               const SizedBox(height: 12),
                               Text(
@@ -10037,7 +9945,7 @@ class _WebcamMeasurementDialogState extends State<_WebcamMeasurementDialog> {
                       // Loading Overlay
                       if (_isLoading)
                         Container(
-                          color: Colors.black.withOpacity(0.75),
+                          color: Colors.black.withValues(alpha: 0.75),
                           child: Center(
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
@@ -10071,9 +9979,9 @@ class _WebcamMeasurementDialogState extends State<_WebcamMeasurementDialog> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF2ECC71).withOpacity(0.12),
+                    color: const Color(0xFF2ECC71).withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF2ECC71).withOpacity(0.4)),
+                    border: Border.all(color: const Color(0xFF2ECC71).withValues(alpha: 0.4)),
                   ),
                   child: Row(
                     children: [
@@ -10105,9 +10013,9 @@ class _WebcamMeasurementDialogState extends State<_WebcamMeasurementDialog> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.12),
+                    color: Colors.red.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.red.withOpacity(0.4)),
+                    border: Border.all(color: Colors.red.withValues(alpha: 0.4)),
                   ),
                   child: Row(
                     children: [
@@ -10126,9 +10034,9 @@ class _WebcamMeasurementDialogState extends State<_WebcamMeasurementDialog> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.12),
+                    color: Colors.orange.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.orange.withOpacity(0.4)),
+                    border: Border.all(color: Colors.orange.withValues(alpha: 0.4)),
                   ),
                   child: Row(
                     children: [

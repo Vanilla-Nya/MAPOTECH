@@ -739,9 +739,9 @@ class _RevGeoWilayahMapWidgetState extends State<RevGeoWilayahMapWidget> {
           if (currentLayer) map.removeLayer(currentLayer);
           currentLayer = L.geoJSON(data.features[0], {
             style: {
-              color: '${colorHex}',
+              color: '$colorHex',
               weight: 3.5,
-              fillColor: '${colorHex}',
+              fillColor: '$colorHex',
               fillOpacity: 0.25
             }
           }).addTo(map);
@@ -752,10 +752,10 @@ class _RevGeoWilayahMapWidgetState extends State<RevGeoWilayahMapWidget> {
       } catch (e) {}
     }
 
-    loadDistrictBoundary("${cleanProv.replaceAll('"', '')}", "${cleanReg.replaceAll('"', '')}", "${cleanDist.replaceAll('"', '')}", "${colorHex}");
+    loadDistrictBoundary("${cleanProv.replaceAll('"', '')}", "${cleanReg.replaceAll('"', '')}", "${cleanDist.replaceAll('"', '')}", "$colorHex");
 
     // Render Patient Pins
-    const rawMarkersData = ${markersJson};
+    const rawMarkersData = $markersJson;
     window.hasMarkerBounds = false;
     if (Array.isArray(rawMarkersData) && rawMarkersData.length > 0) {
       const markerBounds = [];
@@ -768,27 +768,27 @@ class _RevGeoWilayahMapWidgetState extends State<RevGeoWilayahMapWidget> {
 
           const pinIcon = L.divIcon({
             className: 'custom-patient-pin',
-            html: \`
+            html: `
               <div class="custom-pin-container">
                 <div class="custom-pin-pulse" style="background-color: \${color};"></div>
                 <div class="custom-pin-body" style="background-color: \${color};">
                   <div class="custom-pin-dot"></div>
                 </div>
               </div>
-            \`,
+            `,
             iconSize: [32, 32],
             iconAnchor: [16, 32],
             popupAnchor: [0, -32]
           });
 
-          const popupHtml = \`
+          const popupHtml = `
             <div style="font-family: system-ui, -apple-system, sans-serif; padding: 6px 8px; min-width: 190px;">
               <div style="font-size: 13px; font-weight: 800; color: #0f172a; margin-bottom: 2px;">\${m.title || 'Pasien'}</div>
-              \${m.subtitle ? \`<div style="display: inline-block; padding: 2px 8px; border-radius: 12px; background-color: \${color}22; color: \${color}; font-size: 10px; font-weight: 700; margin-bottom: 6px;">\${m.subtitle}</div>\` : ''}
-              \${m.info ? \`<div style="font-size: 11px; color: #475569; line-height: 1.4;">\${m.info}</div>\` : ''}
-              \${m.details ? \`<div style="font-size: 10px; color: #64748b; margin-top: 6px; border-top: 1px dashed #cbd5e1; padding-top: 4px;">\${m.details}</div>\` : ''}
+              \${m.subtitle ? `<div style="display: inline-block; padding: 2px 8px; border-radius: 12px; background-color: \${color}22; color: \${color}; font-size: 10px; font-weight: 700; margin-bottom: 6px;">\${m.subtitle}</div>` : ''}
+              \${m.info ? `<div style="font-size: 11px; color: #475569; line-height: 1.4;">\${m.info}</div>` : ''}
+              \${m.details ? `<div style="font-size: 10px; color: #64748b; margin-top: 6px; border-top: 1px dashed #cbd5e1; padding-top: 4px;">\${m.details}</div>` : ''}
             </div>
-          \`;
+          `;
 
           L.marker([lat, lng], { icon: pinIcon })
             .addTo(map)

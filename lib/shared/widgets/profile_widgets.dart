@@ -246,7 +246,7 @@ class ProfileDropdownField extends StatelessWidget {
           decoration: BoxDecoration(
             color: inputBg,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: borderTint.withOpacity(0.15)),
+            border: Border.all(color: borderTint.withValues(alpha: 0.15)),
           ),
           child: Row(
             children: [

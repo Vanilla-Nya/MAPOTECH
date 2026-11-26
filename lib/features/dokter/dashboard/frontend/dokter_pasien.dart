@@ -9,7 +9,6 @@ import 'package:mapotech/shared/supabase_service.dart';
 import 'dart:ui' show ImageFilter;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'dart:typed_data';
 import 'dart:io' as io;
 
 // ─── Data Models ─────────────────────────────────────────────────────────────
@@ -482,7 +481,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                 ),
                 hintStyle: GoogleFonts.outfit(
                   fontSize: 13,
-                  color: subtitleColor.withOpacity(0.5),
+                  color: subtitleColor.withValues(alpha: 0.5),
                 ),
                 border: InputBorder.none,
                 isDense: true,
@@ -583,7 +582,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
             width: 56,
             height: 56,
             decoration: BoxDecoration(
-              color: subCol.withOpacity(0.08),
+              color: subCol.withValues(alpha: 0.08),
               shape: BoxShape.circle,
             ),
             alignment: Alignment.center,
@@ -649,7 +648,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
 
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.4),
+      barrierColor: Colors.black.withValues(alpha: 0.4),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) {
           return Dialog(
@@ -667,7 +666,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.15),
+                    color: Colors.black.withValues(alpha: 0.15),
                     blurRadius: 40,
                     offset: const Offset(0, 16),
                   ),
@@ -693,7 +692,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                             width: 38,
                             height: 38,
                             decoration: BoxDecoration(
-                              color: purple.withOpacity(0.12),
+                              color: purple.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             alignment: Alignment.center,
@@ -1362,7 +1361,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
         style: GoogleFonts.outfit(
           fontSize: 9.5,
           fontWeight: FontWeight.w900,
-          color: textCol.withOpacity(0.85),
+          color: textCol.withValues(alpha: 0.85),
           letterSpacing: 0.2,
         ),
       ),
@@ -1402,7 +1401,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
         hintText: hint,
         hintStyle: GoogleFonts.outfit(
           fontSize: 11.5,
-          color: subtitle.withOpacity(0.4),
+          color: subtitle.withValues(alpha: 0.4),
         ),
         counterText: '',
         prefixIcon: Icon(icon, size: 16, color: subtitle),
@@ -1424,7 +1423,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: text.withOpacity(0.3), width: 1.5),
+          borderSide: BorderSide(color: text.withValues(alpha: 0.3), width: 1.5),
         ),
         errorStyle: GoogleFonts.outfit(fontSize: 9, height: 0.8),
       ),
@@ -1570,7 +1569,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
   ) {
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.4),
+      barrierColor: Colors.black.withValues(alpha: 0.4),
       builder: (dialogCtx) {
         int activeTab = 0; // 0: OVERVIEW, 1: MEDICAL HISTORY
         bool verified = patient.satusehatId != null;
@@ -1623,7 +1622,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                         ),
                         Container(
                           height: 140,
-                          color: Colors.black.withOpacity(0.15),
+                          color: Colors.black.withValues(alpha: 0.15),
                         ),
                         Positioned(
                           right: 16,
@@ -1634,7 +1633,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                               width: 32,
                               height: 32,
                               decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.4),
+                                color: Colors.black.withValues(alpha: 0.4),
                                 shape: BoxShape.circle,
                               ),
                               child: const Icon(
@@ -1657,7 +1656,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                               border: Border.all(color: cardBg, width: 4),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
+                                  color: Colors.black.withValues(alpha: 0.1),
                                   blurRadius: 10,
                                   offset: const Offset(0, 4),
                                 ),
@@ -1672,7 +1671,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                                           (context, error, stackTrace) =>
                                               Container(
                                                 color: patient.avatarBg
-                                                    .withOpacity(0.15),
+                                                    .withValues(alpha: 0.15),
                                                 alignment: Alignment.center,
                                                 child: Text(
                                                   initials,
@@ -1685,7 +1684,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                                               ),
                                     )
                                   : Container(
-                                      color: patient.avatarBg.withOpacity(0.15),
+                                      color: patient.avatarBg.withValues(alpha: 0.15),
                                       alignment: Alignment.center,
                                       child: Text(
                                         initials,
@@ -1728,7 +1727,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                                   vertical: 4,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: colorTheme.withOpacity(0.12),
+                                  color: colorTheme.withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: Row(
@@ -1763,7 +1762,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                             style: GoogleFonts.outfit(
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
-                              color: subtitle.withOpacity(0.6),
+                              color: subtitle.withValues(alpha: 0.6),
                             ),
                           ),
                         ],
@@ -1795,7 +1794,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                                   fontWeight: FontWeight.w900,
                                   color: activeTab == 0
                                       ? colorTheme
-                                      : subtitle.withOpacity(0.5),
+                                      : subtitle.withValues(alpha: 0.5),
                                   letterSpacing: 0.5,
                                 ),
                               ),
@@ -1823,7 +1822,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                                   fontWeight: FontWeight.w900,
                                   color: activeTab == 1
                                       ? colorTheme
-                                      : subtitle.withOpacity(0.5),
+                                      : subtitle.withValues(alpha: 0.5),
                                   letterSpacing: 0.5,
                                 ),
                               ),
@@ -1972,13 +1971,13 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: verified
-                ? const Color(0xFF27AE60).withOpacity(0.06)
-                : Colors.amber.withOpacity(0.06),
+                ? const Color(0xFF27AE60).withValues(alpha: 0.06)
+                : Colors.amber.withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: verified
-                  ? const Color(0xFF27AE60).withOpacity(0.2)
-                  : Colors.amber.withOpacity(0.2),
+                  ? const Color(0xFF27AE60).withValues(alpha: 0.2)
+                  : Colors.amber.withValues(alpha: 0.2),
             ),
           ),
           child: Row(
@@ -1988,8 +1987,8 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                 height: 36,
                 decoration: BoxDecoration(
                   color: verified
-                      ? const Color(0xFF27AE60).withOpacity(0.12)
-                      : Colors.amber.withOpacity(0.12),
+                      ? const Color(0xFF27AE60).withValues(alpha: 0.12)
+                      : Colors.amber.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
@@ -2029,7 +2028,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                             (verified
                                     ? const Color(0xFF27AE60)
                                     : Colors.amber[900])!
-                                .withOpacity(0.7),
+                                .withValues(alpha: 0.7),
                       ),
                     ),
                   ],
@@ -2049,7 +2048,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                     backgroundColor: Colors.white,
                     foregroundColor: Colors.amber[900],
                     elevation: 0,
-                    side: BorderSide(color: Colors.amber.withOpacity(0.3)),
+                    side: BorderSide(color: Colors.amber.withValues(alpha: 0.3)),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20),
                     ),
@@ -2095,7 +2094,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
           style: GoogleFonts.outfit(
             fontSize: 7.5,
             fontWeight: FontWeight.w900,
-            color: subtitleCol.withOpacity(0.6),
+            color: subtitleCol.withValues(alpha: 0.6),
             letterSpacing: 0.5,
           ),
         ),
@@ -2260,7 +2259,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
 
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.4),
+      barrierColor: Colors.black.withValues(alpha: 0.4),
       builder: (ctx) {
         return Dialog(
           shape: RoundedRectangleBorder(
@@ -2375,7 +2374,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                             width: 38,
                             height: 38,
                             decoration: BoxDecoration(
-                              color: themeAccent.withOpacity(0.12),
+                              color: themeAccent.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             alignment: Alignment.center,
@@ -2435,7 +2434,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                                     width: 32,
                                     height: 32,
                                     decoration: BoxDecoration(
-                                      color: themeAccent.withOpacity(0.12),
+                                      color: themeAccent.withValues(alpha: 0.12),
                                       shape: BoxShape.circle,
                                     ),
                                     child: Icon(Icons.person_rounded, color: themeAccent, size: 16),
@@ -2457,7 +2456,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                                           'Dokter Pemeriksa',
                                           style: GoogleFonts.outfit(
                                             fontSize: 9,
-                                            color: subtitleColor.withOpacity(0.8),
+                                            color: subtitleColor.withValues(alpha: 0.8),
                                           ),
                                         ),
                                       ],
@@ -2547,7 +2546,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                           decoration: BoxDecoration(
-                                            color: Colors.redAccent.withOpacity(0.12),
+                                            color: Colors.redAccent.withValues(alpha: 0.12),
                                             borderRadius: BorderRadius.circular(4),
                                           ),
                                           child: Text(
@@ -2605,9 +2604,9 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
                               Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: Colors.blueAccent.withOpacity(0.06),
+                                  color: Colors.blueAccent.withValues(alpha: 0.06),
                                   borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: Colors.blueAccent.withOpacity(0.15)),
+                                  border: Border.all(color: Colors.blueAccent.withValues(alpha: 0.15)),
                                 ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -2668,7 +2667,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
         style: GoogleFonts.outfit(
           fontSize: 8.5,
           fontWeight: FontWeight.w900,
-          color: textColor.withOpacity(0.5),
+          color: textColor.withValues(alpha: 0.5),
           letterSpacing: 0.5,
         ),
       ),
@@ -2726,7 +2725,7 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: colorTheme.withOpacity(0.12),
+                color: colorTheme.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
@@ -2781,168 +2780,6 @@ class _DokterPasienState extends ConsumerState<DokterPasien> {
             },
           ),
       ],
-    );
-  }
-
-  void _showDeleteConfirmDialog(
-    BuildContext context,
-    PasienModel patient,
-    BuildContext dialogCtx,
-  ) {
-    final state = ref.read(landingPageProvider);
-    final isDark = state.appearance == 'dark';
-    final cardBg = isDark ? const Color(0xFF161619) : Colors.white;
-    final textColor = isDark ? Colors.white : const Color(0xFF1B0C3C);
-    final subtitleColor = isDark ? Colors.grey[400]! : const Color(0xFF6F6A8A);
-
-    showDialog(
-      context: context,
-      barrierColor: Colors.black.withOpacity(0.4),
-      builder: (ctx) => AlertDialog(
-        backgroundColor: cardBg,
-        surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            const Icon(
-              Icons.warning_amber_rounded,
-              color: Colors.redAccent,
-              size: 20,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'Hapus Rekam Medis?',
-              style: GoogleFonts.outfit(
-                fontSize: 14,
-                fontWeight: FontWeight.w900,
-                color: textColor,
-              ),
-            ),
-          ],
-        ),
-        content: Text(
-          'Apakah Anda yakin ingin menghapus seluruh berkas rekam medis dan data pasien ${patient.nama}? Tindakan ini tidak dapat dibatalkan.',
-          style: GoogleFonts.outfit(
-            fontSize: 11,
-            color: subtitleColor,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(
-              'Batal',
-              style: GoogleFonts.outfit(
-                fontSize: 11,
-                color: subtitleColor,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              ref
-                  .read(dokterPasienListProvider.notifier)
-                  .deletePasien(patient.id);
-              Navigator.of(ctx).pop();
-              Navigator.of(dialogCtx).pop();
-              _showSuccessSnackBar(
-                context,
-                'Rekam medis pasien ${patient.nama} berhasil dihapus.',
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.redAccent,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: Text(
-              'Hapus',
-              style: GoogleFonts.outfit(
-                fontSize: 11,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showPemeriksaanDialog(
-    BuildContext context,
-    PasienModel patient,
-    Color cardBg,
-    Color text,
-    Color subtitle,
-    Color border,
-    Color themeColor,
-  ) {
-    showDialog(
-      context: context,
-      barrierColor: Colors.black.withOpacity(0.3),
-      builder: (ctx) => AlertDialog(
-        backgroundColor: cardBg,
-        surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(
-          'Mulai Pemeriksaan Pasien',
-          style: GoogleFonts.outfit(
-            fontSize: 16,
-            fontWeight: FontWeight.w900,
-            color: text,
-          ),
-        ),
-        content: Text(
-          'Apakah Anda ingin memulai pemeriksaan RME (Rekam Medis Elektronik) aktif untuk pasien ${patient.nama} (${patient.id})?',
-          style: GoogleFonts.outfit(
-            fontSize: 12,
-            color: subtitle,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(
-              'Batal',
-              style: GoogleFonts.outfit(
-                fontSize: 11,
-                color: subtitle,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _showSuccessSnackBar(
-                context,
-                'Sesi pemeriksaan RME ${patient.nama} dimulai.',
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: themeColor,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: Text(
-              'Ya, Mulai',
-              style: GoogleFonts.outfit(
-                fontSize: 11,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -3033,7 +2870,7 @@ class _PasienCardState extends State<PasienCard> {
             border: Border.all(color: widget.border, width: 1.5),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.02),
+                color: Colors.black.withValues(alpha: 0.02),
                 blurRadius: 12,
                 offset: const Offset(0, 6),
               ),
@@ -3048,8 +2885,8 @@ class _PasienCardState extends State<PasienCard> {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      widget.patient.avatarBg.withOpacity(0.25),
-                      widget.patient.avatarBg.withOpacity(0.05),
+                      widget.patient.avatarBg.withValues(alpha: 0.25),
+                      widget.patient.avatarBg.withValues(alpha: 0.05),
                     ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
@@ -3070,7 +2907,7 @@ class _PasienCardState extends State<PasienCard> {
                           border: Border.all(color: widget.cardBg, width: 3),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.08),
+                              color: Colors.black.withValues(alpha: 0.08),
                               blurRadius: 8,
                               offset: const Offset(0, 4),
                             ),
@@ -3090,7 +2927,7 @@ class _PasienCardState extends State<PasienCard> {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: widget.accent.withOpacity(0.12),
+                          color: widget.accent.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Row(
@@ -3143,7 +2980,7 @@ class _PasienCardState extends State<PasienCard> {
                       style: GoogleFonts.outfit(
                         fontSize: 9,
                         fontWeight: FontWeight.bold,
-                        color: widget.subtitle.withOpacity(0.6),
+                        color: widget.subtitle.withValues(alpha: 0.6),
                       ),
                     ),
                   ],
@@ -3194,7 +3031,7 @@ class _PasienCardState extends State<PasienCard> {
 
   Widget _buildInitialsAvatar(String initials) {
     return Container(
-      color: widget.patient.avatarBg.withOpacity(0.15),
+      color: widget.patient.avatarBg.withValues(alpha: 0.15),
       alignment: Alignment.center,
       child: Text(
         initials,
@@ -3230,7 +3067,7 @@ class _PasienCardState extends State<PasienCard> {
           style: GoogleFonts.outfit(
             fontSize: 9,
             fontWeight: FontWeight.w900,
-            color: isActive ? widget.accent : widget.subtitle.withOpacity(0.6),
+            color: isActive ? widget.accent : widget.subtitle.withValues(alpha: 0.6),
             letterSpacing: 0.5,
           ),
         ),
@@ -3245,7 +3082,7 @@ class _PasienCardState extends State<PasienCard> {
         children: [
           CustomPaint(
             size: const Size(120, 40),
-            painter: HeartbeatPainter(color: widget.subtitle.withOpacity(0.2)),
+            painter: HeartbeatPainter(color: widget.subtitle.withValues(alpha: 0.2)),
           ),
           const SizedBox(height: 8),
           Text(
@@ -3253,7 +3090,7 @@ class _PasienCardState extends State<PasienCard> {
             style: GoogleFonts.outfit(
               fontSize: 9,
               fontWeight: FontWeight.w900,
-              color: widget.subtitle.withOpacity(0.4),
+              color: widget.subtitle.withValues(alpha: 0.4),
               letterSpacing: 0.5,
             ),
           ),
@@ -3277,7 +3114,7 @@ class _PasienCardState extends State<PasienCard> {
                 width: 5,
                 height: 5,
                 decoration: BoxDecoration(
-                  color: widget.subtitle.withOpacity(0.3),
+                  color: widget.subtitle.withValues(alpha: 0.3),
                   shape: BoxShape.circle,
                 ),
               ),
@@ -3329,7 +3166,7 @@ class _PasienCardState extends State<PasienCard> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 12, color: widget.subtitle.withOpacity(0.6)),
+        Icon(icon, size: 12, color: widget.subtitle.withValues(alpha: 0.6)),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
@@ -3337,7 +3174,7 @@ class _PasienCardState extends State<PasienCard> {
             style: GoogleFonts.outfit(
               fontSize: 10,
               fontWeight: FontWeight.bold,
-              color: widget.text.withOpacity(0.8),
+              color: widget.text.withValues(alpha: 0.8),
             ),
             maxLines: maxLines,
             overflow: TextOverflow.ellipsis,
@@ -3383,7 +3220,7 @@ class _HistoryItemCardState extends State<HistoryItemCard> {
     final hoverShadow = _isHovered
         ? [
             BoxShadow(
-              color: widget.colorTheme.withOpacity(0.15),
+              color: widget.colorTheme.withValues(alpha: 0.15),
               blurRadius: 8,
               offset: const Offset(2, 4),
             )
@@ -3425,7 +3262,7 @@ class _HistoryItemCardState extends State<HistoryItemCard> {
                   width: 32,
                   height: 32,
                   decoration: BoxDecoration(
-                    color: widget.colorTheme.withOpacity(0.1),
+                    color: widget.colorTheme.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
@@ -3452,7 +3289,7 @@ class _HistoryItemCardState extends State<HistoryItemCard> {
                         style: GoogleFonts.outfit(
                           fontSize: 8,
                           fontWeight: FontWeight.bold,
-                          color: widget.subtitle.withOpacity(0.5),
+                          color: widget.subtitle.withValues(alpha: 0.5),
                           letterSpacing: 0.5,
                         ),
                       ),
@@ -3465,7 +3302,7 @@ class _HistoryItemCardState extends State<HistoryItemCard> {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF27AE60).withOpacity(0.12),
+                    color: const Color(0xFF27AE60).withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(

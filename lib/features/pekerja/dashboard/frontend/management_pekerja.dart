@@ -6,7 +6,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/supabase_service.dart';
 import 'package:mapotech/shared/widgets/ui.dart';
-import 'package:mapotech/shared/widgets/location_selector_widget.dart';
 import 'dart:math';
 
 // ─── Worker Data Model ────────────────────────────────────────────────────────
@@ -536,7 +535,7 @@ class _ManagementPekerjaWidgetState
                                 : 'Cari nama, NIK, atau peran...',
                             hintStyle: GoogleFonts.outfit(
                               fontSize: 11,
-                              color: subtitleColor.withOpacity(0.6),
+                              color: subtitleColor.withValues(alpha: 0.6),
                             ),
                             border: InputBorder.none,
                             isDense: true,
@@ -575,10 +574,12 @@ class _ManagementPekerjaWidgetState
                         ),
                       ],
                       onChanged: (val) {
-                        if (val != null) setState(() {
+                        if (val != null) {
+                          setState(() {
                           _roleFilter = val;
                           _visibleCount = _batchSize; // reset lazy window
                         });
+                        }
                       },
                     ),
                   ),
@@ -749,7 +750,7 @@ class _ManagementPekerjaWidgetState
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: worker.avatarBg.withOpacity(0.12),
+                    color: worker.avatarBg.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
                   alignment: Alignment.center,
@@ -781,7 +782,7 @@ class _ManagementPekerjaWidgetState
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF48C9B0).withOpacity(0.1),
+                          color: const Color(0xFF48C9B0).withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
@@ -814,7 +815,7 @@ class _ManagementPekerjaWidgetState
                   return Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: subtitleColor.withOpacity(0.08),
+                      color: subtitleColor.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(color: borderColor),
                     ),
@@ -835,7 +836,7 @@ class _ManagementPekerjaWidgetState
               children: [
                 IconButton(
                   icon: const Icon(Icons.shield_outlined, size: 18),
-                  color: subtitleColor.withOpacity(0.7),
+                  color: subtitleColor.withValues(alpha: 0.7),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                   tooltip: 'Detail & Hak Akses',
@@ -844,7 +845,7 @@ class _ManagementPekerjaWidgetState
                 const SizedBox(width: 12),
                 IconButton(
                   icon: const Icon(Icons.delete_outline_rounded, size: 18),
-                  color: Colors.redAccent.withOpacity(0.8),
+                  color: Colors.redAccent.withValues(alpha: 0.8),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                   tooltip: 'Hapus Pekerja',
@@ -872,7 +873,7 @@ class _ManagementPekerjaWidgetState
         child: Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: cardBg.withOpacity(0.2),
+            color: cardBg.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(20),
           ),
           child: Column(
@@ -886,7 +887,7 @@ class _ManagementPekerjaWidgetState
                   shape: BoxShape.circle,
                   border: Border.all(color: border),
                 ),
-                child: Icon(Icons.add, color: text.withOpacity(0.8), size: 20),
+                child: Icon(Icons.add, color: text.withValues(alpha: 0.8), size: 20),
               ),
               const SizedBox(height: 18),
               Text(
@@ -1053,7 +1054,7 @@ class _ManagementPekerjaWidgetState
                             height: 120,
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
-                                colors: [tealAccent.withOpacity(0.85), tealAccent.withOpacity(0.55)],
+                                colors: [tealAccent.withValues(alpha: 0.85), tealAccent.withValues(alpha: 0.55)],
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                               ),
@@ -1075,7 +1076,7 @@ class _ManagementPekerjaWidgetState
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.25),
+                                color: Colors.white.withValues(alpha: 0.25),
                                 borderRadius: BorderRadius.circular(100),
                               ),
                               child: Row(
@@ -1104,7 +1105,7 @@ class _ManagementPekerjaWidgetState
                                 color: tealAccent,
                                 shape: BoxShape.circle,
                                 border: Border.all(color: Colors.white, width: 4),
-                                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 10, offset: const Offset(0, 4))],
+                                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 10, offset: const Offset(0, 4))],
                               ),
                               alignment: Alignment.center,
                               child: Text(
@@ -1280,7 +1281,7 @@ class _ManagementPekerjaWidgetState
                                     ),
                                     child: Column(
                                       children: [
-                                        Icon(Icons.bar_chart_rounded, size: 48, color: tealAccent.withOpacity(0.5)),
+                                        Icon(Icons.bar_chart_rounded, size: 48, color: tealAccent.withValues(alpha: 0.5)),
                                         const SizedBox(height: 16),
                                         Text(
                                           'Coming Soon',
@@ -1477,7 +1478,7 @@ class _ManagementPekerjaWidgetState
                       : (isDark ? const Color(0xFF252529) : const Color(0xFFF3F4F8)),
                   borderRadius: BorderRadius.circular(100),
                   border: Border.all(
-                    color: isSel ? accentColor : (isDlc ? accentColor.withOpacity(0.4) : borderColor),
+                    color: isSel ? accentColor : (isDlc ? accentColor.withValues(alpha: 0.4) : borderColor),
                     width: isDlc ? 1.5 : 1.0,
                   ),
                 ),
@@ -1503,7 +1504,7 @@ class _ManagementPekerjaWidgetState
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                         decoration: BoxDecoration(
-                          color: isSel ? Colors.white.withOpacity(0.25) : accentColor.withOpacity(0.15),
+                          color: isSel ? Colors.white.withValues(alpha: 0.25) : accentColor.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
@@ -1529,10 +1530,10 @@ class _ManagementPekerjaWidgetState
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: accentColor.withOpacity(0.06),
+              color: accentColor.withValues(alpha: 0.06),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: accentColor.withOpacity(0.3),
+                color: accentColor.withValues(alpha: 0.3),
                 width: 1.2,
               ),
             ),
@@ -1636,7 +1637,7 @@ class _ManagementPekerjaWidgetState
                         style: GoogleFonts.outfit(fontSize: 12, color: txtColor),
                         decoration: InputDecoration(
                           hintText: 'Cari modul (Pasien, KIA, Obat, Bridging)...',
-                          hintStyle: GoogleFonts.outfit(fontSize: 11, color: subColor.withOpacity(0.6)),
+                          hintStyle: GoogleFonts.outfit(fontSize: 11, color: subColor.withValues(alpha: 0.6)),
                           border: InputBorder.none,
                           isDense: true,
                         ),
@@ -1718,7 +1719,7 @@ class _ManagementPekerjaWidgetState
                 color: isDark ? const Color(0xFF252529) : const Color(0xFFF8F9FC),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: isChecked ? accentColor.withOpacity(0.5) : borderColor,
+                  color: isChecked ? accentColor.withValues(alpha: 0.5) : borderColor,
                   width: isChecked ? 1.5 : 1.0,
                 ),
               ),
@@ -1729,7 +1730,7 @@ class _ManagementPekerjaWidgetState
                     height: 34,
                     decoration: BoxDecoration(
                       color: isChecked
-                          ? accentColor.withOpacity(0.15)
+                          ? accentColor.withValues(alpha: 0.15)
                           : (isDark ? const Color(0xFF1E1E22) : const Color(0xFFECEEF2)),
                       borderRadius: BorderRadius.circular(10),
                     ),
@@ -1755,7 +1756,7 @@ class _ManagementPekerjaWidgetState
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
-                                color: accentColor.withOpacity(0.12),
+                                color: accentColor.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(

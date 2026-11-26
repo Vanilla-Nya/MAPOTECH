@@ -65,7 +65,7 @@ class _CustomProgressBarState extends State<CustomProgressBar>
     final primary = widget.primaryColor ?? const Color(0xFF00BFA6);
     final secondary = widget.secondaryColor ?? const Color(0xFFB577F2);
     final track = widget.trackColor ??
-        (isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.06));
+        (isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06));
     final radius = widget.borderRadius ?? BorderRadius.circular(100);
 
     final clampedVal = widget.value.clamp(0.0, 1.0);
@@ -100,9 +100,9 @@ class _CustomProgressBarState extends State<CustomProgressBar>
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                     decoration: BoxDecoration(
-                      color: primary.withOpacity(0.12),
+                      color: primary.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: primary.withOpacity(0.25), width: 1),
+                      border: Border.all(color: primary.withValues(alpha: 0.25), width: 1),
                     ),
                     child: Text(
                       '$percentInt%',
@@ -147,7 +147,7 @@ class _CustomProgressBarState extends State<CustomProgressBar>
                       borderRadius: radius,
                       boxShadow: [
                         BoxShadow(
-                          color: primary.withOpacity(0.35),
+                          color: primary.withValues(alpha: 0.35),
                           blurRadius: 6,
                           offset: const Offset(0, 1),
                         ),
@@ -171,9 +171,9 @@ class _CustomProgressBarState extends State<CustomProgressBar>
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
                                 colors: [
-                                  Colors.white.withOpacity(0.0),
-                                  Colors.white.withOpacity(0.45),
-                                  Colors.white.withOpacity(0.0),
+                                  Colors.white.withValues(alpha: 0.0),
+                                  Colors.white.withValues(alpha: 0.45),
+                                  Colors.white.withValues(alpha: 0.0),
                                 ],
                               ),
                             ),
@@ -377,7 +377,7 @@ class _CustomLazyLoaderState extends ConsumerState<CustomLazyLoader>
               border: Border.all(color: notifier.getBorderColor()),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(state.appearance == 'dark' ? 0.2 : 0.04),
+                  color: Colors.black.withValues(alpha: state.appearance == 'dark' ? 0.2 : 0.04),
                   blurRadius: 12,
                   offset: const Offset(0, 3),
                 ),
@@ -518,7 +518,7 @@ class _CustomPageLoaderState extends ConsumerState<CustomPageLoader> {
                 border: Border.all(color: notifier.getBorderColor()),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(state.appearance == 'dark' ? 0.2 : 0.04),
+                    color: Colors.black.withValues(alpha: state.appearance == 'dark' ? 0.2 : 0.04),
                     blurRadius: 12,
                     offset: const Offset(0, 3),
                   ),

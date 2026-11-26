@@ -103,7 +103,7 @@ class _FloatingSettingsState extends ConsumerState<FloatingSettings>
                     border: Border.all(color: borderColor, width: 1.5),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.12),
+                        color: Colors.black.withValues(alpha: 0.12),
                         blurRadius: 24,
                         offset: const Offset(0, 10),
                       ),
@@ -248,7 +248,7 @@ class _FloatingSettingsState extends ConsumerState<FloatingSettings>
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: mainBtnBg.withOpacity(0.35),
+                        color: mainBtnBg.withValues(alpha: 0.35),
                         blurRadius: 20,
                         offset: const Offset(0, 8),
                       ),
@@ -314,7 +314,7 @@ class _FloatingSettingsState extends ConsumerState<FloatingSettings>
           boxShadow: [
             if (isSelected)
               BoxShadow(
-                color: bg.withOpacity(0.2),
+                color: bg.withValues(alpha: 0.2),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -376,7 +376,7 @@ class _FloatingSettingsState extends ConsumerState<FloatingSettings>
           boxShadow: [
             if (isSelected)
               BoxShadow(
-                color: bg.withOpacity(0.2),
+                color: bg.withValues(alpha: 0.2),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),

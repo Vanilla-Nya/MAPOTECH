@@ -1,8 +1,6 @@
 import 'package:flutter/services.dart';
-import 'dart:convert';
 import 'dart:math';
 import 'dart:ui';
-import 'dart:typed_data';
 import 'dart:io' as io;
 import 'package:mapotech/shared/web_helpers.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -10,7 +8,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
-import 'package:crypto/crypto.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
@@ -18,8 +15,6 @@ import 'package:mapotech/shared/supabase_service.dart';
 import 'package:mapotech/features/pasien/dashboard/frontend/pasien_dokter_search.dart';
 import 'package:mapotech/shared/widgets/skeleton_loading.dart';
 import 'package:mapotech/shared/widgets/location_selector_widget.dart';
-import 'package:mapotech/shared/location_service.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:mapotech/shared/duitku_payment_service.dart';
 import 'package:mapotech/shared/widgets/custom_dialog.dart';
@@ -55,7 +50,6 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
   bool _isPremiumActive = false;
   String _premiumExpiry = '-';
   int _premiumDaysRemaining = 0;
-  DateTime? _premiumExpiryDate;
   bool _isPremiumLifetime = false;
 
   // Tab index: 0 = Profile & Status, 1 = Practice & Service, 2 = API & Integration
@@ -458,7 +452,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
           left: 0,
           right: 0,
           child: Container(
-            color: Colors.white.withOpacity(0.9),
+            color: Colors.white.withValues(alpha: 0.9),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -531,39 +525,43 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
             userRes['province']?.toString().toUpperCase() ?? 'JAWA TIMUR';
         if (prov.contains('JAWA TIMUR')) {
           _selectedProvinsi = 'JAWA TIMUR';
-        } else if (prov.contains('JAWA TENGAH'))
+        } else if (prov.contains('JAWA TENGAH')) {
           _selectedProvinsi = 'JAWA TENGAH';
-        else if (prov.contains('JAWA BARAT'))
+        } else if (prov.contains('JAWA BARAT')) {
           _selectedProvinsi = 'JAWA BARAT';
-        else if (prov.contains('DKI JAKARTA'))
+        } else if (prov.contains('DKI JAKARTA')) {
           _selectedProvinsi = 'DKI JAKARTA';
+        }
 
         final dist =
             userRes['district']?.toString().toUpperCase() ??
             'KABUPATEN BONDOWOSO';
         if (dist.contains('BONDOWOSO')) {
           _selectedKabupaten = 'KABUPATEN BONDOWOSO';
-        } else if (dist.contains('JEMBER'))
+        } else if (dist.contains('JEMBER')) {
           _selectedKabupaten = 'KABUPATEN JEMBER';
-        else if (dist.contains('BANYUWANGI'))
+        } else if (dist.contains('BANYUWANGI')) {
           _selectedKabupaten = 'KABUPATEN BANYUWANGI';
+        }
 
         final subD =
             userRes['sub_district']?.toString().toUpperCase() ?? 'PUJER';
         if (subD.contains('PUJER')) {
           _selectedKecamatan = 'PUJER';
-        } else if (subD.contains('TENGGARANG'))
+        } else if (subD.contains('TENGGARANG')) {
           _selectedKecamatan = 'TENGGARANG';
-        else if (subD.contains('KLOJEN'))
+        } else if (subD.contains('KLOJEN')) {
           _selectedKecamatan = 'KLOJEN';
+        }
 
         final vill = userRes['village']?.toString().toUpperCase() ?? 'KEJAYAN';
         if (vill.contains('KEJAYAN')) {
           _selectedKelurahan = 'KEJAYAN';
-        } else if (vill.contains('PANGGUNGAN'))
+        } else if (vill.contains('PANGGUNGAN')) {
           _selectedKelurahan = 'PANGGUNGAN';
-        else if (vill.contains('SUMBERSARI'))
+        } else if (vill.contains('SUMBERSARI')) {
           _selectedKelurahan = 'SUMBERSARI';
+        }
       }
 
       // 2. Fetch user_detail_doctor using employing doctor's ID
@@ -731,7 +729,6 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
         _isPremiumLifetime = false;
         _premiumExpiry = '-';
         _premiumDaysRemaining = 0;
-        _premiumExpiryDate = null;
 
         final now = DateTime.now();
         final bool isSubActive =
@@ -769,7 +766,6 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
             } else if (expAt != null) {
               try {
                 final expDate = DateTime.parse(expAt.toString());
-                _premiumExpiryDate = expDate;
                 if (expDate.isBefore(now)) {
                   _isPremiumActive = false;
                   _premiumExpiry = 'Expired';
@@ -971,6 +967,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
 
       ref.read(landingPageProvider.notifier).updateUser(updatedUser);
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Profile information saved successfully!'),
@@ -978,6 +975,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
         ),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error saving profile: $e'),
@@ -985,7 +983,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
         ),
       );
     } finally {
-      setState(() => _isSaving = false);
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -1079,6 +1077,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
 
       await _fetchDbData();
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Practice settings saved successfully!'),
@@ -1086,6 +1085,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
         ),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error saving practice settings: $e'),
@@ -1093,7 +1093,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
         ),
       );
     } finally {
-      setState(() => _isSaving = false);
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -1164,6 +1164,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
           .update({'satusehat_id': _satuSehatIdController.text.trim()})
           .eq('id', userId);
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('API Credentials saved successfully!'),
@@ -1171,6 +1172,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
         ),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error saving API settings: $e'),
@@ -1178,247 +1180,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
         ),
       );
     } finally {
-      setState(() => _isSaving = false);
-    }
-  }
-
-  Future<void> _renewSubscription([int amount = 1000]) async {
-    if (_isAssistant) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Hanya Dokter (Pemilik) yang dapat memperpanjang langganan.',
-          ),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
-      return;
-    }
-    final userId = _effectiveUserId;
-
-    setState(() => _isSaving = true);
-
-    try {
-      final client = SupabaseService.client;
-
-      final res = await client
-          .from('user_detail_doctor')
-          .select('subscription_expired_at')
-          .eq('id', userId)
-          .maybeSingle();
-
-      DateTime currentExpiry = DateTime.now();
-      if (res != null && res['subscription_expired_at'] != null) {
-        try {
-          final parsed = DateTime.parse(res['subscription_expired_at']);
-          if (parsed.isAfter(DateTime.now())) {
-            currentExpiry = parsed;
-          }
-        } catch (_) {}
-      }
-
-      final newExpiry = currentExpiry.add(const Duration(days: 30));
-      final newExpiryStr = newExpiry.toIso8601String();
-
-      await client
-          .from('user_detail_doctor')
-          .update({
-            'subscription_status': 'active',
-            'subscription_expired_at': newExpiryStr,
-          })
-          .eq('id', userId);
-
-      // Automatically record subscription renewal as expense in doctor's financial_transactions
-      try {
-        final txData = {
-          'id_user': userId,
-          'transaction_type': 'expense',
-          'source_type': 'manual',
-          'amount': amount.toDouble(),
-          'description': 'Perpanjangan Langganan Praktik Mandiri 30 Hari',
-          'category': 'Operasional',
-          'status': 'active',
-        };
-        await client
-            .schema('private_doctor')
-            .from('financial_transactions')
-            .insert(txData);
-      } catch (dbErr) {
-        debugPrint('Failed to auto-record subscription expense: $dbErr');
-      }
-
-      await _fetchDbData();
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Subscription successfully renewed for 30 Days! New expiry: $_subExpiry',
-          ),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error renewing subscription: $e'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
-    } finally {
-      setState(() => _isSaving = false);
-    }
-  }
-
-  Future<void> _renewPackageProfile(String packageType, int amount) async {
-    Navigator.of(context).pop(); // Close bottom sheet first
-
-    if (_isAssistant) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Hanya Dokter (Pemilik) yang dapat melakukan pembelian.',
-          ),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
-      return;
-    }
-    final userId = _effectiveUserId;
-
-    setState(() => _isSaving = true);
-
-    try {
-      final client = SupabaseService.client;
-
-      // 1. Fetch current database record
-      final res = await client
-          .from('user_detail_doctor')
-          .select(
-            'subscription_expired_at, subscription_status, header_bg_settings',
-          )
-          .eq('id', userId)
-          .maybeSingle();
-
-      DateTime currentSubExpiry = DateTime.now();
-      if (res != null && res['subscription_expired_at'] != null) {
-        try {
-          final parsed = DateTime.parse(
-            res['subscription_expired_at'].toString(),
-          );
-          if (parsed.isAfter(DateTime.now())) {
-            currentSubExpiry = parsed;
-          }
-        } catch (_) {}
-      }
-
-      final bgSettings = res?['header_bg_settings'];
-      final Map<String, dynamic> settings = bgSettings is Map
-          ? Map<String, dynamic>.from(bgSettings)
-          : <String, dynamic>{};
-
-      DateTime currentPremExpiry = DateTime.now();
-      if (settings['is_premium'] == true &&
-          settings['premium_expired_at'] != 'lifetime' &&
-          settings['premium_expired_at'] != null) {
-        try {
-          final parsed = DateTime.parse(
-            settings['premium_expired_at'].toString(),
-          );
-          if (parsed.isAfter(DateTime.now())) {
-            currentPremExpiry = parsed;
-          }
-        } catch (_) {}
-      }
-
-      String newSubExpiryStr =
-          res?['subscription_expired_at']?.toString() ?? '';
-      String newSubStatus =
-          res?['subscription_status']?.toString() ?? 'inactive';
-
-      // 2. Determine changes based on packageType
-      if (packageType == 'subscription_30') {
-        final newExpiry = currentSubExpiry.add(const Duration(days: 30));
-        newSubExpiryStr = newExpiry.toIso8601String();
-        newSubStatus = 'active';
-      } else if (packageType == 'premium_30') {
-        settings['is_premium'] = true;
-        if (settings['premium_expired_at'] == 'lifetime') {
-          // If already lifetime, keep it lifetime
-        } else {
-          final newExpiry = currentPremExpiry.add(const Duration(days: 30));
-          settings['premium_expired_at'] = newExpiry.toIso8601String();
-        }
-      } else if (packageType == 'premium_sync') {
-        settings['is_premium'] = true;
-        settings['premium_expired_at'] =
-            newSubExpiryStr; // Sync with subscription expiry date string!
-      } else if (packageType == 'premium_lifetime') {
-        settings['is_premium'] = true;
-        settings['premium_expired_at'] = 'lifetime';
-      } else if (packageType == 'bundle_30') {
-        // Subs 30
-        final newSubExpiry = currentSubExpiry.add(const Duration(days: 30));
-        newSubExpiryStr = newSubExpiry.toIso8601String();
-        newSubStatus = 'active';
-        // Premium 30
-        settings['is_premium'] = true;
-        if (settings['premium_expired_at'] == 'lifetime') {
-          // Keep lifetime
-        } else {
-          final newPremExpiry = currentPremExpiry.add(const Duration(days: 30));
-          settings['premium_expired_at'] = newPremExpiry.toIso8601String();
-        }
-      }
-
-      // 3. Perform database update
-      await client
-          .from('user_detail_doctor')
-          .update({
-            'subscription_status': newSubStatus,
-            'subscription_expired_at': newSubExpiryStr,
-            'header_bg_settings': settings,
-          })
-          .eq('id', userId);
-
-      // 4. Record expense
-      String packageDesc = 'Pembelian Paket Layanan';
-      if (packageType == 'subscription_30')
-        packageDesc = 'Perpanjangan Langganan Praktik Mandiri 30 Hari';
-      if (packageType == 'premium_30')
-        packageDesc = 'Pembelian Kustomisasi Profil Premium 30 Hari';
-      if (packageType == 'premium_sync')
-        packageDesc = 'Pembelian Premium Customizer (Sinkronisasi Durasi)';
-      if (packageType == 'premium_lifetime')
-        packageDesc = 'Pembelian Kustomisasi Profil Premium Lifetime';
-      if (packageType == 'bundle_30')
-        packageDesc = 'Pembelian Paket Mega Bundle 30 Hari';
-
-      try {
-        final txData = {
-          'id_user': userId,
-          'transaction_type': 'expense',
-          'source_type': 'manual',
-          'amount': amount.toDouble(),
-          'description': packageDesc,
-          'category': 'Operasional',
-          'status': 'active',
-        };
-        await client
-            .schema('private_doctor')
-            .from('financial_transactions')
-            .insert(txData);
-      } catch (dbErr) {
-        debugPrint('Failed to auto-record package expense: $dbErr');
-      }
-
-      await _fetchDbData();
-      _showPurchaseSuccessDialogProfile(packageType);
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.redAccent),
-      );
-    } finally {
-      setState(() => _isSaving = false);
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -1444,7 +1206,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
               border: Border.all(color: border, width: 1.5),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(isDarkTheme ? 0.5 : 0.08),
+                  color: Colors.black.withValues(alpha: isDarkTheme ? 0.5 : 0.08),
                   blurRadius: 24,
                   offset: const Offset(0, 8),
                 ),
@@ -1475,7 +1237,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                       hoverColor: Colors.transparent,
                       splashColor: Colors.transparent,
                       highlightColor: Colors.transparent,
-                      icon: Icon(Icons.close_rounded, color: text.withOpacity(0.7), size: 24),
+                      icon: Icon(Icons.close_rounded, color: text.withValues(alpha: 0.7), size: 24),
                       onPressed: () => Navigator.of(ctx).pop(),
                     ),
                   ],
@@ -1694,7 +1456,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
         boxShadow: isPopular
             ? [
                 BoxShadow(
-                  color: accentColor.withOpacity(0.15),
+                  color: accentColor.withValues(alpha: 0.15),
                   blurRadius: 16,
                   spreadRadius: 2,
                   offset: const Offset(0, 4),
@@ -1820,7 +1582,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                             feat,
                             style: GoogleFonts.outfit(
                               fontSize: 11.5,
-                              color: textColor.withOpacity(0.85),
+                              color: textColor.withValues(alpha: 0.85),
                               height: 1.3,
                             ),
                           ),
@@ -1847,11 +1609,13 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
         final subText = isDarkTheme ? Colors.white60 : Colors.black54;
 
         String packageName = '';
-        if (packageType == 'subscription')
+        if (packageType == 'subscription') {
           packageName = 'Standard Subscription';
+        }
         if (packageType == 'premium') packageName = 'Premium Customizer';
-        if (packageType == 'bundle')
+        if (packageType == 'bundle') {
           packageName = 'Mega Bundle (Subs + Premium)';
+        }
 
         return Dialog(
           backgroundColor: bg,
@@ -2168,8 +1932,8 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                                           .entry(1, 3);
                                       transformController!.value =
                                           Matrix4.identity()
-                                            ..translate(tx, ty)
-                                            ..scale(val);
+                                            ..translateByDouble(tx, ty, 0.0, 1.0)
+                                            ..scaleByDouble(val, val, val, 1.0);
                                     });
                                   },
                                 ),
@@ -2403,7 +2167,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                                       shape: BoxShape.circle,
                                       color: inputBg,
                                       border: Border.all(
-                                        color: tealColor.withOpacity(0.5),
+                                        color: tealColor.withValues(alpha: 0.5),
                                         width: 2,
                                       ),
                                     ),
@@ -2502,9 +2266,11 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
 
                                                     final initialMatrix =
                                                         Matrix4.identity()
-                                                          ..translate(
+                                                          ..translateByDouble(
                                                             initialTranslationX,
                                                             initialTranslationY,
+                                                            0.0,
+                                                            1.0,
                                                           );
 
                                                     transformController =
@@ -2651,7 +2417,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                                         shape: BoxShape.circle,
                                         color: inputBg,
                                         border: Border.all(
-                                          color: tealColor.withOpacity(0.5),
+                                          color: tealColor.withValues(alpha: 0.5),
                                           width: 2,
                                         ),
                                       ),
@@ -2859,23 +2625,6 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
     return pending != null;
   }
 
-  /// Save pending payment info to localStorage (including raw QRIS string)
-  void _savePendingPayment({
-    required String orderId,
-    required String paymentUrl,
-    required String qrString,
-    required int amount,
-    required String userId,
-    required String packageType,
-  }) {
-    WebStorageHelper.setItem(_kPendingOrderId, orderId);
-    WebStorageHelper.setItem(_kPendingPaymentUrl, paymentUrl);
-    WebStorageHelper.setItem(_kPendingQrString, qrString);
-    WebStorageHelper.setItem(_kPendingAmount, amount.toString());
-    WebStorageHelper.setItem(_kPendingUserId, userId);
-    WebStorageHelper.setItem(_kPendingPackageType, packageType);
-  }
-
   /// Load pending payment from localStorage (returns null if none for this user)
   Map<String, String>? _loadPendingPayment(String userId) {
     final orderId = WebStorageHelper.getItem(_kPendingOrderId);
@@ -2894,16 +2643,6 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
       'amount': amount,
       'packageType': packageType,
     };
-  }
-
-  /// Clear pending payment from localStorage
-  void _clearPendingPayment() {
-    WebStorageHelper.removeItem(_kPendingOrderId);
-    WebStorageHelper.removeItem(_kPendingPaymentUrl);
-    WebStorageHelper.removeItem(_kPendingQrString);
-    WebStorageHelper.removeItem(_kPendingAmount);
-    WebStorageHelper.removeItem(_kPendingUserId);
-    WebStorageHelper.removeItem(_kPendingPackageType);
   }
 
   /// Apply the correct package benefits after a successful Duitku QRIS payment.
@@ -3194,635 +2933,6 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
     }
   }
 
-  /// Check Duitku transaction status via Supabase Edge Function (avoids CORS, auto JWT)
-  Future<bool> _checkDuitkuPaymentStatus(String orderId, int amount) async {
-    final merchantCode = dotenv.env['DUITKU_MERCHANT_CODE'] ?? '';
-    final merchantKey = dotenv.env['DUITKU_MERCHANT_KEY'] ?? '';
-
-    final fnResponse = await SupabaseService.client.functions.invoke(
-      'check-duitku-status',
-      body: {
-        'merchantOrderId': orderId,
-        'merchantCode': merchantCode,
-        'merchantKey': merchantKey,
-      },
-    );
-
-    final data = fnResponse.data as Map<String, dynamic>? ?? {};
-    debugPrint(
-      'check-duitku-status response: $data  status=${fnResponse.status}',
-    );
-    // statusCode '00' means success / paid
-    return data['statusCode']?.toString() == '00';
-  }
-
-  void _showQrisPaymentDialog({
-    required String orderId,
-    required String paymentUrl,
-    required String qrString,
-    required int amount,
-    required String userId,
-    required bool isResume,
-    String packageType = 'subscription_30',
-  }) {
-    final formattedAmount =
-        'Rp ${amount.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}';
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        bool isCheckingPayment = false;
-        bool checkButtonUsed = false;
-
-        return StatefulBuilder(
-          builder: (sbContext, setStateDialog) {
-            Future<void> onCheckPayment() async {
-              if (checkButtonUsed) return;
-              setStateDialog(() {
-                isCheckingPayment = true;
-                checkButtonUsed = true;
-              });
-              try {
-                final isPaid = await _checkDuitkuPaymentStatus(orderId, amount);
-                if (!mounted) return;
-                if (isPaid) {
-                  _clearPendingPayment();
-                  if (dialogContext.mounted) Navigator.of(dialogContext).pop();
-                  if (mounted) setState(() {}); // hide "Continue" button
-                  await _applyDuitkuPackage(packageType, amount);
-                  if (mounted) {
-                    final successMsg = packageType == 'bundle_30'
-                        ? 'Pembayaran berhasil! Mega Bundle aktif: Langganan + Premium diperpanjang 30 hari.'
-                        : 'Pembayaran QRIS berhasil! Langganan diperpanjang 30 hari.';
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(successMsg),
-                        backgroundColor: Colors.green,
-                        duration: const Duration(seconds: 5),
-                      ),
-                    );
-                  }
-                } else {
-                  // Payment not confirmed — re-enable button so user can try again after scanning
-                  setStateDialog(() {
-                    isCheckingPayment = false;
-                    checkButtonUsed = false;
-                  });
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Pembayaran belum diterima. Silakan selesaikan scan QRIS lalu cek kembali.',
-                        ),
-                        backgroundColor: Colors.orangeAccent,
-                        duration: Duration(seconds: 4),
-                      ),
-                    );
-                  }
-                }
-              } catch (e) {
-                debugPrint('Payment status check error: $e');
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Gagal cek status: $e'),
-                      backgroundColor: Colors.redAccent,
-                    ),
-                  );
-                }
-                setStateDialog(() {
-                  isCheckingPayment = false;
-                });
-              }
-            }
-
-            Future<void> onCloseDialog() async {
-              final shouldClose = await showDialog<bool>(
-                context: sbContext,
-                builder: (warnCtx) => AlertDialog(
-                  backgroundColor: const Color(0xFF1E1E22),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  title: Row(
-                    children: [
-                      const Icon(
-                        Icons.warning_amber_rounded,
-                        color: Colors.amber,
-                        size: 22,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Tutup Pembayaran?',
-                        style: GoogleFonts.outfit(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                        ),
-                      ),
-                    ],
-                  ),
-                  content: Text(
-                    'Pembayaran QRIS belum selesai.\n\nQR code tersimpan — tekan "Renew" kembali untuk melanjutkan.',
-                    style: GoogleFonts.outfit(
-                      color: Colors.grey[300],
-                      fontSize: 13,
-                      height: 1.5,
-                    ),
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.of(warnCtx).pop(false),
-                      child: Text(
-                        'Lanjutkan Bayar',
-                        style: GoogleFonts.outfit(
-                          color: const Color(0xFF00A67E),
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.of(warnCtx).pop(true),
-                      child: Text(
-                        'Tutup',
-                        style: GoogleFonts.outfit(color: Colors.grey),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-              if (shouldClose == true && dialogContext.mounted)
-                Navigator.of(dialogContext).pop();
-            }
-
-            Future<void> onResetPayment() async {
-              final confirmReset = await showDialog<bool>(
-                context: sbContext,
-                builder: (confirmCtx) => AlertDialog(
-                  backgroundColor: const Color(0xFF1E1E22),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  title: Row(
-                    children: [
-                      const Icon(
-                        Icons.delete_outline_rounded,
-                        color: Colors.redAccent,
-                        size: 22,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Reset Pembayaran?',
-                        style: GoogleFonts.outfit(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                        ),
-                      ),
-                    ],
-                  ),
-                  content: Text(
-                    'Apakah Anda yakin ingin membatalkan tagihan QRIS yang sekarang dan membuat tagihan baru?',
-                    style: GoogleFonts.outfit(
-                      color: Colors.grey[300],
-                      fontSize: 13,
-                      height: 1.5,
-                    ),
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.of(confirmCtx).pop(false),
-                      child: Text(
-                        'Batal',
-                        style: GoogleFonts.outfit(color: Colors.grey),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.of(confirmCtx).pop(true),
-                      child: Text(
-                        'Ya, Reset',
-                        style: GoogleFonts.outfit(
-                          color: Colors.redAccent,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-
-              if (confirmReset == true) {
-                _clearPendingPayment();
-                if (dialogContext.mounted) Navigator.of(dialogContext).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Pembayaran berhasil direset. Silakan tekan tombol "Renew" kembali.',
-                    ),
-                    backgroundColor: Colors.green,
-                  ),
-                );
-              }
-            }
-
-            final bool hasQr = qrString.isNotEmpty;
-
-            return Dialog(
-              backgroundColor: const Color(0xFF1E1E22),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 380),
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: const Color(
-                                0xFF00A67E,
-                              ).withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(
-                              Icons.qr_code_2_rounded,
-                              color: Color(0xFF00A67E),
-                              size: 22,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  isResume
-                                      ? 'Lanjutkan Pembayaran QRIS'
-                                      : 'Scan & Bayar via QRIS',
-                                  style: GoogleFonts.outfit(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                Text(
-                                  'Berlaku 60 menit · $formattedAmount',
-                                  style: GoogleFonts.outfit(
-                                    color: Colors.grey[400],
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      if (isResume)
-                        Container(
-                          margin: const EdgeInsets.only(bottom: 10),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.amber.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: Colors.amber.withValues(alpha: 0.4),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.history_rounded,
-                                color: Colors.amber,
-                                size: 16,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'QR sebelumnya masih bisa digunakan.',
-                                  style: GoogleFonts.outfit(
-                                    color: Colors.amber,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      if (hasQr)
-                        Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(
-                                  0xFF00A67E,
-                                ).withValues(alpha: 0.25),
-                                blurRadius: 24,
-                                spreadRadius: 2,
-                              ),
-                            ],
-                          ),
-                          child: QrImageView(
-                            data: qrString,
-                            version: QrVersions.auto,
-                            size: 220,
-                            backgroundColor: Colors.white,
-                            errorCorrectionLevel: QrErrorCorrectLevel.M,
-                          ),
-                        ),
-                      // Always show the payment URL button when available (useful when QR is missing)
-                      if (paymentUrl.isNotEmpty) ...[
-                        const SizedBox(height: 10),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: () async {
-                              final uri = Uri.parse(paymentUrl);
-                              if (await canLaunchUrl(uri))
-                                await launchUrl(
-                                  uri,
-                                  mode: LaunchMode.externalApplication,
-                                );
-                            },
-                            icon: const Icon(
-                              Icons.open_in_new_rounded,
-                              size: 16,
-                            ),
-                            label: Text(
-                              hasQr
-                                  ? 'Buka Halaman Pembayaran'
-                                  : 'Bayar Sekarang → Buka Halaman Pembayaran',
-                              style: GoogleFonts.outfit(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: hasQr
-                                  ? const Color(0xFF2A2A2E)
-                                  : const Color(0xFF00A67E),
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              padding: EdgeInsets.symmetric(
-                                vertical: hasQr ? 10 : 14,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                side: hasQr
-                                    ? BorderSide(
-                                        color: const Color(
-                                          0xFF00A67E,
-                                        ).withValues(alpha: 0.4),
-                                      )
-                                    : BorderSide.none,
-                              ),
-                            ),
-                          ),
-                        ),
-                        if (!hasQr) ...[
-                          const SizedBox(height: 6),
-                          Text(
-                            'Anda akan diarahkan ke halaman pembayaran ShopeePay/QRIS.',
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.outfit(
-                              color: Colors.grey[500],
-                              fontSize: 10,
-                              height: 1.4,
-                            ),
-                          ),
-                        ],
-                      ] else if (!hasQr) ...[
-                        // No QR and no paymentUrl — show placeholder
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF2A2A2E),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Colors.grey.withValues(alpha: 0.3),
-                            ),
-                          ),
-                          child: Column(
-                            children: [
-                              const Icon(
-                                Icons.error_outline_rounded,
-                                color: Colors.redAccent,
-                                size: 36,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Tautan pembayaran tidak tersedia.\nSilakan tutup dan coba lagi.',
-                                textAlign: TextAlign.center,
-                                style: GoogleFonts.outfit(
-                                  color: Colors.grey[400],
-                                  fontSize: 12,
-                                  height: 1.5,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2A2A2E),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: const Color(
-                              0xFF00A67E,
-                            ).withValues(alpha: 0.25),
-                          ),
-                        ),
-                        child: Column(
-                          children: [
-                            _buildQrisInfoRow(
-                              Icons.receipt_long,
-                              'Order ID',
-                              orderId,
-                            ),
-                            const Divider(color: Color(0xFF3A3A3E), height: 14),
-                            _buildQrisInfoRow(
-                              Icons.payments_rounded,
-                              'Total',
-                              formattedAmount,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.info_outline,
-                            size: 13,
-                            color: Colors.amber,
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              hasQr
-                                  ? 'Scan QR di atas, lalu tekan "Cek Pembayaran".'
-                                  : 'Buka halaman pembayaran, lalu scan & bayar.',
-                              style: GoogleFonts.outfit(
-                                color: Colors.amber,
-                                fontSize: 11,
-                                height: 1.4,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: onCloseDialog,
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.grey,
-                                side: const BorderSide(
-                                  color: Color(0xFF3A3A3E),
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                              ),
-                              child: Text(
-                                'Tutup',
-                                style: GoogleFonts.outfit(
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            flex: 2,
-                            child: ElevatedButton.icon(
-                              onPressed: (checkButtonUsed || isCheckingPayment)
-                                  ? null
-                                  : onCheckPayment,
-                              icon: isCheckingPayment
-                                  ? const SizedBox(
-                                      width: 14,
-                                      height: 14,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : const Icon(
-                                      Icons.verified_rounded,
-                                      size: 16,
-                                    ),
-                              label: Text(
-                                isCheckingPayment
-                                    ? 'Memeriksa...'
-                                    : checkButtonUsed
-                                    ? 'Sudah Dicek'
-                                    : 'Cek Pembayaran',
-                                style: GoogleFonts.outfit(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                ),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: checkButtonUsed
-                                    ? Colors.grey[700]
-                                    : const Color(0xFF00A67E),
-                                foregroundColor: Colors.white,
-                                disabledBackgroundColor: Colors.grey[800],
-                                disabledForegroundColor: Colors.grey[500],
-                                elevation: 0,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      TextButton.icon(
-                        onPressed: onResetPayment,
-                        icon: const Icon(
-                          Icons.refresh_rounded,
-                          size: 14,
-                          color: Colors.redAccent,
-                        ),
-                        label: Text(
-                          'Batalkan & Buat Pembayaran Baru',
-                          style: GoogleFonts.outfit(
-                            color: Colors.redAccent,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        style: TextButton.styleFrom(
-                          minimumSize: Size.zero,
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 6,
-                            horizontal: 12,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildQrisInfoRow(IconData icon, String label, String value) {
-    return Row(
-      children: [
-        Icon(icon, size: 14, color: Colors.grey[500]),
-        const SizedBox(width: 8),
-        Text(
-          label,
-          style: GoogleFonts.outfit(color: Colors.grey[500], fontSize: 12),
-        ),
-        const Spacer(),
-        Text(
-          value,
-          style: GoogleFonts.outfit(
-            color: Colors.white,
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ],
-    );
-  }
-
   @override
   void initState() {
     super.initState();
@@ -3995,7 +3105,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
       if (!mounted) return;
       showDialog(
         context: context,
-        barrierColor: Colors.black.withOpacity(0.45),
+        barrierColor: Colors.black.withValues(alpha: 0.45),
         builder: (ctx) => DoctorDetailDialog(
           dokter: dokterMap,
           isDark: ref.read(landingPageProvider).appearance == 'dark',
@@ -4046,7 +3156,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
       if (mounted) {
         showDialog(
           context: context,
-          barrierColor: Colors.black.withOpacity(0.45),
+          barrierColor: Colors.black.withValues(alpha: 0.45),
           builder: (ctx) => DoctorDetailDialog(
             dokter: fallbackMap,
             isDark: ref.read(landingPageProvider).appearance == 'dark',
@@ -4165,7 +3275,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
         border: Border.all(color: borderColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
             blurRadius: 15,
             offset: const Offset(0, 4),
           ),
@@ -4229,8 +3339,8 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                       ),
                       child: Container(
                         color: isDark
-                            ? Colors.black.withOpacity(0.4)
-                            : tealColor.withOpacity(0.15),
+                            ? Colors.black.withValues(alpha: 0.4)
+                            : tealColor.withValues(alpha: 0.15),
                       ),
                     ),
                   ),
@@ -4255,7 +3365,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                               border: Border.all(color: cardBg, width: 4),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
+                                  color: Colors.black.withValues(alpha: 0.1),
                                   blurRadius: 8,
                                   offset: const Offset(0, 4),
                                 ),
@@ -4719,7 +3829,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                                 'Tell us about your profile, expertise, and experience...',
                             hintStyle: GoogleFonts.outfit(
                               fontSize: 12,
-                              color: subtitleColor.withOpacity(0.6),
+                              color: subtitleColor.withValues(alpha: 0.6),
                             ),
                             border: InputBorder.none,
                             isDense: true,
@@ -4800,7 +3910,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                                 'Nama jalan, RT/RW, Kelurahan, Kecamatan...',
                             hintStyle: GoogleFonts.outfit(
                               fontSize: 12,
-                              color: subtitleColor.withOpacity(0.6),
+                              color: subtitleColor.withValues(alpha: 0.6),
                             ),
                             border: InputBorder.none,
                             isDense: true,
@@ -4850,7 +3960,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                               'Used for identity verification',
                               style: GoogleFonts.outfit(
                                 fontSize: 10,
-                                color: subtitleColor.withOpacity(0.8),
+                                color: subtitleColor.withValues(alpha: 0.8),
                               ),
                             ),
                           ],
@@ -4995,7 +4105,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                                 size: 16,
                                 color: controller.text.isNotEmpty
                                     ? tealColor
-                                    : subtitleColor.withOpacity(0.5),
+                                    : subtitleColor.withValues(alpha: 0.5),
                               ),
                               const SizedBox(width: 8),
                               Expanded(
@@ -5061,7 +4171,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                                 child: Icon(
                                   Icons.close_rounded,
                                   size: 16,
-                                  color: Colors.redAccent.withOpacity(0.8),
+                                  color: Colors.redAccent.withValues(alpha: 0.8),
                                 ),
                               ),
                             ],
@@ -5121,7 +4231,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                                           child: Container(
                                             padding: const EdgeInsets.all(4),
                                             decoration: BoxDecoration(
-                                              color: tealColor.withOpacity(
+                                              color: tealColor.withValues(alpha:
                                                 0.12,
                                               ),
                                               borderRadius:
@@ -5163,7 +4273,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                                                 'https://example.com/sertifikat.pdf',
                                             hintStyle: GoogleFonts.outfit(
                                               fontSize: 12,
-                                              color: subtitleColor.withOpacity(
+                                              color: subtitleColor.withValues(alpha:
                                                 0.4,
                                               ),
                                             ),
@@ -5192,7 +4302,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                                             child: Container(
                                               padding: const EdgeInsets.all(4),
                                               decoration: BoxDecoration(
-                                                color: tealColor.withOpacity(
+                                                color: tealColor.withValues(alpha:
                                                   0.12,
                                                 ),
                                                 borderRadius:
@@ -5231,7 +4341,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                                       : Colors.white,
                                   borderRadius: BorderRadius.circular(8),
                                   border: Border.all(
-                                    color: tealColor.withOpacity(0.4),
+                                    color: tealColor.withValues(alpha: 0.4),
                                     style: BorderStyle.solid,
                                   ),
                                 ),
@@ -5268,7 +4378,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                                               : FontWeight.normal,
                                           color: controller.text.isNotEmpty
                                               ? textColor
-                                              : subtitleColor.withOpacity(0.5),
+                                              : subtitleColor.withValues(alpha: 0.5),
                                         ),
                                         overflow: TextOverflow.ellipsis,
                                       ),
@@ -5292,7 +4402,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                                         child: Container(
                                           padding: const EdgeInsets.all(4),
                                           decoration: BoxDecoration(
-                                            color: tealColor.withOpacity(0.12),
+                                            color: tealColor.withValues(alpha: 0.12),
                                             borderRadius: BorderRadius.circular(
                                               6,
                                             ),
@@ -5343,7 +4453,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                         height: 44,
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: tealColor.withOpacity(0.5)),
+                          border: Border.all(color: tealColor.withValues(alpha: 0.5)),
                         ),
                         alignment: Alignment.center,
                         child: Row(
@@ -5416,13 +4526,13 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: isActive
-                      ? tealColor.withOpacity(0.35)
-                      : Colors.orangeAccent.withOpacity(0.35),
+                      ? tealColor.withValues(alpha: 0.35)
+                      : Colors.orangeAccent.withValues(alpha: 0.35),
                   width: 1.5,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: statusColor.withOpacity(0.08),
+                    color: statusColor.withValues(alpha: 0.08),
                     blurRadius: 20,
                     offset: const Offset(0, 6),
                   ),
@@ -5438,7 +4548,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                         width: 36,
                         height: 36,
                         decoration: BoxDecoration(
-                          color: statusColor.withOpacity(0.12),
+                          color: statusColor.withValues(alpha: 0.12),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
@@ -5481,10 +4591,10 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: statusColor.withOpacity(0.12),
+                          color: statusColor.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(100),
                           border: Border.all(
-                            color: statusColor.withOpacity(0.4),
+                            color: statusColor.withValues(alpha: 0.4),
                           ),
                         ),
                         child: Text(
@@ -5569,7 +4679,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                           borderRadius: BorderRadius.circular(100),
                           child: LinearProgressIndicator(
                             value: progress,
-                            backgroundColor: statusColor.withOpacity(0.12),
+                            backgroundColor: statusColor.withValues(alpha: 0.12),
                             valueColor: AlwaysStoppedAnimation<Color>(
                               statusColor,
                             ),
@@ -5587,10 +4697,10 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                         vertical: 20,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.orangeAccent.withOpacity(0.07),
+                        color: Colors.orangeAccent.withValues(alpha: 0.07),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: Colors.orangeAccent.withOpacity(0.25),
+                          color: Colors.orangeAccent.withValues(alpha: 0.25),
                         ),
                       ),
                       child: Row(
@@ -5634,7 +4744,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                             vertical: 8,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(
+                            color: Colors.black.withValues(alpha:
                               isDark ? 0.2 : 0.02,
                             ),
                             borderRadius: const BorderRadius.only(
@@ -5678,7 +4788,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                             horizontal: 16,
                             vertical: 8,
                           ),
-                          color: Colors.black.withOpacity(isDark ? 0.2 : 0.02),
+                          color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
                           child: Text(
                             'KUSTOMISASI DESAIN PROFILE (PREMIUM)',
                             style: GoogleFonts.outfit(
@@ -5807,9 +4917,9 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 14),
       decoration: BoxDecoration(
-        color: accentColor.withOpacity(0.08),
+        color: accentColor.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: accentColor.withOpacity(0.2)),
+        border: Border.all(color: accentColor.withValues(alpha: 0.2)),
       ),
       child: Column(
         children: [
@@ -5827,7 +4937,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
             style: GoogleFonts.outfit(
               fontSize: 9,
               fontWeight: FontWeight.w700,
-              color: accentColor.withOpacity(0.7),
+              color: accentColor.withValues(alpha: 0.7),
               letterSpacing: 0.5,
             ),
           ),
@@ -6042,7 +5152,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                             : const Color(0xFFF5F0FF)),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: (isRev ? tealColor : purpleColor).withOpacity(0.3),
+                    color: (isRev ? tealColor : purpleColor).withValues(alpha: 0.3),
                   ),
                 ),
                 child: Row(
@@ -6111,6 +5221,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                               );
                             }
                           } catch (e) {
+                            if (!mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text('Invalid link format: $e'),
@@ -6203,6 +5314,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                                     mode: LaunchMode.externalApplication,
                                   );
                                 } else {
+                                  if (!mounted) return;
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
                                       content: Text(
@@ -6216,6 +5328,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                                   );
                                 }
                               } catch (e) {
+                                if (!mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text('Invalid link format: $e'),
@@ -6346,7 +5459,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                     border: Border.all(color: borderColor),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
+                        color: Colors.black.withValues(alpha: 0.04),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
@@ -6670,7 +5783,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
               borderRadius: BorderRadius.circular(12),
             ),
             elevation: 4,
-            shadowColor: tealColor.withOpacity(0.3),
+            shadowColor: tealColor.withValues(alpha: 0.3),
             textStyle: GoogleFonts.outfit(
               fontWeight: FontWeight.bold,
               fontSize: 14,
@@ -6704,7 +5817,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                 style: GoogleFonts.outfit(
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
-                  color: enabled ? textColor : textColor.withOpacity(0.5),
+                  color: enabled ? textColor : textColor.withValues(alpha: 0.5),
                 ),
               ),
               const SizedBox(height: 4),
@@ -6714,7 +5827,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                   fontSize: 10.5,
                   color: enabled
                       ? subtitleColor
-                      : subtitleColor.withOpacity(0.5),
+                      : subtitleColor.withValues(alpha: 0.5),
                   height: 1.4,
                 ),
               ),
@@ -6886,7 +5999,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: tealColor.withOpacity(0.12),
+                    color: tealColor.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
@@ -6960,7 +6073,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.blueAccent.withOpacity(0.12),
+                    color: Colors.blueAccent.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
@@ -7034,7 +6147,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.orangeAccent.withOpacity(0.12),
+                    color: Colors.orangeAccent.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
@@ -7252,7 +6365,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
               hintText: hintText,
               hintStyle: GoogleFonts.outfit(
                 fontSize: 12,
-                color: subtitleColor.withOpacity(0.6),
+                color: subtitleColor.withValues(alpha: 0.6),
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -7346,10 +6459,10 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
             ? Colors.transparent
             : (isDark
                   ? const Color(0xFF1B1B1F)
-                  : const Color(0xFFF1F5F9).withOpacity(0.5)),
+                  : const Color(0xFFF1F5F9).withValues(alpha: 0.5)),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isActive ? borderColor : borderColor.withOpacity(0.5),
+          color: isActive ? borderColor : borderColor.withValues(alpha: 0.5),
         ),
       ),
       child: Opacity(
@@ -7533,7 +6646,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
           Icon(
             Icons.lock_clock_outlined,
             size: 40,
-            color: tealColor.withOpacity(0.5),
+            color: tealColor.withValues(alpha: 0.5),
           ),
           const SizedBox(height: 8),
           Text(
@@ -7620,7 +6733,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
+                      color: Colors.black.withValues(alpha: 0.08),
                       blurRadius: 8,
                       offset: const Offset(0, 3),
                     ),
@@ -7675,7 +6788,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                     shadows: bgUrl.isNotEmpty
                         ? [
                             Shadow(
-                              color: Colors.black.withOpacity(0.6),
+                              color: Colors.black.withValues(alpha: 0.6),
                               blurRadius: 4,
                               offset: const Offset(0, 1),
                             ),
@@ -7696,7 +6809,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                     shadows: bgUrl.isNotEmpty
                         ? [
                             Shadow(
-                              color: Colors.black.withOpacity(0.6),
+                              color: Colors.black.withValues(alpha: 0.6),
                               blurRadius: 4,
                               offset: const Offset(0, 1),
                             ),
@@ -7779,7 +6892,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
+                          color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -7869,7 +6982,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                             Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: tealColor.withOpacity(0.1),
+                                color: tealColor.withValues(alpha: 0.1),
                                 shape: BoxShape.circle,
                               ),
                               child: Icon(
@@ -7933,7 +7046,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                                   : const Color(0xFFFAFAFB),
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
-                                color: tealColor.withOpacity(0.4),
+                                color: tealColor.withValues(alpha: 0.4),
                                 style: BorderStyle.solid,
                                 width: 1.5,
                               ),
@@ -7978,7 +7091,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                           'Tips: Upload transparent PNG/JPG QR image.',
                           style: GoogleFonts.outfit(
                             fontSize: 9.5,
-                            color: subtitleColor.withOpacity(0.8),
+                            color: subtitleColor.withValues(alpha: 0.8),
                           ),
                         ),
                       ] else if (_selectedQrisType ==
@@ -7996,7 +7109,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                           'Enter a direct URL link to your static QR image.',
                           style: GoogleFonts.outfit(
                             fontSize: 9.5,
-                            color: subtitleColor.withOpacity(0.8),
+                            color: subtitleColor.withValues(alpha: 0.8),
                           ),
                         ),
                       ],
@@ -8081,7 +7194,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                                   : const Color(0xFFFAFAFB),
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
-                                color: tealColor.withOpacity(0.4),
+                                color: tealColor.withValues(alpha: 0.4),
                                 style: BorderStyle.solid,
                                 width: 1.5,
                               ),
@@ -8126,7 +7239,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                           'Tips: Upload high-resolution background image/banner.',
                           style: GoogleFonts.outfit(
                             fontSize: 9.5,
-                            color: subtitleColor.withOpacity(0.8),
+                            color: subtitleColor.withValues(alpha: 0.8),
                           ),
                         ),
                       ] else if (_selectedQrisBgType == 'BACKGROUND URL') ...[
@@ -8144,7 +7257,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                           'Enter a direct URL link to your custom background/banner image.',
                           style: GoogleFonts.outfit(
                             fontSize: 9.5,
-                            color: subtitleColor.withOpacity(0.8),
+                            color: subtitleColor.withValues(alpha: 0.8),
                           ),
                         ),
                       ] else ...[
@@ -8152,8 +7265,8 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             color: isDark
-                                ? const Color(0xFF1E2824).withOpacity(0.3)
-                                : const Color(0xFFEAF8F5).withOpacity(0.3),
+                                ? const Color(0xFF1E2824).withValues(alpha: 0.3)
+                                : const Color(0xFFEAF8F5).withValues(alpha: 0.3),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Center(
@@ -8182,7 +7295,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF1B2824) : const Color(0xFFEAF8F5),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: tealColor.withOpacity(0.2)),
+              border: Border.all(color: tealColor.withValues(alpha: 0.2)),
             ),
             child: Row(
               children: [
@@ -8330,10 +7443,6 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
     );
   }
 
-  bool _isLink(String text) {
-    return text.startsWith('http://') || text.startsWith('https://');
-  }
-
   String _getFileName(String pathOrUrl) {
     if (pathOrUrl.isEmpty) return '';
     try {
@@ -8423,13 +7532,13 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                         child: Image.network(
                           url,
                           fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => Column(
+                          errorBuilder: (_, _, _) => Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Icon(
                                 Icons.broken_image_outlined,
                                 size: 48,
-                                color: tealColor.withOpacity(0.5),
+                                color: tealColor.withValues(alpha: 0.5),
                               ),
                               const SizedBox(height: 8),
                               Text(
@@ -8521,7 +7630,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
           width: double.infinity,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: tealColor.withOpacity(0.3)),
+            border: Border.all(color: tealColor.withValues(alpha: 0.3)),
             color: isDark ? const Color(0xFF13131A) : const Color(0xFFF8FAFB),
           ),
           child: Stack(
@@ -8533,11 +7642,11 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                   width: double.infinity,
                   height: double.infinity,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Center(
+                  errorBuilder: (_, _, _) => Center(
                     child: Icon(
                       Icons.broken_image_outlined,
                       size: 32,
-                      color: subtitleColor.withOpacity(0.4),
+                      color: subtitleColor.withValues(alpha: 0.4),
                     ),
                   ),
                 ),
@@ -8553,7 +7662,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                     borderRadius: const BorderRadius.vertical(
                       bottom: Radius.circular(7),
                     ),
-                    color: Colors.black.withOpacity(0.45),
+                    color: Colors.black.withValues(alpha: 0.45),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -8588,7 +7697,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: tealColor.withOpacity(0.3)),
+            border: Border.all(color: tealColor.withValues(alpha: 0.3)),
             color: isDark ? const Color(0xFF13131A) : const Color(0xFFF8FAFB),
           ),
           child: Row(
@@ -8596,7 +7705,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
               Icon(
                 Icons.picture_as_pdf_outlined,
                 size: 24,
-                color: Colors.redAccent.withOpacity(0.8),
+                color: Colors.redAccent.withValues(alpha: 0.8),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -8619,7 +7728,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
                       'Klik untuk buka file',
                       style: GoogleFonts.outfit(
                         fontSize: 9.5,
-                        color: subtitleColor.withOpacity(0.6),
+                        color: subtitleColor.withValues(alpha: 0.6),
                       ),
                     ),
                   ],
@@ -8679,7 +7788,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
       } catch (uploadError) {
         // Fallback: If upload fails (e.g. bucket/RLS policy not configured, or offline),
         // we use a local mock path representation so the user can test the profile save flow locally.
-        print(
+        debugPrint(
           'Supabase upload failed: $uploadError. Falling back to local mock URL.',
         );
         publicUrl =
@@ -8760,7 +7869,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
       } catch (uploadError) {
         // Fallback: If upload fails (e.g. offline or no bucket/RLS configuration),
         // we use a local mock URL so it remains testable in the profile save flow.
-        print(
+        debugPrint(
           'Supabase upload failed: $uploadError. Falling back to local mock URL.',
         );
         publicUrl =
@@ -8840,7 +7949,7 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
       } catch (uploadError) {
         // Fallback: If upload fails (e.g. offline or no bucket/RLS configuration),
         // we use a local mock URL so it remains testable in the profile save flow.
-        print(
+        debugPrint(
           'Supabase upload failed: $uploadError. Falling back to local mock URL.',
         );
         publicUrl =
@@ -8928,141 +8037,6 @@ class _DokterProfileState extends ConsumerState<DokterProfile> {
       ),
     );
   }
-
-  void _showFilePreviewDialog(String fileName) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        final isPdf = fileName.toLowerCase().endsWith('.pdf');
-        return AlertDialog(
-          backgroundColor: const Color(0xFF1E1E22),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    Icon(
-                      isPdf
-                          ? Icons.picture_as_pdf_outlined
-                          : Icons.image_outlined,
-                      color: isPdf ? Colors.redAccent : const Color(0xFF00A67E),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        fileName,
-                        style: GoogleFonts.outfit(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          fontSize: 14,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.close, color: Colors.grey, size: 20),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ],
-          ),
-          content: Container(
-            width: double.maxFinite,
-            height: 350,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: isPdf
-                  ? Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.picture_as_pdf,
-                          size: 64,
-                          color: Colors.red,
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'PDF Document Preview',
-                          style: GoogleFonts.outfit(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
-                            fontSize: 16,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Size: 2.4 MB • 2 Pages',
-                          style: GoogleFonts.outfit(
-                            color: Colors.grey,
-                            fontSize: 12,
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[200],
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            'Click to open externally',
-                            style: GoogleFonts.outfit(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black54,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                      ],
-                    )
-                  : Image.network(
-                      'https://picsum.photos/id/1048/400/300', // Beautiful mock certification photo
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return const Center(child: Icon(Icons.image, size: 64));
-                      },
-                    ),
-            ),
-          ),
-          actions: [
-            ElevatedButton(
-              onPressed: () async {
-                // Also support opening a mock external URL for the certificate
-                final mockUrl = isPdf
-                    ? 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf'
-                    : 'https://picsum.photos/id/1048/800/600';
-                final uri = Uri.parse(mockUrl);
-                try {
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                } catch (_) {}
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00A67E),
-                foregroundColor: Colors.white,
-              ),
-              child: Text(
-                'Open File',
-                style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -9084,22 +8058,22 @@ class MapGraphicsPainter extends CustomPainter {
       ..style = PaintingStyle.stroke;
     final Paint secondaryRoadPaint = Paint()
       ..color = isDark
-          ? const Color(0xFF475569).withOpacity(0.5)
+          ? const Color(0xFF475569).withValues(alpha: 0.5)
           : const Color(0xFFE2E8F0)
       ..strokeWidth = 3 * (zoomLevel / 15.0)
       ..style = PaintingStyle.stroke;
     final Paint parkPaint = Paint()
       ..color = isDark
-          ? const Color(0xFF14532D).withOpacity(0.3)
+          ? const Color(0xFF14532D).withValues(alpha: 0.3)
           : const Color(0xFFDCFCE7);
     final Paint waterPaint = Paint()
       ..color = isDark
-          ? const Color(0xFF1E3A8A).withOpacity(0.5)
+          ? const Color(0xFF1E3A8A).withValues(alpha: 0.5)
           : const Color(0xFFE0F2FE);
     final Paint buildingPaint = Paint()
       ..color = isDark
-          ? const Color(0xFF334155).withOpacity(0.4)
-          : const Color(0xFFE2E8F0).withOpacity(0.8);
+          ? const Color(0xFF334155).withValues(alpha: 0.4)
+          : const Color(0xFFE2E8F0).withValues(alpha: 0.8);
 
     // Land
     canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), landPaint);

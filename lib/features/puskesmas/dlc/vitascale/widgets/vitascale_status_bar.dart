@@ -57,7 +57,7 @@ class VitaScaleStatusBar extends StatelessWidget {
                 height: 48,
                 decoration: BoxDecoration(
                   color: (child.gender == 'L' ? const Color(0xFF3498DB) : const Color(0xFFE91E63))
-                      .withOpacity(0.15),
+                      .withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
@@ -98,7 +98,7 @@ class VitaScaleStatusBar extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: themeAccent.withOpacity(0.12),
+                            color: themeAccent.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(100),
                           ),
                           child: Text(
@@ -144,7 +144,7 @@ class VitaScaleStatusBar extends StatelessWidget {
                     height: 34,
                     icon: Icons.close_rounded,
                     textColor: const Color(0xFFE74C3C),
-                    borderColor: const Color(0xFFE74C3C).withOpacity(0.4),
+                    borderColor: const Color(0xFFE74C3C).withValues(alpha: 0.4),
                     onPressed: onCloseSession,
                   ),
                 ],
@@ -183,7 +183,7 @@ class VitaScaleStatusBar extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF39C12).withOpacity(0.15),
+                    color: const Color(0xFFF39C12).withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(100),
                   ),
                   child: Text(
@@ -204,9 +204,9 @@ class VitaScaleStatusBar extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: const Color(0xFFF39C12).withOpacity(0.12),
+                color: const Color(0xFFF39C12).withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFF39C12).withOpacity(0.35)),
+                border: Border.all(color: const Color(0xFFF39C12).withValues(alpha: 0.35)),
               ),
               child: Row(
                 children: [

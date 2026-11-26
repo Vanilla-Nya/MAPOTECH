@@ -5,7 +5,6 @@ import 'package:latlong2/latlong.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/widgets/ui.dart';
 import 'package:mapotech/shared/supabase_service.dart';
-import 'package:mapotech/shared/widgets/revgeo_wilayah_map_widget.dart';
 import 'package:mapotech/features/dokter/dashboard/frontend/dokter_pasien.dart';
 
 class PuskesmasOwnerDashboard extends ConsumerStatefulWidget {
@@ -133,7 +132,7 @@ class _PuskesmasOwnerDashboardState extends ConsumerState<PuskesmasOwnerDashboar
               children: [
                 Container(
                   padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: themeAccent.withOpacity(0.12), shape: BoxShape.circle),
+                  decoration: BoxDecoration(color: themeAccent.withValues(alpha: 0.12), shape: BoxShape.circle),
                   child: Icon(Icons.edit_location_alt_rounded, color: themeAccent, size: 22),
                 ),
                 const SizedBox(width: 12),
@@ -361,7 +360,7 @@ class _PuskesmasOwnerDashboardState extends ConsumerState<PuskesmasOwnerDashboar
                   width: 64,
                   height: 64,
                   decoration: BoxDecoration(
-                    color: themeAccent.withOpacity(0.14),
+                    color: themeAccent.withValues(alpha: 0.14),
                     shape: BoxShape.circle,
                   ),
                   alignment: Alignment.center,
@@ -381,7 +380,7 @@ class _PuskesmasOwnerDashboardState extends ConsumerState<PuskesmasOwnerDashboar
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
-                              color: themeAccent.withOpacity(0.12),
+                              color: themeAccent.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(100),
                             ),
                             child: Text(
@@ -440,7 +439,7 @@ class _PuskesmasOwnerDashboardState extends ConsumerState<PuskesmasOwnerDashboar
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: (_isLocationSetByOwner ? Colors.green : Colors.orange).withOpacity(0.12),
+                    color: (_isLocationSetByOwner ? Colors.green : Colors.orange).withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(100),
                   ),
                   child: Text(
@@ -659,7 +658,7 @@ class _PuskesmasOwnerDashboardState extends ConsumerState<PuskesmasOwnerDashboar
           height: 10,
           width: double.infinity,
           decoration: BoxDecoration(
-            color: color.withOpacity(0.08),
+            color: color.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(10),
           ),
           alignment: Alignment.centerLeft,

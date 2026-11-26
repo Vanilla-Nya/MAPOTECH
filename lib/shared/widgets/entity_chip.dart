@@ -41,7 +41,7 @@ class _EntityChipState extends State<EntityChip> {
             color: widget.isSelected
                 ? Colors.white
                 : (_isHovered
-                    ? activeColor.withOpacity(0.1)
+                    ? activeColor.withValues(alpha: 0.1)
                     : Colors.transparent),
             borderRadius: BorderRadius.circular(100),
             border: Border.all(
@@ -53,7 +53,7 @@ class _EntityChipState extends State<EntityChip> {
             boxShadow: [
               if (widget.isSelected)
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
+                  color: Colors.black.withValues(alpha: 0.04),
                   blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),
@@ -84,7 +84,7 @@ class _EntityChipState extends State<EntityChip> {
                     vertical: 1.5,
                   ),
                   decoration: BoxDecoration(
-                    color: activeColor.withOpacity(0.2),
+                    color: activeColor.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(

@@ -193,6 +193,7 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
           true,
           noKk: _kkController.text.trim(),
         );
+        if (!mounted) return;
         setState(() {
           _isKepalaKeluarga = true;
           _patientDetail ??= {};
@@ -265,6 +266,7 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
 
       if (confirmDisband == true) {
         await _db.disbandKkGroup(userId);
+        if (!mounted) return;
         setState(() {
           _isKepalaKeluarga = false;
           _familyMembers = [];
@@ -294,6 +296,7 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
           'is_kepala_keluarga': _isKepalaKeluarga,
         },
       );
+      if (!mounted) return;
       setState(() {
         _patientDetail ??= {};
         _patientDetail!['no_kk'] = _kkController.text.trim();
@@ -311,6 +314,7 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
         ),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Gagal menyimpan No. KK: $e'),
@@ -370,6 +374,7 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
 
       // Update local state
       ref.read(landingPageProvider.notifier).updateUser(updatedData);
+      if (!mounted) return;
       setState(() {
         _patientDetail ??= {};
         _patientDetail!['no_kk'] = _kkController.text.trim();
@@ -389,6 +394,7 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
         ),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -402,7 +408,9 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
         ),
       );
     } finally {
-      setState(() => _isSaving = false);
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
   }
 
@@ -497,7 +505,8 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
                       noKk: targetKk,
                     );
 
-                    Navigator.of(ctx).pop();
+                    if (ctx.mounted) Navigator.of(ctx).pop();
+                    if (!mounted) return;
 
                     if (success) {
                       _kkController.text = targetKk;
@@ -621,9 +630,9 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: purple.withOpacity(0.06),
+                        color: purple.withValues(alpha: 0.06),
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: purple.withOpacity(0.2)),
+                        border: Border.all(color: purple.withValues(alpha: 0.2)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -872,8 +881,9 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
                                         )
                                         .toList(),
                                     onChanged: (v) {
-                                      if (v != null)
+                                      if (v != null) {
                                         setModalState(() => genderVal = v);
+                                      }
                                     },
                                   ),
                                 ),
@@ -933,8 +943,9 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
                                             )
                                             .toList(),
                                     onChanged: (v) {
-                                      if (v != null)
+                                      if (v != null) {
                                         setModalState(() => golDarahVal = v);
+                                      }
                                     },
                                   ),
                                 ),
@@ -1009,10 +1020,13 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
 
                           final inserted = await _db.addFamilyMember(newMember);
                           if (inserted != null) {
-                            setState(() {
-                              _familyMembers.add(inserted);
-                            });
-                            Navigator.of(ctx).pop();
+                            if (mounted) {
+                              setState(() {
+                                _familyMembers.add(inserted);
+                              });
+                            }
+                            if (ctx.mounted) Navigator.of(ctx).pop();
+                            if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
@@ -1022,10 +1036,12 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
                               ),
                             );
                           } else {
-                            setState(() {
-                              _familyMembers.add(newMember);
-                            });
-                            Navigator.of(ctx).pop();
+                            if (mounted) {
+                              setState(() {
+                                _familyMembers.add(newMember);
+                              });
+                            }
+                            if (ctx.mounted) Navigator.of(ctx).pop();
                           }
                         },
                         icon: const Icon(Icons.check_circle_rounded, size: 16),
@@ -1060,6 +1076,7 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
       memberUserId: memberUserId,
     );
 
+    if (!mounted) return;
     if (success) {
       if (accept) {
         setState(() {
@@ -1090,6 +1107,7 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
     if (id != null) {
       await _db.deleteFamilyMember(id);
     }
+    if (!mounted) return;
     setState(() {
       _familyMembers.removeAt(idx);
     });
@@ -1137,7 +1155,7 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
             hintText: hint,
             hintStyle: GoogleFonts.outfit(
               fontSize: 10,
-              color: subColor.withOpacity(0.6),
+              color: subColor.withValues(alpha: 0.6),
             ),
             filled: true,
             fillColor: inputBg,
@@ -1610,7 +1628,7 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
                     hintText: 'Masukkan alamat tinggal detail...',
                     hintStyle: GoogleFonts.outfit(
                       fontSize: 11,
-                      color: subtitleColor.withOpacity(0.5),
+                      color: subtitleColor.withValues(alpha: 0.5),
                     ),
                     border: InputBorder.none,
                   ),
@@ -1690,7 +1708,7 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
                   border: Border.all(color: borderColor, width: 2),
                   boxShadow: [
                     BoxShadow(
-                      color: purple.withOpacity(0.1),
+                      color: purple.withValues(alpha: 0.1),
                       blurRadius: 20,
                       offset: const Offset(0, 8),
                     ),
@@ -1743,7 +1761,7 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
                         width: 48,
                         height: 48,
                         decoration: BoxDecoration(
-                          color: purple.withOpacity(0.12),
+                          color: purple.withValues(alpha: 0.12),
                           shape: BoxShape.circle,
                         ),
                         alignment: Alignment.center,
@@ -1808,7 +1826,7 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
                             const SizedBox(width: 6),
                             Switch(
                               value: _isKepalaKeluarga,
-                              activeColor: const Color(0xFF27AE60),
+                              activeThumbColor: const Color(0xFF27AE60),
                               onChanged: (val) =>
                                   _toggleKepalaKeluargaStatus(val),
                             ),
@@ -1983,7 +2001,7 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
                   margin: const EdgeInsets.only(top: 12),
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Colors.amber.withOpacity(0.12),
+                    color: Colors.amber.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: Colors.amber[800]!),
                   ),
@@ -2038,7 +2056,7 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
                       Icon(
                         Icons.people_outline_rounded,
                         size: 36,
-                        color: subtitleColor.withOpacity(0.5),
+                        color: subtitleColor.withValues(alpha: 0.5),
                       ),
                       const SizedBox(height: 8),
                       Text(
@@ -2199,7 +2217,7 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
                                 vertical: 3,
                               ),
                               decoration: BoxDecoration(
-                                color: purple.withOpacity(0.12),
+                                color: purple.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
@@ -2228,7 +2246,7 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
                                 vertical: 2,
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.redAccent.withOpacity(0.12),
+                                color: Colors.redAccent.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
@@ -2258,8 +2276,8 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
                               ),
                               decoration: BoxDecoration(
                                 color: isAccepted
-                                    ? const Color(0xFF27AE60).withOpacity(0.12)
-                                    : Colors.amber.withOpacity(0.15),
+                                    ? const Color(0xFF27AE60).withValues(alpha: 0.12)
+                                    : Colors.amber.withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
@@ -2376,7 +2394,7 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
               width: 120,
               height: 120,
               decoration: BoxDecoration(
-                color: purple.withOpacity(0.12),
+                color: purple.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
             ),
@@ -2388,7 +2406,7 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
               width: 100,
               height: 100,
               decoration: BoxDecoration(
-                color: purple.withOpacity(0.08),
+                color: purple.withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
             ),
@@ -2411,7 +2429,7 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
                       border: Border.all(color: Colors.white, width: 3),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.12),
+                          color: Colors.black.withValues(alpha: 0.12),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -2493,7 +2511,7 @@ class _PasienProfileState extends ConsumerState<PasienProfile> {
                 style: GoogleFonts.outfit(
                   fontSize: 11,
                   color: (isDark ? Colors.white : const Color(0xFF3D1A6E))
-                      .withOpacity(0.6),
+                      .withValues(alpha: 0.6),
                 ),
               ),
             ],

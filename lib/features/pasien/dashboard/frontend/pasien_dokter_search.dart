@@ -14,7 +14,6 @@ import 'package:mapotech/features/dokter/dashboard/frontend/web_map_widget.dart'
 import 'package:mapotech/features/pasien/dashboard/frontend/widgets/pasien_qr_scanner_dialog.dart';
 import 'package:mapotech/features/pasien/dashboard/frontend/widgets/pasien_apotek_pos_dialog.dart';
 import 'package:mapotech/shared/duitku_payment_service.dart';
-import 'package:mapotech/shared/widgets/custom_dialog.dart';
 
 /// Cari Praktik Mandiri, Puskesmas & Pustu/Ponkesdes - Pasien Dashboard Page
 class PasienDokterSearch extends ConsumerStatefulWidget {
@@ -251,7 +250,7 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
     final isDark = state.appearance == 'dark';
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.45),
+      barrierColor: Colors.black.withValues(alpha: 0.45),
       builder: (ctx) => DoctorDetailDialog(
         dokter: dokter,
         isDark: isDark,
@@ -265,7 +264,7 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
     final isDark = state.appearance == 'dark';
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.55),
+      barrierColor: Colors.black.withValues(alpha: 0.55),
       builder: (ctx) => PasienQrScannerDialog(
         onDoctorScanned: (doctor) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -283,7 +282,7 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
         onApotekScanned: (apotek) {
           showDialog(
             context: context,
-            barrierColor: Colors.black.withOpacity(0.55),
+            barrierColor: Colors.black.withValues(alpha: 0.55),
             builder: (dCtx) => PasienApotekPosDialog(
               pharmacy: apotek,
               isDark: isDark,
@@ -368,7 +367,7 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
                                           : 'Cari praktik mandiri atau spesialis...'),
                           hintStyle: GoogleFonts.outfit(
                             fontSize: 13,
-                            color: subtitleColor.withOpacity(0.6),
+                            color: subtitleColor.withValues(alpha: 0.6),
                           ),
                           border: InputBorder.none,
                         ),
@@ -509,7 +508,7 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
               decoration: BoxDecoration(
-                color: purpleAccent.withOpacity(0.10),
+                color: purpleAccent.withValues(alpha: 0.10),
                 borderRadius: BorderRadius.circular(100),
               ),
               child: Text(
@@ -630,7 +629,7 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: isSelected
-              ? accentColor.withOpacity(0.12)
+              ? accentColor.withValues(alpha: 0.12)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(100),
           border: Border.all(color: isSelected ? accentColor : borderColor),
@@ -681,7 +680,7 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
           border: Border.all(color: border),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.03),
+              color: Colors.black.withValues(alpha: 0.03),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -695,9 +694,9 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                color: accent.withOpacity(0.12),
+                color: accent.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
-                border: Border.all(color: accent.withOpacity(0.3), width: 2),
+                border: Border.all(color: accent.withValues(alpha: 0.3), width: 2),
               ),
               alignment: Alignment.center,
               child: ClipOval(
@@ -813,7 +812,7 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: purple.withOpacity(0.08),
+                color: purple.withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
               alignment: Alignment.center,
@@ -833,9 +832,9 @@ class _PasienDokterSearchState extends ConsumerState<PasienDokterSearch> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(100),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -864,7 +863,7 @@ class DoctorDetailDialog extends ConsumerStatefulWidget {
   final int initialTabIndex;
   final bool autoSelectNow;
 
-  const DoctorDetailDialog({
+  const DoctorDetailDialog({super.key, 
     required this.dokter,
     required this.isDark,
     this.isPreview = false,
@@ -1044,7 +1043,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
           left: 0,
           right: 0,
           child: Container(
-            color: Colors.white.withOpacity(0.9),
+            color: Colors.white.withValues(alpha: 0.9),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1099,7 +1098,6 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
   String _blurStyle = 'full';
 
   // Plan/Subscription States
-  bool _isSubscribed = false;
   bool _isPremium = false;
   String? _subscriptionExpiredAt;
 
@@ -1157,7 +1155,6 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
     _blurStyle = settings['blur_style']?.toString() ?? 'full';
 
     // Initialize plan/subscription states
-    _isSubscribed = widget.dokter['subscription_status']?.toString().toUpperCase() == 'ACTIVE';
     _subscriptionExpiredAt = widget.dokter['subscription_expired_at']?.toString();
     final isPremiumField = settings['is_premium'] == true;
     final expAt = settings['premium_expired_at'];
@@ -1360,7 +1357,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
     if (_scheduleError != null) {
       return Center(
         child: Text(
-          'Gagal memuat jadwal: ${_scheduleError}',
+          'Gagal memuat jadwal: $_scheduleError',
           style: GoogleFonts.outfit(fontSize: 11, color: Colors.red[400]),
         ),
       );
@@ -1405,7 +1402,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: isOff ? Colors.red.withOpacity(0.08) : themeAccent.withOpacity(0.08),
+                  color: isOff ? Colors.red.withValues(alpha: 0.08) : themeAccent.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -1491,8 +1488,12 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
 
   static double _mySin(double rad) {
     double r = rad;
-    while (r > 3.14159265) r -= 2 * 3.14159265;
-    while (r < -3.14159265) r += 2 * 3.14159265;
+    while (r > 3.14159265) {
+      r -= 2 * 3.14159265;
+    }
+    while (r < -3.14159265) {
+      r += 2 * 3.14159265;
+    }
     final x = r;
     return x - (x*x*x)/6 + (x*x*x*x*x)/120 - (x*x*x*x*x*x*x)/5040;
   }
@@ -1563,7 +1564,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
                     hintStyle: GoogleFonts.outfit(
                       fontSize: 30,
                       fontWeight: FontWeight.w900,
-                      color: isHourMode ? Colors.white.withOpacity(0.5) : subtitleColor,
+                      color: isHourMode ? Colors.white.withValues(alpha: 0.5) : subtitleColor,
                     ),
                   ),
                   maxLength: 2,
@@ -1637,7 +1638,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
                     hintStyle: GoogleFonts.outfit(
                       fontSize: 30,
                       fontWeight: FontWeight.w900,
-                      color: !isHourMode ? Colors.white.withOpacity(0.5) : subtitleColor,
+                      color: !isHourMode ? Colors.white.withValues(alpha: 0.5) : subtitleColor,
                     ),
                   ),
                   maxLength: 2,
@@ -1693,7 +1694,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
                   width: clockSize * 0.55,
                   height: clockSize * 0.55,
                   decoration: BoxDecoration(
-                    color: borderColor.withOpacity(0.35),
+                    color: borderColor.withValues(alpha: 0.35),
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -1764,7 +1765,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(width: 10, height: 10,
-                  decoration: BoxDecoration(color: borderColor.withOpacity(0.5), shape: BoxShape.circle,
+                  decoration: BoxDecoration(color: borderColor.withValues(alpha: 0.5), shape: BoxShape.circle,
                       border: Border.all(color: borderColor))),
               const SizedBox(width: 6),
               Text('AM (dalam)', style: GoogleFonts.outfit(fontSize: 9, color: subtitleColor)),
@@ -1942,7 +1943,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
                 width: 64,
                 height: 64,
                 decoration: BoxDecoration(
-                  color: themeAccent.withOpacity(0.12),
+                  color: themeAccent.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(Icons.check_circle_rounded, size: 40, color: themeAccent),
@@ -2043,7 +2044,8 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
           // Keep _clockOpenSlots in sync when date changes
           if (_clockOpenSlots.join() != timeSlots.join()) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) setState(() {
+              if (mounted) {
+                setState(() {
                 _clockOpenSlots = timeSlots;
                 _clockHour = -1;
                 _clockMinute = -1;
@@ -2052,6 +2054,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
                 _hourController.text = '';
                 _minuteController.text = '';
               });
+              }
             });
           }
         }
@@ -2073,9 +2076,9 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
             padding: const EdgeInsets.all(12),
             margin: const EdgeInsets.only(bottom: 16),
             decoration: BoxDecoration(
-              color: const Color(0xFFF2C94C).withOpacity(0.12),
+              color: const Color(0xFFF2C94C).withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFF2C94C).withOpacity(0.3)),
+              border: Border.all(color: const Color(0xFFF2C94C).withValues(alpha: 0.3)),
             ),
             child: Row(
               children: [
@@ -2108,13 +2111,13 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      themeAccent.withOpacity(isDark ? 0.22 : 0.12),
-                      themeAccent.withOpacity(isDark ? 0.10 : 0.04),
+                      themeAccent.withValues(alpha: isDark ? 0.22 : 0.12),
+                      themeAccent.withValues(alpha: isDark ? 0.10 : 0.04),
                     ],
                   ),
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                    color: themeAccent.withOpacity(isDark ? 0.45 : 0.35),
+                    color: themeAccent.withValues(alpha: isDark ? 0.45 : 0.35),
                     width: 1.5,
                   ),
                 ),
@@ -2195,7 +2198,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
           height: 76,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
-            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            separatorBuilder: (_, _) => const SizedBox(width: 8),
             itemCount: availableDates.length,
             itemBuilder: (ctx, i) {
               final d = availableDates[i];
@@ -2240,7 +2243,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
                         style: GoogleFonts.outfit(
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
-                          color: isSelected ? Colors.white.withOpacity(0.8) : subtitleColor,
+                          color: isSelected ? Colors.white.withValues(alpha: 0.8) : subtitleColor,
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -2257,7 +2260,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
                         style: GoogleFonts.outfit(
                           fontSize: 9,
                           fontWeight: FontWeight.w700,
-                          color: isSelected ? Colors.white.withOpacity(0.7) : subtitleColor,
+                          color: isSelected ? Colors.white.withValues(alpha: 0.7) : subtitleColor,
                         ),
                       ),
                       if (isToday)
@@ -2326,9 +2329,9 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: themeAccent.withOpacity(0.06),
+              color: themeAccent.withValues(alpha: 0.06),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: themeAccent.withOpacity(0.2)),
+              border: Border.all(color: themeAccent.withValues(alpha: 0.2)),
             ),
             child: Row(
               children: [
@@ -2433,7 +2436,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
     // Open Patient Selection Modal (Self or Family Member from KK)
     await showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.55),
+      barrierColor: Colors.black.withValues(alpha: 0.55),
       builder: (modalCtx) => _PatientBookingSelectionDialog(
         user: user,
         dokter: widget.dokter,
@@ -2517,7 +2520,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
   }) {
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.85),
+      barrierColor: Colors.black.withValues(alpha: 0.85),
       builder: (ctx) => Dialog(
         backgroundColor: Colors.transparent,
         insetPadding: const EdgeInsets.all(16),
@@ -2591,7 +2594,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
                             ),
                           );
                         },
-                        errorBuilder: (_, __, ___) => SizedBox(
+                        errorBuilder: (_, _, _) => SizedBox(
                           height: 160,
                           child: Center(
                             child: Icon(
@@ -2616,7 +2619,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
                         width: 72,
                         height: 72,
                         decoration: BoxDecoration(
-                          color: Colors.red.withOpacity(0.1),
+                          color: Colors.red.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: const Icon(
@@ -2703,7 +2706,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.folder_open_rounded, size: 40, color: subtitleColor.withOpacity(0.4)),
+              Icon(Icons.folder_open_rounded, size: 40, color: subtitleColor.withValues(alpha: 0.4)),
               const SizedBox(height: 12),
               Text(
                 'Belum ada dokumen yang diunggah.',
@@ -2767,8 +2770,8 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
                       height: 44,
                       decoration: BoxDecoration(
                         color: isPdf
-                            ? Colors.red.withOpacity(0.08)
-                            : themeAccent.withOpacity(0.08),
+                            ? Colors.red.withValues(alpha: 0.08)
+                            : themeAccent.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
@@ -2875,7 +2878,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
             ? const [Color(0xFFCB8FFF), Color(0xFFB577F2)]
             : (isDark
                 ? const [Color(0xFF3A3A40), Color(0xFF252528)]
-                : [themeAccent, themeAccent.withOpacity(0.8)]);
+                : [themeAccent, themeAccent.withValues(alpha: 0.8)]);
     }
   }
 
@@ -2887,7 +2890,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
     final imageWidget = Image.network(
       imageUrl,
       fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => Container(
+      errorBuilder: (_, _, _) => Container(
         color: Colors.red[300],
       ),
     );
@@ -2897,7 +2900,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
       child: Image.network(
         imageUrl,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => Container(
+        errorBuilder: (_, _, _) => Container(
           color: Colors.red[300],
         ),
       ),
@@ -2952,7 +2955,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
             if (effectiveBlurAmount > 0 && effectiveBlurStyle != 'none') blurredLayer,
             // Dimming overlay for readability
             Container(
-              color: Colors.black.withOpacity(effectiveOverlayOpacity),
+              color: Colors.black.withValues(alpha: effectiveOverlayOpacity),
             ),
           ],
         ),
@@ -3130,9 +3133,9 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
                     SliderTheme(
                       data: SliderThemeData(
                         activeTrackColor: themeAccent,
-                        inactiveTrackColor: themeAccent.withOpacity(0.2),
+                        inactiveTrackColor: themeAccent.withValues(alpha: 0.2),
                         thumbColor: themeAccent,
-                        overlayColor: themeAccent.withOpacity(0.1),
+                        overlayColor: themeAccent.withValues(alpha: 0.1),
                         valueIndicatorColor: themeAccent,
                         valueIndicatorTextStyle: const TextStyle(color: Colors.white),
                       ),
@@ -3161,9 +3164,9 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
                     SliderTheme(
                       data: SliderThemeData(
                         activeTrackColor: themeAccent,
-                        inactiveTrackColor: themeAccent.withOpacity(0.2),
+                        inactiveTrackColor: themeAccent.withValues(alpha: 0.2),
                         thumbColor: themeAccent,
-                        overlayColor: themeAccent.withOpacity(0.1),
+                        overlayColor: themeAccent.withValues(alpha: 0.1),
                         valueIndicatorColor: themeAccent,
                         valueIndicatorTextStyle: const TextStyle(color: Colors.white),
                       ),
@@ -3426,7 +3429,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: themeAccent.withOpacity(0.15),
+              color: themeAccent.withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
             child: Icon(Icons.lock_rounded, size: 28, color: themeAccent),
@@ -3511,7 +3514,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
               border: Border.all(color: border, width: 1.5),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(isDarkTheme ? 0.5 : 0.08),
+                  color: Colors.black.withValues(alpha: isDarkTheme ? 0.5 : 0.08),
                   blurRadius: 24,
                   offset: const Offset(0, 8),
                 ),
@@ -3542,7 +3545,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
                       hoverColor: Colors.transparent,
                       splashColor: Colors.transparent,
                       highlightColor: Colors.transparent,
-                      icon: Icon(Icons.close_rounded, color: text.withOpacity(0.7), size: 24),
+                      icon: Icon(Icons.close_rounded, color: text.withValues(alpha: 0.7), size: 24),
                       onPressed: () => Navigator.of(ctx).pop(),
                     ),
                   ],
@@ -3761,7 +3764,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
         boxShadow: isPopular
             ? [
                 BoxShadow(
-                  color: accentColor.withOpacity(0.15),
+                  color: accentColor.withValues(alpha: 0.15),
                   blurRadius: 16,
                   spreadRadius: 2,
                   offset: const Offset(0, 4),
@@ -3887,7 +3890,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
                             feat,
                             style: GoogleFonts.outfit(
                               fontSize: 11.5,
-                              color: textColor.withOpacity(0.85),
+                              color: textColor.withValues(alpha: 0.85),
                               height: 1.3,
                             ),
                           ),
@@ -4083,7 +4086,6 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
       }
 
       setState(() {
-        _isSubscribed = newSubStatus == 'active';
         _subscriptionExpiredAt = newSubExpiryStr;
 
         final isPremiumField = settings['is_premium'] == true;
@@ -4110,190 +4112,6 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
       _showPurchaseSuccessDialog(packageType);
     } catch (e) {
       if (mounted) Navigator.of(context).pop();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Pembelian gagal: $e'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _renewPackage(String packageType, int amount) async {
-    Navigator.of(context).pop(); // Close bottom sheet first
-    
-    // Show Loading Dialog
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => const Center(
-        child: CircularProgressIndicator(color: Color(0xFF00BFA6)),
-      ),
-    );
-
-    try {
-      final client = SupabaseService.client;
-      final userId = widget.dokter['id'] as String;
-
-      // 1. Fetch current database record
-      final res = await client
-          .from('user_detail_doctor')
-          .select('subscription_expired_at, subscription_status, header_bg_settings')
-          .eq('id', userId)
-          .maybeSingle();
-
-      DateTime currentSubExpiry = DateTime.now();
-      if (res != null && res['subscription_expired_at'] != null) {
-        try {
-          final parsed = DateTime.parse(res['subscription_expired_at'].toString());
-          if (parsed.isAfter(DateTime.now())) {
-            currentSubExpiry = parsed;
-          }
-        } catch (_) {}
-      }
-
-      final bgSettings = res?['header_bg_settings'];
-      final Map<String, dynamic> settings = bgSettings is Map
-          ? Map<String, dynamic>.from(bgSettings)
-          : <String, dynamic>{};
-
-      DateTime currentPremExpiry = DateTime.now();
-      if (settings['is_premium'] == true && settings['premium_expired_at'] != 'lifetime' && settings['premium_expired_at'] != null) {
-        try {
-          final parsed = DateTime.parse(settings['premium_expired_at'].toString());
-          if (parsed.isAfter(DateTime.now())) {
-            currentPremExpiry = parsed;
-          }
-        } catch (_) {}
-      }
-
-      String newSubExpiryStr = res?['subscription_expired_at']?.toString() ?? '';
-      String newSubStatus = res?['subscription_status']?.toString() ?? 'inactive';
-
-      // 2. Determine changes based on packageType
-      if (packageType == 'subscription_30') {
-        final newExpiry = currentSubExpiry.add(const Duration(days: 30));
-        newSubExpiryStr = newExpiry.toIso8601String();
-        newSubStatus = 'active';
-      } else if (packageType == 'subscription_lifetime') {
-        newSubExpiryStr = DateTime(2099, 12, 31, 23, 59, 59).toIso8601String();
-        newSubStatus = 'active';
-      } else if (packageType == 'premium_30') {
-        settings['is_premium'] = true;
-        if (settings['premium_expired_at'] == 'lifetime') {
-          // If already lifetime, keep it lifetime
-        } else {
-          final newExpiry = currentPremExpiry.add(const Duration(days: 30));
-          settings['premium_expired_at'] = newExpiry.toIso8601String();
-        }
-      } else if (packageType == 'premium_sync') {
-        settings['is_premium'] = true;
-        settings['premium_expired_at'] = newSubExpiryStr;
-      } else if (packageType == 'premium_lifetime') {
-        settings['is_premium'] = true;
-        settings['premium_expired_at'] = 'lifetime';
-      } else if (packageType == 'bundle_30') {
-        // Subs 30
-        final newSubExpiry = currentSubExpiry.add(const Duration(days: 30));
-        newSubExpiryStr = newSubExpiry.toIso8601String();
-        newSubStatus = 'active';
-        // Premium 30
-        settings['is_premium'] = true;
-        if (settings['premium_expired_at'] == 'lifetime') {
-          // Keep lifetime
-        } else {
-          final newPremExpiry = currentPremExpiry.add(const Duration(days: 30));
-          settings['premium_expired_at'] = newPremExpiry.toIso8601String();
-        }
-      } else if (packageType == 'bundle_lifetime') {
-        // Subs lifetime
-        newSubExpiryStr = DateTime(2099, 12, 31, 23, 59, 59).toIso8601String();
-        newSubStatus = 'active';
-        // Premium lifetime
-        settings['is_premium'] = true;
-        settings['premium_expired_at'] = 'lifetime';
-      }
-
-      // 3. Perform database update
-      await client
-          .from('user_detail_doctor')
-          .update({
-            'subscription_status': newSubStatus,
-            'subscription_expired_at': newSubExpiryStr,
-            'header_bg_settings': settings,
-          })
-          .eq('id', userId);
-
-      // Record financial expense
-      String packageDesc = 'Pembelian Paket Layanan';
-      if (packageType == 'subscription_30') packageDesc = 'Perpanjangan Langganan Praktik Mandiri 30 Hari';
-      if (packageType == 'subscription_lifetime') packageDesc = 'Langganan Praktik Mandiri Lifetime';
-      if (packageType == 'premium_30') packageDesc = 'Pembelian Kustomisasi Profil Premium 30 Hari';
-      if (packageType == 'premium_sync') packageDesc = 'Pembelian Premium Customizer (Sinkronisasi Durasi)';
-      if (packageType == 'premium_lifetime') packageDesc = 'Pembelian Kustomisasi Profil Premium Lifetime';
-      if (packageType == 'bundle_30') packageDesc = 'Pembelian Paket Mega Bundle 30 Hari';
-      if (packageType == 'bundle_lifetime') packageDesc = 'Pembelian Paket Mega Bundle Lifetime';
-
-      try {
-        final txData = {
-          'id_user': userId,
-          'transaction_type': 'expense',
-          'source_type': 'manual',
-          'amount': amount.toDouble(),
-          'description': packageDesc,
-          'category': 'Operasional',
-          'status': 'active',
-        };
-        await client
-            .schema('private_doctor')
-            .from('financial_transactions')
-            .insert(txData);
-      } catch (dbErr) {
-        debugPrint('Failed to auto-record package expense: $dbErr');
-      }
-
-      // 4. Update local state
-      setState(() {
-        _isSubscribed = newSubStatus == 'active';
-        _subscriptionExpiredAt = newSubExpiryStr;
-
-        final isPremiumField = settings['is_premium'] == true;
-        final expAt = settings['premium_expired_at'];
-        if (isPremiumField) {
-          if (expAt == 'lifetime') {
-            _isPremium = true;
-          } else if (expAt != null) {
-            try {
-              final expDate = DateTime.parse(expAt.toString());
-              _isPremium = expDate.isAfter(DateTime.now());
-            } catch (_) {
-              _isPremium = false;
-            }
-          } else {
-            _isPremium = true;
-          }
-        } else {
-          _isPremium = false;
-        }
-      });
-
-      // Close loading dialog
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
-
-      // Show Success Dialog
-      _showPurchaseSuccessDialog(packageType);
-
-    } catch (e) {
-      // Close loading dialog
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
-
-      // Show Error Snackbar
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -4408,7 +4226,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected ? themeAccent.withOpacity(0.08) : Colors.transparent,
+          color: isSelected ? themeAccent.withValues(alpha: 0.08) : Colors.transparent,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: isSelected ? themeAccent : Colors.transparent,
@@ -4420,7 +4238,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
             Icon(
               icon,
               size: 18,
-              color: isSelected ? themeAccent : textColor.withOpacity(0.6),
+              color: isSelected ? themeAccent : textColor.withValues(alpha: 0.6),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -4453,12 +4271,12 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
         width: 32,
         height: 32,
         decoration: BoxDecoration(
-          color: color.withOpacity(0.2),
+          color: color.withValues(alpha: 0.2),
           shape: BoxShape.circle,
           border: Border.all(
             color: isSelected
                 ? (isDark ? Colors.white : Colors.black)
-                : color.withOpacity(0.6),
+                : color.withValues(alpha: 0.6),
             width: isSelected ? 2.5 : 1,
           ),
         ),
@@ -4497,7 +4315,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
           boxShadow: [
             if (isSelected)
               BoxShadow(
-                color: Colors.black.withOpacity(0.2),
+                color: Colors.black.withValues(alpha: 0.2),
                 blurRadius: 4,
                 spreadRadius: 1,
               ),
@@ -4560,7 +4378,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
         });
       }
     } catch (e) {
-      print('Upload bg failed: $e');
+      debugPrint('Upload bg failed: $e');
       if (mounted) {
         setState(() => _isUploadingBgImage = false);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -4612,32 +4430,32 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
   Color _getTaglineBgColor() {
     switch (_taglineColor.toLowerCase()) {
       case 'amber':
-        return Colors.amber.withOpacity(0.15);
+        return Colors.amber.withValues(alpha: 0.15);
       case 'cyan':
-        return Colors.cyan.withOpacity(0.15);
+        return Colors.cyan.withValues(alpha: 0.15);
       case 'green':
-        return Colors.green.withOpacity(0.15);
+        return Colors.green.withValues(alpha: 0.15);
       case 'rose':
-        return Colors.pink.withOpacity(0.15);
+        return Colors.pink.withValues(alpha: 0.15);
       case 'white':
       default:
-        return Colors.white.withOpacity(0.15);
+        return Colors.white.withValues(alpha: 0.15);
     }
   }
 
   Color _getTaglineBorderColor() {
     switch (_taglineColor.toLowerCase()) {
       case 'amber':
-        return Colors.amber.withOpacity(0.3);
+        return Colors.amber.withValues(alpha: 0.3);
       case 'cyan':
-        return Colors.cyan.withOpacity(0.3);
+        return Colors.cyan.withValues(alpha: 0.3);
       case 'green':
-        return Colors.green.withOpacity(0.3);
+        return Colors.green.withValues(alpha: 0.3);
       case 'rose':
-        return Colors.pink.withOpacity(0.3);
+        return Colors.pink.withValues(alpha: 0.3);
       case 'white':
       default:
-        return Colors.white.withOpacity(0.3);
+        return Colors.white.withValues(alpha: 0.3);
     }
   }
 
@@ -4760,7 +4578,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
                   : BorderRadius.circular(28),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
+                  color: Colors.black.withValues(alpha: 0.2),
                   blurRadius: 40,
                   offset: const Offset(0, 16),
                 ),
@@ -4789,7 +4607,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.2),
+                                    color: Colors.white.withValues(alpha: 0.2),
                                     borderRadius: BorderRadius.circular(100),
                                   ),
                                   child: Text(
@@ -4816,9 +4634,9 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
                                   width: 72,
                                   height: 72,
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.25),
+                                    color: Colors.white.withValues(alpha: 0.25),
                                     shape: BoxShape.circle,
-                                    border: Border.all(color: Colors.white.withOpacity(0.6), width: 2),
+                                    border: Border.all(color: Colors.white.withValues(alpha: 0.6), width: 2),
                                   ),
                                   alignment: Alignment.center,
                                   child: ClipOval(
@@ -4828,7 +4646,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
                                             width: 72,
                                             height: 72,
                                             fit: BoxFit.cover,
-                                            errorBuilder: (_, __, ___) => _buildInitialsAvatar(themeAccent),
+                                            errorBuilder: (_, _, _) => _buildInitialsAvatar(themeAccent),
                                           )
                                         : _buildInitialsAvatar(themeAccent),
                                   ),
@@ -4848,7 +4666,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
                                         style: GoogleFonts.outfit(
                                           fontSize: 13,
                                           fontWeight: FontWeight.w600,
-                                          color: Colors.white.withOpacity(0.9),
+                                          color: Colors.white.withValues(alpha: 0.9),
                                         ),
                                       ),
                                       if (_isPremium && _promoTaglineController.text.trim().isNotEmpty) ...[
@@ -4895,7 +4713,7 @@ class _DoctorDetailDialogState extends ConsumerState<DoctorDetailDialog>
                               indicatorColor: Colors.white,
                               indicatorWeight: 3,
                               labelColor: Colors.white,
-                              unselectedLabelColor: Colors.white.withOpacity(0.55),
+                              unselectedLabelColor: Colors.white.withValues(alpha: 0.55),
                               labelStyle: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w800),
                               unselectedLabelStyle: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600),
                               tabs: const [
@@ -5175,22 +4993,22 @@ class MapGraphicsPainter extends CustomPainter {
       ..style = PaintingStyle.stroke;
     final Paint secondaryRoadPaint = Paint()
       ..color = isDark
-          ? const Color(0xFF475569).withOpacity(0.5)
+          ? const Color(0xFF475569).withValues(alpha: 0.5)
           : const Color(0xFFE2E8F0)
       ..strokeWidth = 3 * (zoomLevel / 15.0)
       ..style = PaintingStyle.stroke;
     final Paint parkPaint = Paint()
       ..color = isDark
-          ? const Color(0xFF14532D).withOpacity(0.3)
+          ? const Color(0xFF14532D).withValues(alpha: 0.3)
           : const Color(0xFFDCFCE7);
     final Paint waterPaint = Paint()
       ..color = isDark
-          ? const Color(0xFF1E3A8A).withOpacity(0.5)
+          ? const Color(0xFF1E3A8A).withValues(alpha: 0.5)
           : const Color(0xFFE0F2FE);
     final Paint buildingPaint = Paint()
       ..color = isDark
-          ? const Color(0xFF334155).withOpacity(0.4)
-          : const Color(0xFFE2E8F0).withOpacity(0.8);
+          ? const Color(0xFF334155).withValues(alpha: 0.4)
+          : const Color(0xFFE2E8F0).withValues(alpha: 0.8);
 
     // Land
     canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), landPaint);
@@ -5390,7 +5208,7 @@ class _PatientBookingSelectionDialogState extends ConsumerState<_PatientBookingS
           border: Border.all(color: borderColor),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.25),
+              color: Colors.black.withValues(alpha: 0.25),
               blurRadius: 25,
               offset: const Offset(0, 8),
             ),
@@ -5420,9 +5238,9 @@ class _PatientBookingSelectionDialogState extends ConsumerState<_PatientBookingS
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: themeAccent.withOpacity(0.18),
+                        color: themeAccent.withValues(alpha: 0.18),
                         shape: BoxShape.circle,
-                        border: Border.all(color: themeAccent.withOpacity(0.4)),
+                        border: Border.all(color: themeAccent.withValues(alpha: 0.4)),
                       ),
                       alignment: Alignment.center,
                       child: Icon(Icons.people_alt_rounded, color: themeAccent, size: 22),
@@ -5575,7 +5393,7 @@ class _PatientBookingSelectionDialogState extends ConsumerState<_PatientBookingS
                             ),
                             child: Column(
                               children: [
-                                Icon(Icons.family_restroom_rounded, size: 36, color: subtitleColor.withOpacity(0.5)),
+                                Icon(Icons.family_restroom_rounded, size: 36, color: subtitleColor.withValues(alpha: 0.5)),
                                 const SizedBox(height: 8),
                                 Text(
                                   'Belum Ada Anggota Keluarga',
@@ -5742,7 +5560,7 @@ class _PatientBookingSelectionDialogState extends ConsumerState<_PatientBookingS
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
         decoration: BoxDecoration(
           color: isSelected
-              ? themeAccent.withOpacity(0.12)
+              ? themeAccent.withValues(alpha: 0.12)
               : (isDark ? const Color(0xFF1E1E22) : const Color(0xFFF8FAFD)),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
@@ -5793,7 +5611,7 @@ class _PatientBookingSelectionDialogState extends ConsumerState<_PatientBookingS
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: isSelected
-              ? accentColor.withOpacity(0.08)
+              ? accentColor.withValues(alpha: 0.08)
               : (isDark ? const Color(0xFF1E1E22) : const Color(0xFFF8FAFD)),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
@@ -5807,7 +5625,7 @@ class _PatientBookingSelectionDialogState extends ConsumerState<_PatientBookingS
               width: 38,
               height: 38,
               decoration: BoxDecoration(
-                color: accentColor.withOpacity(0.15),
+                color: accentColor.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
               alignment: Alignment.center,
@@ -5836,7 +5654,7 @@ class _PatientBookingSelectionDialogState extends ConsumerState<_PatientBookingS
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: accentColor.withOpacity(0.12),
+                          color: accentColor.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(100),
                         ),
                         child: Text(

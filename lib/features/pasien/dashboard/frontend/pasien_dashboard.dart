@@ -229,7 +229,7 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
     final isDark = state.appearance == 'dark';
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.55),
+      barrierColor: Colors.black.withValues(alpha: 0.55),
       builder: (ctx) => PasienQrScannerDialog(
         onDoctorScanned: (doctor) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -244,7 +244,7 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
           );
           showDialog(
             context: context,
-            barrierColor: Colors.black.withOpacity(0.45),
+            barrierColor: Colors.black.withValues(alpha: 0.45),
             builder: (dCtx) => DoctorDetailDialog(
               dokter: doctor,
               isDark: isDark,
@@ -256,7 +256,7 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
         onApotekScanned: (apotek) {
           showDialog(
             context: context,
-            barrierColor: Colors.black.withOpacity(0.55),
+            barrierColor: Colors.black.withValues(alpha: 0.55),
             builder: (dCtx) => PasienApotekPosDialog(
               pharmacy: apotek,
               isDark: isDark,
@@ -597,7 +597,7 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                                         width: 44,
                                         height: 44,
                                         decoration: BoxDecoration(
-                                          color: themeAccent.withOpacity(0.12),
+                                          color: themeAccent.withValues(alpha: 0.12),
                                           shape: BoxShape.circle,
                                         ),
                                         alignment: Alignment.center,
@@ -703,7 +703,7 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                                         Icon(
                                           Icons.calendar_today_rounded,
                                           size: 28,
-                                          color: subtitleColor.withOpacity(0.5),
+                                          color: subtitleColor.withValues(alpha: 0.5),
                                         ),
                                         const SizedBox(height: 12),
                                         Text(
@@ -812,7 +812,7 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                                                     child: Container(
                                                       decoration: BoxDecoration(
                                                         color: themeAccent
-                                                            .withOpacity(0.2),
+                                                            .withValues(alpha: 0.2),
                                                         shape: BoxShape.circle,
                                                       ),
                                                       alignment:
@@ -868,7 +868,7 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                                                             context: context,
                                                             barrierColor: Colors
                                                                 .black
-                                                                .withOpacity(
+                                                                .withValues(alpha:
                                                                   0.45,
                                                                 ),
                                                             builder: (ctx) =>
@@ -889,7 +889,7 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                                                             ),
                                                             boxShadow: [
                                                               BoxShadow(
-                                                                color: Colors.black.withOpacity(0.2),
+                                                                color: Colors.black.withValues(alpha: 0.2),
                                                                 blurRadius: 6,
                                                                 offset: const Offset(0, 3),
                                                               ),
@@ -953,7 +953,7 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                                                             context: context,
                                                             barrierColor: Colors
                                                                 .black
-                                                                .withOpacity(
+                                                                .withValues(alpha:
                                                                   0.45,
                                                                 ),
                                                             builder: (ctx) =>
@@ -975,7 +975,7 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                                                             ),
                                                             boxShadow: [
                                                               BoxShadow(
-                                                                color: Colors.black.withOpacity(0.2),
+                                                                color: Colors.black.withValues(alpha: 0.2),
                                                                 blurRadius: 6,
                                                                 offset: const Offset(0, 3),
                                                               ),
@@ -1084,7 +1084,7 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
             border: Border.all(color: borderColor),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.03),
+                color: Colors.black.withValues(alpha: 0.03),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -1096,7 +1096,7 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: themeAccent.withOpacity(0.12),
+                  color: themeAccent.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
@@ -1158,12 +1158,12 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
             color: cardBgColor,
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
-              color: themeAccent.withOpacity(0.4),
+              color: themeAccent.withValues(alpha: 0.4),
               width: 1.5,
             ),
             boxShadow: [
               BoxShadow(
-                color: themeAccent.withOpacity(0.08),
+                color: themeAccent.withValues(alpha: 0.08),
                 blurRadius: 14,
                 offset: const Offset(0, 4),
               ),
@@ -1177,8 +1177,8 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      themeAccent.withOpacity(0.2),
-                      themeAccent.withOpacity(0.08),
+                      themeAccent.withValues(alpha: 0.2),
+                      themeAccent.withValues(alpha: 0.08),
                     ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
@@ -1260,7 +1260,7 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
             border: Border.all(color: borderColor),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.03),
+                color: Colors.black.withValues(alpha: 0.03),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -1272,7 +1272,7 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: themeAccent.withOpacity(0.12),
+                  color: themeAccent.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
@@ -1353,26 +1353,26 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
             gradient: LinearGradient(
               colors: isDark
                   ? [
-                      themeAccent.withOpacity(0.18),
+                      themeAccent.withValues(alpha: 0.18),
                       cardBgColor,
-                      const Color(0xFF48C9B0).withOpacity(0.12),
+                      const Color(0xFF48C9B0).withValues(alpha: 0.12),
                     ]
                   : [
-                      themeAccent.withOpacity(0.12),
+                      themeAccent.withValues(alpha: 0.12),
                       cardBgColor,
-                      const Color(0xFF48C9B0).withOpacity(0.06),
+                      const Color(0xFF48C9B0).withValues(alpha: 0.06),
                     ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
-              color: themeAccent.withOpacity(0.35),
+              color: themeAccent.withValues(alpha: 0.35),
               width: 1.5,
             ),
             boxShadow: [
               BoxShadow(
-                color: themeAccent.withOpacity(isDark ? 0.15 : 0.06),
+                color: themeAccent.withValues(alpha: isDark ? 0.15 : 0.06),
                 blurRadius: 16,
                 offset: const Offset(0, 4),
               ),
@@ -1386,7 +1386,7 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                   gradient: LinearGradient(
                     colors: [
                       themeAccent,
-                      themeAccent.withOpacity(0.8),
+                      themeAccent.withValues(alpha: 0.8),
                     ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
@@ -1394,7 +1394,7 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: themeAccent.withOpacity(0.4),
+                      color: themeAccent.withValues(alpha: 0.4),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -1429,7 +1429,7 @@ class _PasienDashboardState extends ConsumerState<PasienDashboard> {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF0F9D58).withOpacity(0.15),
+                            color: const Color(0xFF0F9D58).withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
@@ -1542,7 +1542,7 @@ class PharmacyDetailDialog extends StatelessWidget {
                   width: 56,
                   height: 56,
                   decoration: BoxDecoration(
-                    color: themeAccent.withOpacity(0.12),
+                    color: themeAccent.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Icon(
@@ -1596,9 +1596,9 @@ class PharmacyDetailDialog extends StatelessWidget {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: green.withOpacity(0.08),
+                  color: green.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: green.withOpacity(0.2)),
+                  border: Border.all(color: green.withValues(alpha: 0.2)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,

@@ -585,12 +585,12 @@ class _PuskesmasPantauanIbuHamilState extends ConsumerState<PuskesmasPantauanIbu
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: isPonkesdesUser
-                  ? [const Color(0xFF27AE60).withOpacity(0.12), const Color(0xFF2ECC71).withOpacity(0.06)]
-                  : [themeAccent.withOpacity(0.12), themeAccent.withOpacity(0.04)],
+                  ? [const Color(0xFF27AE60).withValues(alpha: 0.12), const Color(0xFF2ECC71).withValues(alpha: 0.06)]
+                  : [themeAccent.withValues(alpha: 0.12), themeAccent.withValues(alpha: 0.04)],
             ),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: isPonkesdesUser ? const Color(0xFF27AE60).withOpacity(0.3) : themeAccent.withOpacity(0.3),
+              color: isPonkesdesUser ? const Color(0xFF27AE60).withValues(alpha: 0.3) : themeAccent.withValues(alpha: 0.3),
             ),
           ),
           child: Row(
@@ -598,7 +598,7 @@ class _PuskesmasPantauanIbuHamilState extends ConsumerState<PuskesmasPantauanIbu
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: isPonkesdesUser ? const Color(0xFF27AE60).withOpacity(0.15) : themeAccent.withOpacity(0.15),
+                  color: isPonkesdesUser ? const Color(0xFF27AE60).withValues(alpha: 0.15) : themeAccent.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
@@ -629,7 +629,7 @@ class _PuskesmasPantauanIbuHamilState extends ConsumerState<PuskesmasPantauanIbu
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF2ECC71).withOpacity(0.15),
+                            color: const Color(0xFF2ECC71).withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(100),
                           ),
                           child: Row(
@@ -674,7 +674,7 @@ class _PuskesmasPantauanIbuHamilState extends ConsumerState<PuskesmasPantauanIbu
                 width: 56,
                 height: 56,
                 decoration: BoxDecoration(
-                  color: themeAccent.withOpacity(0.12),
+                  color: themeAccent.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
@@ -690,7 +690,7 @@ class _PuskesmasPantauanIbuHamilState extends ConsumerState<PuskesmasPantauanIbu
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: themeAccent.withOpacity(0.15),
+                            color: themeAccent.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(100),
                           ),
                           child: Text(
@@ -825,7 +825,7 @@ class _PuskesmasPantauanIbuHamilState extends ConsumerState<PuskesmasPantauanIbu
                         Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: themeAccent.withOpacity(0.12),
+                            color: themeAccent.withValues(alpha: 0.12),
                             shape: BoxShape.circle,
                           ),
                           child: Icon(Icons.location_on_rounded, size: 20, color: themeAccent),
@@ -882,7 +882,7 @@ class _PuskesmasPantauanIbuHamilState extends ConsumerState<PuskesmasPantauanIbu
                 height: 420,
                 showOnlyMap: true,
                 markers: filteredList.map((item) {
-                  final colorHex = '#${item.ksprColor.value.toRadixString(16).substring(2)}';
+                  final colorHex = '#${item.ksprColor.toARGB32().toRadixString(16).substring(2)}';
                   return {
                     'id': item.id,
                     'patient': item,
@@ -912,7 +912,7 @@ class _PuskesmasPantauanIbuHamilState extends ConsumerState<PuskesmasPantauanIbu
                     isDark,
                   );
                 },
-                onChanged: (_, __, ___, ____) {},
+                onChanged: (_, _, _, _) {},
               ),
             ],
           ),
@@ -1022,7 +1022,7 @@ class _PuskesmasPantauanIbuHamilState extends ConsumerState<PuskesmasPantauanIbu
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemCount: filteredList.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 12),
+          separatorBuilder: (_, _) => const SizedBox(height: 12),
           itemBuilder: (context, index) {
             final item = filteredList[index];
             return Material(
@@ -1058,7 +1058,7 @@ class _PuskesmasPantauanIbuHamilState extends ConsumerState<PuskesmasPantauanIbu
                             width: 44,
                             height: 44,
                             decoration: BoxDecoration(
-                              color: themeAccent.withOpacity(0.12),
+                              color: themeAccent.withValues(alpha: 0.12),
                               shape: BoxShape.circle,
                             ),
                             alignment: Alignment.center,
@@ -1079,7 +1079,7 @@ class _PuskesmasPantauanIbuHamilState extends ConsumerState<PuskesmasPantauanIbu
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                       decoration: BoxDecoration(
-                                        color: item.ksprColor.withOpacity(0.15),
+                                        color: item.ksprColor.withValues(alpha: 0.15),
                                         borderRadius: BorderRadius.circular(100),
                                       ),
                                       child: Text(
@@ -1092,7 +1092,7 @@ class _PuskesmasPantauanIbuHamilState extends ConsumerState<PuskesmasPantauanIbu
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                         decoration: BoxDecoration(
-                                          color: const Color(0xFFE74C3C).withOpacity(0.15),
+                                          color: const Color(0xFFE74C3C).withValues(alpha: 0.15),
                                           borderRadius: BorderRadius.circular(100),
                                         ),
                                         child: Text(
@@ -1106,7 +1106,7 @@ class _PuskesmasPantauanIbuHamilState extends ConsumerState<PuskesmasPantauanIbu
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                         decoration: BoxDecoration(
-                                          color: const Color(0xFFE67E22).withOpacity(0.15),
+                                          color: const Color(0xFFE67E22).withValues(alpha: 0.15),
                                           borderRadius: BorderRadius.circular(100),
                                         ),
                                         child: Text(
@@ -1119,9 +1119,9 @@ class _PuskesmasPantauanIbuHamilState extends ConsumerState<PuskesmasPantauanIbu
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFF009688).withOpacity(0.12),
+                                        color: const Color(0xFF009688).withValues(alpha: 0.12),
                                         borderRadius: BorderRadius.circular(100),
-                                        border: Border.all(color: const Color(0xFF009688).withOpacity(0.3)),
+                                        border: Border.all(color: const Color(0xFF009688).withValues(alpha: 0.3)),
                                       ),
                                       child: Text(
                                         'RME: ${item.satuSehatIhs}',
@@ -1129,7 +1129,7 @@ class _PuskesmasPantauanIbuHamilState extends ConsumerState<PuskesmasPantauanIbu
                                       ),
                                     ),
                                     const Spacer(),
-                                    Icon(Icons.touch_app_rounded, size: 14, color: themeAccent.withOpacity(0.7)),
+                                    Icon(Icons.touch_app_rounded, size: 14, color: themeAccent.withValues(alpha: 0.7)),
                                   ],
                                 ),
                                 const SizedBox(height: 2),
@@ -1150,9 +1150,9 @@ class _PuskesmasPantauanIbuHamilState extends ConsumerState<PuskesmasPantauanIbu
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFF3498DB).withOpacity(0.12),
+                                        color: const Color(0xFF3498DB).withValues(alpha: 0.12),
                                         borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(color: const Color(0xFF3498DB).withOpacity(0.3)),
+                                        border: Border.all(color: const Color(0xFF3498DB).withValues(alpha: 0.3)),
                                       ),
                                       child: Row(
                                         mainAxisSize: MainAxisSize.min,
@@ -1204,9 +1204,9 @@ class _PuskesmasPantauanIbuHamilState extends ConsumerState<PuskesmasPantauanIbu
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(100),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Text(
         label,
@@ -1314,7 +1314,7 @@ class _PatientAncDetailModalState extends ConsumerState<PatientAncDetailModal> {
           Container(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
             decoration: BoxDecoration(
-              color: widget.isDark ? Colors.white.withOpacity(0.04) : Colors.black.withOpacity(0.03),
+              color: widget.isDark ? Colors.white.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.03),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
               border: Border(bottom: BorderSide(color: widget.borderColor)),
             ),
@@ -1326,7 +1326,7 @@ class _PatientAncDetailModalState extends ConsumerState<PatientAncDetailModal> {
                       width: 48,
                       height: 48,
                       decoration: BoxDecoration(
-                        color: widget.item.ksprColor.withOpacity(0.15),
+                        color: widget.item.ksprColor.withValues(alpha: 0.15),
                         shape: BoxShape.circle,
                       ),
                       alignment: Alignment.center,
@@ -1347,9 +1347,9 @@ class _PatientAncDetailModalState extends ConsumerState<PatientAncDetailModal> {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                                 decoration: BoxDecoration(
-                                  color: widget.item.ksprColor.withOpacity(0.15),
+                                  color: widget.item.ksprColor.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(100),
-                                  border: Border.all(color: widget.item.ksprColor.withOpacity(0.3)),
+                                  border: Border.all(color: widget.item.ksprColor.withValues(alpha: 0.3)),
                                 ),
                                 child: Text(
                                   widget.item.ksprStatus,
@@ -1360,9 +1360,9 @@ class _PatientAncDetailModalState extends ConsumerState<PatientAncDetailModal> {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF009688).withOpacity(0.12),
+                                  color: const Color(0xFF009688).withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(100),
-                                  border: Border.all(color: const Color(0xFF009688).withOpacity(0.3)),
+                                  border: Border.all(color: const Color(0xFF009688).withValues(alpha: 0.3)),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
@@ -1543,10 +1543,10 @@ class _PatientAncDetailModalState extends ConsumerState<PatientAncDetailModal> {
                                   'subtitle': widget.item.ksprStatus,
                                   'info': 'No. HP: ${widget.item.noTelepon}',
                                   'details': '📍 ${widget.item.alamat}',
-                                  'color': '#${widget.item.ksprColor.value.toRadixString(16).substring(2)}',
+                                  'color': '#${widget.item.ksprColor.toARGB32().toRadixString(16).substring(2)}',
                                 }
                               ],
-                              onChanged: (_, __, ___, ____) {},
+                              onChanged: (_, _, _, _) {},
                             ),
                           ],
                         ),
@@ -1583,7 +1583,7 @@ class _PatientAncDetailModalState extends ConsumerState<PatientAncDetailModal> {
                                     painter: PieChartPainter(
                                       segments: [
                                         PieChartSegment('Kunjungan Selesai', widget.item.jumlahKunjungan.toDouble(), const Color(0xFF2ECC71)),
-                                        PieChartSegment('Sisa Target ANC', (6 - widget.item.jumlahKunjungan).clamp(0, 6).toDouble(), const Color(0xFF3498DB).withOpacity(0.3)),
+                                        PieChartSegment('Sisa Target ANC', (6 - widget.item.jumlahKunjungan).clamp(0, 6).toDouble(), const Color(0xFF3498DB).withValues(alpha: 0.3)),
                                       ],
                                     ),
                                   ),
@@ -1613,7 +1613,7 @@ class _PatientAncDetailModalState extends ConsumerState<PatientAncDetailModal> {
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                         decoration: BoxDecoration(
-                                          color: const Color(0xFF2ECC71).withOpacity(0.15),
+                                          color: const Color(0xFF2ECC71).withValues(alpha: 0.15),
                                           borderRadius: BorderRadius.circular(8),
                                         ),
                                         child: Text(
@@ -1648,9 +1648,9 @@ class _PatientAncDetailModalState extends ConsumerState<PatientAncDetailModal> {
                         width: double.infinity,
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          color: widget.themeAccent.withOpacity(0.08),
+                          color: widget.themeAccent.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: widget.themeAccent.withOpacity(0.3)),
+                          border: Border.all(color: widget.themeAccent.withValues(alpha: 0.3)),
                         ),
                         child: Column(
                           children: [
@@ -1659,7 +1659,7 @@ class _PatientAncDetailModalState extends ConsumerState<PatientAncDetailModal> {
                                 Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color: widget.themeAccent.withOpacity(0.15),
+                                    color: widget.themeAccent.withValues(alpha: 0.15),
                                     shape: BoxShape.circle,
                                   ),
                                   child: Icon(Icons.send_rounded, size: 20, color: widget.themeAccent),
@@ -1710,16 +1710,16 @@ class _PatientAncDetailModalState extends ConsumerState<PatientAncDetailModal> {
                         margin: const EdgeInsets.only(top: 12),
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF1ABC9C).withOpacity(0.08),
+                          color: const Color(0xFF1ABC9C).withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: const Color(0xFF1ABC9C).withOpacity(0.3)),
+                          border: Border.all(color: const Color(0xFF1ABC9C).withValues(alpha: 0.3)),
                         ),
                         child: Row(
                           children: [
                             Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF1ABC9C).withOpacity(0.15),
+                                color: const Color(0xFF1ABC9C).withValues(alpha: 0.15),
                                 shape: BoxShape.circle,
                               ),
                               child: const Icon(Icons.child_care_rounded, size: 20, color: Color(0xFF1ABC9C)),
@@ -1778,7 +1778,7 @@ class _PatientAncDetailModalState extends ConsumerState<PatientAncDetailModal> {
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
                         itemCount: widget.item.riwayatKunjungan.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        separatorBuilder: (_, _) => const SizedBox(height: 8),
                         itemBuilder: (context, idx) {
                           final r = widget.item.riwayatKunjungan[idx];
                           return Material(
@@ -1803,7 +1803,7 @@ class _PatientAncDetailModalState extends ConsumerState<PatientAncDetailModal> {
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                       decoration: BoxDecoration(
-                                        color: widget.themeAccent.withOpacity(0.12),
+                                        color: widget.themeAccent.withValues(alpha: 0.12),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: Text(
@@ -1857,7 +1857,7 @@ class _PatientAncDetailModalState extends ConsumerState<PatientAncDetailModal> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: widget.isDark ? Colors.white.withOpacity(0.04) : Colors.black.withOpacity(0.03),
+              color: widget.isDark ? Colors.white.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.03),
               borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
               border: Border(top: BorderSide(color: widget.borderColor)),
             ),
@@ -1908,7 +1908,7 @@ class _PatientAncDetailModalState extends ConsumerState<PatientAncDetailModal> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: widget.isDark ? Colors.white.withOpacity(0.04) : Colors.black.withOpacity(0.03),
+            color: widget.isDark ? Colors.white.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.03),
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
             border: Border(bottom: BorderSide(color: widget.borderColor)),
           ),
@@ -1946,7 +1946,7 @@ class _PatientAncDetailModalState extends ConsumerState<PatientAncDetailModal> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF2ECC71).withOpacity(0.15),
+                            color: const Color(0xFF2ECC71).withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(100),
                           ),
                           child: Text(
@@ -1991,7 +1991,7 @@ class _PatientAncDetailModalState extends ConsumerState<PatientAncDetailModal> {
                     border: Border.all(color: widget.borderColor),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.06),
+                        color: Colors.black.withValues(alpha: 0.06),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
@@ -2011,7 +2011,7 @@ class _PatientAncDetailModalState extends ConsumerState<PatientAncDetailModal> {
                               fit: BoxFit.cover,
                               errorBuilder: (ctx, err, stack) {
                                 return Container(
-                                  color: widget.themeAccent.withOpacity(0.1),
+                                  color: widget.themeAccent.withValues(alpha: 0.1),
                                   alignment: Alignment.center,
                                   child: Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
@@ -2036,7 +2036,7 @@ class _PatientAncDetailModalState extends ConsumerState<PatientAncDetailModal> {
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                               decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.75),
+                                color: Colors.black.withValues(alpha: 0.75),
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(color: Colors.white24),
                               ),
@@ -2159,7 +2159,7 @@ class _PatientAncDetailModalState extends ConsumerState<PatientAncDetailModal> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: widget.isDark ? Colors.white.withOpacity(0.04) : Colors.black.withOpacity(0.03),
+            color: widget.isDark ? Colors.white.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.03),
             borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
             border: Border(top: BorderSide(color: widget.borderColor)),
           ),
@@ -2250,7 +2250,7 @@ class _PatientAncDetailModalState extends ConsumerState<PatientAncDetailModal> {
                         Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF25D366).withOpacity(0.15),
+                            color: const Color(0xFF25D366).withValues(alpha: 0.15),
                             shape: BoxShape.circle,
                           ),
                           child: const Icon(Icons.mark_chat_read_rounded, size: 22, color: Color(0xFF25D366)),
@@ -2389,7 +2389,7 @@ class _PatientAncDetailModalState extends ConsumerState<PatientAncDetailModal> {
                             Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF1ABC9C).withOpacity(0.15),
+                                color: const Color(0xFF1ABC9C).withValues(alpha: 0.15),
                                 shape: BoxShape.circle,
                               ),
                               child: const Icon(Icons.child_care_rounded, size: 22, color: Color(0xFF1ABC9C)),
@@ -2412,9 +2412,9 @@ class _PatientAncDetailModalState extends ConsumerState<PatientAncDetailModal> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1ABC9C).withOpacity(0.08),
+                        color: const Color(0xFF1ABC9C).withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFF1ABC9C).withOpacity(0.2)),
+                        border: Border.all(color: const Color(0xFF1ABC9C).withValues(alpha: 0.2)),
                       ),
                       child: Text(
                         'Ibu ${item.nama} telah mencapai persalinan. Antrian MomiCare akan ditutup secara permanen (ALL INSERT riwayat), dan antrian baru VitaScale Anak (0–59 bulan) akan otomatis dibuat dan mewarisi titik koordinat rumah & kontak orang tua.',
@@ -2437,7 +2437,7 @@ class _PatientAncDetailModalState extends ConsumerState<PatientAncDetailModal> {
                       children: [
                         Expanded(
                           child: DropdownButtonFormField<String>(
-                            value: selectedGender,
+                            initialValue: selectedGender,
                             dropdownColor: cardBgColor,
                             style: GoogleFonts.outfit(fontSize: 12, color: textColor),
                             decoration: InputDecoration(
@@ -2538,7 +2538,7 @@ class _PatientAncDetailModalState extends ConsumerState<PatientAncDetailModal> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: accentColor.withOpacity(0.12),
+              color: accentColor.withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, size: 18, color: accentColor),
@@ -2895,7 +2895,7 @@ class _AddPatientModalDialogState extends State<AddPatientModalDialog> {
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: widget.themeAccent.withOpacity(0.15),
+                        color: widget.themeAccent.withValues(alpha: 0.15),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(Icons.person_add_rounded, size: 22, color: widget.themeAccent),
@@ -3007,7 +3007,7 @@ class _AddPatientModalDialogState extends State<AddPatientModalDialog> {
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemCount: _mapotechRegisteredPatients.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 10),
+          separatorBuilder: (_, _) => const SizedBox(height: 10),
           itemBuilder: (context, idx) {
             final m = _mapotechRegisteredPatients[idx];
             return Container(
@@ -3020,7 +3020,7 @@ class _AddPatientModalDialogState extends State<AddPatientModalDialog> {
               child: Row(
                 children: [
                   CircleAvatar(
-                    backgroundColor: widget.themeAccent.withOpacity(0.12),
+                    backgroundColor: widget.themeAccent.withValues(alpha: 0.12),
                     child: Icon(Icons.face_3_rounded, size: 20, color: widget.themeAccent),
                   ),
                   const SizedBox(width: 12),

@@ -1,8 +1,5 @@
 import 'package:flutter/services.dart';
-import 'dart:convert';
-import 'dart:math';
 import 'dart:ui' show ImageFilter;
-import 'dart:typed_data';
 import 'dart:io' as io;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -50,8 +47,6 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
 
   // RevGeo API Controller & Territory Map state
   late TextEditingController _revgeoApiUrlController;
-  bool _showBatasWilayahOnMap = true;
-  String _batasHighlightColor = '#1ABC9C';
 
   // API Controllers
   late TextEditingController _ssOrgIdController;
@@ -75,9 +70,6 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
   DateTime? _subExpiryDate;
   String _subExpiry = '-';
   int _subDaysRemaining = 0;
-  int _subHoursRemaining = 0;
-  int _subMinutesRemaining = 0;
-  int _subTotalDays = 30;
 
   // Schedule operational hours
   final List<Map<String, dynamic>> _scheduleDays = [
@@ -132,7 +124,7 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
     },
   ];
 
-  double _zoomLevel = 15.0;
+  final double _zoomLevel = 15.0;
 
   @override
   void initState() {
@@ -213,7 +205,7 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
           .select('id, day, open_time, close_time, is_off')
           .eq('id_puskesmas', userId);
 
-      if (schedules != null && schedules.isNotEmpty) {
+      if (schedules.isNotEmpty) {
         for (var dayMap in _scheduleDays) {
           final matchedList = schedules.where(
             (s) =>
@@ -293,26 +285,18 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                 final diff = expiryDate.difference(now);
                 if (diff.isNegative) {
                   _subDaysRemaining = 0;
-                  _subHoursRemaining = 0;
-                  _subMinutesRemaining = 0;
                 } else {
                   _subDaysRemaining = diff.inDays;
-                  _subHoursRemaining = diff.inHours % 24;
-                  _subMinutesRemaining = diff.inMinutes % 60;
                 }
               } catch (_) {
                 _subExpiry = '-';
                 _subExpiryDate = null;
                 _subDaysRemaining = 0;
-                _subHoursRemaining = 0;
-                _subMinutesRemaining = 0;
               }
             } else {
               _subExpiry = '-';
               _subExpiryDate = null;
               _subDaysRemaining = 0;
-              _subHoursRemaining = 0;
-              _subMinutesRemaining = 0;
             }
           }
           final bool isSubActive =
@@ -617,7 +601,7 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                                   ? Image.network(
                                       _avatarUrl,
                                       fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) =>
+                                      errorBuilder: (_, _, _) =>
                                           const Center(
                                             child: Icon(
                                               Icons.person_rounded,
@@ -723,7 +707,7 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                                 shape: BoxShape.circle,
                                 color: inputBg,
                                 border: Border.all(
-                                  color: tealColor.withOpacity(0.5),
+                                  color: tealColor.withValues(alpha: 0.5),
                                   width: 2,
                                 ),
                               ),
@@ -901,7 +885,7 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                                   shape: BoxShape.circle,
                                   color: inputBg,
                                   border: Border.all(
-                                    color: tealColor.withOpacity(0.5),
+                                    color: tealColor.withValues(alpha: 0.5),
                                     width: 2,
                                   ),
                                 ),
@@ -909,7 +893,7 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                                   child: Image.network(
                                     urlController.text.trim(),
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => const Icon(
+                                    errorBuilder: (_, _, _) => const Icon(
                                       Icons.broken_image_rounded,
                                       color: Colors.redAccent,
                                       size: 30,
@@ -974,7 +958,7 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
     setState(() => _isUploadingPhoto = true);
 
     try {
-      String? finalUrl;
+      final String finalUrl;
       if (result['type'] == 'upload') {
         final Uint8List originalBytes = result['bytes'] as Uint8List;
         final String fileName = result['fileName'] as String;
@@ -994,7 +978,7 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
         finalUrl = result['url'] as String;
       }
 
-      if (finalUrl != null && finalUrl.isNotEmpty) {
+      if (finalUrl.isNotEmpty) {
         await SupabaseService.client
             .from('user')
             .update({'avatar_url': finalUrl})
@@ -1005,7 +989,7 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
         });
 
         setState(() {
-          _avatarUrl = finalUrl!;
+          _avatarUrl = finalUrl;
         });
       }
     } catch (e) {
@@ -1066,7 +1050,7 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
       if (!mounted) return;
       showDialog(
         context: context,
-        barrierColor: Colors.black.withOpacity(0.45),
+        barrierColor: Colors.black.withValues(alpha: 0.45),
         builder: (ctx) => DoctorDetailDialog(
           dokter: faskesMap,
           isDark: ref.read(landingPageProvider).appearance == 'dark',
@@ -1256,7 +1240,7 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
               border: Border.all(color: borderColor),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
+                  color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
                   blurRadius: 15,
                   offset: const Offset(0, 4),
                 ),
@@ -1300,7 +1284,7 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                               child: Image.network(
                                 _avatarUrl,
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => const SizedBox(),
+                                errorBuilder: (_, _, _) => const SizedBox(),
                               ),
                             ),
                           ),
@@ -1315,8 +1299,8 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                             ),
                             child: Container(
                               color: isDark
-                                  ? Colors.black.withOpacity(0.4)
-                                  : themeAccent.withOpacity(0.15),
+                                  ? Colors.black.withValues(alpha: 0.4)
+                                  : themeAccent.withValues(alpha: 0.15),
                             ),
                           ),
                         ),
@@ -1342,7 +1326,7 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withOpacity(0.1),
+                                      color: Colors.black.withValues(alpha: 0.1),
                                       blurRadius: 8,
                                       offset: const Offset(0, 4),
                                     ),
@@ -1362,7 +1346,7 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                                           fit: BoxFit.cover,
                                           width: 90,
                                           height: 90,
-                                          errorBuilder: (_, __, ___) => Center(
+                                          errorBuilder: (_, _, _) => Center(
                                             child: Text(
                                               avatarInitials,
                                               style: GoogleFonts.outfit(
@@ -2062,7 +2046,7 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                       ? const Color(0xFF221F2E)
                       : const Color(0xFFF5F0FF),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: themeAccent.withOpacity(0.3)),
+                  border: Border.all(color: themeAccent.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
@@ -2319,7 +2303,7 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                   ),
                   Switch(
                     value: _showProfileInSearch,
-                    activeColor: themeAccent,
+                    activeThumbColor: themeAccent,
                     onChanged: (val) =>
                         setState(() => _showProfileInSearch = val),
                   ),
@@ -2354,7 +2338,7 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                   ),
                   Switch(
                     value: _serveBPJSPatients,
-                    activeColor: themeAccent,
+                    activeThumbColor: themeAccent,
                     onChanged: (val) =>
                         setState(() => _serveBPJSPatients = val),
                   ),
@@ -2426,13 +2410,13 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: isActive
-              ? activeColor.withOpacity(0.35)
-              : Colors.orangeAccent.withOpacity(0.35),
+              ? activeColor.withValues(alpha: 0.35)
+              : Colors.orangeAccent.withValues(alpha: 0.35),
           width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: statusColor.withOpacity(0.08),
+            color: statusColor.withValues(alpha: 0.08),
             blurRadius: 20,
             offset: const Offset(0, 6),
           ),
@@ -2447,7 +2431,7 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.12),
+                  color: statusColor.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
@@ -2496,9 +2480,9 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                   vertical: 4,
                 ),
                 decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.12),
+                  color: statusColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(100),
-                  border: Border.all(color: statusColor.withOpacity(0.4)),
+                  border: Border.all(color: statusColor.withValues(alpha: 0.4)),
                 ),
                 child: Text(
                   _subStatus,
@@ -2565,7 +2549,7 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                   borderRadius: BorderRadius.circular(100),
                   child: LinearProgressIndicator(
                     value: progress,
-                    backgroundColor: statusColor.withOpacity(0.12),
+                    backgroundColor: statusColor.withValues(alpha: 0.12),
                     valueColor: AlwaysStoppedAnimation<Color>(statusColor),
                     minHeight: 8,
                   ),
@@ -2577,10 +2561,10 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
               decoration: BoxDecoration(
-                color: Colors.orangeAccent.withOpacity(0.07),
+                color: Colors.orangeAccent.withValues(alpha: 0.07),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: Colors.orangeAccent.withOpacity(0.25),
+                  color: Colors.orangeAccent.withValues(alpha: 0.25),
                 ),
               ),
               child: Row(
@@ -2645,13 +2629,13 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: isVitaScaleUnlocked
-                      ? const Color(0xFF1ABC9C).withOpacity(0.08)
-                      : Colors.orange.withOpacity(0.08),
+                      ? const Color(0xFF1ABC9C).withValues(alpha: 0.08)
+                      : Colors.orange.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
                     color: isVitaScaleUnlocked
-                        ? const Color(0xFF1ABC9C).withOpacity(0.3)
-                        : Colors.orange.withOpacity(0.3),
+                        ? const Color(0xFF1ABC9C).withValues(alpha: 0.3)
+                        : Colors.orange.withValues(alpha: 0.3),
                   ),
                 ),
                 child: Column(
@@ -2663,8 +2647,8 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
                             color: isVitaScaleUnlocked
-                                ? const Color(0xFF1ABC9C).withOpacity(0.15)
-                                : Colors.orange.withOpacity(0.15),
+                                ? const Color(0xFF1ABC9C).withValues(alpha: 0.15)
+                                : Colors.orange.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Icon(
@@ -2702,8 +2686,8 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
                             color: isVitaScaleUnlocked
-                                ? const Color(0xFF27AE60).withOpacity(0.15)
-                                : Colors.orange.withOpacity(0.15),
+                                ? const Color(0xFF27AE60).withValues(alpha: 0.15)
+                                : Colors.orange.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
@@ -2853,9 +2837,9 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 14),
       decoration: BoxDecoration(
-        color: accentColor.withOpacity(0.08),
+        color: accentColor.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: accentColor.withOpacity(0.2)),
+        border: Border.all(color: accentColor.withValues(alpha: 0.2)),
       ),
       child: Column(
         children: [
@@ -2873,7 +2857,7 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
             style: GoogleFonts.outfit(
               fontSize: 9,
               fontWeight: FontWeight.w900,
-              color: accentColor.withOpacity(0.8),
+              color: accentColor.withValues(alpha: 0.8),
               letterSpacing: 0.5,
             ),
           ),
@@ -2926,6 +2910,7 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
       ref.read(landingPageProvider.notifier).addFavoriteMenuItem('dlc_vitascale_data_anak');
       ref.read(landingPageProvider.notifier).addFavoriteMenuItem('dlc_vitascale_screening');
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -2937,6 +2922,7 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
         ),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to renew subscription: '),
@@ -2971,10 +2957,10 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
             ? Colors.transparent
             : (isDark
                   ? const Color(0xFF1B1B1F)
-                  : const Color(0xFFF1F5F9).withOpacity(0.5)),
+                  : const Color(0xFFF1F5F9).withValues(alpha: 0.5)),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isActive ? borderColor : borderColor.withOpacity(0.5),
+          color: isActive ? borderColor : borderColor.withValues(alpha: 0.5),
         ),
       ),
       child: Opacity(
@@ -2987,7 +2973,7 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: isActive
-                    ? themeAccent.withOpacity(0.12)
+                    ? themeAccent.withValues(alpha: 0.12)
                     : const Color(0xFFE2E8F0),
               ),
               alignment: Alignment.center,
@@ -3079,7 +3065,7 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
             // Holiday toggle
             Switch(
               value: isActive,
-              activeColor: themeAccent,
+              activeThumbColor: themeAccent,
               onChanged: (val) {
                 setState(() {
                   dayMap['active'] = val;
@@ -3441,21 +3427,6 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
     );
   }
 
-  Widget _buildFieldTitle(String label, Color color) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Text(
-        label,
-        style: GoogleFonts.outfit(
-          fontSize: 9,
-          fontWeight: FontWeight.w900,
-          color: color,
-          letterSpacing: 1.0,
-        ),
-      ),
-    );
-  }
-
   Widget _buildTextField(
     TextEditingController controller,
     String hint,
@@ -3486,7 +3457,7 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
           hintText: hint,
           hintStyle: GoogleFonts.outfit(
             fontSize: 13,
-            color: textColor.withOpacity(0.4),
+            color: textColor.withValues(alpha: 0.4),
           ),
           border: InputBorder.none,
           isDense: true,
@@ -3561,7 +3532,7 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1ABC9C).withOpacity(0.12),
+                  color: const Color(0xFF1ABC9C).withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: const Icon(
@@ -3610,7 +3581,7 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: isVitaScaleUnlocked
-                  ? const Color(0xFF1ABC9C).withOpacity(0.4)
+                  ? const Color(0xFF1ABC9C).withValues(alpha: 0.4)
                   : borderColor,
               width: isVitaScaleUnlocked ? 1.5 : 1.0,
             ),
@@ -3625,7 +3596,7 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1ABC9C).withOpacity(0.12),
+                      color: const Color(0xFF1ABC9C).withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(
@@ -3654,13 +3625,13 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
                                 color: isVitaScaleUnlocked
-                                    ? const Color(0xFF27AE60).withOpacity(0.15)
-                                    : Colors.orange.withOpacity(0.15),
+                                    ? const Color(0xFF27AE60).withValues(alpha: 0.15)
+                                    : Colors.orange.withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(6),
                                 border: Border.all(
                                   color: isVitaScaleUnlocked
-                                      ? const Color(0xFF27AE60).withOpacity(0.4)
-                                      : Colors.orange.withOpacity(0.4),
+                                      ? const Color(0xFF27AE60).withValues(alpha: 0.4)
+                                      : Colors.orange.withValues(alpha: 0.4),
                                 ),
                               ),
                               child: Text(
@@ -3806,7 +3777,7 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE91E63).withOpacity(0.12),
+                      color: const Color(0xFFE91E63).withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(
@@ -3834,7 +3805,7 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF27AE60).withOpacity(0.15),
+                                color: const Color(0xFF27AE60).withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
@@ -3905,9 +3876,9 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.25)),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

@@ -123,7 +123,7 @@ class _AchievementsCarouselSectionState
   void _showCertificateDialog(AchievementItem achievement, int index) {
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.75),
+      barrierColor: Colors.black.withValues(alpha: 0.75),
       builder: (ctx) => CertificateDetailModal(
         achievement: achievement,
         index: index,
@@ -155,7 +155,7 @@ class _AchievementsCarouselSectionState
                   color: const Color(0xFFFEF5E7),
                   borderRadius: BorderRadius.circular(100),
                   border: Border.all(
-                    color: const Color(0xFFF5B041).withOpacity(0.3),
+                    color: const Color(0xFFF5B041).withValues(alpha: 0.3),
                   ),
                 ),
                 child: Row(
@@ -316,13 +316,13 @@ class _AchievementsCarouselSectionState
                     color: _currentPageIndex == i
                         ? const Color(0xFF48C9B0)
                         : (widget.isDark
-                            ? Colors.white.withOpacity(0.2)
-                            : Colors.black.withOpacity(0.12)),
+                            ? Colors.white.withValues(alpha: 0.2)
+                            : Colors.black.withValues(alpha: 0.12)),
                     borderRadius: BorderRadius.circular(100),
                     boxShadow: _currentPageIndex == i
                         ? [
                             BoxShadow(
-                              color: const Color(0xFF48C9B0).withOpacity(0.4),
+                              color: const Color(0xFF48C9B0).withValues(alpha: 0.4),
                               blurRadius: 8,
                               offset: const Offset(0, 2),
                             ),
@@ -352,17 +352,17 @@ class _AchievementsCarouselSectionState
           height: 42,
           decoration: BoxDecoration(
             color: widget.isDark
-                ? const Color(0xFF1E293B).withOpacity(0.9)
-                : Colors.white.withOpacity(0.9),
+                ? const Color(0xFF1E293B).withValues(alpha: 0.9)
+                : Colors.white.withValues(alpha: 0.9),
             shape: BoxShape.circle,
             border: Border.all(
               color: widget.isDark
-                  ? Colors.white.withOpacity(0.15)
-                  : Colors.black.withOpacity(0.08),
+                  ? Colors.white.withValues(alpha: 0.15)
+                  : Colors.black.withValues(alpha: 0.08),
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.12),
+                color: Colors.black.withValues(alpha: 0.12),
                 blurRadius: 16,
                 offset: const Offset(0, 4),
               ),
@@ -394,7 +394,7 @@ class _AchievementsCarouselSectionState
         border: Border.all(color: borderColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -405,7 +405,7 @@ class _AchievementsCarouselSectionState
         color: Colors.transparent,
         child: InkWell(
           onTap: () => _showCertificateDialog(achievement, index),
-          hoverColor: Colors.black.withOpacity(0.02),
+          hoverColor: Colors.black.withValues(alpha: 0.02),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -544,7 +544,7 @@ class _AchievementsCarouselSectionState
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
+                    color: Colors.black.withValues(alpha: 0.2),
                     blurRadius: 6,
                   ),
                 ],
@@ -563,15 +563,15 @@ class _AchievementsCarouselSectionState
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.65),
+                color: Colors.black.withValues(alpha: 0.65),
                 borderRadius: BorderRadius.circular(100),
                 border: Border.all(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withValues(alpha: 0.2),
                   width: 0.8,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.3),
+                    color: Colors.black.withValues(alpha: 0.3),
                     blurRadius: 8,
                   ),
                 ],
@@ -951,12 +951,12 @@ class CertificateDetailModal extends StatelessWidget {
               borderRadius: BorderRadius.circular(28),
               border: Border.all(
                 color: isDark
-                    ? Colors.white.withOpacity(0.15)
-                    : Colors.black.withOpacity(0.08),
+                    ? Colors.white.withValues(alpha: 0.15)
+                    : Colors.black.withValues(alpha: 0.08),
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.5),
+                  color: Colors.black.withValues(alpha: 0.5),
                   blurRadius: 36,
                   offset: const Offset(0, 18),
                 ),
@@ -976,7 +976,7 @@ class CertificateDetailModal extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFF5B041).withOpacity(0.15),
+                              color: const Color(0xFFF5B041).withValues(alpha: 0.15),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
@@ -1017,8 +1017,8 @@ class CertificateDetailModal extends StatelessWidget {
                           padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
                             color: isDark
-                                ? Colors.white.withOpacity(0.1)
-                                : Colors.black.withOpacity(0.05),
+                                ? Colors.white.withValues(alpha: 0.1)
+                                : Colors.black.withValues(alpha: 0.05),
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
@@ -1043,12 +1043,12 @@ class CertificateDetailModal extends StatelessWidget {
                       color: isDark ? const Color(0xFF020617) : const Color(0xFFF8FAFC),
                       borderRadius: BorderRadius.circular(18),
                       border: Border.all(
-                        color: const Color(0xFFD4AF37).withOpacity(0.5),
+                        color: const Color(0xFFD4AF37).withValues(alpha: 0.5),
                         width: 2,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.08),
+                          color: Colors.black.withValues(alpha: 0.08),
                           blurRadius: 16,
                           offset: const Offset(0, 4),
                         ),
@@ -1217,8 +1217,8 @@ class CertificateDetailModal extends StatelessWidget {
                                   style: OutlinedButton.styleFrom(
                                     side: BorderSide(
                                       color: isDark
-                                          ? Colors.white.withOpacity(0.2)
-                                          : Colors.black.withOpacity(0.15),
+                                          ? Colors.white.withValues(alpha: 0.2)
+                                          : Colors.black.withValues(alpha: 0.15),
                                     ),
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 20,

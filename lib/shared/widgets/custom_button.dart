@@ -57,17 +57,17 @@ class _CustomButtonState extends State<CustomButton> {
           : Colors.transparent;
       buttonTextColor = isEnabled
           ? defaultTextColor
-          : defaultTextColor.withOpacity(0.5);
+          : defaultTextColor.withValues(alpha: 0.5);
       border = Border.all(
         color: isEnabled
             ? defaultBorderColor
-            : defaultBorderColor.withOpacity(0.5),
+            : defaultBorderColor.withValues(alpha: 0.5),
         width: 1.5,
       );
     } else {
       buttonColor = isEnabled
           ? defaultPrimaryColor
-          : defaultPrimaryColor.withOpacity(0.5);
+          : defaultPrimaryColor.withValues(alpha: 0.5);
       buttonTextColor = widget.textColor ?? Colors.white;
     }
 
@@ -111,7 +111,7 @@ class _CustomButtonState extends State<CustomButton> {
               boxShadow: [
                 if (!widget.isSecondary)
                   BoxShadow(
-                    color: defaultPrimaryColor.withOpacity(
+                    color: defaultPrimaryColor.withValues(alpha:
                       _isHovered ? 0.35 : 0.2,
                     ),
                     blurRadius: _isHovered ? 16 : 10,

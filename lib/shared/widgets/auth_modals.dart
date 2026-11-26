@@ -3,20 +3,16 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
-import 'package:mapotech/shared/widgets/animated_portal_switcher.dart';
-import 'package:mapotech/shared/widgets/custom_button.dart';
 import 'package:bcrypt/bcrypt.dart';
 import 'package:mapotech/shared/supabase_service.dart';
-import 'package:mapotech/shared/widgets/animated_transitions.dart';
 import 'package:mapotech/shared/widgets/ui.dart';
-import 'package:mapotech/shared/widgets/location_selector_widget.dart';
 import 'dart:async';
 
 /// Shows the premium login modal dialog.
 void showLoginModal(BuildContext context, WidgetRef ref) {
   showAnimatedDialog(
     context: context,
-    barrierColor: Colors.black.withOpacity(0.65),
+    barrierColor: Colors.black.withValues(alpha: 0.65),
     barrierDismissible: true,
     builder: (context) {
       return Dialog(
@@ -33,7 +29,7 @@ void showLoginModal(BuildContext context, WidgetRef ref) {
 void showRegisterModal(BuildContext context, WidgetRef ref) {
   showAnimatedDialog(
     context: context,
-    barrierColor: Colors.black.withOpacity(0.65),
+    barrierColor: Colors.black.withValues(alpha: 0.65),
     barrierDismissible: true,
     builder: (context) {
       return Dialog(
@@ -246,7 +242,7 @@ class _LoginModalContentState extends State<_LoginModalContent> {
     showGeneralDialog(
       context: context,
       barrierDismissible: false,
-      barrierColor: Colors.black.withOpacity(0.5),
+      barrierColor: Colors.black.withValues(alpha: 0.5),
       transitionDuration: const Duration(milliseconds: 250),
       pageBuilder: (dialogCtx, anim1, anim2) {
         loadingDialogContext = dialogCtx;
@@ -549,7 +545,7 @@ class _LoginModalContentState extends State<_LoginModalContent> {
 
     // Disabled visual properties if soon
     final fieldColorText = isSoonActive
-        ? subtitleColor.withOpacity(0.6)
+        ? subtitleColor.withValues(alpha: 0.6)
         : textColor;
 
     return Container(
@@ -560,7 +556,7 @@ class _LoginModalContentState extends State<_LoginModalContent> {
         border: Border.all(color: Colors.transparent),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 40,
             offset: const Offset(0, 20),
           ),
@@ -609,9 +605,9 @@ class _LoginModalContentState extends State<_LoginModalContent> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   decoration: BoxDecoration(
-                    color: Colors.redAccent.withOpacity(0.12),
+                    color: Colors.redAccent.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.redAccent.withOpacity(0.4)),
+                    border: Border.all(color: Colors.redAccent.withValues(alpha: 0.4)),
                   ),
                   child: Row(
                     children: [
@@ -709,7 +705,7 @@ class _LoginModalContentState extends State<_LoginModalContent> {
                                 hintText: 'name@company.com',
                                 hintStyle: GoogleFonts.outfit(
                                   fontSize: 13,
-                                  color: subtitleColor.withOpacity(0.5),
+                                  color: subtitleColor.withValues(alpha: 0.5),
                                 ),
                                 border: InputBorder.none,
                               ),
@@ -780,7 +776,7 @@ class _LoginModalContentState extends State<_LoginModalContent> {
                                 hintText: '••••••••',
                                 hintStyle: GoogleFonts.outfit(
                                   fontSize: 13,
-                                  color: subtitleColor.withOpacity(0.5),
+                                  color: subtitleColor.withValues(alpha: 0.5),
                                 ),
                                 border: InputBorder.none,
                               ),
@@ -812,8 +808,8 @@ class _LoginModalContentState extends State<_LoginModalContent> {
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        btnGradient[0].withOpacity(0.4),
-                        btnGradient[1].withOpacity(0.4),
+                        btnGradient[0].withValues(alpha: 0.4),
+                        btnGradient[1].withValues(alpha: 0.4),
                       ],
                     ),
                     borderRadius: BorderRadius.circular(100),
@@ -855,7 +851,7 @@ class _LoginModalContentState extends State<_LoginModalContent> {
                       fontSize: 9,
                       fontWeight: FontWeight.w900,
                       color: isSoonActive
-                          ? subtitleColor.withOpacity(0.4)
+                          ? subtitleColor.withValues(alpha: 0.4)
                           : accentPurple,
                       letterSpacing: 1.0,
                     ),
@@ -1003,7 +999,7 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
         border: Border.all(color: Colors.transparent),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 40,
             offset: const Offset(0, 20),
           ),
@@ -1290,7 +1286,7 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
                                 borderRadius: BorderRadius.circular(14),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(
+                                    color: Colors.black.withValues(alpha:
                                       isDark ? 0.15 : 0.04,
                                     ),
                                     blurRadius: 10,
@@ -1314,7 +1310,7 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
                                 fontSize: 9,
                                 fontWeight: FontWeight.w900,
                                 letterSpacing: 0.5,
-                                color: textColor.withOpacity(0.8),
+                                color: textColor.withValues(alpha: 0.8),
                               ),
                             ),
                           ],
@@ -1335,7 +1331,7 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
                           height: 48,
                           padding: const EdgeInsets.only(bottom: 2),
                           alignment: Alignment.bottomCenter,
-                          color: ribbonBg.withOpacity(isDark ? 0.2 : 0.6),
+                          color: ribbonBg.withValues(alpha: isDark ? 0.2 : 0.6),
                           child: Text(
                             'SEGERA',
                             style: GoogleFonts.outfit(
@@ -1362,8 +1358,8 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  btnGradient[0].withOpacity(0.4),
-                  btnGradient[1].withOpacity(0.4),
+                  btnGradient[0].withValues(alpha: 0.4),
+                  btnGradient[1].withValues(alpha: 0.4),
                 ],
               ),
               borderRadius: BorderRadius.circular(100),
@@ -1465,7 +1461,7 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
                     hintText: 'John Doe',
                     hintStyle: GoogleFonts.outfit(
                       fontSize: 13,
-                      color: subtitleColor.withOpacity(0.5),
+                      color: subtitleColor.withValues(alpha: 0.5),
                     ),
                     border: InputBorder.none,
                   ),
@@ -1522,7 +1518,7 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
                         counterText: '',
                         hintStyle: GoogleFonts.outfit(
                           fontSize: 13,
-                          color: subtitleColor.withOpacity(0.5),
+                          color: subtitleColor.withValues(alpha: 0.5),
                         ),
                         border: InputBorder.none,
                       ),
@@ -1635,7 +1631,7 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
                         hintText: 'Kota/Kabupaten',
                         hintStyle: GoogleFonts.outfit(
                           fontSize: 13,
-                          color: subtitleColor.withOpacity(0.5),
+                          color: subtitleColor.withValues(alpha: 0.5),
                         ),
                         border: InputBorder.none,
                       ),
@@ -1685,7 +1681,7 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
                               hintText: 'mm / dd / yyyy',
                               hintStyle: GoogleFonts.outfit(
                                 fontSize: 13,
-                                color: subtitleColor.withOpacity(0.5),
+                                color: subtitleColor.withValues(alpha: 0.5),
                               ),
                               border: InputBorder.none,
                             ),
@@ -1770,7 +1766,7 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
                     counterText: '',
                     hintStyle: GoogleFonts.outfit(
                       fontSize: 13,
-                      color: subtitleColor.withOpacity(0.5),
+                      color: subtitleColor.withValues(alpha: 0.5),
                     ),
                     border: InputBorder.none,
                   ),
@@ -1897,25 +1893,24 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
                           if (_selectedRoleId == 'ponkesdes') dbRole = 'ponkesdes';
 
                           final exists = await db.checkNikExists(_nikController.text.trim(), dbRole);
+                          if (!mounted) return;
                           setState(() => _isLoading = false);
 
                           if (exists) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  backgroundColor: Colors.redAccent,
-                                  content: Text(
-                                    state.language == 'id'
-                                        ? 'NIK sudah terdaftar!'
-                                        : 'NIK already registered!',
-                                    style: GoogleFonts.outfit(
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                backgroundColor: Colors.redAccent,
+                                content: Text(
+                                  state.language == 'id'
+                                      ? 'NIK sudah terdaftar!'
+                                      : 'NIK already registered!',
+                                  style: GoogleFonts.outfit(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
                                   ),
                                 ),
-                              );
-                            }
+                              ),
+                            );
                             return;
                           }
                         } catch (e) {
@@ -1957,8 +1952,8 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: isDark
-                ? const Color(0xFF1E1E22).withOpacity(0.5)
-                : const Color(0xFFF7F5FC).withOpacity(0.5),
+                ? const Color(0xFF1E1E22).withValues(alpha: 0.5)
+                : const Color(0xFFF7F5FC).withValues(alpha: 0.5),
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
               color: isDark ? const Color(0xFF2C2C2C) : Colors.grey[100]!,
@@ -2034,7 +2029,7 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
                     hintText: 'Alamat lengkap (opsional)',
                     hintStyle: GoogleFonts.outfit(
                       fontSize: 11,
-                      color: subtitleColor.withOpacity(0.5),
+                      color: subtitleColor.withValues(alpha: 0.5),
                     ),
                     border: InputBorder.none,
                   ),
@@ -2121,7 +2116,7 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: _otpVerified
-                  ? Colors.green.withOpacity(0.5)
+                  ? Colors.green.withValues(alpha: 0.5)
                   : (isDark ? const Color(0xFF2C2C2C) : Colors.grey[200]!),
               width: _otpVerified ? 1.5 : 1,
             ),
@@ -2151,7 +2146,7 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
                     hintText: 'name@company.com',
                     hintStyle: GoogleFonts.outfit(
                       fontSize: 13,
-                      color: subtitleColor.withOpacity(0.5),
+                      color: subtitleColor.withValues(alpha: 0.5),
                     ),
                     border: InputBorder.none,
                   ),
@@ -2166,9 +2161,9 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.1),
+                    color: Colors.green.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.green.withOpacity(0.3)),
+                    border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
                   ),
                   child: Text(
                     state.language == 'id' ? 'TERVERIFIKASI' : 'VERIFIED',
@@ -2217,56 +2212,16 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
 
                               // Check if email already registered
                               final emailExists = await db.checkEmailExists(email);
+                              if (!mounted) return;
                               if (emailExists) {
                                 setState(() => _isLoading = false);
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      backgroundColor: Colors.redAccent,
-                                      content: Text(
-                                        state.language == 'id'
-                                            ? 'Email sudah terdaftar!'
-                                            : 'Email already registered!',
-                                        style: GoogleFonts.outfit(
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                }
-                                return;
-                              }
-
-                              final otp = await db.sendOtp(email);
-                              setState(() {
-                                _otpSent = true;
-                                _isLoading = false;
-                              });
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    backgroundColor: accentPurple,
-                                    content: Text(
-                                      state.language == 'id'
-                                          ? 'OTP terkirim! Kode: $otp (dev mode)'
-                                          : 'OTP sent! Code: $otp (dev mode)',
-                                      style: GoogleFonts.outfit(
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              }
-                            } catch (e) {
-                              setState(() => _isLoading = false);
-                              if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     backgroundColor: Colors.redAccent,
                                     content: Text(
-                                      '$e',
+                                      state.language == 'id'
+                                          ? 'Email sudah terdaftar!'
+                                          : 'Email already registered!',
                                       style: GoogleFonts.outfit(
                                         fontWeight: FontWeight.bold,
                                         color: Colors.white,
@@ -2274,7 +2229,44 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
                                     ),
                                   ),
                                 );
+                                return;
                               }
+
+                              final otp = await db.sendOtp(email);
+                              if (!mounted) return;
+                              setState(() {
+                                _otpSent = true;
+                                _isLoading = false;
+                              });
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  backgroundColor: accentPurple,
+                                  content: Text(
+                                    state.language == 'id'
+                                        ? 'OTP terkirim! Kode: $otp (dev mode)'
+                                        : 'OTP sent! Code: $otp (dev mode)',
+                                    style: GoogleFonts.outfit(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            } catch (e) {
+                              if (!mounted) return;
+                              setState(() => _isLoading = false);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  backgroundColor: Colors.redAccent,
+                                  content: Text(
+                                    '$e',
+                                    style: GoogleFonts.outfit(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              );
                             }
                           },
                           borderRadius: BorderRadius.circular(8),
@@ -2284,12 +2276,12 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
                               vertical: 6,
                             ),
                             decoration: BoxDecoration(
-                              color: accentPurple.withOpacity(
+                              color: accentPurple.withValues(alpha:
                                 isDark ? 0.15 : 0.08,
                               ),
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
-                                color: accentPurple.withOpacity(0.2),
+                                color: accentPurple.withValues(alpha: 0.2),
                               ),
                             ),
                             child: Text(
@@ -2359,7 +2351,7 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
                             hintText: '------',
                             hintStyle: GoogleFonts.outfit(
                               fontSize: 16,
-                              color: subtitleColor.withOpacity(0.4),
+                              color: subtitleColor.withValues(alpha: 0.4),
                               letterSpacing: 4,
                             ),
                             border: InputBorder.none,
@@ -2394,32 +2386,31 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
                             _emailController.text.trim(),
                             otp,
                           );
+                          if (!mounted) return;
                           setState(() {
                             _isLoading = false;
                             _otpVerified = valid;
                           });
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                backgroundColor: valid
-                                    ? Colors.green
-                                    : Colors.redAccent,
-                                content: Text(
-                                  valid
-                                      ? (state.language == 'id'
-                                            ? 'Email terverifikasi!'
-                                            : 'Email verified!')
-                                      : (state.language == 'id'
-                                            ? 'Kode salah atau kadaluarsa!'
-                                            : 'Wrong or expired code!'),
-                                  style: GoogleFonts.outfit(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              backgroundColor: valid
+                                  ? Colors.green
+                                  : Colors.redAccent,
+                              content: Text(
+                                valid
+                                    ? (state.language == 'id'
+                                          ? 'Email terverifikasi!'
+                                          : 'Email verified!')
+                                    : (state.language == 'id'
+                                          ? 'Kode salah atau kadaluarsa!'
+                                          : 'Wrong or expired code!'),
+                                style: GoogleFonts.outfit(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
                                 ),
                               ),
-                            );
-                          }
+                            ),
+                          );
                         } catch (e) {
                           setState(() => _isLoading = false);
                         }
@@ -2487,7 +2478,7 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
                     hintText: '••••••••',
                     hintStyle: GoogleFonts.outfit(
                       fontSize: 13,
-                      color: subtitleColor.withOpacity(0.5),
+                      color: subtitleColor.withValues(alpha: 0.5),
                     ),
                     border: InputBorder.none,
                   ),
@@ -2546,7 +2537,7 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
                     hintText: '••••••••',
                     hintStyle: GoogleFonts.outfit(
                       fontSize: 13,
-                      color: subtitleColor.withOpacity(0.5),
+                      color: subtitleColor.withValues(alpha: 0.5),
                     ),
                     border: InputBorder.none,
                   ),
@@ -2679,29 +2670,29 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
                         try {
                           final db = SupabaseService();
                           final emailExists = await db.checkEmailExists(email);
+                          if (!mounted) return;
                           if (emailExists) {
                             setState(() => _isLoading = false);
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  backgroundColor: Colors.redAccent,
-                                  content: Text(
-                                    state.language == 'id'
-                                        ? 'Email sudah terdaftar!'
-                                        : 'Email already registered!',
-                                    style: GoogleFonts.outfit(
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                backgroundColor: Colors.redAccent,
+                                content: Text(
+                                  state.language == 'id'
+                                      ? 'Email sudah terdaftar!'
+                                      : 'Email already registered!',
+                                  style: GoogleFonts.outfit(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
                                   ),
                                 ),
-                              );
-                            }
+                              ),
+                            );
                             return;
                           }
                         } catch (e) {
-                          print('Email double-check failed: $e');
+                          debugPrint('Email double-check failed: $e');
                         }
+                        if (!mounted) return;
                         setState(() => _isLoading = false);
 
                         // Show the premium full-screen loading page with progress and FAQ
@@ -2717,10 +2708,11 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
                           }
                         });
 
+                        if (!mounted) return;
                         showGeneralDialog(
                           context: context,
                           barrierDismissible: false,
-                          barrierColor: Colors.black.withOpacity(0.5),
+                          barrierColor: Colors.black.withValues(alpha: 0.5),
                           transitionDuration: const Duration(milliseconds: 250),
                           pageBuilder: (context, anim1, anim2) => FadeTransition(
                             opacity: anim1,
@@ -2791,52 +2783,50 @@ class _RegisterModalContentState extends State<_RegisterModalContent> {
                           }
                           await Future.delayed(const Duration(milliseconds: 150));
 
-                          if (context.mounted && Navigator.canPop(context)) {
+                          if (mounted && Navigator.canPop(context)) {
                             Navigator.pop(context);
                           }
                           progressNotifier.dispose();
+                          if (!mounted) return;
                           setState(() => _isLoading = false);
 
-                          if (context.mounted) {
-                            Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                backgroundColor: accentPurple,
-                                content: Text(
-                                  state.language == 'id'
-                                      ? 'Pendaftaran berhasil! Akun Anda telah aktif dan siap digunakan.'
-                                      : 'Registration successful! Your account is active and ready to use.',
-                                  style: GoogleFonts.outfit(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              backgroundColor: accentPurple,
+                              content: Text(
+                                state.language == 'id'
+                                    ? 'Pendaftaran berhasil! Akun Anda telah aktif dan siap digunakan.'
+                                    : 'Registration successful! Your account is active and ready to use.',
+                                style: GoogleFonts.outfit(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
                                 ),
-                                duration: const Duration(seconds: 5),
                               ),
-                            );
-                          }
+                              duration: const Duration(seconds: 5),
+                            ),
+                          );
                         } catch (e) {
                           loadingTimer.cancel();
-                          if (context.mounted && Navigator.canPop(context)) {
+                          if (mounted && Navigator.canPop(context)) {
                             Navigator.pop(context);
                           }
                           progressNotifier.dispose();
+                          if (!mounted) return;
                           setState(() => _isLoading = false);
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                backgroundColor: Colors.redAccent,
-                                content: Text(
-                                  '${state.language == 'id' ? 'Pendaftaran gagal: ' : 'Registration failed: '}$e',
-                                  style: GoogleFonts.outfit(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              backgroundColor: Colors.redAccent,
+                              content: Text(
+                                '${state.language == 'id' ? 'Pendaftaran gagal: ' : 'Registration failed: '}$e',
+                                style: GoogleFonts.outfit(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
                                 ),
-                                duration: const Duration(seconds: 5),
                               ),
-                            );
-                          }
+                              duration: const Duration(seconds: 5),
+                            ),
+                          );
                         }
                       },
                     ),

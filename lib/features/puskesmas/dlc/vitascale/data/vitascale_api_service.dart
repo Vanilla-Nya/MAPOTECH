@@ -390,14 +390,14 @@ class VitaScaleApiService {
     try {
       final payload = <String, dynamic>{
         if (base64Image != null && base64Image.isNotEmpty) 'image': base64Image,
-        if (h != null) 'H': h,
-        if (ppm100 != null) 'PPM100': ppm100,
-        if (t != null) 't': t,
-        if (k1 != null) 'k1': k1,
-        if (skala != null) 'skala': skala,
-        if (useRoi != null) 'use_roi': useRoi,
-        if (useK1 != null) 'use_k1': useK1,
-        if (preset != null) 'preset': preset,
+        'H': ?h,
+        'PPM100': ?ppm100,
+        't': ?t,
+        'k1': ?k1,
+        'skala': ?skala,
+        'use_roi': ?useRoi,
+        'use_k1': ?useK1,
+        'preset': ?preset,
       };
 
       final response = await _client

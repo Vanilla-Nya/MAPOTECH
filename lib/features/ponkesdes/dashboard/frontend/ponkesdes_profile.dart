@@ -1,7 +1,4 @@
-import 'dart:convert';
-import 'dart:math';
 import 'dart:ui' show ImageFilter;
-import 'dart:typed_data';
 import 'dart:io' as io;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -68,9 +65,6 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
   DateTime? _subExpiryDate;
   String _subExpiry = '-';
   int _subDaysRemaining = 0;
-  int _subHoursRemaining = 0;
-  int _subMinutesRemaining = 0;
-  int _subTotalDays = 30;
 
   // Schedule operational hours
   final List<Map<String, dynamic>> _scheduleDays = [
@@ -83,7 +77,7 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
     {'day': 'Sunday', 'initial': 'S', 'active': false, 'start': '08:00 AM', 'end': '12:00 PM'},
   ];
 
-  double _zoomLevel = 15.0;
+  final double _zoomLevel = 15.0;
 
   @override
   void initState() {
@@ -146,7 +140,7 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
           .select('id, day, open_time, close_time, is_off')
           .eq('id_ponkesdes', userId);
 
-      if (schedules != null && schedules.isNotEmpty) {
+      if (schedules.isNotEmpty) {
         for (var dayMap in _scheduleDays) {
           final matchedList = schedules.where(
             (s) => s['day'].toString().toLowerCase() == dayMap['day'].toString().toLowerCase(),
@@ -204,26 +198,18 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
                 final diff = expiryDate.difference(now);
                 if (diff.isNegative) {
                   _subDaysRemaining = 0;
-                  _subHoursRemaining = 0;
-                  _subMinutesRemaining = 0;
                 } else {
                   _subDaysRemaining = diff.inDays;
-                  _subHoursRemaining = diff.inHours % 24;
-                  _subMinutesRemaining = diff.inMinutes % 60;
                 }
               } catch (_) {
                 _subExpiry = '-';
                 _subExpiryDate = null;
                 _subDaysRemaining = 0;
-                _subHoursRemaining = 0;
-                _subMinutesRemaining = 0;
               }
             } else {
               _subExpiry = '-';
               _subExpiryDate = null;
               _subDaysRemaining = 0;
-              _subHoursRemaining = 0;
-              _subMinutesRemaining = 0;
             }
           }
           final bool isSubActive = _subStatus == 'ACTIVE' && _subExpiryDate != null && _subExpiryDate!.isAfter(DateTime.now());
@@ -498,7 +484,7 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
                                   ? Image.network(
                                       _avatarUrl,
                                       fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.person_rounded, color: Colors.grey)),
+                                      errorBuilder: (_, _, _) => const Center(child: Icon(Icons.person_rounded, color: Colors.grey)),
                                     )
                                   : const Center(child: Icon(Icons.person_rounded, color: Colors.grey)),
                             ),
@@ -566,7 +552,7 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 color: inputBg,
-                                border: Border.all(color: tealColor.withOpacity(0.5), width: 2),
+                                border: Border.all(color: tealColor.withValues(alpha: 0.5), width: 2),
                               ),
                               child: ClipOval(
                                 child: isProcessingImage
@@ -662,13 +648,13 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   color: inputBg,
-                                  border: Border.all(color: tealColor.withOpacity(0.5), width: 2),
+                                  border: Border.all(color: tealColor.withValues(alpha: 0.5), width: 2),
                                 ),
                                 child: ClipOval(
                                   child: Image.network(
                                     urlController.text.trim(),
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_rounded, color: Colors.redAccent, size: 30),
+                                    errorBuilder: (_, _, _) => const Icon(Icons.broken_image_rounded, color: Colors.redAccent, size: 30),
                                   ),
                                 ),
                               ),
@@ -718,7 +704,7 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
     setState(() => _isUploadingPhoto = true);
 
     try {
-      String? finalUrl;
+      final String finalUrl;
       if (result['type'] == 'upload') {
         final Uint8List originalBytes = result['bytes'] as Uint8List;
         final String fileName = result['fileName'] as String;
@@ -737,7 +723,7 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
         finalUrl = result['url'] as String;
       }
 
-      if (finalUrl != null && finalUrl.isNotEmpty) {
+      if (finalUrl.isNotEmpty) {
         await SupabaseService.client
             .from('user')
             .update({'avatar_url': finalUrl})
@@ -748,7 +734,7 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
         });
 
         setState(() {
-          _avatarUrl = finalUrl!;
+          _avatarUrl = finalUrl;
         });
       }
     } catch (e) {
@@ -801,7 +787,7 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
       if (!mounted) return;
       showDialog(
         context: context,
-        barrierColor: Colors.black.withOpacity(0.45),
+        barrierColor: Colors.black.withValues(alpha: 0.45),
         builder: (ctx) => DoctorDetailDialog(
           dokter: faskesMap,
           isDark: ref.read(landingPageProvider).appearance == 'dark',
@@ -967,7 +953,7 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
               border: Border.all(color: borderColor),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
+                  color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
                   blurRadius: 15,
                   offset: const Offset(0, 4),
                 ),
@@ -997,7 +983,7 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
                             borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
                             child: ImageFiltered(
                               imageFilter: ImageFilter.blur(sigmaX: 15.0, sigmaY: 15.0),
-                              child: Image.network(_avatarUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox()),
+                              child: Image.network(_avatarUrl, fit: BoxFit.cover, errorBuilder: (_, _, _) => const SizedBox()),
                             ),
                           ),
                         ),
@@ -1005,7 +991,7 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
                         Positioned.fill(
                           child: ClipRRect(
                             borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
-                            child: Container(color: isDark ? Colors.black.withOpacity(0.4) : themeAccent.withOpacity(0.15)),
+                            child: Container(color: isDark ? Colors.black.withValues(alpha: 0.4) : themeAccent.withValues(alpha: 0.15)),
                           ),
                         ),
                       Positioned(
@@ -1023,7 +1009,7 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
                                   color: isDark ? const Color(0xFF252528) : Colors.white,
                                   border: Border.all(color: cardBgColor, width: 4),
                                   boxShadow: [
-                                    BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, 4)),
+                                    BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, 4)),
                                   ],
                                 ),
                                 child: ClipOval(
@@ -1035,7 +1021,7 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
                                               fit: BoxFit.cover,
                                               width: 90,
                                               height: 90,
-                                              errorBuilder: (_, __, ___) => Center(
+                                              errorBuilder: (_, _, _) => Center(
                                                 child: Text(
                                                   avatarInitials,
                                                   style: GoogleFonts.outfit(fontSize: 28, fontWeight: FontWeight.w900, color: themeAccent),
@@ -1464,7 +1450,7 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
                 decoration: BoxDecoration(
                   color: isDark ? const Color(0xFF221F2E) : const Color(0xFFF5F0FF),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: themeAccent.withOpacity(0.3)),
+                  border: Border.all(color: themeAccent.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
@@ -1614,7 +1600,7 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
                       ],
                     ),
                   ),
-                  Switch(value: _showProfileInSearch, activeColor: themeAccent, onChanged: (val) => setState(() => _showProfileInSearch = val)),
+                  Switch(value: _showProfileInSearch, activeThumbColor: themeAccent, onChanged: (val) => setState(() => _showProfileInSearch = val)),
                 ],
               ),
               const SizedBox(height: 16),
@@ -1631,7 +1617,7 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
                       ],
                     ),
                   ),
-                  Switch(value: _serveBPJSPatients, activeColor: themeAccent, onChanged: (val) => setState(() => _serveBPJSPatients = val)),
+                  Switch(value: _serveBPJSPatients, activeThumbColor: themeAccent, onChanged: (val) => setState(() => _serveBPJSPatients = val)),
                 ],
               ),
               const SizedBox(height: 32),
@@ -1682,12 +1668,12 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
         color: cardBg,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isActive ? activeColor.withOpacity(0.35) : Colors.orangeAccent.withOpacity(0.35),
+          color: isActive ? activeColor.withValues(alpha: 0.35) : Colors.orangeAccent.withValues(alpha: 0.35),
           width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: statusColor.withOpacity(0.08),
+            color: statusColor.withValues(alpha: 0.08),
             blurRadius: 20,
             offset: const Offset(0, 6),
           ),
@@ -1702,7 +1688,7 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.12),
+                  color: statusColor.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
@@ -1740,9 +1726,9 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.12),
+                  color: statusColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(100),
-                  border: Border.all(color: statusColor.withOpacity(0.4)),
+                  border: Border.all(color: statusColor.withValues(alpha: 0.4)),
                 ),
                 child: Text(
                   _subStatus,
@@ -1791,7 +1777,7 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
                   borderRadius: BorderRadius.circular(100),
                   child: LinearProgressIndicator(
                     value: progress,
-                    backgroundColor: statusColor.withOpacity(0.12),
+                    backgroundColor: statusColor.withValues(alpha: 0.12),
                     valueColor: AlwaysStoppedAnimation<Color>(statusColor),
                     minHeight: 8,
                   ),
@@ -1803,9 +1789,9 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
               decoration: BoxDecoration(
-                color: Colors.orangeAccent.withOpacity(0.07),
+                color: Colors.orangeAccent.withValues(alpha: 0.07),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.orangeAccent.withOpacity(0.25)),
+                border: Border.all(color: Colors.orangeAccent.withValues(alpha: 0.25)),
               ),
               child: Row(
                 children: [
@@ -1896,9 +1882,9 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 14),
       decoration: BoxDecoration(
-        color: accentColor.withOpacity(0.08),
+        color: accentColor.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: accentColor.withOpacity(0.2)),
+        border: Border.all(color: accentColor.withValues(alpha: 0.2)),
       ),
       child: Column(
         children: [
@@ -1909,7 +1895,7 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
           const SizedBox(height: 2),
           Text(
             label.toUpperCase(),
-            style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: accentColor.withOpacity(0.8), letterSpacing: 0.5),
+            style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w900, color: accentColor.withValues(alpha: 0.8), letterSpacing: 0.5),
           ),
         ],
       ),
@@ -1955,6 +1941,7 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
 
       await _loadProfileData();
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -1966,6 +1953,7 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
         ),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to renew subscription: '),
@@ -1995,9 +1983,9 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isActive ? Colors.transparent : (isDark ? const Color(0xFF1B1B1F) : const Color(0xFFF1F5F9).withOpacity(0.5)),
+        color: isActive ? Colors.transparent : (isDark ? const Color(0xFF1B1B1F) : const Color(0xFFF1F5F9).withValues(alpha: 0.5)),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isActive ? borderColor : borderColor.withOpacity(0.5)),
+        border: Border.all(color: isActive ? borderColor : borderColor.withValues(alpha: 0.5)),
       ),
       child: Opacity(
         opacity: isActive ? 1.0 : 0.5,
@@ -2006,7 +1994,7 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
             Container(
               width: 32,
               height: 32,
-              decoration: BoxDecoration(shape: BoxShape.circle, color: isActive ? themeAccent.withOpacity(0.12) : const Color(0xFFE2E8F0)),
+              decoration: BoxDecoration(shape: BoxShape.circle, color: isActive ? themeAccent.withValues(alpha: 0.12) : const Color(0xFFE2E8F0)),
               alignment: Alignment.center,
               child: Text(dayInitial, style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: isActive ? themeAccent : Colors.grey)),
             ),
@@ -2054,7 +2042,7 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
 
             Switch(
               value: isActive,
-              activeColor: themeAccent,
+              activeThumbColor: themeAccent,
               onChanged: (val) {
                 setState(() {
                   dayMap['active'] = val;
@@ -2227,7 +2215,7 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
               isDense: true,
               counterText: '',
               hintText: hintText,
-              hintStyle: GoogleFonts.outfit(fontSize: 11, color: subtitleColor.withOpacity(0.5)),
+              hintStyle: GoogleFonts.outfit(fontSize: 11, color: subtitleColor.withValues(alpha: 0.5)),
             ),
           ),
         ),
@@ -2300,7 +2288,7 @@ class _PonkesdesProfileState extends ConsumerState<PonkesdesProfile> {
         style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: textColor),
         decoration: InputDecoration(
           hintText: hint,
-          hintStyle: GoogleFonts.outfit(fontSize: 13, color: textColor.withOpacity(0.4)),
+          hintStyle: GoogleFonts.outfit(fontSize: 13, color: textColor.withValues(alpha: 0.4)),
           border: InputBorder.none,
           isDense: true,
         ),

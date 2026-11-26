@@ -82,7 +82,7 @@ class _PasienPuskesmasSearchState extends ConsumerState<PasienPuskesmasSearch> {
     final isDark = state.appearance == 'dark';
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.45),
+      barrierColor: Colors.black.withValues(alpha: 0.45),
       builder: (ctx) => PuskesmasDetailDialog(
         puskesmas: puskesmas,
         isDark: isDark,
@@ -229,7 +229,7 @@ class _PasienPuskesmasSearchState extends ConsumerState<PasienPuskesmasSearch> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
               decoration: BoxDecoration(
-                color: themeAccent.withOpacity(0.12),
+                color: themeAccent.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(100),
               ),
               child: Text(
@@ -378,7 +378,7 @@ class _PasienPuskesmasSearchState extends ConsumerState<PasienPuskesmasSearch> {
           border: Border.all(color: border),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.03),
+              color: Colors.black.withValues(alpha: 0.03),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -392,9 +392,9 @@ class _PasienPuskesmasSearchState extends ConsumerState<PasienPuskesmasSearch> {
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                color: typeColor.withOpacity(0.12),
+                color: typeColor.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
-                border: Border.all(color: typeColor.withOpacity(0.3), width: 2),
+                border: Border.all(color: typeColor.withValues(alpha: 0.3), width: 2),
               ),
               alignment: Alignment.center,
               child: ClipOval(
@@ -511,7 +511,7 @@ class _PasienPuskesmasSearchState extends ConsumerState<PasienPuskesmasSearch> {
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: typeColor.withOpacity(0.08),
+                color: typeColor.withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
               alignment: Alignment.center,
@@ -531,9 +531,9 @@ class _PasienPuskesmasSearchState extends ConsumerState<PasienPuskesmasSearch> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(100),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -570,7 +570,7 @@ class PuskesmasDetailDialog extends ConsumerStatefulWidget {
 }
 
 class _PuskesmasDetailDialogState extends ConsumerState<PuskesmasDetailDialog> {
-  double _zoomLevel = 15.0;
+  final double _zoomLevel = 15.0;
 
   String _getMapEmbedUrl(String inputLink) {
     if (inputLink.isEmpty) {
@@ -684,7 +684,7 @@ class _PuskesmasDetailDialogState extends ConsumerState<PuskesmasDetailDialog> {
           border: Border.all(color: borderColor),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.2),
+              color: Colors.black.withValues(alpha: 0.2),
               blurRadius: 30,
               offset: const Offset(0, 10),
             ),
@@ -742,7 +742,7 @@ class _PuskesmasDetailDialogState extends ConsumerState<PuskesmasDetailDialog> {
                             style: GoogleFonts.outfit(
                               fontSize: 10,
                               fontWeight: FontWeight.w800,
-                              color: Colors.white.withOpacity(0.8),
+                              color: Colors.white.withValues(alpha: 0.8),
                               letterSpacing: 0.5,
                             ),
                           ),
@@ -972,9 +972,9 @@ class _PuskesmasDetailDialogState extends ConsumerState<PuskesmasDetailDialog> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withOpacity(isDark ? 0.18 : 0.1),
+        color: color.withValues(alpha: isDark ? 0.18 : 0.1),
         borderRadius: BorderRadius.circular(100),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -998,9 +998,9 @@ class _PuskesmasDetailDialogState extends ConsumerState<PuskesmasDetailDialog> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: color.withOpacity(isDark ? 0.12 : 0.08),
+        color: color.withValues(alpha: isDark ? 0.12 : 0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [

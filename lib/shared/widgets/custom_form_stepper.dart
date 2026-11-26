@@ -56,7 +56,7 @@ class CustomFormStepper extends StatelessWidget {
         border: Border.all(color: borderColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -119,7 +119,7 @@ class CustomFormStepper extends StatelessWidget {
     Widget contentInside;
 
     if (hasError) {
-      circleBg = const Color(0xFFE74C3C).withOpacity(0.15);
+      circleBg = const Color(0xFFE74C3C).withValues(alpha: 0.15);
       circleBorder = const Color(0xFFE74C3C);
       contentInside = const Icon(Icons.priority_high_rounded, size: 14, color: Color(0xFFE74C3C));
     } else if (isActive) {
@@ -135,16 +135,16 @@ class CustomFormStepper extends StatelessWidget {
       );
     } else if (isDone) {
       if (hasWarning) {
-        circleBg = const Color(0xFFF39C12).withOpacity(0.15);
+        circleBg = const Color(0xFFF39C12).withValues(alpha: 0.15);
         circleBorder = const Color(0xFFF39C12);
         contentInside = const Icon(Icons.info_outline_rounded, size: 13, color: Color(0xFFD68910));
       } else {
-        circleBg = const Color(0xFF27AE60).withOpacity(0.18);
+        circleBg = const Color(0xFF27AE60).withValues(alpha: 0.18);
         circleBorder = const Color(0xFF27AE60);
         contentInside = const Icon(Icons.check_rounded, size: 14, color: Color(0xFF27AE60));
       }
     } else {
-      circleBg = borderColor.withOpacity(0.06);
+      circleBg = borderColor.withValues(alpha: 0.06);
       circleBorder = borderColor;
       contentInside = Text(
         '${item.step}',
@@ -174,7 +174,7 @@ class CustomFormStepper extends StatelessWidget {
                 boxShadow: isActive
                     ? [
                         BoxShadow(
-                          color: themeAccent.withOpacity(0.35),
+                          color: themeAccent.withValues(alpha: 0.35),
                           blurRadius: 6,
                           offset: const Offset(0, 2),
                         ),
@@ -225,7 +225,7 @@ class CustomFormStepper extends StatelessWidget {
 
   Widget _buildConnector(FormStepItem current, FormStepItem next, {double? width}) {
     final isDone = current.step < currentStep;
-    final color = isDone ? themeAccent.withOpacity(0.6) : borderColor.withOpacity(0.4);
+    final color = isDone ? themeAccent.withValues(alpha: 0.6) : borderColor.withValues(alpha: 0.4);
 
     if (width != null) {
       return Container(

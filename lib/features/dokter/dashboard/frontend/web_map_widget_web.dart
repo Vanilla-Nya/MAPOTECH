@@ -1,6 +1,7 @@
+import 'dart:js_interop';
 import 'dart:ui_web' as ui_web;
-import 'dart:html' as html;
 import 'package:flutter/material.dart';
+import 'package:web/web.dart' as web;
 
 class WebPlatformMapWidget extends StatefulWidget {
   final String mapUrl;
@@ -18,7 +19,7 @@ class WebPlatformMapWidget extends StatefulWidget {
 
 class _WebPlatformMapWidgetState extends State<WebPlatformMapWidget> {
   late String _elementId;
-  html.IFrameElement? _iframeElement;
+  web.HTMLIFrameElement? _iframeElement;
 
   @override
   void initState() {
@@ -32,9 +33,9 @@ class _WebPlatformMapWidgetState extends State<WebPlatformMapWidget> {
       _iframeElement!.style.pointerEvents = pointerEvents;
     }
     try {
-      final elem = html.document.getElementById(_elementId);
-      if (elem != null) {
-        elem.style.pointerEvents = pointerEvents;
+      final elem = web.document.getElementById(_elementId);
+      if (elem != null && elem.isA<web.HTMLElement>()) {
+        (elem as web.HTMLElement).style.pointerEvents = pointerEvents;
       }
     } catch (_) {}
   }
@@ -51,7 +52,7 @@ class _WebPlatformMapWidgetState extends State<WebPlatformMapWidget> {
     final String viewType = 'iframe-map-${widget.mapUrl.hashCode}-${widget.isDark ? "dark" : "light"}';
 
     ui_web.platformViewRegistry.registerViewFactory(viewType, (int viewId) {
-      final iframe = html.IFrameElement()
+      final iframe = web.HTMLIFrameElement()
         ..id = _elementId
         ..src = widget.mapUrl
         ..style.border = 'none'

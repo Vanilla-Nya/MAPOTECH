@@ -69,7 +69,7 @@ class SegeraHadirMockup extends ConsumerWidget {
                     decoration: BoxDecoration(
                       color: addressBarBg,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: borderColor.withOpacity(0.4)),
+                      border: Border.all(color: borderColor.withValues(alpha: 0.4)),
                     ),
                     alignment: Alignment.center,
                     child: Text(
@@ -77,7 +77,7 @@ class SegeraHadirMockup extends ConsumerWidget {
                       style: GoogleFonts.outfit(
                         fontSize: 8,
                         fontWeight: FontWeight.w700,
-                        color: bodyTextColor.withOpacity(0.6),
+                        color: bodyTextColor.withValues(alpha: 0.6),
                         letterSpacing: 1.0,
                       ),
                     ),
@@ -105,7 +105,7 @@ class SegeraHadirMockup extends ConsumerWidget {
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
+                          color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
                           blurRadius: 15,
                           offset: const Offset(0, 6),
                         )
@@ -159,7 +159,7 @@ class SegeraHadirMockup extends ConsumerWidget {
                       style: GoogleFonts.outfit(
                         fontSize: 10,
                         fontWeight: FontWeight.w800,
-                        color: bodyTextColor.withOpacity(0.7),
+                        color: bodyTextColor.withValues(alpha: 0.7),
                         height: 1.6,
                         letterSpacing: 0.5,
                       ),
@@ -173,7 +173,7 @@ class SegeraHadirMockup extends ConsumerWidget {
                     decoration: BoxDecoration(
                       color: isDark ? const Color(0xFF201A2B) : const Color(0xFFF9F5FE),
                       borderRadius: BorderRadius.circular(100),
-                      border: Border.all(color: accentPurple.withOpacity(0.2)),
+                      border: Border.all(color: accentPurple.withValues(alpha: 0.2)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,

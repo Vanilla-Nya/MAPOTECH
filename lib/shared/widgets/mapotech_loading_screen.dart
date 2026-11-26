@@ -131,7 +131,6 @@ class _MapotechLoadingScreenState extends ConsumerState<MapotechLoadingScreen> w
     final primaryColor = notifier.getPrimaryColor();
     final secondaryColor = notifier.getSecondaryColor();
     final backgroundColor = notifier.getBackgroundColor();
-    final cardColor = notifier.getCardColor();
     final textColor = notifier.getTextColor();
     final bodyTextColor = notifier.getBodyTextColor();
 
@@ -181,7 +180,7 @@ class _MapotechLoadingScreenState extends ConsumerState<MapotechLoadingScreen> w
               height: 350,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: primaryColor.withOpacity(0.06),
+                color: primaryColor.withValues(alpha: 0.06),
               ),
             ),
           ),
@@ -193,7 +192,7 @@ class _MapotechLoadingScreenState extends ConsumerState<MapotechLoadingScreen> w
               height: 400,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: secondaryColor.withOpacity(0.04),
+                color: secondaryColor.withValues(alpha: 0.04),
               ),
             ),
           ),
@@ -215,10 +214,10 @@ class _MapotechLoadingScreenState extends ConsumerState<MapotechLoadingScreen> w
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                           decoration: BoxDecoration(
-                            color: primaryColor.withOpacity(0.12),
+                            color: primaryColor.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(100),
                             border: Border.all(
-                              color: primaryColor.withOpacity(0.25),
+                              color: primaryColor.withValues(alpha: 0.25),
                               width: 1,
                             ),
                           ),
@@ -266,20 +265,20 @@ class _MapotechLoadingScreenState extends ConsumerState<MapotechLoadingScreen> w
                           padding: const EdgeInsets.all(20.0),
                           decoration: BoxDecoration(
                             color: isDark 
-                                ? const Color(0xFF1E293B).withOpacity(0.85)
-                                : const Color(0xFFF8FAFC).withOpacity(0.95),
+                                ? const Color(0xFF1E293B).withValues(alpha: 0.85)
+                                : const Color(0xFFF8FAFC).withValues(alpha: 0.95),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
                               color: isDark 
-                                  ? Colors.white.withOpacity(0.05)
-                                  : primaryColor.withOpacity(0.15),
+                                  ? Colors.white.withValues(alpha: 0.05)
+                                  : primaryColor.withValues(alpha: 0.15),
                               width: 1,
                             ),
                             boxShadow: [
                               BoxShadow(
                                 color: isDark 
-                                    ? Colors.black.withOpacity(0.2)
-                                    : Colors.black.withOpacity(0.05),
+                                    ? Colors.black.withValues(alpha: 0.2)
+                                    : Colors.black.withValues(alpha: 0.05),
                                 blurRadius: 20,
                                 offset: const Offset(0, 8),
                               ),
@@ -305,8 +304,8 @@ class _MapotechLoadingScreenState extends ConsumerState<MapotechLoadingScreen> w
                                   height: 1.4,
                                   fontWeight: FontWeight.w500,
                                   color: isDark 
-                                      ? const Color(0xFFF3F4F6).withOpacity(0.75)
-                                      : bodyTextColor.withOpacity(0.8),
+                                      ? const Color(0xFFF3F4F6).withValues(alpha: 0.75)
+                                      : bodyTextColor.withValues(alpha: 0.8),
                                 ),
                               ),
                             ],
@@ -328,7 +327,7 @@ class _MapotechLoadingScreenState extends ConsumerState<MapotechLoadingScreen> w
                         style: GoogleFonts.outfit(
                           fontSize: 11,
                           fontWeight: FontWeight.w900,
-                          color: bodyTextColor.withOpacity(0.5),
+                          color: bodyTextColor.withValues(alpha: 0.5),
                           letterSpacing: 2,
                         ),
                       ),
@@ -339,10 +338,10 @@ class _MapotechLoadingScreenState extends ConsumerState<MapotechLoadingScreen> w
                         height: 12,
                         width: double.infinity,
                         decoration: BoxDecoration(
-                          color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey[200],
+                          color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey[200],
                           borderRadius: BorderRadius.circular(100),
                           border: Border.all(
-                            color: isDark ? Colors.white.withOpacity(0.03) : Colors.grey[300]!,
+                            color: isDark ? Colors.white.withValues(alpha: 0.03) : Colors.grey[300]!,
                             width: 1,
                           ),
                         ),
@@ -367,7 +366,7 @@ class _MapotechLoadingScreenState extends ConsumerState<MapotechLoadingScreen> w
                                   borderRadius: BorderRadius.circular(100),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: primaryColor.withOpacity(0.35),
+                                      color: primaryColor.withValues(alpha: 0.35),
                                       blurRadius: 8,
                                       spreadRadius: 1,
                                       offset: const Offset(0, 1),
@@ -390,7 +389,7 @@ class _MapotechLoadingScreenState extends ConsumerState<MapotechLoadingScreen> w
                             style: GoogleFonts.outfit(
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
-                              color: primaryColor.withOpacity(0.8),
+                              color: primaryColor.withValues(alpha: 0.8),
                             ),
                           ),
                           Text(

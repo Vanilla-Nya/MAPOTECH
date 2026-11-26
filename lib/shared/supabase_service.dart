@@ -76,7 +76,7 @@ class SupabaseService {
 
       // Send onboarding welcome email via Resend API asynchronously
       sendWelcomeEmail(email: email, name: name, role: role).catchError((e) {
-        print('Failed to send welcome email: $e');
+        debugPrint('Failed to send welcome email: $e');
         return false;
       });
 
@@ -103,7 +103,7 @@ class SupabaseService {
       );
       return rows.isNotEmpty;
     } catch (e) {
-      print('Error checking email: $e');
+      debugPrint('Error checking email: $e');
       return false;
     }
   }
@@ -125,7 +125,7 @@ class SupabaseService {
       );
       return rows.isNotEmpty;
     } catch (e) {
-      print('Error checking NIK: $e');
+      debugPrint('Error checking NIK: $e');
       return false;
     }
   }
@@ -139,7 +139,7 @@ class SupabaseService {
     try {
       final apiKey = dotenv.env['RESEND_API_KEY'];
       if (apiKey == null || apiKey.isEmpty) {
-        print('Resend API Key is not configured in env file');
+        debugPrint('Resend API Key is not configured in env file');
         return false;
       }
 
@@ -236,11 +236,11 @@ class SupabaseService {
       if (response.statusCode == 200 || response.statusCode == 201) {
         return true;
       } else {
-        print('Failed to send welcome email: ${response.body}');
+        debugPrint('Failed to send welcome email: ${response.body}');
         return false;
       }
     } catch (e) {
-      print('Error sending welcome email: $e');
+      debugPrint('Error sending welcome email: $e');
       return false;
     }
   }
@@ -1029,7 +1029,7 @@ class SupabaseService {
       );
       return created;
     } catch (e) {
-      print('Error ingesting prescription to pharmacy order: $e');
+      debugPrint('Error ingesting prescription to pharmacy order: $e');
       return null;
     }
   }
@@ -1068,7 +1068,7 @@ class SupabaseService {
       );
       return created;
     } catch (e) {
-      print('Error creating physical prescription: $e');
+      debugPrint('Error creating physical prescription: $e');
       return null;
     }
   }
@@ -1223,7 +1223,7 @@ class SupabaseService {
         'address': locationName,
       });
     } catch (e) {
-      print('Error saving puskesmas map location: $e');
+      debugPrint('Error saving puskesmas map location: $e');
     }
   }
 
@@ -1259,7 +1259,7 @@ class SupabaseService {
     try {
       await client.from('user').update(data).eq('id', userId);
     } catch (e) {
-      print('Error updating user: $e');
+      debugPrint('Error updating user: $e');
     }
 
     if (patientDetailData != null && patientDetailData.isNotEmpty) {
@@ -1269,7 +1269,7 @@ class SupabaseService {
           ...patientDetailData,
         });
       } catch (e) {
-        print('Error updating user_detail_patient: $e');
+        debugPrint('Error updating user_detail_patient: $e');
       }
     }
   }
@@ -1289,7 +1289,7 @@ class SupabaseService {
           .order('created_at', ascending: true);
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      print('Error fetching family members: $e');
+      debugPrint('Error fetching family members: $e');
       return [];
     }
   }
@@ -1327,7 +1327,7 @@ class SupabaseService {
       }
       return [];
     } catch (e) {
-      print('Error fetching all family members for user: $e');
+      debugPrint('Error fetching all family members for user: $e');
       return [];
     }
   }
@@ -1344,7 +1344,7 @@ class SupabaseService {
         return Map<String, dynamic>.from(response.first);
       }
     } catch (e) {
-      print('Error adding family member: $e');
+      debugPrint('Error adding family member: $e');
     }
     return null;
   }
@@ -1364,7 +1364,7 @@ class SupabaseService {
           .eq('patient_id', patientId);
       return true;
     } catch (e) {
-      print('Error disbanding KK group: $e');
+      debugPrint('Error disbanding KK group: $e');
       return false;
     }
   }
@@ -1386,7 +1386,7 @@ class SupabaseService {
       await client.from('user_detail_patient').upsert(payload);
       return true;
     } catch (e) {
-      print('Error updating status kepala keluarga: $e');
+      debugPrint('Error updating status kepala keluarga: $e');
       return false;
     }
   }
@@ -1396,7 +1396,7 @@ class SupabaseService {
       await client.from('patient_family_members').delete().eq('id', id);
       return true;
     } catch (e) {
-      print('Error deleting family member: $e');
+      debugPrint('Error deleting family member: $e');
       return false;
     }
   }
@@ -1413,7 +1413,7 @@ class SupabaseService {
           .limit(10);
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      print('Error searching patients: $e');
+      debugPrint('Error searching patients: $e');
       return [];
     }
   }
@@ -1458,7 +1458,7 @@ class SupabaseService {
 
       return true;
     } catch (e) {
-      print('Error joining KK: $e');
+      debugPrint('Error joining KK: $e');
       return false;
     }
   }
@@ -1490,7 +1490,7 @@ class SupabaseService {
       }
       return true;
     } catch (e) {
-      print('Error updating accept_kk status: $e');
+      debugPrint('Error updating accept_kk status: $e');
       return false;
     }
   }
@@ -1544,7 +1544,7 @@ class SupabaseService {
         }
       }
     } catch (e) {
-      print('Error fetching favorite_menus from $tableName: $e');
+      debugPrint('Error fetching favorite_menus from $tableName: $e');
     }
     return null;
   }
@@ -1563,7 +1563,7 @@ class SupabaseService {
         'favorite_menus': favoriteMenus,
       });
     } catch (e) {
-      print('Error saving favorite_menus to $tableName: $e');
+      debugPrint('Error saving favorite_menus to $tableName: $e');
     }
   }
 
@@ -1612,7 +1612,7 @@ class SupabaseService {
           .inFilter('id_queue', queueIds);
       return List<Map<String, dynamic>>.from(res as List);
     } catch (e) {
-      print('Error fetching private clinical encounters: $e');
+      debugPrint('Error fetching private clinical encounters: $e');
       return [];
     }
   }
@@ -1629,7 +1629,7 @@ class SupabaseService {
           .eq('id_clinical_ecounters', encounterId);
       return List<Map<String, dynamic>>.from(res as List);
     } catch (e) {
-      print('Error fetching encounter diagnoses: $e');
+      debugPrint('Error fetching encounter diagnoses: $e');
       return [];
     }
   }
@@ -1643,7 +1643,7 @@ class SupabaseService {
           .select('*')
           .eq('id_clinical_ecounter', encounterId)
           .maybeSingle();
-      return res as Map<String, dynamic>?;
+      return res;
     } catch (_) {
       return null;
     }
@@ -1660,7 +1660,7 @@ class SupabaseService {
           .select('*')
           .eq('id_clinical_ecounter', encounterId)
           .maybeSingle();
-      return res as Map<String, dynamic>?;
+      return res;
     } catch (_) {
       return null;
     }
@@ -1714,7 +1714,7 @@ class SupabaseService {
         }
       }
     } catch (e) {
-      print('Error loading catalog medicines: $e');
+      debugPrint('Error loading catalog medicines: $e');
     }
 
     try {
@@ -1741,7 +1741,7 @@ class SupabaseService {
         }
       }
     } catch (e) {
-      print('Error loading electronic prescriptions: $e');
+      debugPrint('Error loading electronic prescriptions: $e');
     }
 
     return medicinesList;
@@ -1774,7 +1774,7 @@ class SupabaseService {
               .eq('id_transaction', transactionId);
           return List<Map<String, dynamic>>.from(resPublic as List);
         } catch (e) {
-          print('Error fetching transaction items: $e');
+          debugPrint('Error fetching transaction items: $e');
           return [];
         }
       }
@@ -2290,8 +2290,8 @@ class SupabaseService {
         await _patch(
           'medicine?id=eq.${Uri.encodeComponent(medicineId)}',
           {
-            if (kfaCode != null) 'kfa_code': kfaCode,
-            if (kfaName != null) 'kfa_name': kfaName,
+            'kfa_code': ?kfaCode,
+            'kfa_name': ?kfaName,
           },
           schema: 'private_doctor',
         );
@@ -2625,7 +2625,6 @@ class SupabaseService {
     Map<String, dynamic> attributes,
     String previousHash,
   ) {
-    final Map<String, dynamic> hashable = {};
     final excludedKeys = {
       'current_hash',
       'previous_hash',
@@ -3017,7 +3016,7 @@ class SupabaseService {
       try {
         queuesRaw = await _get('doctor_queues?select=*', schema: 'public');
       } catch (e) {
-        print('Error fetching doctor queues statistics: $e');
+        debugPrint('Error fetching doctor queues statistics: $e');
       }
 
       final Map<String, Map<String, dynamic>> queuesMap = {
@@ -3145,7 +3144,7 @@ class SupabaseService {
       }
       return null;
     } catch (e) {
-      print('Error looking up doctor by QR token/id: $e');
+      debugPrint('Error looking up doctor by QR token/id: $e');
       return null;
     }
   }
@@ -3160,7 +3159,7 @@ class SupabaseService {
           schema: 'public',
         );
       } catch (e) {
-        print('Error fetching puskesmas: $e');
+        debugPrint('Error fetching puskesmas: $e');
       }
 
       List<dynamic> ponkesdesRaw = [];
@@ -3170,14 +3169,14 @@ class SupabaseService {
           schema: 'public',
         );
       } catch (e) {
-        print('Error fetching ponkesdes: $e');
+        debugPrint('Error fetching ponkesdes: $e');
       }
 
       List<dynamic> pustuRaw = [];
       try {
         pustuRaw = await client.from('user_detail_pustu_ponkesdes').select();
       } catch (e) {
-        print('Error fetching pustu list: $e');
+        debugPrint('Error fetching pustu list: $e');
       }
 
       final List<Map<String, dynamic>> list = [];
@@ -3517,7 +3516,7 @@ class SupabaseService {
       sendWelcomeEmail(email: email, name: name, role: 'patient').catchError((
         e,
       ) {
-        print('Failed to send welcome email: $e');
+        debugPrint('Failed to send welcome email: $e');
         return false;
       });
 
@@ -3552,7 +3551,7 @@ class SupabaseService {
           .order('created_at', ascending: true);
       return List<Map<String, dynamic>>.from(rows);
     } catch (e) {
-      print('Error fetching pekerja list: $e');
+      debugPrint('Error fetching pekerja list: $e');
       return [];
     }
   }
@@ -3608,7 +3607,7 @@ class SupabaseService {
 
       return rows.isNotEmpty ? Map<String, dynamic>.from(rows.first) : null;
     } catch (e) {
-      print('Error inserting pekerja: $e');
+      debugPrint('Error inserting pekerja: $e');
       rethrow;
     }
   }
@@ -3637,31 +3636,31 @@ class SupabaseService {
   }) async {
     try {
       final payload = <String, dynamic>{
-        if (nama != null) 'nama': nama,
-        if (email != null) 'email': email,
-        if (nik != null) 'nik': nik,
-        if (idPekerja != null) 'id_pekerja': idPekerja,
-        if (peran != null) 'peran': peran,
-        if (telepon != null) 'telepon': telepon,
-        if (username != null) 'username': username,
-        if (gender != null) 'gender': gender,
-        if (birthPlace != null) 'birth_place': birthPlace,
-        if (birthDate != null) 'birth_date': birthDate,
-        if (address != null) 'address': address,
-        if (province != null) 'province': province,
-        if (district != null) 'district': district,
-        if (subDistrict != null) 'sub_district': subDistrict,
-        if (village != null) 'village': village,
-        if (isBertugas != null) 'is_bertugas': isBertugas,
-        if (permissions != null) 'permissions': permissions,
-        if (avatarColor != null) 'avatar_color': avatarColor,
+        'nama': ?nama,
+        'email': ?email,
+        'nik': ?nik,
+        'id_pekerja': ?idPekerja,
+        'peran': ?peran,
+        'telepon': ?telepon,
+        'username': ?username,
+        'gender': ?gender,
+        'birth_place': ?birthPlace,
+        'birth_date': ?birthDate,
+        'address': ?address,
+        'province': ?province,
+        'district': ?district,
+        'sub_district': ?subDistrict,
+        'village': ?village,
+        'is_bertugas': ?isBertugas,
+        'permissions': ?permissions,
+        'avatar_color': ?avatarColor,
       };
 
       await client.from(_staffTable).update(payload).eq('id', workerId);
 
       return true;
     } catch (e) {
-      print('Error updating pekerja: $e');
+      debugPrint('Error updating pekerja: $e');
       return false;
     }
   }
@@ -3672,7 +3671,7 @@ class SupabaseService {
       await client.from(_staffTable).delete().eq('id', workerId);
       return true;
     } catch (e) {
-      print('Error deleting pekerja: $e');
+      debugPrint('Error deleting pekerja: $e');
       return false;
     }
   }
@@ -3686,7 +3685,7 @@ class SupabaseService {
           .eq('id', workerId);
       return true;
     } catch (e) {
-      print('Error toggling pekerja duty: $e');
+      debugPrint('Error toggling pekerja duty: $e');
       return false;
     }
   }
@@ -3703,7 +3702,7 @@ class SupabaseService {
           .eq('id', workerId);
       return true;
     } catch (e) {
-      print('Error updating pekerja permissions: $e');
+      debugPrint('Error updating pekerja permissions: $e');
       return false;
     }
   }
@@ -3725,7 +3724,7 @@ class SupabaseService {
           .order('created_at', ascending: true);
       return List<Map<String, dynamic>>.from(rows);
     } catch (e) {
-      print(
+      debugPrint(
         'Note: Supabase table $_pustuTable exception or not created yet: $e',
       );
       return [];
@@ -3755,18 +3754,17 @@ class SupabaseService {
         'owner_id': ownerId,
         'nama': nama,
         'tipe': tipe,
-        if (kodeUnit != null) 'kode_unit': kodeUnit,
-        if (penanggungJawab != null) 'penanggung_jawab': penanggungJawab,
-        if (nikPenanggungJawab != null)
-          'nik_penanggung_jawab': nikPenanggungJawab,
-        if (telepon != null) 'telepon': telepon,
-        if (alamat != null) 'alamat': alamat,
-        if (village != null) 'village': village,
-        if (kecamatan != null) 'kecamatan': kecamatan,
-        if (latitude != null) 'latitude': latitude,
-        if (longitude != null) 'longitude': longitude,
+        'kode_unit': ?kodeUnit,
+        'penanggung_jawab': ?penanggungJawab,
+        'nik_penanggung_jawab': ?nikPenanggungJawab,
+        'telepon': ?telepon,
+        'alamat': ?alamat,
+        'village': ?village,
+        'kecamatan': ?kecamatan,
+        'latitude': ?latitude,
+        'longitude': ?longitude,
         'status_operasional': statusOperasional ?? 'Aktif / Buka',
-        if (jamLayanan != null) 'jam_layanan': jamLayanan,
+        'jam_layanan': ?jamLayanan,
         'permissions': permissions,
         'avatar_color': avatarColor,
       };
@@ -3775,7 +3773,7 @@ class SupabaseService {
 
       return rows.isNotEmpty ? Map<String, dynamic>.from(rows.first) : null;
     } catch (e) {
-      print('Error inserting pustu/ponkesdes: $e');
+      debugPrint('Error inserting pustu/ponkesdes: $e');
       return null;
     }
   }
@@ -3798,27 +3796,26 @@ class SupabaseService {
   }) async {
     try {
       final payload = <String, dynamic>{
-        if (nama != null) 'nama': nama,
-        if (tipe != null) 'tipe': tipe,
-        if (kodeUnit != null) 'kode_unit': kodeUnit,
-        if (penanggungJawab != null) 'penanggung_jawab': penanggungJawab,
-        if (nikPenanggungJawab != null)
-          'nik_penanggung_jawab': nikPenanggungJawab,
-        if (telepon != null) 'telepon': telepon,
-        if (alamat != null) 'alamat': alamat,
-        if (village != null) 'village': village,
-        if (kecamatan != null) 'kecamatan': kecamatan,
-        if (latitude != null) 'latitude': latitude,
-        if (longitude != null) 'longitude': longitude,
-        if (statusOperasional != null) 'status_operasional': statusOperasional,
-        if (jamLayanan != null) 'jam_layanan': jamLayanan,
+        'nama': ?nama,
+        'tipe': ?tipe,
+        'kode_unit': ?kodeUnit,
+        'penanggung_jawab': ?penanggungJawab,
+        'nik_penanggung_jawab': ?nikPenanggungJawab,
+        'telepon': ?telepon,
+        'alamat': ?alamat,
+        'village': ?village,
+        'kecamatan': ?kecamatan,
+        'latitude': ?latitude,
+        'longitude': ?longitude,
+        'status_operasional': ?statusOperasional,
+        'jam_layanan': ?jamLayanan,
       };
 
       await client.from(_pustuTable).update(payload).eq('id', unitId);
 
       return true;
     } catch (e) {
-      print('Error updating pustu/ponkesdes: $e');
+      debugPrint('Error updating pustu/ponkesdes: $e');
       return false;
     }
   }
@@ -3828,7 +3825,7 @@ class SupabaseService {
       await client.from(_pustuTable).delete().eq('id', unitId);
       return true;
     } catch (e) {
-      print('Error deleting pustu/ponkesdes: $e');
+      debugPrint('Error deleting pustu/ponkesdes: $e');
       return false;
     }
   }
@@ -3844,7 +3841,7 @@ class SupabaseService {
           .eq('id', unitId);
       return true;
     } catch (e) {
-      print('Error toggling status pustu/ponkesdes: $e');
+      debugPrint('Error toggling status pustu/ponkesdes: $e');
       return false;
     }
   }

@@ -39,7 +39,7 @@ class _PasienQrScannerPageState extends ConsumerState<PasienQrScannerPage> {
             border: Border.all(color: borderColor),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 16,
                 offset: const Offset(0, 4),
               ),
@@ -113,7 +113,7 @@ class _PasienQrScannerPageState extends ConsumerState<PasienQrScannerPage> {
             border: Border.all(color: borderColor),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.03),
+                color: Colors.black.withValues(alpha: 0.03),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
@@ -134,7 +134,7 @@ class _PasienQrScannerPageState extends ConsumerState<PasienQrScannerPage> {
               );
               showDialog(
                 context: context,
-                barrierColor: Colors.black.withOpacity(0.45),
+                barrierColor: Colors.black.withValues(alpha: 0.45),
                 builder: (dCtx) => DoctorDetailDialog(
                   dokter: doctor,
                   isDark: isDark,
@@ -146,7 +146,7 @@ class _PasienQrScannerPageState extends ConsumerState<PasienQrScannerPage> {
             onApotekScanned: (apotek) {
               showDialog(
                 context: context,
-                barrierColor: Colors.black.withOpacity(0.55),
+                barrierColor: Colors.black.withValues(alpha: 0.55),
                 builder: (dCtx) => PasienApotekPosDialog(
                   pharmacy: apotek,
                   isDark: isDark,

@@ -1,10 +1,14 @@
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:js' as js;
+import 'dart:js_interop';
+
+@JS('eval')
+external void _jsEval(String code);
+
+@JS('__mapotech_print_invoice')
+external void _printInvoiceJs(String jsonData);
 
 void printInvoiceHtml(String jsonData) {
   try {
-    js.context.callMethod('eval', [
-      r'''
+    _jsEval(r'''
       window.__mapotech_print_invoice = function(dataStr) {
         var data = JSON.parse(dataStr);
         var paperSize = data.paperSize;
@@ -227,8 +231,7 @@ void printInvoiceHtml(String jsonData) {
           }, 600);
         };
       };
-      ''',
-    ]);
-    js.context.callMethod('__mapotech_print_invoice', [jsonData]);
+      ''');
+    _printInvoiceJs(jsonData);
   } catch (_) {}
 }

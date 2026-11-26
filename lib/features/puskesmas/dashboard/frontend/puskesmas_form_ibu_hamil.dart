@@ -82,10 +82,12 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
 
   String _normalizeKspr(String? val) {
     if (val == null || val.isEmpty) return 'Risiko Rendah (KRR)';
-    if (val.contains('Sangat') || val.contains('KRST'))
+    if (val.contains('Sangat') || val.contains('KRST')) {
       return 'Risiko Sangat Tinggi (KRST)';
-    if (val.contains('Tinggi') || val.contains('KRT'))
+    }
+    if (val.contains('Tinggi') || val.contains('KRT')) {
       return 'Risiko Tinggi (KRT)';
+    }
     return 'Risiko Rendah (KRR)';
   }
 
@@ -799,13 +801,13 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: isFormLengkap
-                          ? const Color(0xFF27AE60).withOpacity(0.1)
-                          : const Color(0xFFE74C3C).withOpacity(0.1),
+                          ? const Color(0xFF27AE60).withValues(alpha: 0.1)
+                          : const Color(0xFFE74C3C).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: isFormLengkap
-                            ? const Color(0xFF27AE60).withOpacity(0.3)
-                            : const Color(0xFFE74C3C).withOpacity(0.3),
+                            ? const Color(0xFF27AE60).withValues(alpha: 0.3)
+                            : const Color(0xFFE74C3C).withValues(alpha: 0.3),
                       ),
                     ),
                     child: Row(
@@ -887,7 +889,7 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
                           ),
                           backgroundColor: const Color(
                             0xFFE74C3C,
-                          ).withOpacity(0.08),
+                          ).withValues(alpha: 0.08),
                           side: const BorderSide(color: Color(0xFFE74C3C)),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(100),
@@ -935,7 +937,7 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
                           ),
                           backgroundColor: const Color(
                             0xFFF39C12,
-                          ).withOpacity(0.08),
+                          ).withValues(alpha: 0.08),
                           side: const BorderSide(color: Color(0xFFF39C12)),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(100),
@@ -1476,7 +1478,7 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
                   width: 56,
                   height: 56,
                   decoration: BoxDecoration(
-                    color: themeAccent.withOpacity(0.12),
+                    color: themeAccent.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
                   alignment: Alignment.center,
@@ -1499,7 +1501,7 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
                               vertical: 3,
                             ),
                             decoration: BoxDecoration(
-                              color: themeAccent.withOpacity(0.15),
+                              color: themeAccent.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(100),
                             ),
                             child: Text(
@@ -1606,9 +1608,9 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1661,7 +1663,7 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
     return OutlinedButton.icon(
       style: OutlinedButton.styleFrom(
         side: BorderSide(
-          color: isPrimary ? themeAccent : Colors.grey.withOpacity(0.4),
+          color: isPrimary ? themeAccent : Colors.grey.withValues(alpha: 0.4),
         ),
         foregroundColor: isPrimary ? themeAccent : null,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -1697,12 +1699,12 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
         color: isDark ? const Color(0xFF16202A) : const Color(0xFFF0FDF4),
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          color: const Color(0xFF27AE60).withOpacity(0.4),
+          color: const Color(0xFF27AE60).withValues(alpha: 0.4),
           width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF27AE60).withOpacity(0.08),
+            color: const Color(0xFF27AE60).withValues(alpha: 0.08),
             blurRadius: 16,
             offset: const Offset(0, 4),
           ),
@@ -1721,10 +1723,10 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
                   vertical: 4,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF27AE60).withOpacity(0.18),
+                  color: const Color(0xFF27AE60).withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(100),
                   border: Border.all(
-                    color: const Color(0xFF27AE60).withOpacity(0.4),
+                    color: const Color(0xFF27AE60).withValues(alpha: 0.4),
                   ),
                 ),
                 child: Row(
@@ -1784,10 +1786,10 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
                 width: 52,
                 height: 52,
                 decoration: BoxDecoration(
-                  color: patient.ksprColor.withOpacity(0.15),
+                  color: patient.ksprColor.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: patient.ksprColor.withOpacity(0.35),
+                    color: patient.ksprColor.withValues(alpha: 0.35),
                     width: 1.5,
                   ),
                 ),
@@ -1823,10 +1825,10 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: patient.ksprColor.withOpacity(0.15),
+                            color: patient.ksprColor.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(100),
                             border: Border.all(
-                              color: patient.ksprColor.withOpacity(0.3),
+                              color: patient.ksprColor.withValues(alpha: 0.3),
                             ),
                           ),
                           child: Text(
@@ -1886,7 +1888,7 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
           ),
 
           const SizedBox(height: 16),
-          Divider(height: 1, color: const Color(0xFF27AE60).withOpacity(0.2)),
+          Divider(height: 1, color: const Color(0xFF27AE60).withValues(alpha: 0.2)),
           const SizedBox(height: 12),
 
           // Baris Bawah: Navigasi Langkah (Aksi Cepat)
@@ -1973,7 +1975,7 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: themeAccent.withOpacity(0.12),
+                          color: themeAccent.withValues(alpha: 0.12),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
@@ -2012,7 +2014,7 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF2ECC71).withOpacity(0.15),
+                      color: const Color(0xFF2ECC71).withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(100),
                     ),
                     child: Text(
@@ -2052,10 +2054,10 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
                     'info': 'NIK: ${item.nik}<br/>• HPL: ${item.hpl}',
                     'details': '📍 ${item.alamat}',
                     'color':
-                        '#${item.ksprColor.value.toRadixString(16).substring(2)}',
+                        '#${item.ksprColor.toARGB32().toRadixString(16).substring(2)}',
                   };
                 }).toList(),
-                onChanged: (_, __, ___, ____) {},
+                onChanged: (_, _, _, _) {},
               ),
             ],
           ),
@@ -2079,7 +2081,7 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: themeAccent.withOpacity(0.15),
+                      color: themeAccent.withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
@@ -2223,7 +2225,7 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemCount: filteredList.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 12),
+          separatorBuilder: (_, _) => const SizedBox(height: 12),
           itemBuilder: (context, idx) {
             final item = filteredList[idx];
             final isCurrentSelected = _selectedPatient?.nik == item.nik;
@@ -2254,7 +2256,7 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
                         width: 46,
                         height: 46,
                         decoration: BoxDecoration(
-                          color: themeAccent.withOpacity(0.12),
+                          color: themeAccent.withValues(alpha: 0.12),
                           shape: BoxShape.circle,
                         ),
                         alignment: Alignment.center,
@@ -2286,7 +2288,7 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
                                     vertical: 2,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: item.ksprColor.withOpacity(0.15),
+                                    color: item.ksprColor.withValues(alpha: 0.15),
                                     borderRadius: BorderRadius.circular(100),
                                   ),
                                   child: Text(
@@ -2466,7 +2468,7 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
                           width: 48,
                           height: 48,
                           decoration: BoxDecoration(
-                            color: item.ksprColor.withOpacity(0.15),
+                            color: item.ksprColor.withValues(alpha: 0.15),
                             shape: BoxShape.circle,
                           ),
                           alignment: Alignment.center,
@@ -2496,7 +2498,7 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
                                   vertical: 2,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: item.ksprColor.withOpacity(0.15),
+                                  color: item.ksprColor.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(100),
                                 ),
                                 child: Text(
@@ -2629,7 +2631,7 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
                             vertical: 3,
                           ),
                           decoration: BoxDecoration(
-                            color: themeAccent.withOpacity(0.12),
+                            color: themeAccent.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
@@ -2651,7 +2653,7 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: item.riwayatKunjungan.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      separatorBuilder: (_, _) => const SizedBox(height: 8),
                       itemBuilder: (context, idx) {
                         final r = item.riwayatKunjungan[idx];
                         return Container(
@@ -2672,7 +2674,7 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
                                   vertical: 4,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: themeAccent.withOpacity(0.12),
+                                  color: themeAccent.withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
@@ -2814,9 +2816,9 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           decoration: BoxDecoration(
-            color: themeAccent.withOpacity(0.12),
+            color: themeAccent.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: themeAccent.withOpacity(0.3)),
+            border: Border.all(color: themeAccent.withValues(alpha: 0.3)),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2850,12 +2852,12 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
                                   decoration: BoxDecoration(
                                     color: const Color(
                                       0xFF2ECC71,
-                                    ).withOpacity(0.15),
+                                    ).withValues(alpha: 0.15),
                                     borderRadius: BorderRadius.circular(100),
                                     border: Border.all(
                                       color: const Color(
                                         0xFF2ECC71,
-                                      ).withOpacity(0.4),
+                                      ).withValues(alpha: 0.4),
                                     ),
                                   ),
                                   child: Row(
@@ -3192,7 +3194,7 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
               child: OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: Color(0xFF009688)),
-                  backgroundColor: const Color(0xFF009688).withOpacity(0.08),
+                  backgroundColor: const Color(0xFF009688).withValues(alpha: 0.08),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -3277,9 +3279,9 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: themeAccent.withOpacity(0.06),
+            color: themeAccent.withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: themeAccent.withOpacity(0.2)),
+            border: Border.all(color: themeAccent.withValues(alpha: 0.2)),
           ),
           child: Row(
             children: [
@@ -3301,7 +3303,7 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
         const SizedBox(height: 8),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
-          activeColor: themeAccent,
+          activeThumbColor: themeAccent,
           title: Text(
             'Pemeriksaan Dokter Umum/Spesialis & Skrining USG Terpenuhi (Wajib di K1 & K5)',
             style: GoogleFonts.outfit(
@@ -3557,7 +3559,7 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
 
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
-          activeColor: themeAccent,
+          activeThumbColor: themeAccent,
           title: Text(
             'Pemberian Imunisasi Td (Tetanus Difteri) pada Kunjungan Ini',
             style: GoogleFonts.outfit(
@@ -3682,7 +3684,7 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
 
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
-          activeColor: themeAccent,
+          activeThumbColor: themeAccent,
           title: Text(
             'Pemberian Tablet Tambah Darah (TTD minimal 90 Tablet selama Hamil)',
             style: GoogleFonts.outfit(
@@ -3697,7 +3699,7 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
 
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
-          activeColor: themeAccent,
+          activeThumbColor: themeAccent,
           title: Text(
             'Skrining Triple Eliminasi (HIV / Sifilis / Hepatitis B Non-Reaktif)',
             style: GoogleFonts.outfit(
@@ -3752,17 +3754,17 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: _skorKspr.contains('Sangat Tinggi')
-                ? const Color(0xFFE74C3C).withOpacity(0.12)
+                ? const Color(0xFFE74C3C).withValues(alpha: 0.12)
                 : (_skorKspr.contains('Tinggi')
-                      ? const Color(0xFFE67E22).withOpacity(0.12)
-                      : const Color(0xFF2ECC71).withOpacity(0.12)),
+                      ? const Color(0xFFE67E22).withValues(alpha: 0.12)
+                      : const Color(0xFF2ECC71).withValues(alpha: 0.12)),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: _skorKspr.contains('Sangat Tinggi')
-                  ? const Color(0xFFE74C3C).withOpacity(0.3)
+                  ? const Color(0xFFE74C3C).withValues(alpha: 0.3)
                   : (_skorKspr.contains('Tinggi')
-                        ? const Color(0xFFE67E22).withOpacity(0.3)
-                        : const Color(0xFF2ECC71).withOpacity(0.3)),
+                        ? const Color(0xFFE67E22).withValues(alpha: 0.3)
+                        : const Color(0xFF2ECC71).withValues(alpha: 0.3)),
             ),
           ),
           child: Row(
@@ -3919,9 +3921,9 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF009688).withOpacity(0.08),
+        color: const Color(0xFF009688).withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF009688).withOpacity(0.3)),
+        border: Border.all(color: const Color(0xFF009688).withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -3946,7 +3948,7 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF009688).withOpacity(0.15),
+                  color: const Color(0xFF009688).withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(100),
                 ),
                 child: Text(
@@ -4149,7 +4151,7 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
         border: Border.all(color: borderColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -4334,20 +4336,20 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
     final String badgeText;
 
     if (hasRed) {
-      badgeBg = const Color(0xFFE74C3C).withOpacity(0.12);
-      badgeBorder = const Color(0xFFE74C3C).withOpacity(0.4);
+      badgeBg = const Color(0xFFE74C3C).withValues(alpha: 0.12);
+      badgeBorder = const Color(0xFFE74C3C).withValues(alpha: 0.4);
       badgeColor = const Color(0xFFE74C3C);
       badgeIcon = Icons.error_outline_rounded;
       badgeText = '${redErrors.length} Data Wajib Kurang (Klik)';
     } else if (hasYellow) {
-      badgeBg = const Color(0xFFF39C12).withOpacity(0.12);
-      badgeBorder = const Color(0xFFF39C12).withOpacity(0.4);
+      badgeBg = const Color(0xFFF39C12).withValues(alpha: 0.12);
+      badgeBorder = const Color(0xFFF39C12).withValues(alpha: 0.4);
       badgeColor = const Color(0xFFD68910);
       badgeIcon = Icons.info_outline_rounded;
       badgeText = 'Form Lengkap (${yellowWarnings.length} Saran Opsional)';
     } else {
-      badgeBg = const Color(0xFF27AE60).withOpacity(0.12);
-      badgeBorder = const Color(0xFF27AE60).withOpacity(0.4);
+      badgeBg = const Color(0xFF27AE60).withValues(alpha: 0.12);
+      badgeBorder = const Color(0xFF27AE60).withValues(alpha: 0.4);
       badgeColor = const Color(0xFF27AE60);
       badgeIcon = Icons.check_circle_rounded;
       badgeText = '✅ Form 10T Lengkap (Siap Simpan)';
@@ -4386,9 +4388,9 @@ class _PuskesmasFormIbuHamilState extends ConsumerState<PuskesmasFormIbuHamil> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: const Color(0xFF009688).withOpacity(0.08),
+        color: const Color(0xFF009688).withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: const Color(0xFF009688).withOpacity(0.2)),
+        border: Border.all(color: const Color(0xFF009688).withValues(alpha: 0.2)),
       ),
       child: Text(
         label,

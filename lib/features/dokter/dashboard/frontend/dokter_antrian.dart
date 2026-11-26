@@ -473,7 +473,6 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
 
     // Pagination
     final totalDataCount = filteredQueues.length;
-    final totalPages = (totalDataCount / _rowsPerPage).ceil();
     final startIndex = (_currentPage - 1) * _rowsPerPage;
     final endIndex = (startIndex + _rowsPerPage) > totalDataCount
         ? totalDataCount
@@ -676,7 +675,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                           width: 36,
                           height: 36,
                           decoration: BoxDecoration(
-                            color: purpleAccent.withOpacity(0.1),
+                            color: purpleAccent.withValues(alpha: 0.1),
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
@@ -736,7 +735,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                       width: 38,
                       height: 38,
                       decoration: BoxDecoration(
-                        color: purpleAccent.withOpacity(0.12),
+                        color: purpleAccent.withValues(alpha: 0.12),
                         shape: BoxShape.circle,
                       ),
                       alignment: Alignment.center,
@@ -959,7 +958,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
             border: Border.all(color: borderColor),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.01),
+                color: Colors.black.withValues(alpha: 0.01),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
@@ -1122,7 +1121,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
             Icon(
               Icons.calendar_month_outlined,
               size: 14,
-              color: textColor.withOpacity(0.6),
+              color: textColor.withValues(alpha: 0.6),
             ),
           ],
         ),
@@ -1150,7 +1149,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
             Icon(
               Icons.settings_outlined,
               size: 14,
-              color: textColor.withOpacity(0.6),
+              color: textColor.withValues(alpha: 0.6),
             ),
             const SizedBox(width: 6),
             Text(
@@ -1158,7 +1157,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
               style: GoogleFonts.outfit(
                 fontSize: 10.5,
                 fontWeight: FontWeight.bold,
-                color: textColor.withOpacity(0.85),
+                color: textColor.withValues(alpha: 0.85),
               ),
             ),
           ],
@@ -1248,7 +1247,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: const Color(0xFF27AE60).withOpacity(0.1),
+        color: const Color(0xFF27AE60).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(100),
       ),
       child: Row(
@@ -1311,7 +1310,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                 hintText: 'Cari Pasien...',
                 hintStyle: GoogleFonts.outfit(
                   fontSize: 12,
-                  color: subtitleColor.withOpacity(0.5),
+                  color: subtitleColor.withValues(alpha: 0.5),
                 ),
                 border: InputBorder.none,
                 isDense: true,
@@ -1332,7 +1331,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
     Color border, {
     Color? dotColor,
   }) {
-    final bg = isSelected ? const Color(0xFFB577F2).withOpacity(0.12) : cardBg;
+    final bg = isSelected ? const Color(0xFFB577F2).withValues(alpha: 0.12) : cardBg;
     final fg = isSelected ? const Color(0xFFB577F2) : subtitleColor;
 
     return MouseRegion(
@@ -1429,7 +1428,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                       width: 28,
                       height: 28,
                       decoration: BoxDecoration(
-                        color: queue.avatarBg.withOpacity(0.12),
+                        color: queue.avatarBg.withValues(alpha: 0.12),
                         shape: BoxShape.circle,
                       ),
                       alignment: Alignment.center,
@@ -1513,20 +1512,20 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
 
     switch (status) {
       case 'Menunggu':
-        bg = Colors.amber[600]!.withOpacity(0.1);
+        bg = Colors.amber[600]!.withValues(alpha: 0.1);
         fg = Colors.amber[700]!;
         break;
       case 'Memproses...':
-        bg = const Color(0xFFB577F2).withOpacity(0.1);
+        bg = const Color(0xFFB577F2).withValues(alpha: 0.1);
         fg = const Color(0xFFB577F2);
         break;
       case 'Pembayaran':
-        bg = Colors.indigo.withOpacity(0.1);
+        bg = Colors.indigo.withValues(alpha: 0.1);
         fg = Colors.indigo;
         break;
       case 'Selesai':
       default:
-        bg = const Color(0xFF27AE60).withOpacity(0.1);
+        bg = const Color(0xFF27AE60).withValues(alpha: 0.1);
         fg = const Color(0xFF27AE60);
         break;
     }
@@ -1563,7 +1562,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: subtitle.withOpacity(0.08),
+              color: subtitle.withValues(alpha: 0.08),
               shape: BoxShape.circle,
             ),
             alignment: Alignment.center,
@@ -1642,7 +1641,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
 
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.4),
+      barrierColor: Colors.black.withValues(alpha: 0.4),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setWizardState) {
           // Queue number is now auto-generated by the database (A-NNN format, resets daily)
@@ -1675,7 +1674,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.15),
+                    color: Colors.black.withValues(alpha: 0.15),
                     blurRadius: 40,
                     offset: const Offset(0, 16),
                   ),
@@ -1701,7 +1700,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                           width: 38,
                           height: 38,
                           decoration: BoxDecoration(
-                            color: purple.withOpacity(0.12),
+                            color: purple.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           alignment: Alignment.center,
@@ -2207,7 +2206,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? purple.withOpacity(0.08)
+                          ? purple.withValues(alpha: 0.08)
                           : (isDark
                                 ? const Color(0xFF1E1E22)
                                 : const Color(0xFFF6F8FA)),
@@ -2313,9 +2312,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
   }) {
     final state = ref.read(landingPageProvider);
     final isEn = state.language == 'en';
-    final purple = ref.read(landingPageProvider.notifier).getPrimaryColor();
     final orange = const Color(0xFFF39C12);
-    final isChecking = false; // Simulated state
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2413,7 +2410,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
                               : gender,
                           style: GoogleFonts.outfit(
                             fontSize: 12,
-                            color: subCol.withOpacity(0.5),
+                            color: subCol.withValues(alpha: 0.5),
                           ),
                         ),
                         dropdownColor: isDark
@@ -2500,9 +2497,9 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: orange.withOpacity(0.08),
+            color: orange.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: orange.withOpacity(0.15)),
+            border: Border.all(color: orange.withValues(alpha: 0.15)),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2552,9 +2549,9 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: purple.withOpacity(0.08),
+            color: purple.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: purple.withOpacity(0.2)),
+            border: Border.all(color: purple.withValues(alpha: 0.2)),
           ),
           child: Row(
             children: [
@@ -2609,42 +2606,40 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
 
         // Tipe Pasien Radio Switch
         _buildFormFieldLabel('Tipe Pasien *'.tr(state), textCol),
-        Row(
-          children: [
-            Radio<String>(
-              value: 'BPJS',
-              groupValue: type,
-              activeColor: purple,
-              onChanged: (val) {
-                if (val != null) setWizardState(() => onTypeChanged(val));
-              },
-            ),
-            Text(
-              'BPJS',
-              style: GoogleFonts.outfit(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: textCol,
+        RadioGroup<String>(
+          groupValue: type,
+          onChanged: (val) {
+            if (val != null) setWizardState(() => onTypeChanged(val));
+          },
+          child: Row(
+            children: [
+              Radio<String>(
+                value: 'BPJS',
+                activeColor: purple,
               ),
-            ),
-            const SizedBox(width: 24),
-            Radio<String>(
-              value: 'Umum',
-              groupValue: type,
-              activeColor: purple,
-              onChanged: (val) {
-                if (val != null) setWizardState(() => onTypeChanged(val));
-              },
-            ),
-            Text(
-              'Umum'.tr(state),
-              style: GoogleFonts.outfit(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: textCol,
+              Text(
+                'BPJS',
+                style: GoogleFonts.outfit(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: textCol,
+                ),
               ),
-            ),
-          ],
+              const SizedBox(width: 24),
+              Radio<String>(
+                value: 'Umum',
+                activeColor: purple,
+              ),
+              Text(
+                'Umum'.tr(state),
+                style: GoogleFonts.outfit(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: textCol,
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 14),
 
@@ -2737,7 +2732,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
     if (queue.status == 'Pembayaran') {
       showDialog(
         context: context,
-        barrierColor: Colors.black.withOpacity(0.4),
+        barrierColor: Colors.black.withValues(alpha: 0.4),
         builder: (ctx) => Dialog(
           backgroundColor: Colors.transparent,
           insetPadding: const EdgeInsets.symmetric(
@@ -2750,7 +2745,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
     } else {
       showDialog(
         context: context,
-        barrierColor: Colors.black.withOpacity(0.4),
+        barrierColor: Colors.black.withValues(alpha: 0.4),
         builder: (ctx) => Dialog(
           backgroundColor: Colors.transparent,
           child: PatientQueueDetailDialog(queue: queue, isDark: isDark),
@@ -2775,7 +2770,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
 
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.3),
+      barrierColor: Colors.black.withValues(alpha: 0.3),
       builder: (ctx) => AlertDialog(
         backgroundColor: cardBg,
         surfaceTintColor: Colors.transparent,
@@ -2874,7 +2869,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
         style: GoogleFonts.outfit(
           fontSize: 9.5,
           fontWeight: FontWeight.w900,
-          color: textCol.withOpacity(0.85),
+          color: textCol.withValues(alpha: 0.85),
           letterSpacing: 0.2,
         ),
       ),
@@ -2915,7 +2910,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
         hintText: hint,
         hintStyle: GoogleFonts.outfit(
           fontSize: 11.5,
-          color: subtitle.withOpacity(0.4),
+          color: subtitle.withValues(alpha: 0.4),
         ),
         prefixIcon: Icon(icon, size: 16, color: subtitle),
         counterText: '',
@@ -2936,7 +2931,7 @@ class _DokterAntrianState extends ConsumerState<DokterAntrian> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: text.withOpacity(0.3), width: 1.5),
+          borderSide: BorderSide(color: text.withValues(alpha: 0.3), width: 1.5),
         ),
         errorStyle: GoogleFonts.outfit(fontSize: 9, height: 0.8),
       ),
@@ -3190,7 +3185,7 @@ class _PatientQueueDetailDialogState
         border: Border.all(color: borderColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -3467,6 +3462,7 @@ class _PatientQueueDetailDialogState
                                             .registerPatientSatuSehat(
                                               widget.queue,
                                             );
+                                        if (!context.mounted) return;
                                         Navigator.of(context).pop();
                                         ScaffoldMessenger.of(
                                           context,
@@ -3479,6 +3475,7 @@ class _PatientQueueDetailDialogState
                                           ),
                                         );
                                       } catch (e) {
+                                        if (!context.mounted) return;
                                         ScaffoldMessenger.of(
                                           context,
                                         ).showSnackBar(
@@ -3514,54 +3511,50 @@ class _PatientQueueDetailDialogState
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Row(
-                          children: [
-                            Radio<String>(
-                              value: 'BPJS',
-                              groupValue: _selectedType,
-                              activeColor: const Color(0xFF0F9D58),
-                              onChanged: (val) {
-                                if (val != null) {
-                                  setState(() => _selectedType = val);
-                                }
-                              },
-                            ),
-                            Text(
-                              'BPJS',
-                              style: GoogleFonts.outfit(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: textColor,
+                    RadioGroup<String>(
+                      groupValue: _selectedType,
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() => _selectedType = val);
+                        }
+                      },
+                      child: Row(
+                        children: [
+                          Row(
+                            children: [
+                              Radio<String>(
+                                value: 'BPJS',
+                                activeColor: const Color(0xFF0F9D58),
                               ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(width: 24),
-                        Row(
-                          children: [
-                            Radio<String>(
-                              value: 'Umum',
-                              groupValue: _selectedType,
-                              activeColor: const Color(0xFF0F9D58),
-                              onChanged: (val) {
-                                if (val != null) {
-                                  setState(() => _selectedType = val);
-                                }
-                              },
-                            ),
-                            Text(
-                              'GENERAL',
-                              style: GoogleFonts.outfit(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: textColor,
+                              Text(
+                                'BPJS',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: textColor,
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ],
+                            ],
+                          ),
+                          const SizedBox(width: 24),
+                          Row(
+                            children: [
+                              Radio<String>(
+                                value: 'Umum',
+                                activeColor: const Color(0xFF0F9D58),
+                              ),
+                              Text(
+                                'GENERAL',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: textColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                     Text(
                       'When Registering: ${_selectedType.toUpperCase()}',
@@ -3645,6 +3638,7 @@ class _PatientQueueDetailDialogState
                                 widget.queue.id,
                                 'Memproses...',
                               );
+                          if (!context.mounted) return;
                           Navigator.of(context).pop();
                         },
                       ),
@@ -3712,7 +3706,6 @@ class _CashierPaymentDialogState extends ConsumerState<CashierPaymentDialog> {
   String _paymentMethod = 'CASH'; // 'CASH' or 'QRIS'
   String? _encounterId;
   String? _electronicPrescriptionId;
-  String? _doctorQrisPath;
   final TextEditingController _receivedController = TextEditingController(
     text: '0',
   );
@@ -4079,7 +4072,7 @@ class _CashierPaymentDialogState extends ConsumerState<CashierPaymentDialog> {
         border: Border.all(color: borderColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.12),
+            color: Colors.black.withValues(alpha: 0.12),
             blurRadius: 30,
             offset: const Offset(0, 12),
           ),
@@ -4755,7 +4748,7 @@ class _CashierPaymentDialogState extends ConsumerState<CashierPaymentDialog> {
               color: Colors.white,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: const Color(0xFF48C9B0).withOpacity(0.5),
+                color: const Color(0xFF48C9B0).withValues(alpha: 0.5),
               ),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -4902,6 +4895,7 @@ class _CashierPaymentDialogState extends ConsumerState<CashierPaymentDialog> {
                       await ref
                           .read(dokterAntrianListProvider.notifier)
                           .updateAntrianStatus(widget.queue.id, 'Selesai');
+                      if (!mounted) return;
                       Navigator.of(context).pop();
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
@@ -4912,6 +4906,7 @@ class _CashierPaymentDialogState extends ConsumerState<CashierPaymentDialog> {
                         ),
                       );
                     } catch (e) {
+                      if (!mounted) return;
                       ScaffoldMessenger.of(
                         context,
                       ).showSnackBar(SnackBar(content: Text('Gagal: $e')));
@@ -5003,6 +4998,7 @@ class _CashierPaymentDialogState extends ConsumerState<CashierPaymentDialog> {
               await ref
                   .read(dokterAntrianListProvider.notifier)
                   .updateAntrianStatus(widget.queue.id, 'Selesai');
+              if (!mounted) return;
               Navigator.of(context).pop();
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
@@ -5011,6 +5007,7 @@ class _CashierPaymentDialogState extends ConsumerState<CashierPaymentDialog> {
                 ),
               );
             } catch (e) {
+              if (!mounted) return;
               ScaffoldMessenger.of(
                 context,
               ).showSnackBar(SnackBar(content: Text('Gagal: $e')));
@@ -5044,7 +5041,7 @@ class _CashierPaymentDialogState extends ConsumerState<CashierPaymentDialog> {
           border: Border.all(color: const Color(0xFFECEEF2)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.01),
+              color: Colors.black.withValues(alpha: 0.01),
               blurRadius: 4,
               offset: const Offset(0, 2),
             ),
@@ -5183,7 +5180,7 @@ class _CashierPaymentDialogState extends ConsumerState<CashierPaymentDialog> {
                       Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: activeGreen.withOpacity(0.08),
+                          color: activeGreen.withValues(alpha: 0.08),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
@@ -5258,7 +5255,7 @@ class _CashierPaymentDialogState extends ConsumerState<CashierPaymentDialog> {
                           borderRadius: BorderRadius.circular(8),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
+                              color: Colors.black.withValues(alpha: 0.05),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             ),
@@ -5274,7 +5271,7 @@ class _CashierPaymentDialogState extends ConsumerState<CashierPaymentDialog> {
                                   width: 60,
                                   height: 60,
                                   decoration: BoxDecoration(
-                                    color: activeGreen.withOpacity(0.08),
+                                    color: activeGreen.withValues(alpha: 0.08),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   alignment: Alignment.center,
@@ -5627,43 +5624,27 @@ class _CashierPaymentDialogState extends ConsumerState<CashierPaymentDialog> {
 
     String startStr = '—';
     String endStr = '—';
+    const monthsIndo = [
+      "Januari",
+      "Februari",
+      "Maret",
+      "April",
+      "Mei",
+      "Juni",
+      "Juli",
+      "Agustus",
+      "September",
+      "Oktober",
+      "November",
+      "Desember",
+    ];
     if (_suratSakitMulai != null) {
       startStr =
-          '${_suratSakitMulai!.day} ' +
-          [
-            "Januari",
-            "Februari",
-            "Maret",
-            "April",
-            "Mei",
-            "Juni",
-            "Juli",
-            "Agustus",
-            "September",
-            "Oktober",
-            "November",
-            "Desember",
-          ][_suratSakitMulai!.month - 1] +
-          " ${_suratSakitMulai!.year}";
+          '${_suratSakitMulai!.day} ${monthsIndo[_suratSakitMulai!.month - 1]} ${_suratSakitMulai!.year}';
     }
     if (_suratSakitSelesai != null) {
       endStr =
-          '${_suratSakitSelesai!.day} ' +
-          [
-            "Januari",
-            "Februari",
-            "Maret",
-            "April",
-            "Mei",
-            "Juni",
-            "Juli",
-            "Agustus",
-            "September",
-            "Oktober",
-            "November",
-            "Desember",
-          ][_suratSakitSelesai!.month - 1] +
-          " ${_suratSakitSelesai!.year}";
+          '${_suratSakitSelesai!.day} ${monthsIndo[_suratSakitSelesai!.month - 1]} ${_suratSakitSelesai!.year}';
     }
 
     showDialog(
@@ -5703,7 +5684,7 @@ class _CashierPaymentDialogState extends ConsumerState<CashierPaymentDialog> {
                       Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: activeGreen.withOpacity(0.08),
+                          color: activeGreen.withValues(alpha: 0.08),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
@@ -5780,7 +5761,7 @@ class _CashierPaymentDialogState extends ConsumerState<CashierPaymentDialog> {
                           borderRadius: BorderRadius.circular(8),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
+                              color: Colors.black.withValues(alpha: 0.05),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             ),
@@ -5796,7 +5777,7 @@ class _CashierPaymentDialogState extends ConsumerState<CashierPaymentDialog> {
                                   width: 60,
                                   height: 60,
                                   decoration: BoxDecoration(
-                                    color: activeGreen.withOpacity(0.08),
+                                    color: activeGreen.withValues(alpha: 0.08),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   alignment: Alignment.center,
@@ -5930,7 +5911,7 @@ class _CashierPaymentDialogState extends ConsumerState<CashierPaymentDialog> {
                             ),
                             _rujukanPreviewRow(
                               'Umur',
-                              '${patient.umur}',
+                              patient.umur,
                               false,
                             ),
                             _rujukanPreviewRow('Alamat', patient.alamat, false),
@@ -6078,7 +6059,7 @@ class _CashierPaymentDialogState extends ConsumerState<CashierPaymentDialog> {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: activeGreen.withOpacity(0.08),
+        color: activeGreen.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(4),
         border: Border(left: BorderSide(color: activeGreen, width: 3)),
       ),
@@ -6300,7 +6281,7 @@ class _InvoicePrintPreviewDialogState
         border: Border.all(color: borderColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.15),
+            color: Colors.black.withValues(alpha: 0.15),
             blurRadius: 40,
             offset: const Offset(0, 16),
           ),
@@ -6320,7 +6301,7 @@ class _InvoicePrintPreviewDialogState
                   width: 32,
                   height: 32,
                   decoration: BoxDecoration(
-                    color: green.withOpacity(0.12),
+                    color: green.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   alignment: Alignment.center,
@@ -6379,7 +6360,7 @@ class _InvoicePrintPreviewDialogState
                             ),
                             decoration: BoxDecoration(
                               color: paperSize == sz
-                                  ? green.withOpacity(0.12)
+                                  ? green.withValues(alpha: 0.12)
                                   : Colors.transparent,
                               borderRadius: BorderRadius.circular(6),
                               border: Border.all(
@@ -6464,7 +6445,7 @@ class _InvoicePrintPreviewDialogState
                           : BorderRadius.circular(8),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.10),
+                          color: Colors.black.withValues(alpha: 0.10),
                           blurRadius: 20,
                           offset: const Offset(0, 6),
                         ),
@@ -6508,7 +6489,7 @@ class _InvoicePrintPreviewDialogState
                                       width: 40,
                                       height: 40,
                                       decoration: BoxDecoration(
-                                        color: green.withOpacity(0.12),
+                                        color: green.withValues(alpha: 0.12),
                                         shape: BoxShape.circle,
                                       ),
                                       alignment: Alignment.center,
@@ -6525,7 +6506,7 @@ class _InvoicePrintPreviewDialogState
                                   width: 40,
                                   height: 40,
                                   decoration: BoxDecoration(
-                                    color: green.withOpacity(0.12),
+                                    color: green.withValues(alpha: 0.12),
                                     shape: BoxShape.circle,
                                   ),
                                   alignment: Alignment.center,

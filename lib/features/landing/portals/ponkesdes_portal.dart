@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/layouts/responsive_layout.dart';
-import 'package:mapotech/shared/widgets/custom_button.dart';
 import 'package:mapotech/shared/widgets/three_dimensional_device_wrapper.dart';
 import 'package:mapotech/shared/widgets/auth_modals.dart';
 import 'package:mapotech/shared/widgets/ui.dart';

@@ -12,7 +12,7 @@ void showSelectionModal(BuildContext context, WidgetRef ref) {
 
   showAnimatedDialog(
     context: context,
-    barrierColor: Colors.black.withOpacity(0.65),
+    barrierColor: Colors.black.withValues(alpha: 0.65),
     barrierDismissible: true,
     builder: (context) {
       return Dialog(
@@ -111,7 +111,7 @@ class _SelectionModalContent extends StatelessWidget {
         border: Border.all(color: isDark ? const Color(0xFF2C2C2C) : Colors.transparent),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.5 : 0.08),
+            color: Colors.black.withValues(alpha: isDark ? 0.5 : 0.08),
             blurRadius: 40,
             offset: const Offset(0, 20),
           )
@@ -139,9 +139,9 @@ class _SelectionModalContent extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                 decoration: BoxDecoration(
-                  color: accentPurple.withOpacity(isDark ? 0.15 : 0.08),
+                  color: accentPurple.withValues(alpha: isDark ? 0.15 : 0.08),
                   borderRadius: BorderRadius.circular(100),
-                  border: Border.all(color: accentPurple.withOpacity(0.2)),
+                  border: Border.all(color: accentPurple.withValues(alpha: 0.2)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -223,7 +223,7 @@ class _SelectionModalContent extends StatelessWidget {
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(20),
                                   border: Border.all(
-                                    color: isDark ? const Color(0xFF2C2C2C) : Colors.grey[200]!.withOpacity(0.5),
+                                    color: isDark ? const Color(0xFF2C2C2C) : Colors.grey[200]!.withValues(alpha: 0.5),
                                   ),
                                 ),
                                 child: Column(
@@ -238,7 +238,7 @@ class _SelectionModalContent extends StatelessWidget {
                                         borderRadius: BorderRadius.circular(14),
                                         boxShadow: [
                                           BoxShadow(
-                                            color: Colors.black.withOpacity(isDark ? 0.15 : 0.04),
+                                            color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.04),
                                             blurRadius: 10,
                                             offset: const Offset(0, 4),
                                           )
@@ -246,7 +246,7 @@ class _SelectionModalContent extends StatelessWidget {
                                       ),
                                       child: Icon(
                                         role['icon'] as IconData,
-                                        color: isSoon ? accentPurple.withOpacity(0.5) : accentPurple,
+                                        color: isSoon ? accentPurple.withValues(alpha: 0.5) : accentPurple,
                                         size: 20,
                                       ),
                                     ),
@@ -260,7 +260,7 @@ class _SelectionModalContent extends StatelessWidget {
                                         fontSize: 9,
                                         fontWeight: FontWeight.w900,
                                         letterSpacing: 0.5,
-                                        color: isSoon ? textColor.withOpacity(0.4) : textColor.withOpacity(0.8),
+                                        color: isSoon ? textColor.withValues(alpha: 0.4) : textColor.withValues(alpha: 0.8),
                                       ),
                                     ),
                                   ],

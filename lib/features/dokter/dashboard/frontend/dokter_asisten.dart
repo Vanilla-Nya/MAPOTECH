@@ -7,8 +7,6 @@ import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/widgets/ui.dart';
 
 import 'package:mapotech/shared/supabase_service.dart';
-import 'package:mapotech/shared/widgets/location_selector_widget.dart';
-import 'package:mapotech/shared/location_service.dart';
 import 'dart:math';
 
 // ─── UUID Generation Helper ──────────────────────────────────────────────────
@@ -448,7 +446,7 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                           ),
                           hintStyle: GoogleFonts.outfit(
                             fontSize: 11,
-                            color: subtitleColor.withOpacity(0.6),
+                            color: subtitleColor.withValues(alpha: 0.6),
                           ),
                           border: InputBorder.none,
                           isDense: true,
@@ -508,7 +506,7 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                 Icon(
                   Icons.badge_outlined,
                   size: 48,
-                  color: subtitleColor.withOpacity(0.3),
+                  color: subtitleColor.withValues(alpha: 0.3),
                 ),
                 const SizedBox(height: 16),
                 Text(
@@ -576,7 +574,7 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
         child: Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: cardBg.withOpacity(0.2),
+            color: cardBg.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(20),
           ),
           child: Column(
@@ -590,7 +588,7 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                   shape: BoxShape.circle,
                   border: Border.all(color: border),
                 ),
-                child: Icon(Icons.add, color: text.withOpacity(0.8), size: 20),
+                child: Icon(Icons.add, color: text.withValues(alpha: 0.8), size: 20),
               ),
               const SizedBox(height: 18),
               Text(
@@ -654,7 +652,7 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: a.avatarBg.withOpacity(0.12),
+                    color: a.avatarBg.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
                   alignment: Alignment.center,
@@ -689,7 +687,7 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: roleColor.withOpacity(0.1),
+                          color: roleColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
@@ -742,7 +740,7 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                       vertical: 3,
                     ),
                     decoration: BoxDecoration(
-                      color: subtitle.withOpacity(0.08),
+                      color: subtitle.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(color: border),
                     ),
@@ -750,7 +748,7 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                       p,
                       style: GoogleFonts.outfit(
                         fontSize: 8,
-                        color: text.withOpacity(0.8),
+                        color: text.withValues(alpha: 0.8),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -921,8 +919,8 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
                                 colors: [
-                                  purpleAccent.withOpacity(0.8),
-                                  purpleAccent.withOpacity(0.5),
+                                  purpleAccent.withValues(alpha: 0.8),
+                                  purpleAccent.withValues(alpha: 0.5),
                                 ],
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
@@ -956,7 +954,7 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                                 vertical: 4,
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.24),
+                                color: Colors.white.withValues(alpha: 0.24),
                                 borderRadius: BorderRadius.circular(100),
                               ),
                               child: Row(
@@ -1000,7 +998,7 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.12),
+                                    color: Colors.black.withValues(alpha: 0.12),
                                     blurRadius: 10,
                                     offset: const Offset(0, 4),
                                   ),
@@ -1509,7 +1507,6 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
             final purple = ref.read(landingPageProvider.notifier).getPrimaryColor();
 
             // Dynamic regions mapping
-            final provinces = ['Pilih Provinsi', 'Jawa Timur', 'DKI Jakarta'];
             List<String> cities = ['Pilih Kota/Kabupaten'];
             if (prov == 'Jawa Timur') {
               cities.addAll(['Bondowoso', 'Surabaya']);
@@ -2042,6 +2039,7 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                                     password: pass.isEmpty ? null : pass,
                                   )
                                   .then((_) {
+                                    if (!context.mounted) return;
                                     Navigator.pop(
                                       context,
                                     ); // Pop loading spinner
@@ -2049,7 +2047,7 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                         content: Text(
-                                          'Data asisten ${name} berhasil diperbarui!',
+                                          'Data asisten $name berhasil diperbarui!',
                                         ),
                                         backgroundColor: const Color(
                                           0xFF48C9B0,
@@ -2058,6 +2056,7 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                                     );
                                   })
                                   .catchError((err) {
+                                    if (!context.mounted) return;
                                     Navigator.pop(
                                       context,
                                     ); // Pop loading spinner
@@ -2150,7 +2149,6 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
             ];
 
             // Region data pickers
-            final provinces = ['Pilih Provinsi', 'Jawa Timur', 'DKI Jakarta'];
             List<String> cities = ['Pilih Kota/Kabupaten'];
             if (prov == 'Jawa Timur') {
               cities.addAll(['Bondowoso', 'Surabaya']);
@@ -2443,7 +2441,7 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                                                             GoogleFonts.outfit(
                                                               fontSize: 11,
                                                               color: subColor
-                                                                  .withOpacity(
+                                                                  .withValues(alpha:
                                                                     0.5,
                                                                   ),
                                                             ),
@@ -3109,6 +3107,7 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                                   .read(dokterAsistenListProvider.notifier)
                                   .addAsisten(newAsisten, password)
                                   .then((_) {
+                                    if (!context.mounted) return;
                                     Navigator.pop(
                                       context,
                                     ); // Pop loading spinner
@@ -3125,6 +3124,7 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                                     );
                                   })
                                   .catchError((err) {
+                                    if (!context.mounted) return;
                                     Navigator.pop(
                                       context,
                                     ); // Pop loading spinner
@@ -3213,6 +3213,7 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                     .read(dokterAsistenListProvider.notifier)
                     .removeAsisten(a.id)
                     .then((_) {
+                      if (!context.mounted) return;
                       Navigator.pop(context); // Pop loading spinner
                       Navigator.pop(context); // Pop confirm delete
                       Navigator.pop(context); // Pop detail dialog
@@ -3224,6 +3225,7 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
                       );
                     })
                     .catchError((err) {
+                      if (!context.mounted) return;
                       Navigator.pop(context); // Pop loading spinner
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
@@ -3287,7 +3289,7 @@ class _DokterAsistenState extends ConsumerState<DokterAsisten> {
           counterText: '',
           hintStyle: GoogleFonts.outfit(
             fontSize: 11,
-            color: subtitle.withOpacity(0.5),
+            color: subtitle.withValues(alpha: 0.5),
             fontWeight: FontWeight.w500,
           ),
           border: InputBorder.none,

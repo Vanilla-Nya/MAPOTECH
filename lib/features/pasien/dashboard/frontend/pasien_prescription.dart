@@ -315,7 +315,7 @@ class _PasienPrescriptionState extends ConsumerState<PasienPrescription> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.assignment_turned_in_rounded, size: 48, color: purpleAccent.withOpacity(0.3)),
+                            Icon(Icons.assignment_turned_in_rounded, size: 48, color: purpleAccent.withValues(alpha: 0.3)),
                             const SizedBox(height: 12),
                             Text(
                               isEn ? 'No Prescriptions' : 'Tidak Ada Resep',
@@ -378,7 +378,7 @@ class _PasienPrescriptionState extends ConsumerState<PasienPrescription> {
             border: Border.all(color: border),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.03),
+                color: Colors.black.withValues(alpha: 0.03),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -392,7 +392,7 @@ class _PasienPrescriptionState extends ConsumerState<PasienPrescription> {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: purple.withOpacity(0.10),
+                  color: purple.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 alignment: Alignment.center,
@@ -449,8 +449,8 @@ class _PasienPrescriptionState extends ConsumerState<PasienPrescription> {
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
                         color: diambil
-                            ? greenColor.withOpacity(0.08)
-                            : orangeColor.withOpacity(0.08),
+                            ? greenColor.withValues(alpha: 0.08)
+                            : orangeColor.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
@@ -479,9 +479,9 @@ class _PasienPrescriptionState extends ConsumerState<PasienPrescription> {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: greenColor.withOpacity(0.10),
+                    color: greenColor.withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: greenColor.withOpacity(0.2)),
+                    border: Border.all(color: greenColor.withValues(alpha: 0.2)),
                   ),
                   alignment: Alignment.center,
                   child: Icon(Icons.check_circle_rounded, color: greenColor, size: 26),
@@ -505,7 +505,7 @@ class _PasienPrescriptionState extends ConsumerState<PasienPrescription> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: purple.withOpacity(0.2)),
+        border: Border.all(color: purple.withValues(alpha: 0.2)),
       ),
       padding: const EdgeInsets.all(4),
       child: CustomPaint(painter: _QrPatternPainter()),
@@ -515,7 +515,7 @@ class _PasienPrescriptionState extends ConsumerState<PasienPrescription> {
   void _showResepDetail(BuildContext context, ResepObat resep, bool isDark) {
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.45),
+      barrierColor: Colors.black.withValues(alpha: 0.45),
       builder: (ctx) => _ResepDetailDialog(
         resep: resep,
         isDark: isDark,
@@ -560,7 +560,7 @@ class _ResepDetailDialog extends ConsumerWidget {
           borderRadius: BorderRadius.circular(28),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.18),
+              color: Colors.black.withValues(alpha: 0.18),
               blurRadius: 40,
               offset: const Offset(0, 16),
             ),
@@ -597,7 +597,7 @@ class _ResepDetailDialog extends ConsumerWidget {
                         width: 32,
                         height: 32,
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           shape: BoxShape.circle,
                         ),
                         alignment: Alignment.center,
@@ -614,7 +614,7 @@ class _ResepDetailDialog extends ConsumerWidget {
                         width: 64,
                         height: 64,
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.22),
+                          color: Colors.white.withValues(alpha: 0.22),
                           borderRadius: BorderRadius.circular(18),
                         ),
                         alignment: Alignment.center,
@@ -693,9 +693,9 @@ class _ResepDetailDialog extends ConsumerWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                           decoration: BoxDecoration(
-                            color: greenColor.withOpacity(0.08),
+                            color: greenColor.withValues(alpha: 0.08),
                             borderRadius: BorderRadius.circular(100),
-                            border: Border.all(color: greenColor.withOpacity(0.2)),
+                            border: Border.all(color: greenColor.withValues(alpha: 0.2)),
                           ),
                           child: Row(
                             children: [
@@ -737,9 +737,9 @@ class _ResepDetailDialog extends ConsumerWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.08),
+                        color: Colors.blue.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(100),
-                        border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                        border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -764,9 +764,9 @@ class _ResepDetailDialog extends ConsumerWidget {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF3498DB).withOpacity(0.06),
+                        color: const Color(0xFF3498DB).withValues(alpha: 0.06),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFF3498DB).withOpacity(0.15)),
+                        border: Border.all(color: const Color(0xFF3498DB).withValues(alpha: 0.15)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -794,9 +794,9 @@ class _ResepDetailDialog extends ConsumerWidget {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.orange.withOpacity(0.06),
+                        color: Colors.orange.withValues(alpha: 0.06),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.orange.withOpacity(0.15)),
+                        border: Border.all(color: Colors.orange.withValues(alpha: 0.15)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -834,9 +834,9 @@ class _ResepDetailDialog extends ConsumerWidget {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.06),
+                        color: Colors.green.withValues(alpha: 0.06),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.green.withOpacity(0.15)),
+                        border: Border.all(color: Colors.green.withValues(alpha: 0.15)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -893,9 +893,9 @@ class _ResepDetailDialog extends ConsumerWidget {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF27AE60).withOpacity(0.12),
+                                  color: const Color(0xFF27AE60).withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(100),
-                                  border: Border.all(color: const Color(0xFF27AE60).withOpacity(0.3)),
+                                  border: Border.all(color: const Color(0xFF27AE60).withValues(alpha: 0.3)),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
@@ -925,7 +925,7 @@ class _ResepDetailDialog extends ConsumerWidget {
                               border: Border.all(color: borderColor, width: 2),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.06),
+                                  color: Colors.black.withValues(alpha: 0.06),
                                   blurRadius: 10,
                                   offset: const Offset(0, 4),
                                 ),
@@ -972,9 +972,9 @@ class _ResepDetailDialog extends ConsumerWidget {
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF3498DB).withOpacity(0.06),
+                      color: const Color(0xFF3498DB).withValues(alpha: 0.06),
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFF3498DB).withOpacity(0.15)),
+                      border: Border.all(color: const Color(0xFF3498DB).withValues(alpha: 0.15)),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1027,7 +1027,7 @@ class _ResepDetailDialog extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.18),
+        color: Colors.white.withValues(alpha: 0.18),
         borderRadius: BorderRadius.circular(100),
       ),
       child: Row(
@@ -1096,9 +1096,9 @@ class _ResepDetailDialog extends ConsumerWidget {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                         decoration: BoxDecoration(
-                          color: badgeColor.withOpacity(0.10),
+                          color: badgeColor.withValues(alpha: 0.10),
                           borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: badgeColor.withOpacity(0.2)),
+                          border: Border.all(color: badgeColor.withValues(alpha: 0.2)),
                         ),
                         child: Text(
                           badgeLabel,

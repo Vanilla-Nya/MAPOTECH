@@ -10,7 +10,6 @@ import 'package:mapotech/shared/satusehat_service.dart';
 import 'package:mapotech/shared/widgets/common_pagination.dart';
 import 'package:mapotech/shared/widgets/skeleton_loading.dart';
 import 'package:mapotech/shared/thousands_formatter.dart';
-import 'package:flutter/services.dart';
 
 class BukuKasEntry {
   final String id;
@@ -363,6 +362,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
         await _loadEncounterDetails(encounter['id']);
       }
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
@@ -377,6 +377,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
       );
     } catch (e) {
       debugPrint('Error registering SatuSehat: $e');
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
@@ -390,7 +391,9 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
         ),
       );
     } finally {
-      setState(() => _isRegisteringPatient = false);
+      if (mounted) {
+        setState(() => _isRegisteringPatient = false);
+      }
     }
   }
 
@@ -954,6 +957,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
 
       _closeExpenseWizard();
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
@@ -1365,7 +1369,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                     width: 38,
                     height: 38,
                     decoration: BoxDecoration(
-                      color: activeGreen.withOpacity(0.12),
+                      color: activeGreen.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     alignment: Alignment.center,
@@ -1402,14 +1406,14 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                                     (state.satusehatAutoSync
                                             ? activeGreen
                                             : Colors.orangeAccent)
-                                        .withOpacity(0.08),
+                                        .withValues(alpha: 0.08),
                                 borderRadius: BorderRadius.circular(100),
                                 border: Border.all(
                                   color:
                                       (state.satusehatAutoSync
                                               ? activeGreen
                                               : Colors.orangeAccent)
-                                          .withOpacity(0.3),
+                                          .withValues(alpha: 0.3),
                                 ),
                               ),
                               child: Row(
@@ -1458,7 +1462,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                   ElevatedButton(
                     onPressed: _exportReport,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: activeGreen.withOpacity(0.12),
+                      backgroundColor: activeGreen.withValues(alpha: 0.12),
                       foregroundColor: activeGreen,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
@@ -1915,7 +1919,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                                     hintText: 'Cari transaksi...'.tr(state),
                                     hintStyle: GoogleFonts.outfit(
                                       fontSize: 10,
-                                      color: subtitleColor.withOpacity(0.5),
+                                      color: subtitleColor.withValues(alpha: 0.5),
                                     ),
                                     border: InputBorder.none,
                                     isDense: true,
@@ -2311,7 +2315,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                     decoration: BoxDecoration(
                       border: Border(bottom: BorderSide(color: borderColor)),
                       color: _selectedGroupedDay?.date == group.date
-                          ? purple.withOpacity(0.04)
+                          ? purple.withValues(alpha: 0.04)
                           : Colors.transparent,
                     ),
                     children: [
@@ -2362,7 +2366,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: categoryColor.withOpacity(0.08),
+                            color: categoryColor.withValues(alpha: 0.08),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
@@ -2604,7 +2608,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.blueAccent.withOpacity(0.08),
+                              color: Colors.blueAccent.withValues(alpha: 0.08),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
@@ -2659,7 +2663,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                               hintText: 'Search name or NIK...',
                               hintStyle: GoogleFonts.outfit(
                                 fontSize: 10,
-                                color: subtitleColor.withOpacity(0.5),
+                                color: subtitleColor.withValues(alpha: 0.5),
                               ),
                               border: InputBorder.none,
                               isDense: true,
@@ -2976,7 +2980,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                                   bottom: BorderSide(color: borderColor),
                                 ),
                                 color: isSelected
-                                    ? activeGreen.withOpacity(0.04)
+                                    ? activeGreen.withValues(alpha: 0.04)
                                     : Colors.transparent,
                               ),
                               children: [
@@ -3049,7 +3053,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                                           (p['type'] == 'BPJS'
                                                   ? Colors.blueAccent
                                                   : purple)
-                                              .withOpacity(0.12),
+                                              .withValues(alpha: 0.12),
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Text(
@@ -3190,7 +3194,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.08),
+              color: color.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, size: 16, color: color),
@@ -3224,7 +3228,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
           });
         },
         child: Container(
-          color: Colors.black.withOpacity(0.35),
+          color: Colors.black.withValues(alpha: 0.35),
           child: GestureDetector(
             onTap: () {}, // Prevent click propagation to close modal
             child: Center(
@@ -3243,7 +3247,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                   border: Border.all(color: border),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.25),
+                      color: Colors.black.withValues(alpha: 0.25),
                       blurRadius: 30,
                       offset: const Offset(0, 10),
                     ),
@@ -3296,7 +3300,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                                   '${enc['type'].toString().toUpperCase()} • NIK: ${enc['nik']}',
                                   style: GoogleFonts.outfit(
                                     fontSize: 9.5,
-                                    color: Colors.white.withOpacity(0.85),
+                                    color: Colors.white.withValues(alpha: 0.85),
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
@@ -3453,10 +3457,10 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                                   padding: const EdgeInsets.all(12),
                                   margin: const EdgeInsets.only(bottom: 14),
                                   decoration: BoxDecoration(
-                                    color: Colors.red.shade50.withOpacity(0.6),
+                                    color: Colors.red.shade50.withValues(alpha: 0.6),
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
-                                      color: Colors.redAccent.withOpacity(0.2),
+                                      color: Colors.redAccent.withValues(alpha: 0.2),
                                     ),
                                   ),
                                   child: Row(
@@ -3504,12 +3508,12 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                                 Container(
                                   padding: const EdgeInsets.all(14),
                                   decoration: BoxDecoration(
-                                    color: Colors.orange.shade50.withOpacity(
+                                    color: Colors.orange.shade50.withValues(alpha:
                                       0.6,
                                     ),
                                     borderRadius: BorderRadius.circular(16),
                                     border: Border.all(
-                                      color: Colors.orangeAccent.withOpacity(
+                                      color: Colors.orangeAccent.withValues(alpha:
                                         0.2,
                                       ),
                                     ),
@@ -3520,7 +3524,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                                         padding: const EdgeInsets.all(8),
                                         decoration: BoxDecoration(
                                           color: Colors.orangeAccent
-                                              .withOpacity(0.08),
+                                              .withValues(alpha: 0.08),
                                           shape: BoxShape.circle,
                                         ),
                                         child: const Icon(
@@ -3715,7 +3719,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: border.withOpacity(0.04),
+        color: border.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: border),
       ),
@@ -3750,7 +3754,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: border.withOpacity(0.02),
+        color: border.withValues(alpha: 0.02),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: border),
       ),
@@ -3773,7 +3777,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
         width: double.infinity,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: border.withOpacity(0.02),
+          color: border.withValues(alpha: 0.02),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: border),
         ),
@@ -3781,7 +3785,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
           'No diagnosis data',
           style: GoogleFonts.outfit(
             fontSize: 10.5,
-            color: subtitle.withOpacity(0.5),
+            color: subtitle.withValues(alpha: 0.5),
             fontStyle: FontStyle.italic,
             fontWeight: FontWeight.bold,
           ),
@@ -3792,7 +3796,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: border.withOpacity(0.02),
+        color: border.withValues(alpha: 0.02),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: border),
       ),
@@ -3812,7 +3816,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF48C9B0).withOpacity(0.12),
+                    color: const Color(0xFF48C9B0).withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
@@ -3881,7 +3885,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
         width: double.infinity,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: border.withOpacity(0.02),
+          color: border.withValues(alpha: 0.02),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: border),
         ),
@@ -3889,7 +3893,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
           'No therapy data',
           style: GoogleFonts.outfit(
             fontSize: 10.5,
-            color: subtitle.withOpacity(0.5),
+            color: subtitle.withValues(alpha: 0.5),
             fontStyle: FontStyle.italic,
             fontWeight: FontWeight.bold,
           ),
@@ -3899,7 +3903,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
 
     return Container(
       decoration: BoxDecoration(
-        color: border.withOpacity(0.01),
+        color: border.withValues(alpha: 0.01),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: border),
       ),
@@ -3913,7 +3917,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
         children: [
           TableRow(
             decoration: BoxDecoration(
-              color: border.withOpacity(0.04),
+              color: border.withValues(alpha: 0.04),
               border: Border(bottom: BorderSide(color: border)),
             ),
             children: [
@@ -3982,15 +3986,15 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
   }) {
     // Elegant theme-based dynamic color scheme for background glow and icon tint
     final Color primaryColor = valueCol;
-    final Color iconBg = primaryColor.withOpacity(0.08);
+    final Color iconBg = primaryColor.withValues(alpha: 0.08);
 
     // Dynamic badge coloring
     final Color badgeBg = isBadgeRed 
-        ? Colors.redAccent.withOpacity(0.08) 
-        : const Color(0xFF48C9B0).withOpacity(0.08);
+        ? Colors.redAccent.withValues(alpha: 0.08) 
+        : const Color(0xFF48C9B0).withValues(alpha: 0.08);
     final Color badgeBorder = isBadgeRed 
-        ? Colors.redAccent.withOpacity(0.2) 
-        : const Color(0xFF48C9B0).withOpacity(0.2);
+        ? Colors.redAccent.withValues(alpha: 0.2) 
+        : const Color(0xFF48C9B0).withValues(alpha: 0.2);
     final Color badgeTextCol = isBadgeRed 
         ? Colors.redAccent 
         : const Color(0xFF48C9B0);
@@ -4002,7 +4006,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
         border: Border.all(color: border, width: 1.2),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -4114,10 +4118,10 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                     vertical: 1.5,
                   ),
                   decoration: BoxDecoration(
-                    color: badgeColor.withOpacity(0.06),
+                    color: badgeColor.withValues(alpha: 0.06),
                     borderRadius: BorderRadius.circular(5),
                     border: Border.all(
-                      color: badgeColor.withOpacity(0.18),
+                      color: badgeColor.withValues(alpha: 0.18),
                       width: 1,
                     ),
                   ),
@@ -4137,7 +4141,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
               subtitleDesc,
               style: GoogleFonts.outfit(
                 fontSize: 8.5,
-                color: subCol.withOpacity(0.8),
+                color: subCol.withValues(alpha: 0.8),
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -4261,7 +4265,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: isSelected
-              ? activeColor.withOpacity(0.12)
+              ? activeColor.withValues(alpha: 0.12)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
@@ -4377,7 +4381,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
 
     return Positioned.fill(
       child: Container(
-        color: Colors.black.withOpacity(0.3),
+        color: Colors.black.withValues(alpha: 0.3),
         child: Center(
           child: SingleChildScrollView(
             child: Container(
@@ -4390,7 +4394,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                 border: Border.all(color: border),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
+                    color: Colors.black.withValues(alpha: 0.2),
                     blurRadius: 20,
                     offset: const Offset(0, 10),
                   ),
@@ -4409,7 +4413,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                             width: 32,
                             height: 32,
                             decoration: BoxDecoration(
-                              color: accentColor.withOpacity(0.12),
+                              color: accentColor.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             alignment: Alignment.center,
@@ -4457,7 +4461,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             decoration: BoxDecoration(
                               color: !isExpense
-                                  ? activeGreen.withOpacity(0.15)
+                                  ? activeGreen.withValues(alpha: 0.15)
                                   : inputBg,
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
@@ -4508,7 +4512,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             decoration: BoxDecoration(
                               color: isExpense
-                                  ? Colors.redAccent.withOpacity(0.15)
+                                  ? Colors.redAccent.withValues(alpha: 0.15)
                                   : inputBg,
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
@@ -4572,7 +4576,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                           : 'cth. Pendapatan Tambahan / Klaim'.tr(state),
                       hintStyle: GoogleFonts.outfit(
                         fontSize: 11,
-                        color: subtitle.withOpacity(0.5),
+                        color: subtitle.withValues(alpha: 0.5),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 14,
@@ -4689,7 +4693,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                                 hintText: 'cth. 150.000'.tr(state),
                                 hintStyle: GoogleFonts.outfit(
                                   fontSize: 11,
-                                  color: subtitle.withOpacity(0.5),
+                                  color: subtitle.withValues(alpha: 0.5),
                                 ),
                                 contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 14,
@@ -4794,7 +4798,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
       child: GestureDetector(
         onTap: () => setState(() => _selectedGroupedDay = null),
         child: Container(
-          color: Colors.black.withOpacity(0.3),
+          color: Colors.black.withValues(alpha: 0.3),
           child: GestureDetector(
             onTap: () {}, // Prevent click propagation to close modal
             child: Center(
@@ -4812,7 +4816,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                     border: Border.all(color: border),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
+                        color: Colors.black.withValues(alpha: 0.2),
                         blurRadius: 25,
                         offset: const Offset(0, 8),
                       ),
@@ -4897,10 +4901,10 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                             child: Container(
                               padding: const EdgeInsets.all(14),
                               decoration: BoxDecoration(
-                                color: activeGreen.withOpacity(0.04),
+                                color: activeGreen.withValues(alpha: 0.04),
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
-                                  color: activeGreen.withOpacity(0.2),
+                                  color: activeGreen.withValues(alpha: 0.2),
                                 ),
                               ),
                               child: Column(
@@ -4933,10 +4937,10 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                             child: Container(
                               padding: const EdgeInsets.all(14),
                               decoration: BoxDecoration(
-                                color: Colors.redAccent.withOpacity(0.04),
+                                color: Colors.redAccent.withValues(alpha: 0.04),
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
-                                  color: Colors.redAccent.withOpacity(0.2),
+                                  color: Colors.redAccent.withValues(alpha: 0.2),
                                 ),
                               ),
                               child: Column(
@@ -5009,7 +5013,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                                         width: 36,
                                         height: 36,
                                         decoration: BoxDecoration(
-                                          color: txColor.withOpacity(0.08),
+                                          color: txColor.withValues(alpha: 0.08),
                                           shape: BoxShape.circle,
                                         ),
                                         child: Icon(
@@ -5045,7 +5049,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                                                         vertical: 2,
                                                       ),
                                                   decoration: BoxDecoration(
-                                                    color: txColor.withOpacity(
+                                                    color: txColor.withValues(alpha:
                                                       0.08,
                                                     ),
                                                     borderRadius:
@@ -5159,9 +5163,9 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(
-          color: activeGreen.withOpacity(0.08),
+          color: activeGreen.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(100),
-          border: Border.all(color: activeGreen.withOpacity(0.2)),
+          border: Border.all(color: activeGreen.withValues(alpha: 0.2)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -5189,9 +5193,9 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
           decoration: BoxDecoration(
-            color: Colors.redAccent.withOpacity(0.08),
+            color: Colors.redAccent.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(100),
-            border: Border.all(color: Colors.redAccent.withOpacity(0.2)),
+            border: Border.all(color: Colors.redAccent.withValues(alpha: 0.2)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -5231,9 +5235,9 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
           decoration: BoxDecoration(
-            color: activeGreen.withOpacity(0.08),
+            color: activeGreen.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(100),
-            border: Border.all(color: activeGreen.withOpacity(0.3)),
+            border: Border.all(color: activeGreen.withValues(alpha: 0.3)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -5289,7 +5293,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
       child: GestureDetector(
         onTap: () => setState(() => _selectedEntry = null),
         child: Container(
-          color: Colors.black.withOpacity(0.3),
+          color: Colors.black.withValues(alpha: 0.3),
           child: GestureDetector(
             onTap: () {}, // Prevent click propagation to close modal
             child: Center(
@@ -5307,7 +5311,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                     border: Border.all(color: border),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
+                        color: Colors.black.withValues(alpha: 0.2),
                         blurRadius: 25,
                         offset: const Offset(0, 8),
                       ),
@@ -5340,7 +5344,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          color: border.withOpacity(0.04),
+                          color: border.withValues(alpha: 0.04),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(color: border),
                         ),
@@ -5381,7 +5385,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
                                         (isPemasukan
                                                 ? activeGreen
                                                 : Colors.redAccent)
-                                            .withOpacity(0.12),
+                                            .withValues(alpha: 0.12),
                                     borderRadius: BorderRadius.circular(100),
                                   ),
                                   child: Text(
@@ -5683,7 +5687,7 @@ class _DokterPembukuanState extends ConsumerState<DokterPembukuan> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: (isSynced ? activeGreen : Colors.amber).withOpacity(
+                  color: (isSynced ? activeGreen : Colors.amber).withValues(alpha:
                     0.12,
                   ),
                   borderRadius: BorderRadius.circular(100),
@@ -6062,7 +6066,7 @@ class CashflowChartPainter extends CustomPainter {
       ..shader = LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: [color.withOpacity(0.18), color.withOpacity(0.0)],
+        colors: [color.withValues(alpha: 0.18), color.withValues(alpha: 0.0)],
       ).createShader(Rect.fromLTWH(35, 0, size.width - 35, size.height))
       ..style = PaintingStyle.fill;
     canvas.drawPath(fillPath, fillPaint);

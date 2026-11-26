@@ -550,7 +550,7 @@ class DashboardDrawer extends ConsumerWidget {
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: themeAccent.withOpacity(0.3),
+                            color: themeAccent.withValues(alpha: 0.3),
                             blurRadius: 12,
                             offset: const Offset(0, 4),
                           ),
@@ -604,8 +604,8 @@ class DashboardDrawer extends ConsumerWidget {
                                 blendMode: BlendMode.dstIn,
                                 child: Container(
                                   color: isDark
-                                      ? Colors.black.withOpacity(0.4)
-                                      : themeAccent.withOpacity(0.15),
+                                      ? Colors.black.withValues(alpha: 0.4)
+                                      : themeAccent.withValues(alpha: 0.15),
                                 ),
                               ),
                             ),
@@ -704,7 +704,7 @@ class DashboardDrawer extends ConsumerWidget {
                                         style: GoogleFonts.outfit(
                                           fontSize: 8,
                                           fontWeight: FontWeight.w900,
-                                          color: Colors.white.withOpacity(0.7),
+                                          color: Colors.white.withValues(alpha: 0.7),
                                           letterSpacing: 0.5,
                                         ),
                                       ),
@@ -736,7 +736,7 @@ class DashboardDrawer extends ConsumerWidget {
                           width: 44,
                           height: 44,
                           decoration: BoxDecoration(
-                            color: themeAccent.withOpacity(0.12),
+                            color: themeAccent.withValues(alpha: 0.12),
                             shape: BoxShape.circle,
                           ),
                           child: ClipOval(
@@ -868,7 +868,7 @@ class DashboardDrawer extends ConsumerWidget {
     VoidCallback? onTap,
   }) {
     final isSelected = activeMenu == menuId;
-    final activeBg = accentColor.withOpacity(0.12);
+    final activeBg = accentColor.withValues(alpha: 0.12);
 
     return Material(
       color: Colors.transparent,
@@ -928,7 +928,7 @@ class DashboardDrawer extends ConsumerWidget {
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: accentColor.withOpacity(0.15),
+                      color: accentColor.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(100),
                     ),
                     child: Text(
@@ -1004,7 +1004,7 @@ class _FullScreenDrawerOverlayState
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: themeAccent.withOpacity(0.15),
+                  color: themeAccent.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
@@ -1057,9 +1057,9 @@ class _FullScreenDrawerOverlayState
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: themeAccent.withOpacity(0.08),
+                    color: themeAccent.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: themeAccent.withOpacity(0.2)),
+                    border: Border.all(color: themeAccent.withValues(alpha: 0.2)),
                   ),
                   child: Row(
                     children: [
@@ -1512,7 +1512,7 @@ class _FullScreenDrawerOverlayState
               ),
               boxShadow: [
                 BoxShadow(
-                  color: themeAccent.withOpacity(0.25),
+                  color: themeAccent.withValues(alpha: 0.25),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
                 ),
@@ -1574,8 +1574,8 @@ class _FullScreenDrawerOverlayState
                       blendMode: BlendMode.dstIn,
                       child: Container(
                         color: isDark
-                            ? Colors.black.withOpacity(0.4)
-                            : themeAccent.withOpacity(0.15),
+                            ? Colors.black.withValues(alpha: 0.4)
+                            : themeAccent.withValues(alpha: 0.15),
                       ),
                     ),
                   ),
@@ -1597,7 +1597,7 @@ class _FullScreenDrawerOverlayState
                           width: 36,
                           height: 36,
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.18),
+                            color: Colors.white.withValues(alpha: 0.18),
                             shape: BoxShape.circle,
                           ),
                           alignment: Alignment.center,
@@ -1626,7 +1626,7 @@ class _FullScreenDrawerOverlayState
                               style: GoogleFonts.outfit(
                                 fontSize: 9,
                                 fontWeight: FontWeight.w900,
-                                color: Colors.white.withOpacity(0.75),
+                                color: Colors.white.withValues(alpha: 0.75),
                                 letterSpacing: 1.0,
                               ),
                             ),
@@ -1758,7 +1758,7 @@ class _FullScreenDrawerOverlayState
                             : 'Apa yang ingin Anda cari hari ini?',
                         hintStyle: GoogleFonts.outfit(
                           fontSize: 13,
-                          color: subtitleColor.withOpacity(0.5),
+                          color: subtitleColor.withValues(alpha: 0.5),
                         ),
                         border: InputBorder.none,
                         suffixIcon: _searchQuery.isNotEmpty
@@ -1863,7 +1863,7 @@ class _FullScreenDrawerOverlayState
                         boxShadow: isSelected
                             ? [
                                 BoxShadow(
-                                  color: cluster.accentColor.withOpacity(0.35),
+                                  color: cluster.accentColor.withValues(alpha: 0.35),
                                   blurRadius: 10,
                                   offset: const Offset(0, 4),
                                 ),
@@ -1906,8 +1906,8 @@ class _FullScreenDrawerOverlayState
                               ),
                               decoration: BoxDecoration(
                                 color: isSelected
-                                    ? Colors.white.withOpacity(0.25)
-                                    : themeAccent.withOpacity(0.15),
+                                    ? Colors.white.withValues(alpha: 0.25)
+                                    : themeAccent.withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(100),
                               ),
                               child: Text(
@@ -2011,7 +2011,7 @@ class _FullScreenDrawerOverlayState
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
           color: isSelected
-              ? themeAccent.withOpacity(0.18)
+              ? themeAccent.withValues(alpha: 0.18)
               : (isDark ? const Color(0xFF1E1E22) : const Color(0xFFF1EEFA)),
           borderRadius: BorderRadius.circular(100),
           border: Border.all(
@@ -2050,7 +2050,7 @@ class _FullScreenDrawerOverlayState
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
+        color: Colors.white.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(100),
       ),
       child: Row(
@@ -2094,7 +2094,7 @@ class _FullScreenDrawerOverlayState
     final Color cardBg;
     if (isSelected) {
       cardBg = isDark
-          ? accentColor.withOpacity(0.24)
+          ? accentColor.withValues(alpha: 0.24)
           : (isRev ? const Color(0xFFF9E7F9) : const Color(0xFFE8F8F5));
     } else {
       cardBg = isDark
@@ -2135,7 +2135,7 @@ class _FullScreenDrawerOverlayState
         border: Border.all(color: borderCol, width: 2),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -2148,9 +2148,9 @@ class _FullScreenDrawerOverlayState
         child: InkWell(
           onTap: handleCardTap,
           borderRadius: BorderRadius.circular(24),
-          hoverColor: accentColor.withOpacity(0.08),
-          splashColor: accentColor.withOpacity(0.15),
-          highlightColor: accentColor.withOpacity(0.05),
+          hoverColor: accentColor.withValues(alpha: 0.08),
+          splashColor: accentColor.withValues(alpha: 0.15),
+          highlightColor: accentColor.withValues(alpha: 0.05),
           child: Stack(
             children: [
               // 1. Center Content (Main body of the card)
@@ -2209,15 +2209,15 @@ class _FullScreenDrawerOverlayState
                         decoration: BoxDecoration(
                           color: isFav
                               ? (isDark
-                                    ? const Color(0xFFFFB800).withOpacity(0.25)
+                                    ? const Color(0xFFFFB800).withValues(alpha: 0.25)
                                     : const Color(0xFFFFF8E1))
                               : (isDark
-                                    ? Colors.white.withOpacity(0.06)
-                                    : Colors.black.withOpacity(0.04)),
+                                    ? Colors.white.withValues(alpha: 0.06)
+                                    : Colors.black.withValues(alpha: 0.04)),
                           shape: BoxShape.circle,
                           border: Border.all(
                             color: isFav
-                                ? const Color(0xFFFFB800).withOpacity(0.6)
+                                ? const Color(0xFFFFB800).withValues(alpha: 0.6)
                                 : Colors.transparent,
                             width: 1,
                           ),
@@ -2252,7 +2252,7 @@ class _FullScreenDrawerOverlayState
                       decoration: BoxDecoration(
                         color: isSelected
                             ? accentColor
-                            : accentColor.withOpacity(0.18),
+                            : accentColor.withValues(alpha: 0.18),
                         borderRadius: BorderRadius.circular(100),
                       ),
                       child: Text(
