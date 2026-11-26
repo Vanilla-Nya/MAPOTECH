@@ -78,15 +78,20 @@ class ChildProfile {
     this.longitude = 113.9123,
   });
 
-  /// Menghitung usia anak dalam bulan secara presisi
-  int get ageInMonths {
-    final now = DateTime.now();
+  /// Menghitung jumlah bulan penuh dari [birthDate] hingga [referenceDate].
+  /// Bulan berjalan hanya bertambah jika hari saat ini >= tanggal lahir (tepat 1 bulan penuh).
+  static int calculateCompletedMonths(DateTime birthDate, [DateTime? referenceDate]) {
+    final now = referenceDate ?? DateTime.now();
+    if (birthDate.isAfter(now)) return 0;
     int months = (now.year - birthDate.year) * 12 + now.month - birthDate.month;
     if (now.day < birthDate.day) {
       months--;
     }
     return months < 0 ? 0 : months;
   }
+
+  /// Menghitung usia anak dalam bulan secara presisi
+  int get ageInMonths => calculateCompletedMonths(birthDate);
 
   /// Menghitung usia dalam format teks (misal: "1 Tahun 4 Bulan" atau "8 Bulan")
   String get ageLabel {

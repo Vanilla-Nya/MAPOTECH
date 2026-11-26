@@ -387,12 +387,16 @@ class VitaScaleMqttService {
     sendCommand('reconfig');
   }
 
-  /// Perintah Remote Ganti Wi-Fi ESP32 Langsung via MQTT saat alat sedang online
+  /// Perintah Remote Ganti Wi-Fi & Parameter ESP32 Langsung via MQTT saat alat sedang online
   void setWifiCredentials({
     required String ssid,
     String password = '',
     String? faskesId,
     String? deviceId,
+    String? broker,
+    int? port,
+    double? poleHeightCm,
+    double? calFactor,
   }) {
     if (ssid.trim().isEmpty) return;
     sendCommand('set_wifi', params: {
@@ -400,6 +404,10 @@ class VitaScaleMqttService {
       'password': password,
       if (faskesId != null && faskesId.trim().isNotEmpty) 'faskes_id': faskesId.trim(),
       if (deviceId != null && deviceId.trim().isNotEmpty) 'device_id': deviceId.trim(),
+      if (broker != null && broker.trim().isNotEmpty) 'broker': broker.trim(),
+      if (port != null && port > 0) 'port': port,
+      if (poleHeightCm != null && poleHeightCm > 0) 'pole_height_cm': poleHeightCm,
+      if (calFactor != null && calFactor > 0) 'cal_factor': calFactor,
     });
   }
 

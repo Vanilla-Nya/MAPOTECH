@@ -467,6 +467,106 @@ class CommunityHealthCenterService {
     }
   }
 
+  /// Memastikan antrean anak ada lalu menyimpan hasil skrining, antropometri,
+  /// dan diagnosa AI Reasoning ke skema `community_health_center`.
+  Future<bool> saveVitaScaleScreeningRecord({
+    required String facilityId,
+    required String nik,
+    required String namaAnak,
+    required String jenisKelamin,
+    required DateTime tanggalLahir,
+    required String namaWali,
+    required String alamat,
+    String? noTelepon,
+    required String examinerName,
+    required int usiaBulan,
+    required double beratBadanKg,
+    required double panjangTinggiCm,
+    required String metodeUkur,
+    double? lingkarKepalaCm,
+    double? lilaCm,
+    double? lingkarPerutCm,
+    String statusGizi = 'Gizi Baik',
+    String statusStunting = 'Normal',
+    String kmsStatus = 'N',
+    bool dapatVitA = false,
+    bool dapatObatCacing = false,
+    String iotSource = 'manual_input',
+    String icd10Code = 'Z00.1',
+    required String diagnosaPrimer,
+    String? faktorEtiologi,
+    required String rencanaNutrisiHarian,
+    String? edukasiOrangTua,
+    String? notes,
+  }) async {
+    if (!_isValidUuid(facilityId)) return false;
+
+    try {
+      final client = SupabaseService.client;
+      final existingQueue = await client
+          .schema(schemaName)
+          .from('vitascale_anak_queue')
+          .select('id')
+          .eq('facility_id', facilityId)
+          .eq('nik', nik)
+          .order('created_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+
+      String idQueue;
+      if (existingQueue != null && existingQueue['id'] != null) {
+        idQueue = existingQueue['id'].toString();
+      } else {
+        final created = await client
+            .schema(schemaName)
+            .from('vitascale_anak_queue')
+            .insert({
+              'facility_id': facilityId,
+              'nik': nik,
+              'nama_anak': namaAnak,
+              'jenis_kelamin': jenisKelamin,
+              'tanggal_lahir': tanggalLahir.toIso8601String().split('T')[0],
+              'nama_wali': namaWali,
+              'no_telepon': noTelepon,
+              'alamat': alamat,
+              'lifecycle': 'aktif',
+            })
+            .select('id')
+            .single();
+        idQueue = created['id'].toString();
+      }
+
+      return await insertVitaScaleAnakKunjunganWithAntropometry(
+        idQueue: idQueue,
+        visitNumber: 'Bulan-$usiaBulan',
+        visitDate: DateTime.now(),
+        examinerName: examinerName,
+        notes: notes,
+        usiaBulan: usiaBulan,
+        beratBadanKg: beratBadanKg,
+        panjangTinggiCm: panjangTinggiCm,
+        metodeUkur: metodeUkur,
+        lingkarKepalaCm: lingkarKepalaCm,
+        lilaCm: lilaCm,
+        lingkarPerutCm: lingkarPerutCm,
+        statusGizi: statusGizi,
+        statusStunting: statusStunting,
+        kmsStatus: kmsStatus,
+        dapatVitA: dapatVitA,
+        dapatObatCacing: dapatObatCacing,
+        iotSource: iotSource,
+        icd10Code: icd10Code,
+        diagnosaPrimer: diagnosaPrimer,
+        faktorEtiologi: faktorEtiologi,
+        rencanaNutrisiHarian: rencanaNutrisiHarian,
+        edukasiOrangTua: edukasiOrangTua,
+      );
+    } catch (e) {
+      debugPrint('[VitaScale Anak] Error saveVitaScaleScreeningRecord: $e');
+      return false;
+    }
+  }
+
   // ===========================================================================
   // 4. AKSES PORTAL PASIEN (PORTAL MOMICARE & MY FAMILY)
   // ===========================================================================

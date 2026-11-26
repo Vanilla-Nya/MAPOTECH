@@ -50,6 +50,7 @@ import 'package:mapotech/features/puskesmas/dashboard/frontend/management_pustu_
 import 'package:mapotech/features/puskesmas/dlc/vitascale/pages/vitascale_data_anak_page.dart';
 import 'package:mapotech/features/puskesmas/dlc/vitascale/pages/vitascale_screening_page.dart';
 import 'package:mapotech/features/puskesmas/dlc/vitascale/data/vitascale_models.dart';
+import 'package:mapotech/features/puskesmas/dlc/vitascale/logic/vitascale_appbar_status.dart';
 
 bool _isCorsafeUrl(String url) {
   if (url.isEmpty) return false;
@@ -588,66 +589,102 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   // Left section: Drawer trigger or Page title
-                  Row(
-                    children: [
-                      if (isMobile)
-                        IconButton(
-                          icon: const Icon(Icons.menu_rounded),
-                          onPressed: () {
-                            // Mobile trigger switches straight to biggest full screen size!
-                            notifier.setDrawerSize(2);
-                          },
-                        )
-                      else
-                        IconButton(
-                          icon: Icon(
-                            state.drawerSize == 0
-                                ? Icons.menu_open_rounded
-                                : Icons.menu_rounded,
-                            color: textColor.withValues(alpha: 0.7),
-                          ),
-                          onPressed: () {
-                            notifier.toggleDrawerSize();
-                          },
-                        ),
-                      const SizedBox(width: 8),
-                      Builder(
-                        builder: (context) {
-                          final role = state.loggedInRole ?? 'pasien';
-                          final menuItems = getMenuItemsForRole(
-                            role,
-                            state.language,
-                            state: state,
-                          );
-                          String displayTitle = _activeMenu.toUpperCase();
-                          for (final item in menuItems) {
-                            if (item.id == _activeMenu) {
-                              displayTitle = item.label.toUpperCase();
-                              break;
-                            }
-                          }
-                          if (_activeMenu == 'settings') {
-                            displayTitle = state.language == 'en'
-                                ? 'SETTINGS'
-                                : 'PENGATURAN';
-                          }
-                          return Text(
-                            displayTitle,
-                            style: GoogleFonts.outfit(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w900,
-                              color: textColor,
-                              letterSpacing: 1.0,
+                  Flexible(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isMobile)
+                          IconButton(
+                            icon: const Icon(Icons.menu_rounded),
+                            onPressed: () {
+                              // Mobile trigger switches straight to biggest full screen size!
+                              notifier.setDrawerSize(2);
+                            },
+                          )
+                        else
+                          IconButton(
+                            icon: Icon(
+                              state.drawerSize == 0
+                                  ? Icons.menu_open_rounded
+                                  : Icons.menu_rounded,
+                              color: textColor.withValues(alpha: 0.7),
                             ),
-                          );
-                        },
-                      ),
-                    ],
+                            onPressed: () {
+                              notifier.toggleDrawerSize();
+                            },
+                          ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Builder(
+                            builder: (context) {
+                              final role = state.loggedInRole ?? 'pasien';
+                              final menuItems = getMenuItemsForRole(
+                                role,
+                                state.language,
+                                state: state,
+                              );
+                              String displayTitle = _activeMenu.toUpperCase();
+                              for (final item in menuItems) {
+                                if (item.id == _activeMenu) {
+                                  displayTitle = item.label.toUpperCase();
+                                  break;
+                                }
+                              }
+                              if (_activeMenu == 'settings') {
+                                displayTitle = state.language == 'en'
+                                    ? 'SETTINGS'
+                                    : 'PENGATURAN';
+                              }
+                              return Text(
+                                displayTitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.outfit(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w900,
+                                  color: textColor,
+                                  letterSpacing: 1.0,
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
 
                   // Right section: Info status indicator and avatar shortcut
                   Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
+                      if (_activeMenu == 'dlc_vitascale_screening')
+                        Consumer(
+                          builder: (context, ref, _) {
+                            final status = ref.watch(
+                              vitaScaleAppBarStatusProvider,
+                            );
+                            final show = status != null && status.showInAppBar;
+                            final isCompactBar =
+                                isMobile ||
+                                MediaQuery.of(context).size.width < 1100;
+                            return AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 200),
+                              child: show
+                                  ? VitaScaleAppBarStatusIcons(
+                                      key: const ValueKey(
+                                        'vitascale_appbar_icons',
+                                      ),
+                                      status: status,
+                                      isCompact: isCompactBar,
+                                      textColor: textColor,
+                                      borderColor: borderColor,
+                                    )
+                                  : const SizedBox.shrink(
+                                      key: ValueKey('vitascale_appbar_empty'),
+                                    ),
+                            );
+                          },
+                        ),
                       if (state.loggedInRole == 'pasien')
                         Container(
                           margin: const EdgeInsets.only(right: 8),
@@ -805,6 +842,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
         case 'dlc_vitascale_screening':
           return VitaScaleScreeningPage(
             selectedChild: _selectedVitascaleChild,
+            embedInDashboardShell: true,
             onNavigateToMenu: (menu) => setState(() => _activeMenu = menu),
           );
         default:
@@ -843,6 +881,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
         case 'dlc_vitascale_screening':
           return VitaScaleScreeningPage(
             selectedChild: _selectedVitascaleChild,
+            embedInDashboardShell: true,
             onNavigateToMenu: (menu) {
               setState(() {
                 _activeMenu = menu;
@@ -920,6 +959,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
         case 'dlc_vitascale_screening':
           return VitaScaleScreeningPage(
             selectedChild: _selectedVitascaleChild,
+            embedInDashboardShell: true,
             onNavigateToMenu: (menu) => setState(() => _activeMenu = menu),
           );
         default:

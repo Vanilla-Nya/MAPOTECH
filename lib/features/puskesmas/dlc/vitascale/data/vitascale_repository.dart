@@ -332,7 +332,7 @@ class VitaScaleRepository implements IVitaScaleRepository {
           if (bDateStr != null) {
             final bDate = DateTime.tryParse(bDateStr);
             if (bDate != null) {
-              final ageMonths = (DateTime.now().year - bDate.year) * 12 + DateTime.now().month - bDate.month;
+              final ageMonths = ChildProfile.calculateCompletedMonths(bDate);
               if (ageMonths <= 144) {
                 dbResults.add(ChildProfile(
                   id: row['id']?.toString() ?? '',
@@ -412,7 +412,7 @@ class VitaScaleRepository implements IVitaScaleRepository {
           if (bDateStr != null) {
             final bDate = DateTime.tryParse(bDateStr);
             if (bDate != null) {
-              final ageMonths = (DateTime.now().year - bDate.year) * 12 + DateTime.now().month - bDate.month;
+              final ageMonths = ChildProfile.calculateCompletedMonths(bDate);
               if (ageMonths <= 144) {
                 final child = ChildProfile(
                   id: row['id']?.toString() ?? 'USR-${DateTime.now().millisecondsSinceEpoch}',
@@ -473,6 +473,12 @@ class VitaScaleRepository implements IVitaScaleRepository {
     return resultList;
   }
 
+  static bool _isValidUuid(String value) {
+    return RegExp(
+      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+    ).hasMatch(value.trim());
+  }
+
   @override
   Future<bool> saveScreeningResult(
     ScreeningSession session, {
@@ -480,8 +486,28 @@ class VitaScaleRepository implements IVitaScaleRepository {
   }) async {
     _mockHistory.insert(0, session);
 
-    if (_client != null && !session.isDemo) {
+    if (_client != null && !session.isDemo && _isValidUuid(session.facilityId)) {
       try {
+        final modeDb = session.mode == AnthropometryMode.recumbentLength
+            ? 'recumbent_length'
+            : 'standing_height';
+
+        await _client.schema('vitascale').from('screening_sessions').upsert({
+          'id': session.sessionId,
+          'facility_id': session.facilityId,
+          'child_id': session.child.id,
+          'child_name': session.child.name,
+          'child_nik': session.child.nik,
+          'child_gender': session.child.gender,
+          'child_birth_date': session.child.birthDate.toIso8601String().split('T')[0],
+          'mode': modeDb,
+          'is_mode_manual_override': session.isModeManualOverride,
+          'is_demo': session.isDemo,
+          'status': 'verified',
+          'start_time': session.startTime.toIso8601String(),
+          'end_time': (session.endTime ?? DateTime.now()).toIso8601String(),
+        });
+
         await _client.schema('vitascale').from('screening_results').insert({
           'session_id': session.sessionId,
           'facility_id': session.facilityId,
@@ -498,7 +524,9 @@ class VitaScaleRepository implements IVitaScaleRepository {
           'verified_at': DateTime.now().toIso8601String(),
           'notes': session.notes,
         });
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[VitaScaleRepo] Error saving to vitascale schema: $e');
+      }
     }
 
     return true;

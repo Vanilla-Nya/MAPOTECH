@@ -1,54 +1,52 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
-import 'package:image_picker/image_picker.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/satusehat_service.dart';
 import 'package:mapotech/shared/widgets/ui.dart';
-import 'package:url_launcher/url_launcher.dart';
 
-import '../cv/vitascale_camera_bridge.dart';
+import '../cv/pcv_camera_capture_bridge.dart';
 import '../data/community_health_center_service.dart';
+import '../data/provisioning/vitascale_esp_provisioning_bridge.dart';
 import '../data/vitascale_api_service.dart';
 import '../data/mqtt/vitascale_mqtt_service.dart';
-import '../data/vitascale_device_simulator.dart';
 import '../data/vitascale_models.dart';
 import '../data/vitascale_repository.dart';
 import '../logic/screening_state_machine.dart';
+import '../logic/vitascale_appbar_status.dart';
 import '../logic/vitascale_reasoning_service.dart';
 import '../vitascale_dlc_gate.dart';
-import '../widgets/measurement_card.dart';
-import '../widgets/vitascale_status_bar.dart';
 
 class VitaScaleScreeningPage extends ConsumerStatefulWidget {
   final ChildProfile? selectedChild;
+  final bool embedInDashboardShell;
   final ValueChanged<String>? onNavigateToMenu;
 
   const VitaScaleScreeningPage({
     super.key,
     this.selectedChild,
+    this.embedInDashboardShell = false,
     this.onNavigateToMenu,
   });
 
   @override
-  ConsumerState<VitaScaleScreeningPage> createState() => _VitaScaleScreeningPageState();
+  ConsumerState<VitaScaleScreeningPage> createState() =>
+      _VitaScaleScreeningPageState();
 }
 
-class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage> {
-  // Mode Tab: 0 = Input Manual & AI Reasoning (Uji Ukur), 1 = Perangkat IoT & Webcam CV
+class _VitaScaleScreeningPageState
+    extends ConsumerState<VitaScaleScreeningPage> {
+  // Mode Tab: 0 = Uji Ukur Manual & AI, 1 = Perangkat IoT (MQTT), 2 = Ukur Tinggi via Foto (PCV)
   int _activeTab = 0;
-  int _formStep = 1; // 1: Identitas Balita, 2: Antropometri Fisik, 3: Reasoning AI, 4: SATUSEHAT & Database
-  int _iotSubTab = 0; // 0 = Sensor IoT ESP32 (Ultrasonik & Load Cell), 1 = Kamera Webcam CV
+  int _formStep =
+      1; // 1: Identitas Balita, 2: Antropometri Fisik, 3: Reasoning AI, 4: SATUSEHAT & Database
 
-  // Simulator & Repo untuk Mode IoT
-  late final VitaScaleDeviceSimulator _simulator;
   final VitaScaleRepository _repository = VitaScaleRepository();
   final TextEditingController _notesController = TextEditingController();
 
@@ -64,18 +62,32 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
   // ===========================================================================
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _nikController = TextEditingController();
-  final TextEditingController _ageController = TextEditingController(text: '24');
-  final TextEditingController _weightController = TextEditingController(text: '11.5');
-  final TextEditingController _heightController = TextEditingController(text: '85.0');
-  final TextEditingController _waistController = TextEditingController(text: '46.0');
-  final TextEditingController _lilaController = TextEditingController(text: '14.5');
-  final TextEditingController _headCircumferenceController = TextEditingController(text: '47.0');
+  final TextEditingController _ageController = TextEditingController(
+    text: '24',
+  );
+  final TextEditingController _weightController = TextEditingController(
+    text: '11.5',
+  );
+  final TextEditingController _heightController = TextEditingController(
+    text: '85.0',
+  );
+  final TextEditingController _waistController = TextEditingController(
+    text: '46.0',
+  );
+  final TextEditingController _lilaController = TextEditingController(
+    text: '14.5',
+  );
+  final TextEditingController _headCircumferenceController =
+      TextEditingController(text: '47.0');
 
   int _selectedGender = 0; // 0 = Laki-laki, 1 = Perempuan
   double _ageMonths = 24.0;
+  DateTime? _selectedBirthDate;
+  bool _isAutoAgeFromBirthDate = true;
 
   // Parameter Khusus Buku KIA 2024 & SATUSEHAT
-  String _measurementMethod = 'TB'; // 'PB' = Telentang (<24 bln), 'TB' = Berdiri (≥24 bln)
+  String _measurementMethod =
+      'TB'; // 'PB' = Telentang (<24 bln), 'TB' = Berdiri (≥24 bln)
   String _kmsStatus = 'N'; // 'N', 'T', '2T', 'BGM', 'Baru'
   bool _receivedVitA = true;
   bool _receivedDeworming = true;
@@ -106,9 +118,13 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
   Uint8List? _pcvSelectedImageBytes;
   String? _pcvSelectedImageName;
   final TextEditingController _pcvUrlController = TextEditingController();
-  final TextEditingController _pcvCustomScaleController = TextEditingController(text: '11.00');
-  double _pcvSelectedScale = 11.00; // Default 11.00 px/cm (Dataset Boneka & Infantometer standar)
-  bool _pcvUseRoi = false; // Default false (Full Frame agar tidak memotong tubuh/kaki)
+  final TextEditingController _pcvCustomScaleController = TextEditingController(
+    text: '11.00',
+  );
+  double _pcvSelectedScale =
+      11.00; // Default 11.00 px/cm (Dataset Boneka & Infantometer standar)
+  bool _pcvUseRoi =
+      false; // Default false (Full Frame agar tidak memotong tubuh/kaki)
   final bool _pcvUseK1 = false; // Koreksi distorsi lensa
   bool _isLoadingPcvImage = false;
   bool _isMeasuringPcv = false;
@@ -127,24 +143,33 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
   // STATE MQTT IOT TELEMETRY (Sensor Ultrasonik HC-SR04 & Load Cell HX711)
   // ===========================================================================
   final VitaScaleMqttService _mqttService = VitaScaleMqttService();
-  final CommunityHealthCenterService _chcService = CommunityHealthCenterService();
+  final CommunityHealthCenterService _chcService =
+      CommunityHealthCenterService();
   StreamSubscription? _mqttTelemetrySub;
   StreamSubscription? _mqttStatusSub;
   bool _isMqttConnecting = false;
+  bool _autoSyncIotToForm = true;
   Map<String, dynamic>? _lastMqttTelemetry;
   String? _activeSavedWifiSsid;
+
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _scrollViewportKey = GlobalKey();
+  final GlobalKey _statusStripKey = GlobalKey();
+  final Object _statusOwnerToken = Object();
+  late final StateController<VitaScaleAppBarStatus?> _appBarStatusCtrl;
+  bool _isStatusScrolledPast = false;
+  bool _statusSyncScheduled = false;
 
   @override
   void initState() {
     super.initState();
-    _simulator = VitaScaleDeviceSimulator(
-      stateMachine: ref.read(screeningStateProvider.notifier),
-    );
-
+    _appBarStatusCtrl = ref.read(vitaScaleAppBarStatusProvider.notifier);
+    _scrollController.addListener(_onScreeningScroll);
     _initMqttListeners();
     _initSession();
     _checkServer();
     _syncDeviceAndWifiFromDatabase();
+    _scheduleAppBarStatusSync();
   }
 
   /// Sinkronisasi antrean offline Wi-Fi & muat konfigurasi alat Puskesmas dari DB/Lokal
@@ -178,7 +203,8 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
   @override
   void didUpdateWidget(covariant VitaScaleScreeningPage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.selectedChild != null && widget.selectedChild?.id != oldWidget.selectedChild?.id) {
+    if (widget.selectedChild != null &&
+        widget.selectedChild?.id != oldWidget.selectedChild?.id) {
       _selectChild(widget.selectedChild!);
     }
   }
@@ -193,11 +219,9 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
 
     final state = ref.read(landingPageProvider);
     final facilityId = state.activePuskesmasId ?? 'PUSKESMAS-001';
-    ref.read(screeningStateProvider.notifier).startSession(
-          child: child,
-          facilityId: facilityId,
-          isDemo: true,
-        );
+    ref
+        .read(screeningStateProvider.notifier)
+        .startSession(child: child, facilityId: facilityId, isDemo: true);
   }
 
   Future<void> _checkServer() async {
@@ -224,7 +248,9 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
         final state = ref.read(landingPageProvider);
         final facilityId = state.activePuskesmasId ?? 'PUSKESMAS-001';
 
-        ref.read(screeningStateProvider.notifier).startSession(
+        ref
+            .read(screeningStateProvider.notifier)
+            .startSession(
               child: _activeChild!,
               facilityId: facilityId,
               isDemo: true,
@@ -234,22 +260,25 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
   }
 
   void _fillFormWithChild(ChildProfile child) {
+    final computedMonths = ChildProfile.calculateCompletedMonths(child.birthDate);
     setState(() {
       _formStep = 1;
       _reasoningPromptCount = 0;
       _smartGrowthResult = null;
       _reasoningResult = null;
       _nameController.text = child.name;
-      _nikController.text = child.nik;
+      _nikController.text = child.nik == '-' ? '' : child.nik;
       _selectedGender = child.gender == 'L' ? 0 : 1;
-      _ageMonths = child.ageInMonths.toDouble();
-      _ageController.text = child.ageInMonths.toString();
-      _measurementMethod = child.isUnder24Months ? 'PB' : 'TB';
+      _selectedBirthDate = child.birthDate;
+      _isAutoAgeFromBirthDate = true;
+      _ageMonths = computedMonths.toDouble();
+      _ageController.text = computedMonths.toString();
+      _measurementMethod = computedMonths < 24 ? 'PB' : 'TB';
       _satuSehatPatientId = null;
       _satuSehatSyncResult = null;
 
       // Estimasi default BB, TB, LK realistis sesuai standar Buku KIA 2024
-      if (child.isUnder24Months) {
+      if (computedMonths < 24) {
         _weightController.text = '9.5';
         _heightController.text = '76.0';
         _headCircumferenceController.text = '45.5';
@@ -261,13 +290,208 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
     });
   }
 
+  DateTime _birthDateForAgeMonths(int months, [DateTime? refDate]) {
+    final now = refDate ?? DateTime.now();
+    final totalMonths = now.year * 12 + (now.month - 1) - months;
+    final targetYear = totalMonths ~/ 12;
+    final targetMonth = (totalMonths % 12) + 1;
+    final lastDay = DateTime(targetYear, targetMonth + 1, 0).day;
+    final targetDay = now.day <= lastDay ? now.day : lastDay;
+    return DateTime(targetYear, targetMonth, targetDay);
+  }
+
+  String _formatDateId(DateTime date) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'Mei',
+      'Jun',
+      'Jul',
+      'Agu',
+      'Sep',
+      'Okt',
+      'Nov',
+      'Des',
+    ];
+    final d = date.day.toString().padLeft(2, '0');
+    final m = months[date.month - 1];
+    return '$d $m ${date.year}';
+  }
+
+  Future<void> _pickChildBirthDate() async {
+    final now = DateTime.now();
+    final initial = _selectedBirthDate ?? _birthDateForAgeMonths(_ageMonths.round(), now);
+    final safeInitial = initial.isAfter(now) ? now : initial;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: safeInitial,
+      firstDate: DateTime(now.year - 13, 1, 1),
+      lastDate: now,
+      helpText: 'Pilih Tanggal Lahir Bayi / Balita',
+    );
+    if (picked == null || !mounted) return;
+
+    final months = ChildProfile.calculateCompletedMonths(picked);
+    setState(() {
+      _selectedBirthDate = picked;
+      _isAutoAgeFromBirthDate = true;
+      _ageMonths = months.toDouble();
+      _ageController.text = months.toString();
+      _measurementMethod = months < 24 ? 'PB' : 'TB';
+      _smartGrowthResult = null;
+      _reasoningResult = null;
+    });
+  }
+
+  void _onScreeningScroll() {
+    _evaluateStatusVisibilityAndSync();
+  }
+
+  void _scheduleAppBarStatusSync() {
+    if (_statusSyncScheduled || !mounted) return;
+    _statusSyncScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _statusSyncScheduled = false;
+      if (!mounted) return;
+      _evaluateStatusVisibilityAndSync(forceSnapshotSync: true);
+    });
+  }
+
+  void _evaluateStatusVisibilityAndSync({bool forceSnapshotSync = false}) {
+    final stripContext = _statusStripKey.currentContext;
+    final viewportContext = _scrollViewportKey.currentContext;
+    bool nextScrolledPast = _isStatusScrolledPast;
+    if (stripContext != null && viewportContext != null) {
+      final stripBox = stripContext.findRenderObject() as RenderBox?;
+      final viewportBox = viewportContext.findRenderObject() as RenderBox?;
+      if (stripBox != null &&
+          stripBox.hasSize &&
+          stripBox.attached &&
+          viewportBox != null &&
+          viewportBox.hasSize &&
+          viewportBox.attached) {
+        final stripBottomY =
+            stripBox.localToGlobal(Offset.zero).dy + stripBox.size.height;
+        final viewportTopY = viewportBox.localToGlobal(Offset.zero).dy;
+        if (_isStatusScrolledPast) {
+          if (stripBottomY > viewportTopY + 24) {
+            nextScrolledPast = false;
+          }
+        } else {
+          if (stripBottomY <= viewportTopY + 8) {
+            nextScrolledPast = true;
+          }
+        }
+      }
+    }
+    final scrolledChanged = nextScrolledPast != _isStatusScrolledPast;
+    if (scrolledChanged) {
+      _isStatusScrolledPast = nextScrolledPast;
+      if (!widget.embedInDashboardShell && mounted) {
+        setState(() {});
+      }
+    }
+    if (scrolledChanged || forceSnapshotSync) {
+      _pushAppBarStatusSnapshot();
+    }
+  }
+
+  VitaScaleAppBarStatus _buildCurrentAppBarSnapshot() {
+    final deviceStatus = _getIotDeviceStatusInfo();
+    final rssi = (_lastMqttTelemetry?['rssi_dbm'] as num?)?.toInt();
+    final poleHeight =
+        (_lastMqttTelemetry?['height'] is Map &&
+            _lastMqttTelemetry!['height']['pole_height_cm'] != null)
+        ? (_lastMqttTelemetry!['height']['pole_height_cm'] as num).toDouble()
+        : _mqttService.poleHeightCm;
+
+    return VitaScaleAppBarStatus(
+      ownerToken: _statusOwnerToken,
+      showInAppBar: _isStatusScrolledPast,
+      activeTab: _activeTab,
+      isCloudOnline: _serverStatus?['isOnline'] == true,
+      isCheckingCloud: _isCheckingServer,
+      cloudBaseUrl: VitaScaleApiConfig.baseUrl,
+      isMqttConnected: _mqttService.isConnected,
+      isMqttConnecting: _isMqttConnecting,
+      iotStatusLabel: deviceStatus.label,
+      iotStatusDetail: deviceStatus.detail,
+      iotStatusIcon: deviceStatus.icon,
+      iotStatusColor: deviceStatus.color,
+      wifiRssiDbm: rssi,
+      poleHeightCm: poleHeight,
+      isGatewayHealthy: _mqttService.isGatewayHealthy || _mqttService.isConnected,
+      pcvScalePxPerCm: _pcvSelectedScale,
+      onPingCloud: () {
+        if (mounted && !_isCheckingServer) {
+          _checkServer();
+        }
+      },
+      onOpenApiHost: () {
+        if (mounted) {
+          _showServerConfigModal();
+        }
+      },
+      onToggleMqtt: () {
+        if (mounted && !_isMqttConnecting) {
+          _toggleMqttConnection();
+        }
+      },
+      onOpenIotSettings: () {
+        if (mounted) {
+          _showMqttSettingsDialog();
+        }
+      },
+      onSendTare: () {
+        if (mounted && _mqttService.isConnected) {
+          _sendMqttTare();
+        }
+      },
+      onScrollToStatus: () {
+        if (!mounted) return;
+        final ctx = _statusStripKey.currentContext;
+        if (ctx != null) {
+          Scrollable.ensureVisible(
+            ctx,
+            alignment: 0.08,
+            duration: const Duration(milliseconds: 320),
+            curve: Curves.easeOutCubic,
+          );
+        } else if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            0,
+            duration: const Duration(milliseconds: 320),
+            curve: Curves.easeOutCubic,
+          );
+        }
+      },
+    );
+  }
+
+  void _pushAppBarStatusSnapshot() {
+    if (!mounted) return;
+    final nextSnapshot = _buildCurrentAppBarSnapshot();
+    if (!nextSnapshot.sameSnapshotAs(_appBarStatusCtrl.state)) {
+      _appBarStatusCtrl.state = nextSnapshot;
+    }
+  }
+
   @override
   void dispose() {
+    _scrollController.removeListener(_onScreeningScroll);
+    _scrollController.dispose();
+    Future.microtask(() {
+      if (_appBarStatusCtrl.state?.ownerToken == _statusOwnerToken) {
+        _appBarStatusCtrl.state = null;
+      }
+    });
     _mqttTelemetrySub?.cancel();
     _mqttStatusSub?.cancel();
     _pcvProgressTimer?.cancel();
     _pcvUrlController.dispose();
-    _simulator.dispose();
+    _pcvCustomScaleController.dispose();
     _notesController.dispose();
     _topSearchController.dispose();
     _nameController.dispose();
@@ -325,11 +549,15 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
     }
 
     if (valKg != null && valKg > 0) {
-      ref.read(screeningStateProvider.notifier).updateWeight(
-        value: valKg,
-        status: isStable ? MeasurementStatus.stable : MeasurementStatus.measuring,
-        source: 'esp32_hx711_mqtt',
-      );
+      ref
+          .read(screeningStateProvider.notifier)
+          .updateWeight(
+            value: valKg,
+            status: isStable
+                ? MeasurementStatus.stable
+                : MeasurementStatus.measuring,
+            source: 'esp32_hx711_mqtt',
+          );
     }
 
     // Parse data tinggi/panjang badan dari Ultrasonik HC-SR04
@@ -338,7 +566,9 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
       final heightMap = data['height'] as Map<String, dynamic>;
       valCm = (heightMap['val_cm'] as num?)?.toDouble();
       final rawDist = (heightMap['raw_dist_cm'] as num?)?.toDouble();
-      final pole = (heightMap['pole_height_cm'] as num?)?.toDouble() ?? _mqttService.poleHeightCm;
+      final pole =
+          (heightMap['pole_height_cm'] as num?)?.toDouble() ??
+          _mqttService.poleHeightCm;
       if (valCm == null && rawDist != null) {
         valCm = pole - rawDist;
       }
@@ -351,24 +581,40 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
     }
 
     if (valCm != null && valCm > 0) {
-      ref.read(screeningStateProvider.notifier).updateHeight(
-        value: valCm,
-        status: MeasurementStatus.stable,
-        source: 'esp32_ultrasonic_mqtt',
-      );
+      ref
+          .read(screeningStateProvider.notifier)
+          .updateHeight(
+            value: valCm,
+            status: MeasurementStatus.stable,
+            source: 'esp32_ultrasonic_mqtt',
+          );
+    }
+
+    if (_activeTab == 1 && _autoSyncIotToForm) {
+      final newBbStr = (valKg != null && valKg > 0) ? valKg.toStringAsFixed(2) : null;
+      final newTbStr = (valCm != null && valCm > 0) ? valCm.toStringAsFixed(1) : null;
+      final bbChanged = newBbStr != null && newBbStr != _weightController.text;
+      final tbChanged = newTbStr != null && newTbStr != _heightController.text;
+
+      if (bbChanged || tbChanged) {
+        setState(() {
+          if (bbChanged) _weightController.text = newBbStr;
+          if (tbChanged) _heightController.text = newTbStr;
+          _smartGrowthResult = null;
+          _reasoningResult = null;
+        });
+      }
     }
   }
 
   /// Menerapkan hasil pembacaan MQTT live ke formulir skrining
-  void _applyMqttTelemetryToForm({bool showSnackbar = true, bool switchToManualTab = false}) {
+  void _applyMqttTelemetryToForm() {
     if (_lastMqttTelemetry == null) {
-      if (showSnackbar) {
-        CustomSnackbar.warning(
-          context,
-          'Belum ada data telemetri yang diterima dari perangkat IoT.',
-          title: 'Data Belum Tersedia',
-        );
-      }
+      CustomSnackbar.warning(
+        context,
+        'Belum ada data telemetri yang diterima dari perangkat IoT.',
+        title: 'Data Belum Tersedia',
+      );
       return;
     }
 
@@ -391,7 +637,9 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
     if (data['height'] is Map) {
       extractedTb = (data['height']['val_cm'] as num?)?.toDouble();
       final rawDist = (data['height']['raw_dist_cm'] as num?)?.toDouble();
-      final pole = (data['height']['pole_height_cm'] as num?)?.toDouble() ?? _mqttService.poleHeightCm;
+      final pole =
+          (data['height']['pole_height_cm'] as num?)?.toDouble() ??
+          _mqttService.poleHeightCm;
       if (extractedTb == null && rawDist != null) {
         extractedTb = pole - rawDist;
       }
@@ -412,19 +660,13 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
       }
       _smartGrowthResult = null;
       _reasoningResult = null;
-      if (switchToManualTab) {
-        _activeTab = 0;
-        _formStep = 2;
-      }
     });
 
-    if (showSnackbar) {
-      CustomSnackbar.success(
-        context,
-        'Data sensor diterapkan ke formulir: TB = ${_heightController.text} cm, BB = ${_weightController.text} kg',
-        title: 'Data IoT Diterapkan',
-      );
-    }
+    CustomSnackbar.success(
+      context,
+      'Data sensor diterapkan ke formulir: TB = ${_heightController.text} cm, BB = ${_weightController.text} kg',
+      title: 'Data IoT Diterapkan',
+    );
   }
 
   Future<void> _toggleMqttConnection() async {
@@ -479,18 +721,38 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
 
   ({IconData icon, Color color, String quality}) _wifiSignalStyle(int? rssi) {
     if (rssi == null || rssi == 0) {
-      return (icon: Icons.wifi_rounded, color: const Color(0xFF3498DB), quality: 'Siap');
+      return (
+        icon: Icons.wifi_rounded,
+        color: const Color(0xFF3498DB),
+        quality: 'Siap',
+      );
     }
     if (rssi >= -55) {
-      return (icon: Icons.signal_wifi_4_bar_rounded, color: const Color(0xFF27AE60), quality: 'Sangat Kuat');
+      return (
+        icon: Icons.signal_wifi_4_bar_rounded,
+        color: const Color(0xFF27AE60),
+        quality: 'Sangat Kuat',
+      );
     }
     if (rssi >= -70) {
-      return (icon: Icons.network_wifi_3_bar_rounded, color: const Color(0xFF1ABC9C), quality: 'Bagus');
+      return (
+        icon: Icons.network_wifi_3_bar_rounded,
+        color: const Color(0xFF1ABC9C),
+        quality: 'Bagus',
+      );
     }
     if (rssi >= -82) {
-      return (icon: Icons.network_wifi_2_bar_rounded, color: const Color(0xFFF39C12), quality: 'Sedang');
+      return (
+        icon: Icons.network_wifi_2_bar_rounded,
+        color: const Color(0xFFF39C12),
+        quality: 'Sedang',
+      );
     }
-    return (icon: Icons.network_wifi_1_bar_rounded, color: const Color(0xFFE74C3C), quality: 'Lemah');
+    return (
+      icon: Icons.network_wifi_1_bar_rounded,
+      color: const Color(0xFFE74C3C),
+      quality: 'Lemah',
+    );
   }
 
   /// Dialog Konfigurasi Fleksibel MQTT, Gateway IoT, & Wi-Fi List ala Laptop/HP
@@ -505,47 +767,41 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
     final portCtrl = TextEditingController(text: _mqttService.port.toString());
     final faskesCtrl = TextEditingController(text: _mqttService.faskesId);
     final deviceCtrl = TextEditingController(text: _mqttService.deviceId);
-    final poleCtrl = TextEditingController(text: _mqttService.poleHeightCm.toStringAsFixed(1));
-    final gatewayCtrl = TextEditingController(text: _mqttService.cloudGatewayUrl);
+    final poleCtrl = TextEditingController(
+      text: _mqttService.poleHeightCm.toStringAsFixed(1),
+    );
+    final gatewayCtrl = TextEditingController(
+      text: _mqttService.cloudGatewayUrl,
+    );
 
-    // Controller untuk Setup Wi-Fi Alat ESP32
-    final espUrlCtrl = TextEditingController(text: 'http://192.168.4.1');
+    // Controller untuk Setup Wi-Fi & Provisioning ESP32 langsung dari Web
     final wifiSsidCtrl = TextEditingController();
     final wifiPassCtrl = TextEditingController();
     final calFactorCtrl = TextEditingController(text: '25.75');
 
     final activeFacilityId = ref.read(landingPageProvider).activePuskesmasId;
 
-    int activeDialogTab = 0; // 0 = Koneksi MQTT, 1 = Wi-Fi Alat
+    int activeDialogTab = 0; // 0 = Koneksi MQTT, 1 = Wi-Fi & Setup ESP32
     bool useWildcard = _mqttService.useWildcard;
     bool isSyncing = false;
 
-    // State Tab Wi-Fi ala Laptop / HP
+    // State Tab Wi-Fi & Provisioning (USB Web Serial / BLE / MQTT Online)
     bool wifiDbInitialized = false;
     bool isLoadingSavedWifi = false;
-    bool isScanningWifi = false;
     bool isSavingWifi = false;
-    bool espPortalReachable = false;
-    bool showApUrlEditor = false;
     bool showAdvancedWifiFields = false;
     bool savePasswordToDb = true;
-    String sendMethod = _mqttService.isConnected ? 'mqtt' : 'ap'; // 'ap' | 'mqtt'
+    String sendMethod = _mqttService.isConnected
+        ? 'mqtt'
+        : (isWebSerialSupported
+              ? 'usb'
+              : (isWebBluetoothSupported ? 'ble' : 'usb'));
     String? espInfoMessage;
     String? activeWifiSsid = _activeSavedWifiSsid;
-    List<Map<String, dynamic>> scannedNetworks = [];
     List<Map<String, dynamic>> savedWifiProfiles = [];
 
     // State ketika user klik salah satu Wi-Fi untuk isi password & Connect
-    Map<String, dynamic>? selectedNetwork; // {'ssid': ..., 'rssi': ..., 'secure': ..., 'isManual': ...}
-
-    String normalizeEspUrl() {
-      final raw = espUrlCtrl.text.trim();
-      if (raw.isEmpty) return 'http://192.168.4.1';
-      final withScheme = (raw.startsWith('http://') || raw.startsWith('https://'))
-          ? raw
-          : 'http://$raw';
-      return withScheme.endsWith('/') ? withScheme.substring(0, withScheme.length - 1) : withScheme;
-    }
+    Map<String, dynamic>? selectedNetwork;
 
     Future<void> refreshSavedWifiAndSync(
       BuildContext ctx,
@@ -563,10 +819,11 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
         isLoadingSavedWifi = false;
         savedWifiProfiles = list;
         final activeRow = list.cast<Map<String, dynamic>?>().firstWhere(
-              (r) => r?['is_active'] == true,
-              orElse: () => list.isNotEmpty ? list.first : null,
-            );
-        if (activeRow != null && (activeRow['ssid'] as String?)?.isNotEmpty == true) {
+          (r) => r?['is_active'] == true,
+          orElse: () => list.isNotEmpty ? list.first : null,
+        );
+        if (activeRow != null &&
+            (activeRow['ssid'] as String?)?.isNotEmpty == true) {
           activeWifiSsid = activeRow['ssid'] as String;
         }
       });
@@ -577,93 +834,20 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
       void Function(void Function()) setDialogState,
     ) {
       final ssid = (network['ssid'] ?? '').toString();
-      final savedMatch = savedWifiProfiles.cast<Map<String, dynamic>?>().firstWhere(
-            (r) => (r?['ssid'] ?? '') == ssid,
-            orElse: () => null,
-          );
+      final savedMatch = savedWifiProfiles
+          .cast<Map<String, dynamic>?>()
+          .firstWhere((r) => (r?['ssid'] ?? '') == ssid, orElse: () => null);
       setDialogState(() {
         selectedNetwork = network;
         wifiSsidCtrl.text = ssid;
         wifiPassCtrl.text = (savedMatch?['saved_password'] ?? '').toString();
-        sendMethod = espPortalReachable
-            ? 'ap'
-            : (_mqttService.isConnected ? 'mqtt' : 'ap');
+        sendMethod = _mqttService.isConnected
+            ? 'mqtt'
+            : (isWebSerialSupported
+                  ? 'usb'
+                  : (isWebBluetoothSupported ? 'ble' : 'usb'));
         espInfoMessage = null;
       });
-    }
-
-    Future<void> scanEsp32Wifi(
-      BuildContext ctx,
-      void Function(void Function()) setDialogState,
-    ) async {
-      final baseUrl = normalizeEspUrl();
-      setDialogState(() {
-        isScanningWifi = true;
-        espInfoMessage = null;
-      });
-      try {
-        final infoResp = await http
-            .get(Uri.parse('$baseUrl/api/info'))
-            .timeout(const Duration(seconds: 4));
-
-        String? currentSsid;
-        if (infoResp.statusCode == 200) {
-          final info = jsonDecode(infoResp.body) as Map<String, dynamic>;
-          if ((info['faskes_id'] as String?)?.isNotEmpty == true) {
-            faskesCtrl.text = info['faskes_id'] as String;
-          }
-          if ((info['device_id'] as String?)?.isNotEmpty == true) {
-            deviceCtrl.text = info['device_id'] as String;
-          }
-          if (info['cal_factor'] is num) {
-            calFactorCtrl.text = (info['cal_factor'] as num).toStringAsFixed(2);
-          }
-          currentSsid = info['configured_ssid'] as String?;
-        }
-
-        final scanResp = await http
-            .get(Uri.parse('$baseUrl/api/scan'))
-            .timeout(const Duration(seconds: 8));
-        final parsedNets = <Map<String, dynamic>>[];
-        if (scanResp.statusCode == 200) {
-          final scanData = jsonDecode(scanResp.body) as Map<String, dynamic>;
-          final nets = scanData['networks'];
-          if (nets is List) {
-            for (final item in nets) {
-              if (item is Map && (item['ssid'] as String?)?.isNotEmpty == true) {
-                parsedNets.add(Map<String, dynamic>.from(item));
-              }
-            }
-          }
-          parsedNets.sort((a, b) {
-            final ra = (a['rssi'] as num?)?.toInt() ?? -100;
-            final rb = (b['rssi'] as num?)?.toInt() ?? -100;
-            return rb.compareTo(ra);
-          });
-        }
-
-        if (!ctx.mounted) return;
-        setDialogState(() {
-          isScanningWifi = false;
-          espPortalReachable = infoResp.statusCode == 200 || scanResp.statusCode == 200;
-          scannedNetworks = parsedNets;
-          if (currentSsid != null && currentSsid.isNotEmpty) {
-            activeWifiSsid = currentSsid;
-          }
-          espInfoMessage = espPortalReachable
-              ? 'Ditemukan ${parsedNets.length} jaringan Wi-Fi dari ESP32.'
-              : 'ESP32 merespons kode ${infoResp.statusCode}.';
-        });
-      } catch (e) {
-        if (!ctx.mounted) return;
-        setDialogState(() {
-          isScanningWifi = false;
-          espPortalReachable = false;
-          espInfoMessage = kIsWeb
-              ? 'Browser HTTPS memblokir scan lokal ke HTTP $baseUrl. Gunakan Wi-Fi Tersimpan / Input Manual (via MQTT), atau klik "Portal Web".'
-              : 'Belum terhubung ke hotspot alat ($baseUrl). Hubungkan Wi-Fi HP/Laptop ke VitaScale-Setup-XXX, lalu klik Scan lagi.';
-        });
-      }
     }
 
     showDialog(
@@ -678,10 +862,6 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
           }
 
           final pendingCount = _chcService.getPendingWifiSyncCount();
-          final savedSsidSet = savedWifiProfiles
-              .map((e) => (e['ssid'] ?? '').toString())
-              .where((s) => s.isNotEmpty)
-              .toSet();
 
           return AlertDialog(
             backgroundColor: cardBg,
@@ -700,7 +880,11 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                         color: const Color(0xFF1ABC9C).withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(Icons.settings_input_antenna_rounded, color: Color(0xFF1ABC9C), size: 22),
+                      child: const Icon(
+                        Icons.settings_input_antenna_rounded,
+                        color: Color(0xFF1ABC9C),
+                        size: 22,
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -709,7 +893,11 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                         children: [
                           Text(
                             'Konfigurasi MQTT & Wi-Fi Alat',
-                            style: GoogleFonts.outfit(fontSize: 17, fontWeight: FontWeight.w800, color: text),
+                            style: GoogleFonts.outfit(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                              color: text,
+                            ),
                           ),
                           Text(
                             'Sesuaikan broker MQTT, sensor tripod, dan jaringan Wi-Fi ESP32',
@@ -732,14 +920,24 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                       Expanded(
                         child: InkWell(
                           borderRadius: BorderRadius.circular(9),
-                          onTap: () => setDialogState(() => activeDialogTab = 0),
+                          onTap: () =>
+                              setDialogState(() => activeDialogTab = 0),
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 8),
                             decoration: BoxDecoration(
-                              color: activeDialogTab == 0 ? cardBg : Colors.transparent,
+                              color: activeDialogTab == 0
+                                  ? cardBg
+                                  : Colors.transparent,
                               borderRadius: BorderRadius.circular(9),
                               boxShadow: activeDialogTab == 0
-                                  ? [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 4)]
+                                  ? [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.06,
+                                        ),
+                                        blurRadius: 4,
+                                      ),
+                                    ]
                                   : null,
                             ),
                             child: Row(
@@ -748,7 +946,9 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                                 Icon(
                                   Icons.hub_rounded,
                                   size: 15,
-                                  color: activeDialogTab == 0 ? const Color(0xFF1ABC9C) : sub,
+                                  color: activeDialogTab == 0
+                                      ? const Color(0xFF1ABC9C)
+                                      : sub,
                                 ),
                                 const SizedBox(width: 6),
                                 Text(
@@ -768,14 +968,24 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                       Expanded(
                         child: InkWell(
                           borderRadius: BorderRadius.circular(9),
-                          onTap: () => setDialogState(() => activeDialogTab = 1),
+                          onTap: () =>
+                              setDialogState(() => activeDialogTab = 1),
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 8),
                             decoration: BoxDecoration(
-                              color: activeDialogTab == 1 ? cardBg : Colors.transparent,
+                              color: activeDialogTab == 1
+                                  ? cardBg
+                                  : Colors.transparent,
                               borderRadius: BorderRadius.circular(9),
                               boxShadow: activeDialogTab == 1
-                                  ? [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 4)]
+                                  ? [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.06,
+                                        ),
+                                        blurRadius: 4,
+                                      ),
+                                    ]
                                   : null,
                             ),
                             child: Row(
@@ -784,7 +994,9 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                                 Icon(
                                   Icons.wifi_rounded,
                                   size: 15,
-                                  color: activeDialogTab == 1 ? const Color(0xFF3498DB) : sub,
+                                  color: activeDialogTab == 1
+                                      ? const Color(0xFF3498DB)
+                                      : sub,
                                 ),
                                 const SizedBox(width: 6),
                                 Text(
@@ -798,14 +1010,21 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                                 if (pendingCount > 0) ...[
                                   const SizedBox(width: 6),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 5,
+                                      vertical: 1,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: const Color(0xFFF39C12),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Text(
                                       '$pendingCount',
-                                      style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.white),
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w800,
+                                        color: Colors.white,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -827,15 +1046,33 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('PRESET CEPAT', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w800, color: sub, letterSpacing: 0.5)),
+                          Text(
+                            'PRESET CEPAT',
+                            style: GoogleFonts.outfit(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: sub,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
                           const SizedBox(height: 6),
                           Wrap(
                             spacing: 8,
                             runSpacing: 6,
                             children: [
                               ActionChip(
-                                avatar: const Icon(Icons.hub_rounded, size: 14, color: Color(0xFF1ABC9C)),
-                                label: Text('HiveMQ Public (Port 8884 WSS)', style: GoogleFonts.outfit(fontSize: 11, color: text)),
+                                avatar: const Icon(
+                                  Icons.hub_rounded,
+                                  size: 14,
+                                  color: Color(0xFF1ABC9C),
+                                ),
+                                label: Text(
+                                  'HiveMQ Public (Port 8884 WSS)',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 11,
+                                    color: text,
+                                  ),
+                                ),
                                 backgroundColor: border.withValues(alpha: 0.2),
                                 onPressed: () {
                                   setDialogState(() {
@@ -845,8 +1082,18 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                                 },
                               ),
                               ActionChip(
-                                avatar: const Icon(Icons.cloud_queue_rounded, size: 14, color: Color(0xFF3498DB)),
-                                label: Text('EMQX Public (Port 8084 WSS)', style: GoogleFonts.outfit(fontSize: 11, color: text)),
+                                avatar: const Icon(
+                                  Icons.cloud_queue_rounded,
+                                  size: 14,
+                                  color: Color(0xFF3498DB),
+                                ),
+                                label: Text(
+                                  'EMQX Public (Port 8084 WSS)',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 11,
+                                    color: text,
+                                  ),
+                                ),
                                 backgroundColor: border.withValues(alpha: 0.2),
                                 onPressed: () {
                                   setDialogState(() {
@@ -856,12 +1103,23 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                                 },
                               ),
                               ActionChip(
-                                avatar: const Icon(Icons.language_rounded, size: 14, color: Color(0xFF9B59B6)),
-                                label: Text('mapotechiotmqtt.vercel.app', style: GoogleFonts.outfit(fontSize: 11, color: text)),
+                                avatar: const Icon(
+                                  Icons.language_rounded,
+                                  size: 14,
+                                  color: Color(0xFF9B59B6),
+                                ),
+                                label: Text(
+                                  'mapotechiotmqtt.vercel.app',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 11,
+                                    color: text,
+                                  ),
+                                ),
                                 backgroundColor: border.withValues(alpha: 0.2),
                                 onPressed: () {
                                   setDialogState(() {
-                                    gatewayCtrl.text = 'https://mapotechiotmqtt.vercel.app';
+                                    gatewayCtrl.text =
+                                        'https://mapotechiotmqtt.vercel.app';
                                   });
                                 },
                               ),
@@ -924,7 +1182,10 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                                   label: 'Tiang / Tripod Acuan (cm)',
                                   hintText: '166.0',
                                   controller: poleCtrl,
-                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                        decimal: true,
+                                      ),
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -932,7 +1193,8 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                                 flex: 3,
                                 child: CustomTextField(
                                   label: 'Gateway Vercel URL',
-                                  hintText: 'https://mapotechiotmqtt.vercel.app',
+                                  hintText:
+                                      'https://mapotechiotmqtt.vercel.app',
                                   controller: gatewayCtrl,
                                 ),
                               ),
@@ -944,15 +1206,23 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                             contentPadding: EdgeInsets.zero,
                             title: Text(
                               'Wildcard Topic Listener',
-                              style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w700, color: text),
+                              style: GoogleFonts.outfit(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                                color: text,
+                              ),
                             ),
                             subtitle: Text(
                               'Dengarkan topik "mapotech/+/vitascale/+/telemetry" untuk menangkap telemetri dari semua ID perangkat.',
-                              style: GoogleFonts.outfit(fontSize: 10.5, color: sub),
+                              style: GoogleFonts.outfit(
+                                fontSize: 10.5,
+                                color: sub,
+                              ),
                             ),
                             value: useWildcard,
                             activeThumbColor: const Color(0xFF1ABC9C),
-                            onChanged: (val) => setDialogState(() => useWildcard = val),
+                            onChanged: (val) =>
+                                setDialogState(() => useWildcard = val),
                           ),
 
                           const SizedBox(height: 8),
@@ -961,27 +1231,47 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                             style: OutlinedButton.styleFrom(
                               foregroundColor: const Color(0xFF1ABC9C),
                               side: const BorderSide(color: Color(0xFF1ABC9C)),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 10,
+                              ),
                             ),
                             icon: isSyncing
-                                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                                ? const SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
                                 : const Icon(Icons.sync_rounded, size: 16),
                             label: Text(
-                              isSyncing ? 'Menghubungi Gateway...' : 'Sinkronkan Konfigurasi dari Gateway Vercel',
-                              style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700),
+                              isSyncing
+                                  ? 'Menghubungi Gateway...'
+                                  : 'Sinkronkan Konfigurasi dari Gateway Vercel',
+                              style: GoogleFonts.outfit(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                             onPressed: isSyncing
                                 ? null
                                 : () async {
                                     setDialogState(() => isSyncing = true);
-                                    await _mqttService.syncWithCloudGateway(url: gatewayCtrl.text.trim());
+                                    await _mqttService.syncWithCloudGateway(
+                                      url: gatewayCtrl.text.trim(),
+                                    );
                                     if (!ctx.mounted) return;
                                     setDialogState(() {
                                       isSyncing = false;
                                       brokerCtrl.text = _mqttService.broker;
-                                      portCtrl.text = _mqttService.port.toString();
-                                      poleCtrl.text = _mqttService.poleHeightCm.toStringAsFixed(1);
+                                      portCtrl.text = _mqttService.port
+                                          .toString();
+                                      poleCtrl.text = _mqttService.poleHeightCm
+                                          .toStringAsFixed(1);
                                     });
                                     if (mounted) {
                                       CustomSnackbar.success(
@@ -995,680 +1285,844 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                         ],
                       )
                     : (selectedNetwork == null
-                        ? Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Header Status Wi-Fi & Tombol Scan ala Laptop / HP
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF3498DB).withValues(alpha: 0.08),
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(color: const Color(0xFF3498DB).withValues(alpha: 0.28)),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Icon(
-                                          activeWifiSsid != null ? Icons.wifi_rounded : Icons.wifi_off_rounded,
-                                          size: 20,
-                                          color: activeWifiSsid != null ? const Color(0xFF1ABC9C) : const Color(0xFF3498DB),
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                activeWifiSsid != null
-                                                    ? 'Wi-Fi Alat: $activeWifiSsid'
-                                                    : 'Wi-Fi Alat Belum Terpilih',
-                                                style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w800, color: text),
-                                              ),
-                                              Text(
-                                                pendingCount > 0
-                                                    ? '$pendingCount perubahan tersimpan lokal • Klik Sync saat ada internet'
-                                                    : (_mqttService.isConnected
-                                                        ? 'Alat online di MQTT (${_mqttService.deviceId})'
-                                                        : 'Sambungkan ke hotspot VitaScale-Setup-XXX untuk scan Wi-Fi'),
-                                                style: GoogleFonts.outfit(fontSize: 10.5, color: sub),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        if (pendingCount > 0)
-                                          TextButton.icon(
-                                            onPressed: () => refreshSavedWifiAndSync(ctx, setDialogState),
-                                            icon: const Icon(Icons.cloud_upload_rounded, size: 15),
-                                            label: Text('Sync DB', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700)),
-                                          ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: ElevatedButton.icon(
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: const Color(0xFF1ABC9C),
-                                              foregroundColor: Colors.white,
-                                              elevation: 0,
-                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                              padding: const EdgeInsets.symmetric(vertical: 9),
-                                            ),
-                                            icon: isScanningWifi
-                                                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                                : const Icon(Icons.radar_rounded, size: 16),
-                                            label: Text(
-                                              isScanningWifi ? 'Memindai...' : 'Scan Wi-Fi',
-                                              style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w700),
-                                            ),
-                                            onPressed: isScanningWifi
-                                                ? null
-                                                : () => scanEsp32Wifi(ctx, setDialogState),
-                                          ),
-                                        ),
-                                        if (_mqttService.isConnected) ...[
-                                          const SizedBox(width: 8),
-                                          OutlinedButton.icon(
-                                            style: OutlinedButton.styleFrom(
-                                              foregroundColor: const Color(0xFF3498DB),
-                                              side: BorderSide(color: const Color(0xFF3498DB).withValues(alpha: 0.6)),
-                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-                                            ),
-                                            icon: const Icon(Icons.wifi_protected_setup_rounded, size: 15),
-                                            label: Text('Hotspot AP', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700)),
-                                            onPressed: () {
-                                              _mqttService.triggerReconfig();
-                                              setDialogState(() {
-                                                espInfoMessage = 'Perintah reconfig dikirim. Sambungkan HP/Laptop ke VitaScale-Setup-XXX lalu klik Scan Wi-Fi.';
-                                              });
-                                            },
-                                          ),
-                                        ],
-                                        const SizedBox(width: 8),
-                                        OutlinedButton.icon(
-                                          style: OutlinedButton.styleFrom(
-                                            foregroundColor: text,
-                                            side: BorderSide(color: border),
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-                                          ),
-                                          icon: const Icon(Icons.open_in_new_rounded, size: 14),
-                                          label: Text('Portal Web', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700)),
-                                          onPressed: () async {
-                                            await launchUrl(
-                                              Uri.parse(normalizeEspUrl()),
-                                              mode: LaunchMode.externalApplication,
-                                            );
-                                          },
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 8),
-                                    InkWell(
-                                      onTap: () => setDialogState(() => showApUrlEditor = !showApUrlEditor),
-                                      child: Row(
-                                        children: [
-                                          Icon(Icons.lan_outlined, size: 13, color: sub),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            'Alamat AP: ${normalizeEspUrl()} (${showApUrlEditor ? 'Tutup' : 'Ubah'})',
-                                            style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w600, color: sub),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    if (showApUrlEditor) ...[
-                                      const SizedBox(height: 8),
-                                      CustomTextField(
-                                        label: 'Alamat Portal Hotspot ESP32',
-                                        hintText: 'http://192.168.4.1',
-                                        controller: espUrlCtrl,
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
-
-                              if (espInfoMessage != null) ...[
-                                const SizedBox(height: 10),
+                          ? Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Header Setup Langsung dari Web (Tanpa 192.168.4.1)
                                 Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    color: (espPortalReachable ? const Color(0xFF27AE60) : const Color(0xFFF39C12)).withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(
-                                      color: (espPortalReachable ? const Color(0xFF27AE60) : const Color(0xFFF39C12)).withValues(alpha: 0.35),
-                                    ),
-                                  ),
-                                  child: Text(
-                                    espInfoMessage!,
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 10.5,
-                                      fontWeight: FontWeight.w600,
-                                      color: espPortalReachable ? const Color(0xFF16A085) : const Color(0xFFD35400),
-                                    ),
-                                  ),
-                                ),
-                              ],
-
-                              // Daftar Wi-Fi Tersimpan (Database Supabase + Cache Lokal)
-                              if (isLoadingSavedWifi) ...[
-                                const SizedBox(height: 12),
-                                Row(
-                                  children: [
-                                    const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
-                                    const SizedBox(width: 8),
-                                    Text('Memuat daftar Wi-Fi tersimpan dari database...', style: GoogleFonts.outfit(fontSize: 11, color: sub)),
-                                  ],
-                                ),
-                              ] else if (savedWifiProfiles.isNotEmpty) ...[
-                                const SizedBox(height: 14),
-                                Text(
-                                  'WI-FI TERSIMPAN (DATABASE PUSKESMAS)',
-                                  style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w800, color: sub, letterSpacing: 0.5),
-                                ),
-                                const SizedBox(height: 6),
-                                Container(
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: border),
-                                  ),
-                                  child: Column(
-                                    children: List.generate(savedWifiProfiles.length, (i) {
-                                      final row = savedWifiProfiles[i];
-                                      final ssid = (row['ssid'] ?? '').toString();
-                                      final isActive = row['is_active'] == true || ssid == activeWifiSsid;
-                                      final hasPass = (row['saved_password'] as String?)?.isNotEmpty == true;
-                                      final isPending = row['pending_sync'] == true;
-                                      final rssi = (row['last_rssi_dbm'] as num?)?.toInt();
-                                      final isSecure = (row['security_type'] ?? 'WPA2') != 'OPEN';
-                                      final sig = _wifiSignalStyle(rssi);
-
-                                      return Column(
-                                        children: [
-                                          if (i > 0) Divider(height: 1, color: border),
-                                          InkWell(
-                                            borderRadius: BorderRadius.circular(10),
-                                            onTap: () => openConnectPrompt(
-                                              {
-                                                'ssid': ssid,
-                                                'rssi': rssi,
-                                                'secure': isSecure,
-                                                'isManual': false,
-                                              },
-                                              setDialogState,
-                                            ),
-                                            child: Padding(
-                                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                              child: Row(
-                                                children: [
-                                                  Stack(
-                                                    clipBehavior: Clip.none,
-                                                    children: [
-                                                      Icon(sig.icon, size: 20, color: isActive ? const Color(0xFF1ABC9C) : sig.color),
-                                                      if (isSecure)
-                                                        Positioned(
-                                                          right: -3,
-                                                          bottom: -2,
-                                                          child: Icon(Icons.lock_rounded, size: 10, color: sub),
-                                                        ),
-                                                    ],
-                                                  ),
-                                                  const SizedBox(width: 12),
-                                                  Expanded(
-                                                    child: Column(
-                                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                                      children: [
-                                                        Row(
-                                                          children: [
-                                                            Flexible(
-                                                              child: Text(
-                                                                ssid,
-                                                                style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w700, color: text),
-                                                                overflow: TextOverflow.ellipsis,
-                                                              ),
-                                                            ),
-                                                            if (isActive) ...[
-                                                              const SizedBox(width: 6),
-                                                              Container(
-                                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                                                                decoration: BoxDecoration(
-                                                                  color: const Color(0xFF27AE60).withValues(alpha: 0.15),
-                                                                  borderRadius: BorderRadius.circular(5),
-                                                                ),
-                                                                child: Text(
-                                                                  'Aktif',
-                                                                  style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w800, color: const Color(0xFF27AE60)),
-                                                                ),
-                                                              ),
-                                                            ],
-                                                          ],
-                                                        ),
-                                                        Text(
-                                                          '${isPending ? 'Antrean Sync DB' : 'Tersimpan di Database'}${hasPass ? ' • Sandi tersimpan' : ''}',
-                                                          style: GoogleFonts.outfit(fontSize: 10, color: isPending ? const Color(0xFFD35400) : sub),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                  Text(
-                                                    'Sambungkan',
-                                                    style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF1ABC9C)),
-                                                  ),
-                                                  const SizedBox(width: 4),
-                                                  IconButton(
-                                                    tooltip: 'Lupakan Wi-Fi ini',
-                                                    icon: Icon(Icons.delete_outline_rounded, size: 17, color: sub),
-                                                    visualDensity: VisualDensity.compact,
-                                                    onPressed: () async {
-                                                      await _chcService.deleteSavedWifi(
-                                                        faskesCode: faskesCtrl.text.trim(),
-                                                        ssid: ssid,
-                                                      );
-                                                      if (!ctx.mounted) return;
-                                                      await refreshSavedWifiAndSync(ctx, setDialogState);
-                                                    },
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      );
-                                    }),
-                                  ),
-                                ),
-                              ],
-
-                              // Daftar Wi-Fi Hasil Scan Sekitar Alat (Persis Laptop / HP)
-                              const SizedBox(height: 16),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    'JARINGAN TERSEDIA (${scannedNetworks.length})',
-                                    style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w800, color: sub, letterSpacing: 0.5),
-                                  ),
-                                  InkWell(
-                                    borderRadius: BorderRadius.circular(6),
-                                    onTap: () => openConnectPrompt(
-                                      {
-                                        'ssid': '',
-                                        'rssi': null,
-                                        'secure': true,
-                                        'isManual': true,
-                                      },
-                                      setDialogState,
-                                    ),
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      child: Row(
-                                        children: [
-                                          const Icon(Icons.add_circle_outline_rounded, size: 14, color: Color(0xFF3498DB)),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            'Input SSID Manual',
-                                            style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF3498DB)),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 6),
-
-                              if (scannedNetworks.isEmpty)
-                                Container(
-                                  width: double.infinity,
                                   padding: const EdgeInsets.all(14),
                                   decoration: BoxDecoration(
-                                    color: border.withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: border),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.wifi_tethering_rounded, size: 22, color: sub),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Text(
-                                          'Klik "Scan Wi-Fi" saat HP/Laptop tersambung ke hotspot VitaScale-Setup-XXX, atau klik "Input SSID Manual" untuk ganti Wi-Fi langsung via MQTT.',
-                                          style: GoogleFonts.outfit(fontSize: 11, color: sub, height: 1.35),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                )
-                              else
-                                Container(
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: border),
+                                    color: const Color(
+                                      0xFF1ABC9C,
+                                    ).withValues(alpha: 0.08),
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(
+                                      color: const Color(
+                                        0xFF1ABC9C,
+                                      ).withValues(alpha: 0.28),
+                                    ),
                                   ),
                                   child: Column(
-                                    children: List.generate(scannedNetworks.length, (i) {
-                                      final net = scannedNetworks[i];
-                                      final ssid = (net['ssid'] ?? '').toString();
-                                      final rssi = (net['rssi'] as num?)?.toInt();
-                                      final isSecure = net['secure'] == true;
-                                      final isConnectedSsid = ssid == activeWifiSsid;
-                                      final isSaved = savedSsidSet.contains(ssid);
-                                      final sig = _wifiSignalStyle(rssi);
-
-                                      return Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
                                         children: [
-                                          if (i > 0) Divider(height: 1, color: border),
-                                          InkWell(
-                                            borderRadius: BorderRadius.circular(10),
-                                            onTap: () => openConnectPrompt(
-                                              {
-                                                'ssid': ssid,
-                                                'rssi': rssi,
-                                                'secure': isSecure,
-                                                'isManual': false,
-                                              },
-                                              setDialogState,
-                                            ),
-                                            child: Padding(
-                                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                              child: Row(
-                                                children: [
-                                                  Stack(
-                                                    clipBehavior: Clip.none,
-                                                    children: [
-                                                      Icon(sig.icon, size: 20, color: sig.color),
-                                                      if (isSecure)
-                                                        Positioned(
-                                                          right: -3,
-                                                          bottom: -2,
-                                                          child: Icon(Icons.lock_rounded, size: 10, color: sub),
-                                                        ),
-                                                    ],
+                                          Icon(
+                                            activeWifiSsid != null
+                                                ? Icons.wifi_rounded
+                                                : Icons.usb_rounded,
+                                            size: 20,
+                                            color: const Color(0xFF1ABC9C),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  activeWifiSsid != null
+                                                      ? 'Wi-Fi Alat: $activeWifiSsid'
+                                                      : 'Setup Wi-Fi & MQTT Langsung di Web',
+                                                  style: GoogleFonts.outfit(
+                                                    fontSize: 12.5,
+                                                    fontWeight: FontWeight.w800,
+                                                    color: text,
                                                   ),
-                                                  const SizedBox(width: 12),
-                                                  Expanded(
-                                                    child: Column(
-                                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                                      children: [
-                                                        Row(
-                                                          children: [
-                                                            Flexible(
-                                                              child: Text(
-                                                                ssid,
-                                                                style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w700, color: text),
-                                                                overflow: TextOverflow.ellipsis,
-                                                              ),
-                                                            ),
-                                                            if (isConnectedSsid) ...[
-                                                              const SizedBox(width: 6),
-                                                              Container(
-                                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                                                                decoration: BoxDecoration(
-                                                                  color: const Color(0xFF27AE60).withValues(alpha: 0.15),
-                                                                  borderRadius: BorderRadius.circular(5),
-                                                                ),
-                                                                child: Text(
-                                                                  'Terhubung',
-                                                                  style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w800, color: const Color(0xFF27AE60)),
-                                                                ),
-                                                              ),
-                                                            ],
-                                                          ],
-                                                        ),
-                                                        Text(
-                                                          '${rssi != null ? '$rssi dBm • ' : ''}${sig.quality} • ${isSecure ? 'Diamankan WPA2' : 'Terbuka'}${isSaved ? ' • Tersimpan DB' : ''}',
-                                                          style: GoogleFonts.outfit(fontSize: 10, color: sub),
-                                                        ),
-                                                      ],
-                                                    ),
+                                                ),
+                                                Text(
+                                                  _mqttService.isConnected
+                                                      ? 'Alat online di MQTT (${_mqttService.deviceId}) • Bisa ganti Wi-Fi/BLE langsung.'
+                                                      : 'Alat baru/diganti? Pilih Wi-Fi di bawah atau tambah SSID lalu kirim via USB / Bluetooth.',
+                                                  style: GoogleFonts.outfit(
+                                                    fontSize: 10.5,
+                                                    color: sub,
                                                   ),
-                                                  Text(
-                                                    'Connect',
-                                                    style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF3498DB)),
-                                                  ),
-                                                  const SizedBox(width: 2),
-                                                  Icon(Icons.chevron_right_rounded, size: 18, color: sub),
-                                                ],
-                                              ),
+                                                ),
+                                              ],
                                             ),
                                           ),
-                                        ],
-                                      );
-                                    }),
-                                  ),
-                                ),
-                            ],
-                          )
-                        : Column(
-                            // Mode B: Prompt Input Password & Connect ala Laptop / HP
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              InkWell(
-                                borderRadius: BorderRadius.circular(8),
-                                onTap: () => setDialogState(() {
-                                  selectedNetwork = null;
-                                  espInfoMessage = null;
-                                }),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 4),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.arrow_back_rounded, size: 16, color: const Color(0xFF3498DB)),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        'Kembali ke daftar Wi-Fi',
-                                        style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: const Color(0xFF3498DB)),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-
-                              // Kartu Identitas Jaringan Dipilih
-                              Builder(
-                                builder: (context) {
-                                  final rssi = (selectedNetwork?['rssi'] as num?)?.toInt();
-                                  final isSecure = selectedNetwork?['secure'] != false;
-                                  final isManual = selectedNetwork?['isManual'] == true;
-                                  final sig = _wifiSignalStyle(rssi);
-                                  return Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(14),
-                                        decoration: BoxDecoration(
-                                          color: sig.color.withValues(alpha: 0.08),
-                                          borderRadius: BorderRadius.circular(14),
-                                          border: Border.all(color: sig.color.withValues(alpha: 0.3)),
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Icon(sig.icon, size: 24, color: sig.color),
-                                            const SizedBox(width: 12),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    isManual
-                                                        ? 'Hubungkan ke Jaringan Manual / Tersembunyi'
-                                                        : 'Hubungkan alat ke "${wifiSsidCtrl.text}"',
-                                                    style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w800, color: text),
+                                          if (pendingCount > 0)
+                                            TextButton.icon(
+                                              onPressed: () =>
+                                                  refreshSavedWifiAndSync(
+                                                    ctx,
+                                                    setDialogState,
                                                   ),
-                                                  Text(
-                                                    isManual
-                                                        ? 'Masukkan nama Wi-Fi (SSID) dan kata sandi Puskesmas'
-                                                        : '${isSecure ? 'Membutuhkan kata sandi Wi-Fi' : 'Jaringan terbuka (tanpa sandi)'}${rssi != null ? ' • Sinyal $rssi dBm (${sig.quality})' : ''}',
-                                                    style: GoogleFonts.outfit(fontSize: 10.5, color: sub),
-                                                  ),
-                                                ],
+                                              icon: const Icon(
+                                                Icons.cloud_upload_rounded,
+                                                size: 15,
+                                              ),
+                                              label: Text(
+                                                'Sync DB',
+                                                style: GoogleFonts.outfit(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
                                               ),
                                             ),
-                                          ],
-                                        ),
+                                        ],
                                       ),
-                                      const SizedBox(height: 14),
-
-                                      if (isManual) ...[
-                                        CustomTextField(
-                                          label: 'Nama Wi-Fi (SSID)',
-                                          hintText: 'Contoh: WiFi_Puskesmas',
-                                          prefixIcon: Icons.wifi_rounded,
-                                          controller: wifiSsidCtrl,
-                                        ),
-                                        const SizedBox(height: 12),
-                                      ],
-
-                                      if (isManual || isSecure) ...[
-                                        CustomTextField(
-                                          label: 'Password Wi-Fi',
-                                          hintText: isManual ? 'Kosongkan jika Wi-Fi tanpa sandi' : 'Masukkan kata sandi Wi-Fi',
-                                          prefixIcon: Icons.lock_outline_rounded,
-                                          isPassword: true,
-                                          controller: wifiPassCtrl,
-                                        ),
-                                        const SizedBox(height: 10),
-                                      ],
-
-                                      CheckboxListTile(
-                                        contentPadding: EdgeInsets.zero,
-                                        controlAffinity: ListTileControlAffinity.leading,
-                                        activeColor: const Color(0xFF1ABC9C),
-                                        title: Text(
-                                          'Simpan Wi-Fi & sandi ke Database Puskesmas',
-                                          style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: text),
-                                        ),
-                                        subtitle: Text(
-                                          'Jika HP sedang di hotspot alat tanpa internet, disimpan lokal dulu lalu otomatis sync ke Supabase saat online.',
-                                          style: GoogleFonts.outfit(fontSize: 10, color: sub),
-                                        ),
-                                        value: savePasswordToDb,
-                                        onChanged: (v) => setDialogState(() => savePasswordToDb = v ?? true),
-                                      ),
-
-                                      const SizedBox(height: 8),
-                                      Text('METODE KIRIM KE ALAT', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w800, color: sub, letterSpacing: 0.5)),
-                                      const SizedBox(height: 6),
+                                      const SizedBox(height: 10),
                                       Wrap(
                                         spacing: 8,
                                         runSpacing: 6,
                                         children: [
-                                          ChoiceChip(
-                                            avatar: Icon(Icons.router_rounded, size: 14, color: sendMethod == 'ap' ? Colors.white : const Color(0xFF3498DB)),
-                                            label: Text(
-                                              'Hotspot Alat (192.168.4.1)',
-                                              style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600, color: sendMethod == 'ap' ? Colors.white : text),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4,
                                             ),
-                                            selected: sendMethod == 'ap',
-                                            selectedColor: const Color(0xFF3498DB),
-                                            backgroundColor: border.withValues(alpha: 0.18),
-                                            onSelected: (_) => setDialogState(() => sendMethod = 'ap'),
-                                          ),
-                                          ChoiceChip(
-                                            avatar: Icon(
-                                              Icons.hub_rounded,
-                                              size: 14,
-                                              color: sendMethod == 'mqtt' ? Colors.white : (_mqttService.isConnected ? const Color(0xFF1ABC9C) : sub),
+                                            decoration: BoxDecoration(
+                                              color: (isWebSerialSupported
+                                                      ? const Color(0xFF16A085)
+                                                      : sub)
+                                                  .withValues(alpha: 0.12),
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
                                             ),
-                                            label: Text(
-                                              _mqttService.isConnected ? 'Langsung via MQTT (Online)' : 'Via MQTT (Offline)',
+                                            child: Text(
+                                              isWebSerialSupported
+                                                  ? 'Cara 1 • USB Serial: Siap'
+                                                  : 'Cara 1 • USB: Chrome/Edge',
                                               style: GoogleFonts.outfit(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w600,
-                                                color: sendMethod == 'mqtt' ? Colors.white : (_mqttService.isConnected ? text : sub),
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w700,
+                                                color: isWebSerialSupported
+                                                    ? const Color(0xFF16A085)
+                                                    : sub,
                                               ),
                                             ),
-                                            selected: sendMethod == 'mqtt',
-                                            selectedColor: const Color(0xFF1ABC9C),
-                                            backgroundColor: border.withValues(alpha: 0.18),
-                                            onSelected: _mqttService.isConnected
-                                                ? (_) => setDialogState(() => sendMethod = 'mqtt')
-                                                : null,
+                                          ),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: (isWebBluetoothSupported
+                                                      ? const Color(0xFF3498DB)
+                                                      : sub)
+                                                  .withValues(alpha: 0.12),
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                            ),
+                                            child: Text(
+                                              isWebBluetoothSupported
+                                                  ? 'Cara 2 • Bluetooth BLE: Siap'
+                                                  : 'Cara 2 • BLE: Chrome/Edge',
+                                              style: GoogleFonts.outfit(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w700,
+                                                color: isWebBluetoothSupported
+                                                    ? const Color(0xFF3498DB)
+                                                    : sub,
+                                              ),
+                                            ),
                                           ),
                                         ],
                                       ),
-
-                                      const SizedBox(height: 12),
-                                      InkWell(
-                                        onTap: () => setDialogState(() => showAdvancedWifiFields = !showAdvancedWifiFields),
-                                        child: Row(
-                                          children: [
-                                            Icon(
-                                              showAdvancedWifiFields ? Icons.expand_less_rounded : Icons.expand_more_rounded,
-                                              size: 16,
-                                              color: sub,
+                                      const SizedBox(height: 10),
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: ElevatedButton.icon(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: const Color(
+                                              0xFF1ABC9C,
                                             ),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              'Identitas Alat & Kalibrasi (${faskesCtrl.text} • ${deviceCtrl.text})',
-                                              style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600, color: sub),
+                                            foregroundColor: Colors.white,
+                                            elevation: 0,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
                                             ),
-                                          ],
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 10,
+                                            ),
+                                          ),
+                                          icon: const Icon(
+                                            Icons.add_circle_outline_rounded,
+                                            size: 16,
+                                          ),
+                                          label: Text(
+                                            'Input Wi-Fi & Setup Alat Baru',
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 11.5,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                          onPressed: () => openConnectPrompt({
+                                            'ssid': activeWifiSsid ?? '',
+                                            'rssi': null,
+                                            'secure': true,
+                                            'isManual': true,
+                                          }, setDialogState),
                                         ),
                                       ),
-                                      if (showAdvancedWifiFields) ...[
-                                        const SizedBox(height: 10),
-                                        Row(
+                                    ],
+                                  ),
+                                ),
+
+                                if (espInfoMessage != null) ...[
+                                  const SizedBox(height: 10),
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: const Color(
+                                        0xFF27AE60,
+                                      ).withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: const Color(
+                                          0xFF27AE60,
+                                        ).withValues(alpha: 0.35),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      espInfoMessage!,
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: const Color(0xFF16A085),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+
+                                // Daftar Wi-Fi Tersimpan (Database Supabase + Cache Lokal)
+                                if (isLoadingSavedWifi) ...[
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    children: [
+                                      const SizedBox(
+                                        width: 14,
+                                        height: 14,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Memuat daftar Wi-Fi tersimpan dari database...',
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 11,
+                                          color: sub,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ] else if (savedWifiProfiles.isNotEmpty) ...[
+                                  const SizedBox(height: 14),
+                                  Text(
+                                    'WI-FI TERSIMPAN (DATABASE PUSKESMAS)',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                      color: sub,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: border),
+                                    ),
+                                    child: Column(
+                                      children: List.generate(savedWifiProfiles.length, (
+                                        i,
+                                      ) {
+                                        final row = savedWifiProfiles[i];
+                                        final ssid = (row['ssid'] ?? '')
+                                            .toString();
+                                        final isActive =
+                                            row['is_active'] == true ||
+                                            ssid == activeWifiSsid;
+                                        final hasPass =
+                                            (row['saved_password'] as String?)
+                                                ?.isNotEmpty ==
+                                            true;
+                                        final isPending =
+                                            row['pending_sync'] == true;
+                                        final rssi =
+                                            (row['last_rssi_dbm'] as num?)
+                                                ?.toInt();
+                                        final isSecure =
+                                            (row['security_type'] ?? 'WPA2') !=
+                                            'OPEN';
+                                        final sig = _wifiSignalStyle(rssi);
+
+                                        return Column(
                                           children: [
-                                            Expanded(
-                                              child: CustomTextField(
-                                                label: 'Puskesmas / Faskes ID',
-                                                hintText: 'PUSKESMAS-001',
-                                                controller: faskesCtrl,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 10),
-                                            Expanded(
-                                              child: CustomTextField(
-                                                label: 'Device ID (ESP32)',
-                                                hintText: 'VTS-001',
-                                                controller: deviceCtrl,
+                                            if (i > 0)
+                                              Divider(height: 1, color: border),
+                                            InkWell(
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                              onTap: () => openConnectPrompt({
+                                                'ssid': ssid,
+                                                'rssi': rssi,
+                                                'secure': isSecure,
+                                                'isManual': false,
+                                              }, setDialogState),
+                                              child: Padding(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 12,
+                                                      vertical: 10,
+                                                    ),
+                                                child: Row(
+                                                  children: [
+                                                    Stack(
+                                                      clipBehavior: Clip.none,
+                                                      children: [
+                                                        Icon(
+                                                          sig.icon,
+                                                          size: 20,
+                                                          color: isActive
+                                                              ? const Color(
+                                                                  0xFF1ABC9C,
+                                                                )
+                                                              : sig.color,
+                                                        ),
+                                                        if (isSecure)
+                                                          Positioned(
+                                                            right: -3,
+                                                            bottom: -2,
+                                                            child: Icon(
+                                                              Icons
+                                                                  .lock_rounded,
+                                                              size: 10,
+                                                              color: sub,
+                                                            ),
+                                                          ),
+                                                      ],
+                                                    ),
+                                                    const SizedBox(width: 12),
+                                                    Expanded(
+                                                      child: Column(
+                                                        crossAxisAlignment:
+                                                            CrossAxisAlignment
+                                                                .start,
+                                                        children: [
+                                                          Row(
+                                                            children: [
+                                                              Flexible(
+                                                                child: Text(
+                                                                  ssid,
+                                                                  style: GoogleFonts.outfit(
+                                                                    fontSize:
+                                                                        12.5,
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .w700,
+                                                                    color: text,
+                                                                  ),
+                                                                  overflow:
+                                                                      TextOverflow
+                                                                          .ellipsis,
+                                                                ),
+                                                              ),
+                                                              if (isActive) ...[
+                                                                const SizedBox(
+                                                                  width: 6,
+                                                                ),
+                                                                Container(
+                                                                  padding:
+                                                                      const EdgeInsets.symmetric(
+                                                                        horizontal:
+                                                                            6,
+                                                                        vertical:
+                                                                            1,
+                                                                      ),
+                                                                  decoration: BoxDecoration(
+                                                                    color:
+                                                                        const Color(
+                                                                          0xFF27AE60,
+                                                                        ).withValues(
+                                                                          alpha:
+                                                                              0.15,
+                                                                        ),
+                                                                    borderRadius:
+                                                                        BorderRadius.circular(
+                                                                          5,
+                                                                        ),
+                                                                  ),
+                                                                  child: Text(
+                                                                    'Aktif',
+                                                                    style: GoogleFonts.outfit(
+                                                                      fontSize:
+                                                                          9,
+                                                                      fontWeight:
+                                                                          FontWeight
+                                                                              .w800,
+                                                                      color: const Color(
+                                                                        0xFF27AE60,
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                              ],
+                                                            ],
+                                                          ),
+                                                          Text(
+                                                            '${isPending ? 'Antrean Sync DB' : 'Tersimpan di Database'}${hasPass ? ' • Sandi tersimpan' : ''}',
+                                                            style: GoogleFonts.outfit(
+                                                              fontSize: 10,
+                                                              color: isPending
+                                                                  ? const Color(
+                                                                      0xFFD35400,
+                                                                    )
+                                                                  : sub,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                    Text(
+                                                      'Sambungkan',
+                                                      style: GoogleFonts.outfit(
+                                                        fontSize: 11,
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                        color: const Color(
+                                                          0xFF1ABC9C,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    IconButton(
+                                                      tooltip:
+                                                          'Lupakan Wi-Fi ini',
+                                                      icon: Icon(
+                                                        Icons
+                                                            .delete_outline_rounded,
+                                                        size: 17,
+                                                        color: sub,
+                                                      ),
+                                                      visualDensity:
+                                                          VisualDensity.compact,
+                                                      onPressed: () async {
+                                                        await _chcService
+                                                            .deleteSavedWifi(
+                                                              faskesCode:
+                                                                  faskesCtrl
+                                                                      .text
+                                                                      .trim(),
+                                                              ssid: ssid,
+                                                            );
+                                                        if (!ctx.mounted) {
+                                                          return;
+                                                        }
+                                                        await refreshSavedWifiAndSync(
+                                                          ctx,
+                                                          setDialogState,
+                                                        );
+                                                      },
+                                                    ),
+                                                  ],
+                                                ),
                                               ),
                                             ),
                                           ],
-                                        ),
-                                        const SizedBox(height: 10),
-                                        CustomTextField(
-                                          label: 'Faktor Kalibrasi Berat (HX711)',
-                                          hintText: '25.75',
-                                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                          controller: calFactorCtrl,
-                                        ),
-                                      ],
-                                    ],
-                                  );
-                                },
-                              ),
-
-                              if (espInfoMessage != null) ...[
-                                const SizedBox(height: 12),
-                                Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFF39C12).withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: const Color(0xFFF39C12).withValues(alpha: 0.35)),
+                                        );
+                                      }),
+                                    ),
                                   ),
-                                  child: Text(
-                                    espInfoMessage!,
-                                    style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.w600, color: const Color(0xFFD35400)),
+                                ],
+
+                                const SizedBox(height: 12),
+                                Text(
+                                  'Tip: Untuk ESP32 baru / ganti unit rusak, colok kabel USB (Cara 1) atau hubungkan Bluetooth BLE (Cara 2), lalu pilih Wi-Fi tersimpan di atas.',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 10.5,
+                                    color: sub,
                                   ),
                                 ),
                               ],
-                            ],
-                          )),
+                            )
+                          : Column(
+                              // Mode B: Prompt Input Password & Connect ala Laptop / HP
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                InkWell(
+                                  borderRadius: BorderRadius.circular(8),
+                                  onTap: () => setDialogState(() {
+                                    selectedNetwork = null;
+                                    espInfoMessage = null;
+                                  }),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 4,
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.arrow_back_rounded,
+                                          size: 16,
+                                          color: const Color(0xFF3498DB),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          'Kembali ke daftar Wi-Fi',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                            color: const Color(0xFF3498DB),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+
+                                // Kartu Identitas Jaringan Dipilih
+                                Builder(
+                                  builder: (context) {
+                                    final rssi =
+                                        (selectedNetwork?['rssi'] as num?)
+                                            ?.toInt();
+                                    final isSecure =
+                                        selectedNetwork?['secure'] != false;
+                                    final isManual =
+                                        selectedNetwork?['isManual'] == true;
+                                    final sig = _wifiSignalStyle(rssi);
+                                    return Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(14),
+                                          decoration: BoxDecoration(
+                                            color: sig.color.withValues(
+                                              alpha: 0.08,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              14,
+                                            ),
+                                            border: Border.all(
+                                              color: sig.color.withValues(
+                                                alpha: 0.3,
+                                              ),
+                                            ),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                sig.icon,
+                                                size: 24,
+                                                color: sig.color,
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      isManual
+                                                          ? 'Hubungkan ke Jaringan Manual / Tersembunyi'
+                                                          : 'Hubungkan alat ke "${wifiSsidCtrl.text}"',
+                                                      style: GoogleFonts.outfit(
+                                                        fontSize: 13.5,
+                                                        fontWeight:
+                                                            FontWeight.w800,
+                                                        color: text,
+                                                      ),
+                                                    ),
+                                                    Text(
+                                                      isManual
+                                                          ? 'Masukkan nama Wi-Fi (SSID) dan kata sandi Puskesmas'
+                                                          : '${isSecure ? 'Membutuhkan kata sandi Wi-Fi' : 'Jaringan terbuka (tanpa sandi)'}${rssi != null ? ' • Sinyal $rssi dBm (${sig.quality})' : ''}',
+                                                      style: GoogleFonts.outfit(
+                                                        fontSize: 10.5,
+                                                        color: sub,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 14),
+
+                                        if (isManual) ...[
+                                          CustomTextField(
+                                            label: 'Nama Wi-Fi (SSID)',
+                                            hintText: 'Contoh: WiFi_Puskesmas',
+                                            prefixIcon: Icons.wifi_rounded,
+                                            controller: wifiSsidCtrl,
+                                          ),
+                                          const SizedBox(height: 12),
+                                        ],
+
+                                        if (isManual || isSecure) ...[
+                                          CustomTextField(
+                                            label: 'Password Wi-Fi',
+                                            hintText: isManual
+                                                ? 'Kosongkan jika Wi-Fi tanpa sandi'
+                                                : 'Masukkan kata sandi Wi-Fi',
+                                            prefixIcon:
+                                                Icons.lock_outline_rounded,
+                                            isPassword: true,
+                                            controller: wifiPassCtrl,
+                                          ),
+                                          const SizedBox(height: 10),
+                                        ],
+
+                                        CheckboxListTile(
+                                          contentPadding: EdgeInsets.zero,
+                                          controlAffinity:
+                                              ListTileControlAffinity.leading,
+                                          activeColor: const Color(0xFF1ABC9C),
+                                          title: Text(
+                                            'Simpan Wi-Fi & sandi ke Database Puskesmas',
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w700,
+                                              color: text,
+                                            ),
+                                          ),
+                                          subtitle: Text(
+                                            'Jika HP sedang di hotspot alat tanpa internet, disimpan lokal dulu lalu otomatis sync ke Supabase saat online.',
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 10,
+                                              color: sub,
+                                            ),
+                                          ),
+                                          value: savePasswordToDb,
+                                          onChanged: (v) => setDialogState(
+                                            () => savePasswordToDb = v ?? true,
+                                          ),
+                                        ),
+
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'METODE KIRIM LANGSUNG DARI WEB',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w800,
+                                            color: sub,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Wrap(
+                                          spacing: 8,
+                                          runSpacing: 6,
+                                          children: [
+                                            ChoiceChip(
+                                              avatar: Icon(
+                                                Icons.usb_rounded,
+                                                size: 14,
+                                                color: sendMethod == 'usb'
+                                                    ? Colors.white
+                                                    : const Color(0xFF16A085),
+                                              ),
+                                              label: Text(
+                                                'Cara 1: USB Kabel',
+                                                style: GoogleFonts.outfit(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: sendMethod == 'usb'
+                                                      ? Colors.white
+                                                      : text,
+                                                ),
+                                              ),
+                                              selected: sendMethod == 'usb',
+                                              selectedColor: const Color(
+                                                0xFF16A085,
+                                              ),
+                                              backgroundColor: border
+                                                  .withValues(alpha: 0.18),
+                                              onSelected: (_) => setDialogState(
+                                                () => sendMethod = 'usb',
+                                              ),
+                                            ),
+                                            ChoiceChip(
+                                              avatar: Icon(
+                                                Icons.bluetooth_rounded,
+                                                size: 14,
+                                                color: sendMethod == 'ble'
+                                                    ? Colors.white
+                                                    : const Color(0xFF3498DB),
+                                              ),
+                                              label: Text(
+                                                'Cara 2: Bluetooth (BLE)',
+                                                style: GoogleFonts.outfit(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: sendMethod == 'ble'
+                                                      ? Colors.white
+                                                      : text,
+                                                ),
+                                              ),
+                                              selected: sendMethod == 'ble',
+                                              selectedColor: const Color(
+                                                0xFF3498DB,
+                                              ),
+                                              backgroundColor: border
+                                                  .withValues(alpha: 0.18),
+                                              onSelected: (_) => setDialogState(
+                                                () => sendMethod = 'ble',
+                                              ),
+                                            ),
+                                            ChoiceChip(
+                                              avatar: Icon(
+                                                Icons.hub_rounded,
+                                                size: 14,
+                                                color: sendMethod == 'mqtt'
+                                                    ? Colors.white
+                                                    : (_mqttService.isConnected
+                                                          ? const Color(
+                                                              0xFF1ABC9C,
+                                                            )
+                                                          : sub),
+                                              ),
+                                              label: Text(
+                                                _mqttService.isConnected
+                                                    ? 'MQTT Online'
+                                                    : 'MQTT (Offline)',
+                                                style: GoogleFonts.outfit(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: sendMethod == 'mqtt'
+                                                      ? Colors.white
+                                                      : (_mqttService
+                                                                .isConnected
+                                                            ? text
+                                                            : sub),
+                                                ),
+                                              ),
+                                              selected: sendMethod == 'mqtt',
+                                              selectedColor: const Color(
+                                                0xFF1ABC9C,
+                                              ),
+                                              backgroundColor: border
+                                                  .withValues(alpha: 0.18),
+                                              onSelected:
+                                                  _mqttService.isConnected
+                                                  ? (_) => setDialogState(
+                                                      () => sendMethod = 'mqtt',
+                                                    )
+                                                  : null,
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          sendMethod == 'usb'
+                                              ? 'Colok kabel USB ke ESP32 lalu klik tombol di bawah. Cocok untuk ESP32 baru / habis diganti.'
+                                              : (sendMethod == 'ble'
+                                                    ? 'Pilih perangkat "VitaScale-..." di popup Bluetooth tanpa cabut Wi-Fi laptop.'
+                                                    : 'ESP32 sedang online di MQTT. Wi-Fi & kalibrasi dikirim nirkabel via broker.'),
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 10,
+                                            color: sub,
+                                          ),
+                                        ),
+
+                                        const SizedBox(height: 12),
+                                        InkWell(
+                                          onTap: () => setDialogState(
+                                            () => showAdvancedWifiFields =
+                                                !showAdvancedWifiFields,
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                showAdvancedWifiFields
+                                                    ? Icons.expand_less_rounded
+                                                    : Icons.expand_more_rounded,
+                                                size: 16,
+                                                color: sub,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                'Identitas Alat & Kalibrasi (${faskesCtrl.text} • ${deviceCtrl.text})',
+                                                style: GoogleFonts.outfit(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: sub,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        if (showAdvancedWifiFields) ...[
+                                          const SizedBox(height: 10),
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: CustomTextField(
+                                                  label:
+                                                      'Puskesmas / Faskes ID',
+                                                  hintText: 'PUSKESMAS-001',
+                                                  controller: faskesCtrl,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 10),
+                                              Expanded(
+                                                child: CustomTextField(
+                                                  label: 'Device ID (ESP32)',
+                                                  hintText: 'VTS-001',
+                                                  controller: deviceCtrl,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 10),
+                                          CustomTextField(
+                                            label:
+                                                'Faktor Kalibrasi Berat (HX711)',
+                                            hintText: '25.75',
+                                            keyboardType:
+                                                const TextInputType.numberWithOptions(
+                                                  decimal: true,
+                                                ),
+                                            controller: calFactorCtrl,
+                                          ),
+                                        ],
+                                      ],
+                                    );
+                                  },
+                                ),
+
+                                if (espInfoMessage != null) ...[
+                                  const SizedBox(height: 12),
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: const Color(
+                                        0xFFF39C12,
+                                      ).withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: const Color(
+                                          0xFFF39C12,
+                                        ).withValues(alpha: 0.35),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      espInfoMessage!,
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: const Color(0xFFD35400),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            )),
               ),
             ),
             actions: activeDialogTab == 0
@@ -1681,28 +2135,50 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                           portCtrl.text = _mqttService.port.toString();
                           faskesCtrl.text = _mqttService.faskesId;
                           deviceCtrl.text = _mqttService.deviceId;
-                          poleCtrl.text = _mqttService.poleHeightCm.toStringAsFixed(1);
+                          poleCtrl.text = _mqttService.poleHeightCm
+                              .toStringAsFixed(1);
                           gatewayCtrl.text = _mqttService.cloudGatewayUrl;
                           useWildcard = true;
                         });
                       },
-                      child: Text('Reset Default', style: GoogleFonts.outfit(fontSize: 12, color: const Color(0xFFE74C3C))),
+                      child: Text(
+                        'Reset Default',
+                        style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          color: const Color(0xFFE74C3C),
+                        ),
+                      ),
                     ),
                     TextButton(
                       onPressed: () => Navigator.of(ctx).pop(),
-                      child: Text('Batal', style: GoogleFonts.outfit(fontSize: 12, color: sub)),
+                      child: Text(
+                        'Batal',
+                        style: GoogleFonts.outfit(fontSize: 12, color: sub),
+                      ),
                     ),
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF1ABC9C),
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
                       icon: const Icon(Icons.check_rounded, size: 16),
-                      label: Text('Simpan & Sambungkan', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700)),
+                      label: Text(
+                        'Simpan & Sambungkan',
+                        style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                       onPressed: () async {
-                        final newPort = int.tryParse(portCtrl.text.trim()) ?? _mqttService.port;
-                        final newPole = double.tryParse(poleCtrl.text.trim()) ?? _mqttService.poleHeightCm;
+                        final newPort =
+                            int.tryParse(portCtrl.text.trim()) ??
+                            _mqttService.port;
+                        final newPole =
+                            double.tryParse(poleCtrl.text.trim()) ??
+                            _mqttService.poleHeightCm;
                         Navigator.of(ctx).pop();
                         setState(() => _isMqttConnecting = true);
 
@@ -1736,139 +2212,216 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                     ),
                   ]
                 : (selectedNetwork == null
-                    ? [
-                        TextButton(
-                          onPressed: () => Navigator.of(ctx).pop(),
-                          child: Text('Tutup', style: GoogleFonts.outfit(fontSize: 12, color: sub)),
-                        ),
-                      ]
-                    : [
-                        TextButton(
-                          onPressed: () => setDialogState(() {
-                            selectedNetwork = null;
-                            espInfoMessage = null;
-                          }),
-                          child: Text('Batal', style: GoogleFonts.outfit(fontSize: 12, color: sub)),
-                        ),
-                        ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: sendMethod == 'mqtt' ? const Color(0xFF1ABC9C) : const Color(0xFF3498DB),
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ? [
+                          TextButton(
+                            onPressed: () => Navigator.of(ctx).pop(),
+                            child: Text(
+                              'Tutup',
+                              style: GoogleFonts.outfit(
+                                fontSize: 12,
+                                color: sub,
+                              ),
+                            ),
                           ),
-                          icon: isSavingWifi
-                              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                              : const Icon(Icons.wifi_rounded, size: 16),
-                          label: Text(
-                            isSavingWifi ? 'Menghubungkan...' : 'Connect & Simpan',
-                            style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700),
+                        ]
+                      : [
+                          TextButton(
+                            onPressed: () => setDialogState(() {
+                              selectedNetwork = null;
+                              espInfoMessage = null;
+                            }),
+                            child: Text(
+                              'Batal',
+                              style: GoogleFonts.outfit(
+                                fontSize: 12,
+                                color: sub,
+                              ),
+                            ),
                           ),
-                          onPressed: isSavingWifi
-                              ? null
-                              : () async {
-                                  final ssid = wifiSsidCtrl.text.trim();
-                                  final pass = wifiPassCtrl.text;
-                                  final faskes = faskesCtrl.text.trim().isEmpty ? 'PUSKESMAS-001' : faskesCtrl.text.trim();
-                                  final dev = deviceCtrl.text.trim().isEmpty ? 'VTS-001' : deviceCtrl.text.trim();
-                                  final cal = double.tryParse(calFactorCtrl.text.trim()) ?? 25.75;
-                                  final rssi = (selectedNetwork?['rssi'] as num?)?.toInt();
-                                  final isSecure = selectedNetwork?['secure'] != false;
+                          ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: sendMethod == 'ble'
+                                  ? const Color(0xFF3498DB)
+                                  : const Color(0xFF1ABC9C),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            icon: isSavingWifi
+                                ? const SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : Icon(
+                                    sendMethod == 'usb'
+                                        ? Icons.usb_rounded
+                                        : (sendMethod == 'ble'
+                                              ? Icons.bluetooth_rounded
+                                              : Icons.hub_rounded),
+                                    size: 16,
+                                  ),
+                            label: Text(
+                              isSavingWifi
+                                  ? 'Mengirim...'
+                                  : (sendMethod == 'usb'
+                                        ? 'Kirim via USB & Simpan'
+                                        : (sendMethod == 'ble'
+                                              ? 'Kirim via Bluetooth & Simpan'
+                                              : 'Kirim via MQTT & Simpan')),
+                              style: GoogleFonts.outfit(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            onPressed: isSavingWifi
+                                ? null
+                                : () async {
+                                    final ssid = wifiSsidCtrl.text.trim();
+                                    final pass = wifiPassCtrl.text;
+                                    final faskes =
+                                        faskesCtrl.text.trim().isEmpty
+                                        ? 'PUSKESMAS-001'
+                                        : faskesCtrl.text.trim();
+                                    final dev = deviceCtrl.text.trim().isEmpty
+                                        ? 'VTS-001'
+                                        : deviceCtrl.text.trim();
+                                    final cal =
+                                        double.tryParse(
+                                          calFactorCtrl.text.trim(),
+                                        ) ??
+                                        25.75;
+                                    final brokerHost =
+                                        brokerCtrl.text.trim().isEmpty
+                                        ? _mqttService.broker
+                                        : brokerCtrl.text.trim();
+                                    final browserPort =
+                                        int.tryParse(portCtrl.text.trim()) ??
+                                        _mqttService.port;
+                                    final espTcpPort =
+                                        esp32MqttTcpPortFromWebPort(
+                                          browserPort,
+                                        );
+                                    final poleCm =
+                                        double.tryParse(
+                                          poleCtrl.text.trim(),
+                                        ) ??
+                                        _mqttService.poleHeightCm;
+                                    final rssi =
+                                        (selectedNetwork?['rssi'] as num?)
+                                            ?.toInt();
+                                    final isSecure =
+                                        selectedNetwork?['secure'] != false;
 
-                                  if (ssid.isEmpty) {
-                                    setDialogState(() {
-                                      espInfoMessage = 'Nama Wi-Fi (SSID) wajib diisi.';
-                                    });
-                                    return;
-                                  }
-
-                                  setDialogState(() {
-                                    isSavingWifi = true;
-                                    espInfoMessage = null;
-                                  });
-
-                                  bool deviceUpdated = false;
-                                  if (sendMethod == 'mqtt' && _mqttService.isConnected) {
-                                    _mqttService.setWifiCredentials(
-                                      ssid: ssid,
-                                      password: pass,
-                                      faskesId: faskes,
-                                      deviceId: dev,
-                                    );
-                                    deviceUpdated = true;
-                                  } else {
-                                    final baseUrl = normalizeEspUrl();
-                                    try {
-                                      final resp = await http
-                                          .post(
-                                            Uri.parse('$baseUrl/api/setup'),
-                                            headers: {'Content-Type': 'application/json'},
-                                            body: jsonEncode({
-                                              'ssid': ssid,
-                                              'password': pass,
-                                              'faskes_id': faskes,
-                                              'device_id': dev,
-                                              'cal_factor': cal,
-                                            }),
-                                          )
-                                          .timeout(const Duration(seconds: 6));
-                                      if (resp.statusCode == 200) {
-                                        deviceUpdated = true;
-                                      } else {
-                                        if (!ctx.mounted) return;
-                                        setDialogState(() {
-                                          isSavingWifi = false;
-                                          espInfoMessage = 'ESP32 menolak (${resp.statusCode}): ${resp.body}';
-                                        });
-                                        return;
-                                      }
-                                    } catch (e) {
-                                      if (!ctx.mounted) return;
+                                    if (ssid.isEmpty) {
                                       setDialogState(() {
-                                        isSavingWifi = false;
-                                        espInfoMessage = kIsWeb
-                                            ? 'Browser HTTPS memblokir akses ke $baseUrl. Gunakan "Langsung via MQTT" jika alat sedang online, atau klik "Portal Web".'
-                                            : 'Gagal menghubungi hotspot $baseUrl. Pastikan HP/Laptop tersambung ke VitaScale-Setup-XXX.';
+                                        espInfoMessage =
+                                            'Nama Wi-Fi (SSID) wajib diisi.';
                                       });
                                       return;
                                     }
-                                  }
 
-                                  if (deviceUpdated) {
-                                    _mqttService.updateConfig(faskesId: faskes, deviceId: dev);
-                                    final saveResult = await _chcService.saveWifiAndDeviceProfile(
-                                      facilityId: activeFacilityId,
-                                      faskesCode: faskes,
-                                      deviceId: dev,
+                                    setDialogState(() {
+                                      isSavingWifi = true;
+                                      espInfoMessage = null;
+                                    });
+
+                                    final payload = EspProvisionPayload(
                                       ssid: ssid,
                                       password: pass,
-                                      savePassword: savePasswordToDb,
-                                      isSecure: isSecure,
-                                      rssiDbm: rssi,
+                                      broker: brokerHost,
+                                      port: espTcpPort,
+                                      faskesId: faskes,
+                                      deviceId: dev,
+                                      poleHeightCm: poleCm,
                                       calFactor: cal,
-                                      tripodHeightCm: _mqttService.poleHeightCm,
-                                      brokerHost: _mqttService.broker,
-                                      brokerPort: _mqttService.port,
                                     );
 
+                                    String statusMsg;
+                                    if (sendMethod == 'mqtt' &&
+                                        _mqttService.isConnected) {
+                                      _mqttService.setWifiCredentials(
+                                        ssid: ssid,
+                                        password: pass,
+                                        faskesId: faskes,
+                                        deviceId: dev,
+                                        broker: brokerHost,
+                                        port: espTcpPort,
+                                        poleHeightCm: poleCm,
+                                        calFactor: cal,
+                                      );
+                                      statusMsg =
+                                          'Wi-Fi "$ssid" & parameter dikirim langsung ke ESP32 via MQTT';
+                                    } else {
+                                      final res = sendMethod == 'ble'
+                                          ? await provisionEspViaBluetooth(
+                                              payload,
+                                            )
+                                          : await provisionEspViaUsbSerial(
+                                              payload,
+                                            );
+                                      if (!res.success) {
+                                        if (!ctx.mounted) return;
+                                        setDialogState(() {
+                                          isSavingWifi = false;
+                                          espInfoMessage = res.message;
+                                        });
+                                        return;
+                                      }
+                                      statusMsg = res.message;
+                                    }
+
+                                    _mqttService.updateConfig(
+                                      broker: brokerHost,
+                                      port: browserPort,
+                                      faskesId: faskes,
+                                      deviceId: dev,
+                                      poleHeightCm: poleCm,
+                                    );
+                                    final saveResult = await _chcService
+                                        .saveWifiAndDeviceProfile(
+                                          facilityId: activeFacilityId,
+                                          faskesCode: faskes,
+                                          deviceId: dev,
+                                          ssid: ssid,
+                                          password: pass,
+                                          savePassword: savePasswordToDb,
+                                          isSecure: isSecure,
+                                          rssiDbm: rssi,
+                                          calFactor: cal,
+                                          tripodHeightCm: poleCm,
+                                          brokerHost: brokerHost,
+                                          brokerPort: browserPort,
+                                        );
+
                                     if (mounted) {
-                                      setState(() => _activeSavedWifiSsid = ssid);
+                                      setState(
+                                        () => _activeSavedWifiSsid = ssid,
+                                      );
                                     }
                                     if (!ctx.mounted) return;
-                                    final syncedCloud = saveResult['synced_cloud'] == true;
-                                    await refreshSavedWifiAndSync(ctx, setDialogState);
+                                    final syncedCloud =
+                                        saveResult['synced_cloud'] == true;
+                                    await refreshSavedWifiAndSync(
+                                      ctx,
+                                      setDialogState,
+                                    );
                                     if (!ctx.mounted) return;
                                     setDialogState(() {
                                       isSavingWifi = false;
                                       activeWifiSsid = ssid;
                                       selectedNetwork = null;
                                       espInfoMessage = syncedCloud
-                                          ? 'Wi-Fi "$ssid" dikirim ke ESP32 & tersimpan ke database Supabase!'
-                                          : 'Wi-Fi "$ssid" dikirim ke ESP32 & disimpan lokal (akan otomatis sync ke Supabase saat ada internet).';
+                                          ? '$statusMsg • Profil disimpan ke database Supabase!'
+                                          : '$statusMsg • Tersimpan lokal (akan otomatis sync DB saat online).';
                                     });
-                                  }
-                                },
-                        ),
-                      ]),
+                                  },
+                          ),
+                        ]),
           );
         },
       ),
@@ -1891,6 +2444,8 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
   }) {
     setState(() {
       _selectedGender = jk;
+      _selectedBirthDate = null;
+      _isAutoAgeFromBirthDate = false;
       _ageMonths = usia;
       _ageController.text = usia.toStringAsFixed(0);
       _weightController.text = bb.toStringAsFixed(1);
@@ -1917,14 +2472,20 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
   // ===========================================================================
   Color _getLilaColor(double? val) {
     if (val == null) return Colors.grey;
-    if (val < 11.5) return const Color(0xFFE74C3C); // Merah - Gizi Buruk / Wasting Akut
-    if (val <= 12.5) return const Color(0xFFE67E22); // Kuning - Risiko Gizi Kurang
+    if (val < 11.5) {
+      return const Color(0xFFE74C3C); // Merah - Gizi Buruk / Wasting Akut
+    }
+    if (val <= 12.5) {
+      return const Color(0xFFE67E22); // Kuning - Risiko Gizi Kurang
+    }
     return const Color(0xFF27AE60); // Hijau - Pita Normal
   }
 
   String _getLilaStatusText(double? val) {
     if (val == null) return 'Belum Diukur';
-    if (val < 11.5) return 'Merah (<11.5 cm) • Indikasi Gizi Buruk / Wasting Akut';
+    if (val < 11.5) {
+      return 'Merah (<11.5 cm) • Indikasi Gizi Buruk / Wasting Akut';
+    }
     if (val <= 12.5) return 'Kuning (11.5-12.5 cm) • Risiko Gizi Kurang';
     return 'Hijau (>12.5 cm) • Status Gizi Normal';
   }
@@ -1948,10 +2509,18 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
   SatuSehatService _getSatuSehatService() {
     final state = ref.read(landingPageProvider);
     return SatuSehatService(
-      clientId: dotenv.env['SATUSEHAT_CLIENT_ID'] ?? dotenv.env['SATUSEHAT_CLIENTID'],
-      clientSecret: dotenv.env['SATUSEHAT_CLIENT_SECRET'] ?? dotenv.env['SATUSEHAT_CLIENTSECRET'],
-      organizationId: dotenv.env['SATUSEHAT_ORG_ID'] ?? state.activePuskesmasId ?? '10000004',
-      locationId: dotenv.env['SATUSEHAT_LOCATION_ID'] ?? 'b017aa54-f1df-4ec2-9529-81788148b1d9',
+      clientId:
+          dotenv.env['SATUSEHAT_CLIENT_ID'] ?? dotenv.env['SATUSEHAT_CLIENTID'],
+      clientSecret:
+          dotenv.env['SATUSEHAT_CLIENT_SECRET'] ??
+          dotenv.env['SATUSEHAT_CLIENTSECRET'],
+      organizationId:
+          dotenv.env['SATUSEHAT_ORG_ID'] ??
+          state.activePuskesmasId ??
+          '10000004',
+      locationId:
+          dotenv.env['SATUSEHAT_LOCATION_ID'] ??
+          'b017aa54-f1df-4ec2-9529-81788148b1d9',
       env: dotenv.env['SATUSEHAT_ENV'] ?? 'stg',
     );
   }
@@ -2038,8 +2607,14 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
     setState(() => _isSyncingSatuSehat = true);
 
     final nik = _nikController.text.trim();
-    final patientId = _satuSehatPatientId ?? (nik.length == 16 ? 'P${nik.substring(nik.length - 10)}' : 'P1000029384');
-    final childName = _nameController.text.trim().isEmpty ? 'Balita Sasaran' : _nameController.text.trim();
+    final patientId =
+        _satuSehatPatientId ??
+        (nik.length == 16
+            ? 'P${nik.substring(nik.length - 10)}'
+            : 'P1000029384');
+    final childName = _nameController.text.trim().isEmpty
+        ? 'Balita Sasaran'
+        : _nameController.text.trim();
     final isRecumbent = _measurementMethod == 'PB';
     final lk = double.tryParse(_headCircumferenceController.text.trim());
     final lila = double.tryParse(_lilaController.text.trim());
@@ -2051,7 +2626,8 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
     if (_smartGrowthResult != null) {
       if (_smartGrowthResult!.isStunting) {
         diagCode = 'E45';
-        diagDesc = 'Retardasi perkembangan akibat malnutrisi energi-protein (Stunting)';
+        diagDesc =
+            'Retardasi perkembangan akibat malnutrisi energi-protein (Stunting)';
       } else if (_smartGrowthResult!.isGiziBurukAtauKurang) {
         diagCode = 'E44.0';
         diagDesc = 'Malnutrisi energi-protein sedang (Gizi Kurang)';
@@ -2073,7 +2649,11 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
               'encounter_id': encounterUuid,
               'patient_id': patientId,
               'synced_at': DateTime.now().toIso8601String(),
-              'observations_count': 2 + (lk != null ? 1 : 0) + (lila != null ? 1 : 0) + (waist != null ? 1 : 0),
+              'observations_count':
+                  2 +
+                  (lk != null ? 1 : 0) +
+                  (lila != null ? 1 : 0) +
+                  (waist != null ? 1 : 0),
               'diagnosis_code': diagCode,
               'diagnosis_desc': diagDesc,
             };
@@ -2087,9 +2667,7 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
         return;
       }
 
-      final headers = {
-        'Content-Type': 'application/json',
-      };
+      final headers = {'Content-Type': 'application/json'};
       final encRes = await ss.createEncounter(
         headers: headers,
         patientId: patientId,
@@ -2126,7 +2704,8 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
             'encounter_id': ssEncounterId,
             'patient_id': patientId,
             'synced_at': DateTime.now().toIso8601String(),
-            'observations_count': (result['observations'] as List?)?.length ?? 0,
+            'observations_count':
+                (result['observations'] as List?)?.length ?? 0,
             'diagnosis_code': diagCode,
             'diagnosis_desc': diagDesc,
           };
@@ -2197,12 +2776,12 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
       });
     }
 
-    if (_ageMonths <= 0) {
+    if (_ageMonths < 0 || _ageController.text.trim().isEmpty) {
       issues.add({
         'step': 1,
         'stepName': '1. Identitas Balita',
         'field': 'Usia Balita',
-        'message': 'Usia Balita Harus Lebih dari 0 Bulan',
+        'message': 'Usia Balita Minimal 0 Bulan',
         'isError': true, // 🔴 Red
       });
     }
@@ -2279,7 +2858,8 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
         'step': 3,
         'stepName': '3. Reasoning AI',
         'field': 'Reasoning Klinis AI',
-        'message': 'Reasoning AI Belum Dijalankan (Opsional / Rekomendasi Klinis)',
+        'message':
+            'Reasoning AI Belum Dijalankan (Opsional / Rekomendasi Klinis)',
         'isError': false, // 🟡 Yellow Opsional (tidak memblokir simpan)
       });
     }
@@ -2301,7 +2881,13 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
     );
   }
 
-  Widget _buildReviewRow(String label, String value, Color subColor, Color textColor, {bool isBold = false}) {
+  Widget _buildReviewRow(
+    String label,
+    String value,
+    Color subColor,
+    Color textColor, {
+    bool isBold = false,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2.5),
       child: Row(
@@ -2353,15 +2939,27 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
           title: Row(
             children: [
               Icon(
-                isFormLengkap ? Icons.verified_rounded : (redErrors.isNotEmpty ? Icons.assignment_late_rounded : Icons.info_outline_rounded),
-                color: isFormLengkap ? const Color(0xFF27AE60) : (redErrors.isNotEmpty ? const Color(0xFFE74C3C) : const Color(0xFFF39C12)),
+                isFormLengkap
+                    ? Icons.verified_rounded
+                    : (redErrors.isNotEmpty
+                          ? Icons.assignment_late_rounded
+                          : Icons.info_outline_rounded),
+                color: isFormLengkap
+                    ? const Color(0xFF27AE60)
+                    : (redErrors.isNotEmpty
+                          ? const Color(0xFFE74C3C)
+                          : const Color(0xFFF39C12)),
                 size: 22,
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   'Review & Validasi Skrining Balita',
-                  style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w900, color: textColor),
+                  style: GoogleFonts.outfit(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    color: textColor,
+                  ),
                 ),
               ),
             ],
@@ -2392,8 +2990,12 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                     child: Row(
                       children: [
                         Icon(
-                          isFormLengkap ? Icons.check_circle_rounded : Icons.error_outline_rounded,
-                          color: isFormLengkap ? const Color(0xFF27AE60) : const Color(0xFFE74C3C),
+                          isFormLengkap
+                              ? Icons.check_circle_rounded
+                              : Icons.error_outline_rounded,
+                          color: isFormLengkap
+                              ? const Color(0xFF27AE60)
+                              : const Color(0xFFE74C3C),
                           size: 20,
                         ),
                         const SizedBox(width: 10),
@@ -2404,13 +3006,15 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                               Text(
                                 isFormLengkap
                                     ? (yellowWarnings.isEmpty
-                                        ? '✅ Form Lengkap & Reasoning AI Selesai'
-                                        : '✅ Data Wajib Lengkap (${yellowWarnings.length} Saran Opsional)')
+                                          ? '✅ Form Lengkap & Reasoning AI Selesai'
+                                          : '✅ Data Wajib Lengkap (${yellowWarnings.length} Saran Opsional)')
                                     : '❌ Form Belum Lengkap (${redErrors.length} Syarat Wajib Belum Terpenuhi)',
                                 style: GoogleFonts.outfit(
                                   fontSize: 11.5,
                                   fontWeight: FontWeight.bold,
-                                  color: isFormLengkap ? const Color(0xFF27AE60) : const Color(0xFFE74C3C),
+                                  color: isFormLengkap
+                                      ? const Color(0xFF27AE60)
+                                      : const Color(0xFFE74C3C),
                                 ),
                               ),
                               const SizedBox(height: 2),
@@ -2418,7 +3022,10 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                                 isFormLengkap
                                     ? 'Data antropometri & penalaran klinis siap disimpan ke database dan disinkronkan ke SATUSEHAT.'
                                     : 'Klik chip merah di bawah untuk langsung menuju langkah yang belum lengkap.',
-                                style: GoogleFonts.outfit(fontSize: 9.5, color: subtitleColor),
+                                style: GoogleFonts.outfit(
+                                  fontSize: 9.5,
+                                  color: subtitleColor,
+                                ),
                               ),
                             ],
                           ),
@@ -2432,7 +3039,11 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                     const SizedBox(height: 14),
                     Text(
                       'Data Wajib Belum Lengkap (Klik untuk menuju form):',
-                      style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.bold, color: const Color(0xFFE74C3C)),
+                      style: GoogleFonts.outfit(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFFE74C3C),
+                      ),
                     ),
                     const SizedBox(height: 6),
                     Wrap(
@@ -2440,14 +3051,26 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                       runSpacing: 6,
                       children: redErrors.map((err) {
                         return ActionChip(
-                          avatar: const Icon(Icons.warning_rounded, size: 13, color: Color(0xFFE74C3C)),
+                          avatar: const Icon(
+                            Icons.warning_rounded,
+                            size: 13,
+                            color: Color(0xFFE74C3C),
+                          ),
                           label: Text(
                             'Step ${err['step']}: ${err['message']}',
-                            style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFFE74C3C)),
+                            style: GoogleFonts.outfit(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFFE74C3C),
+                            ),
                           ),
-                          backgroundColor: const Color(0xFFE74C3C).withValues(alpha: 0.08),
+                          backgroundColor: const Color(
+                            0xFFE74C3C,
+                          ).withValues(alpha: 0.08),
                           side: const BorderSide(color: Color(0xFFE74C3C)),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(100),
+                          ),
                           onPressed: () {
                             Navigator.pop(ctx);
                             setState(() {
@@ -2464,7 +3087,11 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                     const SizedBox(height: 14),
                     Text(
                       'Peringatan / Data Opsional (Klik untuk melengkapi):',
-                      style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.bold, color: const Color(0xFFD68910)),
+                      style: GoogleFonts.outfit(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFFD68910),
+                      ),
                     ),
                     const SizedBox(height: 6),
                     Wrap(
@@ -2472,14 +3099,26 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                       runSpacing: 6,
                       children: yellowWarnings.map((warn) {
                         return ActionChip(
-                          avatar: const Icon(Icons.info_outline_rounded, size: 13, color: Color(0xFFF39C12)),
+                          avatar: const Icon(
+                            Icons.info_outline_rounded,
+                            size: 13,
+                            color: Color(0xFFF39C12),
+                          ),
                           label: Text(
                             'Step ${warn['step']}: ${warn['message']}',
-                            style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFFD68910)),
+                            style: GoogleFonts.outfit(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFFD68910),
+                            ),
                           ),
-                          backgroundColor: const Color(0xFFF39C12).withValues(alpha: 0.08),
+                          backgroundColor: const Color(
+                            0xFFF39C12,
+                          ).withValues(alpha: 0.08),
                           side: const BorderSide(color: Color(0xFFF39C12)),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(100),
+                          ),
                           onPressed: () {
                             Navigator.pop(ctx);
                             setState(() {
@@ -2495,22 +3134,80 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
 
                   // Ringkasan Data Skrining Balita
                   _buildReviewSectionTitle('1. Identitas Balita', textColor),
-                  _buildReviewRow('Nama Balita', _nameController.text, subtitleColor, textColor),
-                  _buildReviewRow('NIK Balita', _nikController.text, subtitleColor, textColor),
-                  _buildReviewRow('Jenis Kelamin / Usia', '${_selectedGender == 0 ? "Laki-laki" : "Perempuan"} • ${_ageMonths.toInt()} Bulan', subtitleColor, textColor),
-                  _buildReviewRow('Metode Pengukuran', _measurementMethod == 'PB' ? 'PB Telentang' : 'TB Berdiri', subtitleColor, textColor),
+                  _buildReviewRow(
+                    'Nama Balita',
+                    _nameController.text,
+                    subtitleColor,
+                    textColor,
+                  ),
+                  _buildReviewRow(
+                    'NIK Balita',
+                    _nikController.text,
+                    subtitleColor,
+                    textColor,
+                  ),
+                  _buildReviewRow(
+                    'Jenis Kelamin / Usia',
+                    '${_selectedGender == 0 ? "Laki-laki" : "Perempuan"} • ${_ageMonths.toInt()} Bulan',
+                    subtitleColor,
+                    textColor,
+                  ),
+                  _buildReviewRow(
+                    'Metode Pengukuran',
+                    _measurementMethod == 'PB' ? 'PB Telentang' : 'TB Berdiri',
+                    subtitleColor,
+                    textColor,
+                  ),
 
                   const SizedBox(height: 8),
                   _buildReviewSectionTitle('2. Antropometri Fisik', textColor),
-                  _buildReviewRow('Berat / Panjang', '${_weightController.text} kg / ${_heightController.text} cm', subtitleColor, textColor),
-                  _buildReviewRow('LiLA / Lingkar Kepala', '${_lilaController.text} cm / ${_headCircumferenceController.text} cm', subtitleColor, textColor),
-                  _buildReviewRow('KMS Balita / Suplemen', '$_kmsStatus • Vit A: ${_receivedVitA ? "Ya" : "Tidak"}', subtitleColor, textColor),
+                  _buildReviewRow(
+                    'Berat / Panjang',
+                    '${_weightController.text} kg / ${_heightController.text} cm',
+                    subtitleColor,
+                    textColor,
+                  ),
+                  _buildReviewRow(
+                    'LiLA / Lingkar Kepala',
+                    '${_lilaController.text} cm / ${_headCircumferenceController.text} cm',
+                    subtitleColor,
+                    textColor,
+                  ),
+                  _buildReviewRow(
+                    'KMS Balita / Suplemen',
+                    '$_kmsStatus • Vit A: ${_receivedVitA ? "Ya" : "Tidak"}',
+                    subtitleColor,
+                    textColor,
+                  ),
 
                   const SizedBox(height: 8),
-                  _buildReviewSectionTitle('3. Hasil AI & Clinical Reasoning', textColor),
-                  _buildReviewRow('Status Gizi (BB/TB)', _smartGrowthResult?.kategoriGiziBbtb ?? 'Belum Dianalisis', subtitleColor, textColor, isBold: true),
-                  _buildReviewRow('Status Stunting (TB/U)', _smartGrowthResult?.kategoriStuntingTbu ?? 'Belum Dianalisis', subtitleColor, textColor, isBold: true),
-                  _buildReviewRow('Clinical Reasoning', _reasoningResult != null ? 'Tersedia (${_reasoningResult!.modelUsed} - ${_reasoningPromptCount}x diprompt)' : 'Belum Dijalankan (Opsional)', subtitleColor, textColor),
+                  _buildReviewSectionTitle(
+                    '3. Hasil AI & Clinical Reasoning',
+                    textColor,
+                  ),
+                  _buildReviewRow(
+                    'Status Gizi (BB/TB)',
+                    _smartGrowthResult?.kategoriGiziBbtb ?? 'Belum Dianalisis',
+                    subtitleColor,
+                    textColor,
+                    isBold: true,
+                  ),
+                  _buildReviewRow(
+                    'Status Stunting (TB/U)',
+                    _smartGrowthResult?.kategoriStuntingTbu ??
+                        'Belum Dianalisis',
+                    subtitleColor,
+                    textColor,
+                    isBold: true,
+                  ),
+                  _buildReviewRow(
+                    'Clinical Reasoning',
+                    _reasoningResult != null
+                        ? 'Tersedia (${_reasoningResult!.modelUsed} - ${_reasoningPromptCount}x diprompt)'
+                        : 'Belum Dijalankan (Opsional)',
+                    subtitleColor,
+                    textColor,
+                  ),
                 ],
               ),
             ),
@@ -2520,15 +3217,24 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
               onPressed: () => Navigator.pop(ctx),
               child: Text(
                 'Batal / Kembali ke Form',
-                style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: subtitleColor),
+                style: GoogleFonts.outfit(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: subtitleColor,
+                ),
               ),
             ),
             if (redErrors.isNotEmpty)
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFE74C3C),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
                 ),
                 onPressed: () {
                   Navigator.pop(ctx);
@@ -2536,29 +3242,54 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                     _formStep = redErrors.first['step'] as int;
                   });
                 },
-                icon: const Icon(Icons.arrow_forward_rounded, size: 14, color: Colors.white),
+                icon: const Icon(
+                  Icons.arrow_forward_rounded,
+                  size: 14,
+                  color: Colors.white,
+                ),
                 label: Text(
                   'Lengkapi Step ${redErrors.first['step']}',
-                  style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                  style: GoogleFonts.outfit(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
               )
             else
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF27AE60),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 10,
+                  ),
                 ),
                 onPressed: () {
                   Navigator.pop(ctx);
                   _executeSaveScreening();
                 },
                 icon: _isSyncingSatuSehat
-                    ? const Icon(Icons.sync_rounded, size: 16, color: Colors.white)
-                    : const Icon(Icons.cloud_upload_rounded, size: 16, color: Colors.white),
+                    ? const Icon(
+                        Icons.sync_rounded,
+                        size: 16,
+                        color: Colors.white,
+                      )
+                    : const Icon(
+                        Icons.cloud_upload_rounded,
+                        size: 16,
+                        color: Colors.white,
+                      ),
                 label: Text(
                   'Konfirmasi & Simpan Database',
-                  style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                  style: GoogleFonts.outfit(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
               ),
           ],
@@ -2572,43 +3303,82 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
     await _syncToSatuSehat();
     if (!mounted) return;
 
-    // 2. Simpan Rekam Medis ke Repository
-    final childName = _nameController.text.trim().isEmpty ? 'Muhammad Rayyan Al-Fatih' : _nameController.text.trim();
+    // 2. Simpan Rekam Medis ke Repository & Database
+    final childName = _nameController.text.trim().isEmpty
+        ? 'Balita Sasaran'
+        : _nameController.text.trim();
     final nik = _nikController.text.trim();
     final bb = double.tryParse(_weightController.text.trim()) ?? 10.0;
     final tb = double.tryParse(_heightController.text.trim()) ?? 80.0;
     final waist = double.tryParse(_waistController.text.trim()) ?? 46.0;
-    final currentStaff = ref.read(landingPageProvider).loggedInName ?? 'Petugas Gizi Puskesmas';
+    final lk = double.tryParse(_headCircumferenceController.text.trim());
+    final lila = double.tryParse(_lilaController.text.trim());
+    final genderCode = _selectedGender == 0 ? 'L' : 'P';
+    final effectiveBirthDate = (_isAutoAgeFromBirthDate && _selectedBirthDate != null)
+        ? _selectedBirthDate!
+        : _birthDateForAgeMonths(_ageMonths.round().clamp(0, 144));
+    final usiaBulan = ChildProfile.calculateCompletedMonths(effectiveBirthDate);
 
-    final session = ScreeningSession(
-      sessionId: 'VITA-${DateTime.now().millisecondsSinceEpoch}',
-      facilityId: ref.read(landingPageProvider).activePuskesmasId ?? 'PUSKESMAS-001',
-      child: _activeChild ??
-          ChildProfile(
+    final facilityId =
+        ref.read(landingPageProvider).activePuskesmasId ?? 'PUSKESMAS-001';
+    final currentStaff =
+        ref.read(landingPageProvider).loggedInName ?? 'Petugas Gizi Puskesmas';
+
+    final weightSource = _activeTab == 1 ? 'esp32_hx711_mqtt' : 'manual_input';
+    final heightSource = _activeTab == 1
+        ? 'esp32_ultrasonic_mqtt'
+        : (_activeTab == 2 ? 'pcv_cloud_cv' : 'manual_input');
+
+    final childProfile = _activeChild != null
+        ? ChildProfile(
+            id: _activeChild!.id,
+            name: childName,
+            nik: nik.isNotEmpty ? nik : _activeChild!.nik,
+            birthDate: effectiveBirthDate,
+            gender: genderCode,
+            parentName: _activeChild!.parentName,
+            noKk: _activeChild!.noKk,
+            phone: _activeChild!.phone,
+            address: _activeChild!.address,
+            photoUrl: _activeChild!.photoUrl,
+            latitude: _activeChild!.latitude,
+            longitude: _activeChild!.longitude,
+          )
+        : ChildProfile(
             id: 'ANK-${nik.length >= 4 ? nik.substring(nik.length - 4) : "001"}',
             name: childName,
             nik: nik,
-            birthDate: DateTime.now().subtract(Duration(days: (_ageMonths * 30.4).round())),
-            gender: _selectedGender == 0 ? 'L' : 'P',
+            birthDate: effectiveBirthDate,
+            gender: genderCode,
             parentName: 'Orang Tua / Wali Balita',
             address: 'Kecamatan Sumberbaru, Kabupaten Jember',
-          ),
+          );
+
+    final summaryNotes =
+        'Metode: ${_activeTab == 1 ? "IoT MQTT" : (_activeTab == 2 ? "Foto PCV" : "Manual")} | Status Gizi: ${_smartGrowthResult?.kategoriGiziBbtb ?? "Normal"} | Stunting: ${_smartGrowthResult?.kategoriStuntingTbu ?? "Normal"} | SATUSEHAT: ${_satuSehatPatientId ?? "Simulasi"}';
+
+    final session = ScreeningSession(
+      sessionId: 'VITA-${DateTime.now().millisecondsSinceEpoch}',
+      facilityId: facilityId,
+      child: childProfile,
       startTime: DateTime.now().subtract(const Duration(minutes: 5)),
       endTime: DateTime.now(),
-      mode: _measurementMethod == 'PB' ? AnthropometryMode.recumbentLength : AnthropometryMode.standingHeight,
+      mode: _measurementMethod == 'PB'
+          ? AnthropometryMode.recumbentLength
+          : AnthropometryMode.standingHeight,
       weight: MeasurementItem(
         type: MeasurementType.weight,
         value: bb,
         status: MeasurementStatus.verified,
         capturedAt: DateTime.now(),
-        source: 'manual_input',
+        source: weightSource,
       ),
       height: MeasurementItem(
         type: MeasurementType.height,
         value: tb,
         status: MeasurementStatus.verified,
         capturedAt: DateTime.now(),
-        source: 'manual_input',
+        source: heightSource,
       ),
       waist: MeasurementItem(
         type: MeasurementType.waist,
@@ -2619,10 +3389,49 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
       ),
       isDemo: false,
       isFinalized: true,
-      notes: 'Status Gizi: ${_smartGrowthResult?.kategoriGiziBbtb ?? "Normal"} | Stunting: ${_smartGrowthResult?.kategoriStuntingTbu ?? "Normal"} | SATUSEHAT: ${_satuSehatPatientId ?? "Simulasi"}',
+      notes: summaryNotes,
     );
 
     await _repository.saveScreeningResult(session, staffName: currentStaff);
+
+    final diagCode = _smartGrowthResult?.isStunting == true
+        ? 'E45'
+        : (_smartGrowthResult?.isGiziBurukAtauKurang == true ? 'E44.0' : 'Z00.1');
+    final diagPrimer =
+        '${_smartGrowthResult?.kategoriGiziBbtb ?? "Normal"} • ${_smartGrowthResult?.kategoriStuntingTbu ?? "Normal"}';
+
+    await _chcService.saveVitaScaleScreeningRecord(
+      facilityId: facilityId,
+      nik: childProfile.nik,
+      namaAnak: childProfile.name,
+      jenisKelamin: childProfile.gender,
+      tanggalLahir: effectiveBirthDate,
+      namaWali: childProfile.parentName,
+      alamat: childProfile.address,
+      noTelepon: childProfile.phone,
+      examinerName: currentStaff,
+      usiaBulan: usiaBulan,
+      beratBadanKg: bb,
+      panjangTinggiCm: tb,
+      metodeUkur: _measurementMethod,
+      lingkarKepalaCm: lk,
+      lilaCm: lila,
+      lingkarPerutCm: waist,
+      statusGizi: _smartGrowthResult?.kategoriGiziBbtb ?? 'Gizi Baik',
+      statusStunting: _smartGrowthResult?.kategoriStuntingTbu ?? 'Normal',
+      kmsStatus: _kmsStatus,
+      dapatVitA: _receivedVitA,
+      dapatObatCacing: _ageMonths >= 12 ? _receivedDeworming : false,
+      iotSource: heightSource,
+      icd10Code: diagCode,
+      diagnosaPrimer: diagPrimer,
+      faktorEtiologi: _reasoningResult?.riskAndEtiology,
+      rencanaNutrisiHarian:
+          _reasoningResult?.nutritionalIntervention ??
+          'Pemantauan pertumbuhan rutin dan gizi seimbang Buku KIA 2024.',
+      edukasiOrangTua: _reasoningResult?.parentEducation,
+      notes: summaryNotes,
+    );
 
     if (mounted) {
       CustomSnackbar.success(
@@ -2639,7 +3448,10 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
   void _checkAndAutoRunMlp() {
     final bb = double.tryParse(_weightController.text.trim()) ?? 0.0;
     final tb = double.tryParse(_heightController.text.trim()) ?? 0.0;
-    if (bb > 0 && tb > 0 && _smartGrowthResult == null && !_isLoadingClassification) {
+    if (bb > 0 &&
+        tb > 0 &&
+        _smartGrowthResult == null &&
+        !_isLoadingClassification) {
       _runMlpClassification(silent: true);
     }
   }
@@ -2733,7 +3545,11 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
     await _runReasoning(mlpResult, bb, tb);
   }
 
-  Future<void> _runReasoning(HasilSmartGrowthBalita mlpResult, double bb, double tb) async {
+  Future<void> _runReasoning(
+    HasilSmartGrowthBalita mlpResult,
+    double bb,
+    double tb,
+  ) async {
     setState(() => _isLoadingReasoning = true);
 
     final waist = double.tryParse(_waistController.text.trim());
@@ -2742,7 +3558,9 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
 
     try {
       final reasoning = await VitaScaleReasoningService.generateReasoning(
-        childName: _nameController.text.trim().isEmpty ? 'Balita Sasaran' : _nameController.text.trim(),
+        childName: _nameController.text.trim().isEmpty
+            ? 'Balita Sasaran'
+            : _nameController.text.trim(),
         genderLabel: _selectedGender == 0 ? 'Laki-laki' : 'Perempuan',
         ageMonths: _ageMonths,
         weightKg: bb,
@@ -2751,7 +3569,9 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
         waistCm: waist,
         lilaCm: lila,
         headCircumferenceCm: lk,
-        measurementMethod: _measurementMethod == 'PB' ? 'PB Telentang (Infantometer - Buku KIA)' : 'TB Berdiri (Stadiometer - Buku KIA)',
+        measurementMethod: _measurementMethod == 'PB'
+            ? 'PB Telentang (Infantometer - Buku KIA)'
+            : 'TB Berdiri (Stadiometer - Buku KIA)',
         kmsStatus: _getKmsLabel(_kmsStatus),
         receivedVitA: _receivedVitA,
         receivedDeworming: _ageMonths >= 12 ? _receivedDeworming : null,
@@ -2808,13 +3628,21 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                   color: const Color(0xFFF39C12).withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.warning_amber_rounded, color: Color(0xFFF39C12), size: 22),
+                child: const Icon(
+                  Icons.warning_amber_rounded,
+                  color: Color(0xFFF39C12),
+                  size: 22,
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   'Konfirmasi Prompt Ulang AI',
-                  style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w900, color: textColor),
+                  style: GoogleFonts.outfit(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    color: textColor,
+                  ),
                 ),
               ),
             ],
@@ -2824,20 +3652,33 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF39C12).withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFF39C12).withValues(alpha: 0.3)),
+                  border: Border.all(
+                    color: const Color(0xFFF39C12).withValues(alpha: 0.3),
+                  ),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFFF39C12)),
+                    const Icon(
+                      Icons.info_outline_rounded,
+                      size: 16,
+                      color: Color(0xFFF39C12),
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'AI sudah diprompt $_reasoningPromptCount kali untuk balita ini.',
-                        style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFFD68910)),
+                        style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFFD68910),
+                        ),
                       ),
                     ),
                   ],
@@ -2846,12 +3687,20 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
               const SizedBox(height: 12),
               Text(
                 'Apakah Anda yakin ingin melakukan prompt / inferensi ulang AI (Gemini 2.5 Flash & Keras MLP)?',
-                style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: textColor),
+                style: GoogleFonts.outfit(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: textColor,
+                ),
               ),
               const SizedBox(height: 6),
               Text(
                 '• Hasil penalaran klinis, rekomendasi nutrisi PMT, dan alur berpikir sebelumnya akan diperbarui dengan data antropometri terkini.\n• Kuota token API reasoning akan digunakan kembali (Prompt ke-${_reasoningPromptCount + 1}).',
-                style: GoogleFonts.outfit(fontSize: 10.5, color: subtitleColor, height: 1.4),
+                style: GoogleFonts.outfit(
+                  fontSize: 10.5,
+                  color: subtitleColor,
+                  height: 1.4,
+                ),
               ),
             ],
           ),
@@ -2860,15 +3709,24 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
               onPressed: () => Navigator.pop(ctx),
               child: Text(
                 'Batal',
-                style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: subtitleColor),
+                style: GoogleFonts.outfit(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.bold,
+                  color: subtitleColor,
+                ),
               ),
             ),
             ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF1ABC9C),
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
               ),
               onPressed: () {
                 Navigator.pop(ctx);
@@ -2878,10 +3736,18 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                   _runReasoningOnly();
                 }
               },
-              icon: const Icon(Icons.refresh_rounded, size: 15, color: Colors.white),
+              icon: const Icon(
+                Icons.refresh_rounded,
+                size: 15,
+                color: Colors.white,
+              ),
               label: Text(
                 'Lanjutkan Prompt Ulang (${_reasoningPromptCount + 1})',
-                style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: Colors.white),
+                style: GoogleFonts.outfit(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
             ),
           ],
@@ -2921,10 +3787,26 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
               spacing: 8,
               runSpacing: 8,
               children: [
-                _buildQuickUrlChip('Vercel Cloud (Live)', 'https://vitascalemapotech.vercel.app', urlCtrl),
-                _buildQuickUrlChip('127.0.0.1:8000', 'http://127.0.0.1:8000', urlCtrl),
-                _buildQuickUrlChip('localhost:8000', 'http://localhost:8000', urlCtrl),
-                _buildQuickUrlChip('Emulator (10.0.2.2)', 'http://10.0.2.2:8000', urlCtrl),
+                _buildQuickUrlChip(
+                  'Vercel Cloud (Live)',
+                  'https://vitascalemapotech.vercel.app',
+                  urlCtrl,
+                ),
+                _buildQuickUrlChip(
+                  '127.0.0.1:8000',
+                  'http://127.0.0.1:8000',
+                  urlCtrl,
+                ),
+                _buildQuickUrlChip(
+                  'localhost:8000',
+                  'http://localhost:8000',
+                  urlCtrl,
+                ),
+                _buildQuickUrlChip(
+                  'Emulator (10.0.2.2)',
+                  'http://10.0.2.2:8000',
+                  urlCtrl,
+                ),
               ],
             ),
           ],
@@ -2952,7 +3834,11 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
     );
   }
 
-  Widget _buildQuickUrlChip(String label, String url, TextEditingController ctrl) {
+  Widget _buildQuickUrlChip(
+    String label,
+    String url,
+    TextEditingController ctrl,
+  ) {
     return InkWell(
       onTap: () => ctrl.text = url,
       borderRadius: BorderRadius.circular(8),
@@ -2961,11 +3847,17 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
         decoration: BoxDecoration(
           color: const Color(0xFF1ABC9C).withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFF1ABC9C).withValues(alpha: 0.3)),
+          border: Border.all(
+            color: const Color(0xFF1ABC9C).withValues(alpha: 0.3),
+          ),
         ),
         child: Text(
           label,
-          style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF1ABC9C)),
+          style: GoogleFonts.outfit(
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            color: const Color(0xFF1ABC9C),
+          ),
         ),
       ),
     );
@@ -2988,7 +3880,8 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                   }).toList();
 
             return CustomDialog(
-              title: 'Daftar Sasaran Balita Terdaftar (${_availableChildren.length})',
+              title:
+                  'Daftar Sasaran Balita Terdaftar (${_availableChildren.length})',
               icon: Icons.people_rounded,
               iconColor: const Color(0xFF1ABC9C),
               maxWidth: 520,
@@ -3001,12 +3894,21 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                       decoration: InputDecoration(
                         hintText: 'Cari Nama, NIK, atau Nama Orang Tua...',
                         hintStyle: GoogleFonts.outfit(fontSize: 11.5),
-                        prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Color(0xFF1ABC9C)),
+                        prefixIcon: const Icon(
+                          Icons.search_rounded,
+                          size: 18,
+                          color: Color(0xFF1ABC9C),
+                        ),
                         isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 10,
+                          horizontal: 12,
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
-                          borderSide: BorderSide(color: Colors.grey.withValues(alpha: 0.3)),
+                          borderSide: BorderSide(
+                            color: Colors.grey.withValues(alpha: 0.3),
+                          ),
                         ),
                       ),
                       style: GoogleFonts.outfit(fontSize: 12),
@@ -3024,27 +3926,43 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                               padding: const EdgeInsets.all(24),
                               child: Text(
                                 'Tidak ada sasaran balita yang cocok dengan "$modalSearchQuery".',
-                                style: GoogleFonts.outfit(fontSize: 12, color: Colors.grey),
+                                style: GoogleFonts.outfit(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                ),
                               ),
                             )
                           : ListView.separated(
                               shrinkWrap: true,
                               itemCount: filteredChildren.length,
-                              separatorBuilder: (_, _) => const Divider(height: 6),
+                              separatorBuilder: (_, _) =>
+                                  const Divider(height: 6),
                               itemBuilder: (ctx, idx) {
                                 final child = filteredChildren[idx];
                                 final isCurrent = child.id == _activeChild?.id;
                                 return ListTile(
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                  tileColor: isCurrent ? const Color(0xFF1ABC9C).withValues(alpha: 0.12) : null,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  tileColor: isCurrent
+                                      ? const Color(
+                                          0xFF1ABC9C,
+                                        ).withValues(alpha: 0.12)
+                                      : null,
                                   leading: Icon(
-                                    child.isUnder24Months ? Icons.child_friendly_rounded : Icons.face_rounded,
-                                    color: isCurrent ? const Color(0xFF1ABC9C) : Colors.grey,
+                                    child.isUnder24Months
+                                        ? Icons.child_friendly_rounded
+                                        : Icons.face_rounded,
+                                    color: isCurrent
+                                        ? const Color(0xFF1ABC9C)
+                                        : Colors.grey,
                                   ),
                                   title: Text(
                                     child.name,
                                     style: GoogleFonts.outfit(
-                                      fontWeight: isCurrent ? FontWeight.bold : FontWeight.w600,
+                                      fontWeight: isCurrent
+                                          ? FontWeight.bold
+                                          : FontWeight.w600,
                                       fontSize: 13,
                                     ),
                                   ),
@@ -3053,8 +3971,12 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
                                     style: GoogleFonts.outfit(fontSize: 10.5),
                                   ),
                                   trailing: StatusBadge(
-                                    label: child.isUnder24Months ? 'PB (TELENTANG)' : 'TB (BERDIRI)',
-                                    color: child.isUnder24Months ? const Color(0xFF3498DB) : const Color(0xFFE67E22),
+                                    label: child.isUnder24Months
+                                        ? 'PB (TELENTANG)'
+                                        : 'TB (BERDIRI)',
+                                    color: child.isUnder24Months
+                                        ? const Color(0xFF3498DB)
+                                        : const Color(0xFFE67E22),
                                     fontSize: 8,
                                   ),
                                   onTap: () {
@@ -3086,7 +4008,9 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
     final name = _nameController.text;
     final age = _ageMonths.toStringAsFixed(0);
     final gender = _selectedGender == 0 ? 'Laki-laki' : 'Perempuan';
-    final caraUkur = _measurementMethod == 'PB' ? 'Panjang Badan Telentang (< 24 Bln)' : 'Tinggi Badan Berdiri (≥ 24 Bln)';
+    final caraUkur = _measurementMethod == 'PB'
+        ? 'Panjang Badan Telentang (< 24 Bln)'
+        : 'Tinggi Badan Berdiri (≥ 24 Bln)';
     final kms = _getKmsLabel(_kmsStatus);
 
     final gizi = _smartGrowthResult?.kategoriGiziBbtb ?? '-';
@@ -3096,7 +4020,8 @@ class _VitaScaleScreeningPageState extends ConsumerState<VitaScaleScreeningPage>
 
     final reasoning = _reasoningResult;
 
-    final report = '''
+    final report =
+        '''
 ==================================================
 LAPORAN SKRINING BALITA VITASCALE x SATUSEHAT KEMENKES RI
 Standar: Buku KIA 2024 & Permenkes No. 2 Tahun 2020
@@ -3155,7 +4080,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
 
   @override
   Widget build(BuildContext context) {
-    final screeningState = ref.watch(screeningStateProvider);
+    _scheduleAppBarStatusSync();
     final landingState = ref.watch(landingPageProvider);
     final notifier = ref.read(landingPageProvider.notifier);
     final isDark = landingState.appearance == 'dark';
@@ -3166,209 +4091,261 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
     final subtitleColor = notifier.getBodyTextColor();
     final borderColor = notifier.getBorderColor();
     final isMobile = MediaQuery.of(context).size.width < 900;
-    const themeAccent = Color(0xFF1ABC9C);
 
     final issues = _validateScreeningForm();
     final redErrors = issues.where((i) => i['isError'] == true).toList();
     final yellowWarnings = issues.where((i) => i['isError'] == false).toList();
 
-    final session = screeningState.session;
-
-    return VitaScaleDlcGate(
-      menuTitle: isEn ? 'Child & Infant Screening' : 'Screening Anak & Bayi',
-      child: Container(
-        color: notifier.getBackgroundColor(),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-            // =================================================================
-            // TOP BAR: TOMBOL KEMBALI & BREADCRUMB
-            // =================================================================
-            Row(
-              children: [
-                InkWell(
-                  onTap: () {
-                    if (widget.onNavigateToMenu != null) {
-                      widget.onNavigateToMenu!('dlc_vitascale_data_anak');
-                    } else {
-                      Navigator.of(context).maybePop();
-                    }
-                  },
-                  borderRadius: BorderRadius.circular(14),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: cardBgColor,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: borderColor),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.arrow_back_rounded, size: 18, color: textColor),
-                        const SizedBox(width: 8),
-                        Text(
-                          isEn ? 'Back to Child Data' : 'Kembali ke Data Anak',
-                          style: GoogleFonts.outfit(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: textColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Text(
-                  isEn ? 'VitaScale DLC Module • AI Screening & Anthropometry' : 'Modul DLC VitaScale • Skrining AI & Antropometri',
-                  style: GoogleFonts.outfit(
-                    fontSize: 12,
-                    color: subtitleColor,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 16),
-
-            // =================================================================
-            // PENCARIAN & PEMILIHAN PASIEN BALITA DI BAGIAN ATAS
-            // =================================================================
-            _buildPatientSearchSection(cardBgColor, borderColor, textColor, subtitleColor, isMobile),
-
-            const SizedBox(height: 16),
-
-            // =================================================================
-            // BANNER TOP HEADER
-            // =================================================================
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: cardBgColor,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: borderColor),
-              ),
-              child: Row(
+    final scrollContent = Container(
+      key: _scrollViewportKey,
+      color: notifier.getBackgroundColor(),
+      child: SingleChildScrollView(
+        controller: _scrollController,
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+              // =================================================================
+              // TOP BAR: TOMBOL KEMBALI & BREADCRUMB
+              // =================================================================
+              Row(
                 children: [
-                  Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1ABC9C).withValues(alpha: 0.12),
-                      shape: BoxShape.circle,
-                    ),
-                    alignment: Alignment.center,
-                    child: const Icon(Icons.monitor_weight_rounded, size: 28, color: Color(0xFF1ABC9C)),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF1ABC9C).withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(100),
-                              ),
-                              child: Text(
-                                isEn ? 'ANTHROPOMETRIC & AI SCREENING MODULE' : 'MODUL SKRINING ANTROPOMETRI & AI',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 8,
-                                  fontWeight: FontWeight.w900,
-                                  color: const Color(0xFF1ABC9C),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'VitaScale by MAPOTECH',
-                              style: GoogleFonts.outfit(fontSize: 10, color: subtitleColor, fontWeight: FontWeight.bold),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          isEn ? 'Child Anthropometry Measurement & Screening' : 'Uji Ukur & Skrining Antropometri Balita',
-                          style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w900, color: textColor),
-                        ),
-                        Text(
-                          isEn ? 'Machine Learning Classification (Keras MLP) & Pediatrician Clinical AI Reasoning.' : 'Klasifikasi Machine Learning (Keras MLP) & Clinical AI Reasoning Dokter Spesialis Anak.',
-                          style: GoogleFonts.outfit(fontSize: 10.5, color: subtitleColor),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Tombol Ganti Server URL
                   InkWell(
-                    onTap: _showServerConfigModal,
-                    borderRadius: BorderRadius.circular(10),
+                    onTap: () {
+                      if (widget.onNavigateToMenu != null) {
+                        widget.onNavigateToMenu!('dlc_vitascale_data_anak');
+                      } else {
+                        Navigator.of(context).maybePop();
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(14),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
                       decoration: BoxDecoration(
-                        color: borderColor.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(10),
+                        color: cardBgColor,
+                        borderRadius: BorderRadius.circular(14),
                         border: Border.all(color: borderColor),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.settings_ethernet_rounded, size: 16, color: subtitleColor),
-                          const SizedBox(width: 6),
+                          Icon(
+                            Icons.arrow_back_rounded,
+                            size: 18,
+                            color: textColor,
+                          ),
+                          const SizedBox(width: 8),
                           Text(
-                            'API Host',
-                            style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: textColor),
+                            isEn
+                                ? 'Back to Child Data'
+                                : 'Kembali ke Data Anak',
+                            style: GoogleFonts.outfit(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: textColor,
+                            ),
                           ),
                         ],
                       ),
                     ),
                   ),
+                  const SizedBox(width: 14),
+                  Text(
+                    isEn
+                        ? 'VitaScale DLC Module • AI Screening & Anthropometry'
+                        : 'Modul DLC VitaScale • Skrining AI & Antropometri',
+                    style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      color: subtitleColor,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                 ],
               ),
-            ),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            // =================================================================
-            // TAB SELECTOR: Mode Input Manual vs Hardware IoT vs Cloud PCV
-            // =================================================================
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: borderColor.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: borderColor),
+              // =================================================================
+              // BANNER TOP HEADER
+              // =================================================================
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: cardBgColor,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: borderColor),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1ABC9C).withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      alignment: Alignment.center,
+                      child: const Icon(
+                        Icons.monitor_weight_rounded,
+                        size: 28,
+                        color: Color(0xFF1ABC9C),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(
+                                    0xFF1ABC9C,
+                                  ).withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(100),
+                                ),
+                                child: Text(
+                                  isEn
+                                      ? 'ANTHROPOMETRIC & AI SCREENING MODULE'
+                                      : 'MODUL SKRINING ANTROPOMETRI & AI',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.w900,
+                                    color: const Color(0xFF1ABC9C),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'VitaScale by MAPOTECH',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 10,
+                                  color: subtitleColor,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            isEn
+                                ? 'Child Anthropometry Measurement & Screening'
+                                : 'Uji Ukur & Skrining Antropometri Balita',
+                            style: GoogleFonts.outfit(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                              color: textColor,
+                            ),
+                          ),
+                          Text(
+                            isEn
+                                ? 'Machine Learning Classification (Keras MLP) & Pediatrician Clinical AI Reasoning.'
+                                : 'Klasifikasi Machine Learning (Keras MLP) & Clinical AI Reasoning Dokter Spesialis Anak.',
+                            style: GoogleFonts.outfit(
+                              fontSize: 10.5,
+                              color: subtitleColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Tombol Ganti Server URL
+                    InkWell(
+                      onTap: _showServerConfigModal,
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: borderColor.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: borderColor),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.settings_ethernet_rounded,
+                              size: 16,
+                              color: subtitleColor,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'API Host',
+                              style: GoogleFonts.outfit(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: textColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              child: isMobile
-                  ? Column(
+
+              const SizedBox(height: 16),
+
+              // =================================================================
+              // PENCARIAN & PEMILIHAN PASIEN BALITA DI BAGIAN ATAS
+              // =================================================================
+              _buildPatientSearchSection(
+                cardBgColor,
+                borderColor,
+                textColor,
+                subtitleColor,
+                isMobile,
+              ),
+
+              const SizedBox(height: 16),
+
+              // =================================================================
+              // TAB SELECTOR: 3 Mode Pengukuran (Manual, IoT MQTT, Foto PCV)
+              // Diletakkan langsung di bawah card pilih pasien / pasien terpilih
+              // =================================================================
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: borderColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: borderColor),
+                ),
+                child: isMobile
+                    ? Column(
                       children: [
                         _buildTabButton(
                           index: 0,
-                          label: 'Uji Ukur Manual & Reasoning AI',
+                          label: 'Uji Ukur Manual & AI',
                           icon: Icons.tune_rounded,
-                          badge: 'Tersedia Sekarang (Tanpa IoT Fisik)',
+                          badge: 'Input Manual',
                           badgeColor: const Color(0xFF1ABC9C),
                         ),
                         const SizedBox(height: 4),
                         _buildTabButton(
                           index: 1,
-                          label: 'Perangkat IoT & Kamera CV',
+                          label: 'Perangkat IoT (MQTT)',
                           icon: Icons.sensors_rounded,
-                          badge: 'ESP32 + Webcam',
+                          badge: 'ESP32 MQTT Live',
                           badgeColor: const Color(0xFF3498DB),
                         ),
                         const SizedBox(height: 4),
                         _buildTabButton(
                           index: 2,
-                          label: 'Ukur Tinggi via Foto AI (PCV API)',
+                          label: 'Ukur Tinggi via Foto (PCV)',
                           icon: Icons.photo_camera_rounded,
-                          badge: 'pcvmapotechs5.vercel.app',
+                          badge: 'Kamera & OpenCV API',
                           badgeColor: const Color(0xFFE91E63),
                         ),
                       ],
@@ -3380,7 +4357,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                             index: 0,
                             label: 'Uji Ukur Manual & AI',
                             icon: Icons.tune_rounded,
-                            badge: 'Tanpa IoT Fisik',
+                            badge: 'Input Manual',
                             badgeColor: const Color(0xFF1ABC9C),
                           ),
                         ),
@@ -3388,9 +4365,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                         Expanded(
                           child: _buildTabButton(
                             index: 1,
-                            label: 'Perangkat IoT & CV',
+                            label: 'Perangkat IoT (MQTT)',
                             icon: Icons.sensors_rounded,
-                            badge: 'ESP32 + Webcam',
+                            badge: 'ESP32 MQTT Live',
                             badgeColor: const Color(0xFF3498DB),
                           ),
                         ),
@@ -3400,24 +4377,19 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                             index: 2,
                             label: 'Ukur Tinggi via Foto (PCV)',
                             icon: Icons.photo_camera_rounded,
-                            badge: 'OpenCV Cloud API',
+                            badge: 'Kamera & OpenCV API',
                             badgeColor: const Color(0xFFE91E63),
                           ),
                         ),
                       ],
                     ),
-            ),
+              ),
 
-            const SizedBox(height: 18),
-
-            // =================================================================
-            // KONTEN TAB 0: UJI UKUR MANUAL & REASONING AI (STEPPER BERTAHAP)
-            // =================================================================
-            if (_activeTab == 0) ...[
-              _buildServerStatusBar(cardBgColor, borderColor, textColor, subtitleColor),
               const SizedBox(height: 16),
 
-              // Custom Form Stepper (1 Card Per Step)
+              // =================================================================
+              // STEPPER TERPADU UNTUK SEMUA MODE (Manual, IoT MQTT, Foto PCV)
+              // =================================================================
               CustomFormStepper(
                 steps: [
                   FormStepItem(
@@ -3426,15 +4398,25 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                     icon: Icons.badge_rounded,
                     hasError: redErrors.any((e) => e['step'] == 1),
                     hasWarning: yellowWarnings.any((w) => w['step'] == 1),
-                    isCompleted: _nikController.text.trim().length == 16 && _nameController.text.trim().isNotEmpty && _ageMonths > 0,
+                    isCompleted:
+                        _nikController.text.trim().length == 16 &&
+                        _nameController.text.trim().isNotEmpty &&
+                        _ageMonths >= 0 &&
+                        _ageController.text.trim().isNotEmpty,
                   ),
                   FormStepItem(
                     step: 2,
-                    label: '2. Antropometri',
+                    label: _activeTab == 1
+                        ? '2. Antropometri (IoT MQTT)'
+                        : (_activeTab == 2
+                              ? '2. Antropometri (Foto PCV)'
+                              : '2. Antropometri'),
                     icon: Icons.straighten_rounded,
                     hasError: redErrors.any((e) => e['step'] == 2),
                     hasWarning: yellowWarnings.any((w) => w['step'] == 2),
-                    isCompleted: double.tryParse(_weightController.text.trim()) != null && double.tryParse(_heightController.text.trim()) != null,
+                    isCompleted:
+                        double.tryParse(_weightController.text.trim()) != null &&
+                        double.tryParse(_heightController.text.trim()) != null,
                   ),
                   FormStepItem(
                     step: 3,
@@ -3468,17 +4450,61 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                 isDark: isDark,
               ),
 
+              const SizedBox(height: 12),
+
+              // =================================================================
+              // STATUS BAR TERPADU DI BAWAH STEPPER
+              // Ketika di-scroll melewati bagian ini, status berpindah menjadi ikon
+              // ringkas di AppBar atas agar tetap terpantau tanpa perlu scroll balik.
+              // =================================================================
+              Container(
+                key: _statusStripKey,
+                child: _buildUnifiedStatusStrip(
+                  cardBg: cardBgColor,
+                  border: borderColor,
+                  text: textColor,
+                  sub: subtitleColor,
+                  isMobile: isMobile,
+                ),
+              ),
+
               const SizedBox(height: 16),
 
-              // Tampilan 1 Kartu Form Aktif Sesuai Step
+              // =================================================================
+              // KARTU FORM AKTIF SESUAI STEP (Berlaku untuk Manual, IoT, & PCV)
+              // =================================================================
               if (_formStep == 1)
-                _buildStep1ChildIdentity(cardBgColor, borderColor, textColor, subtitleColor, isMobile)
+                _buildStep1ChildIdentity(
+                  cardBgColor,
+                  borderColor,
+                  textColor,
+                  subtitleColor,
+                  isMobile,
+                )
               else if (_formStep == 2)
-                _buildStep2Anthropometry(cardBgColor, borderColor, textColor, subtitleColor, isMobile)
+                _buildStep2Anthropometry(
+                  cardBgColor,
+                  borderColor,
+                  textColor,
+                  subtitleColor,
+                  isMobile,
+                )
               else if (_formStep == 3)
-                _buildStep3ReasoningAndAi(cardBgColor, borderColor, textColor, subtitleColor, isMobile)
+                _buildStep3ReasoningAndAi(
+                  cardBgColor,
+                  borderColor,
+                  textColor,
+                  subtitleColor,
+                  isMobile,
+                )
               else if (_formStep == 4)
-                _buildStep4SatuSehatAndSave(cardBgColor, borderColor, textColor, subtitleColor, isMobile),
+                _buildStep4SatuSehatAndSave(
+                  cardBgColor,
+                  borderColor,
+                  textColor,
+                  subtitleColor,
+                  isMobile,
+                ),
 
               const SizedBox(height: 16),
 
@@ -3494,185 +4520,30 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
               ),
 
               const SizedBox(height: 24),
-            ]
-            // =================================================================
-            // KONTEN TAB 1: PERANGKAT IOT & KAMERA CV (EXISTING)
-            // =================================================================
-            else if (_activeTab == 1) ...[
-              _buildMqttStatusBar(cardBgColor, borderColor, textColor, subtitleColor),
-              const SizedBox(height: 16),
-              _buildIotSubTabSelector(cardBgColor, borderColor, textColor, subtitleColor),
-              const SizedBox(height: 16),
-              if (_iotSubTab == 0)
-                _buildIotTelemetryPanel(
+            ],
+          ),
+        ),
+      );
+
+    return VitaScaleDlcGate(
+      menuTitle: isEn ? 'Child & Infant Screening' : 'Screening Anak & Bayi',
+      child: widget.embedInDashboardShell
+          ? scrollContent
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildStandaloneAppBar(
                   cardBg: cardBgColor,
                   border: borderColor,
                   text: textColor,
-                  sub: subtitleColor,
+                  isEn: isEn,
                   isMobile: isMobile,
-                  isDark: isDark,
-                  session: session,
-                )
-              else ...[
-                if (session == null)
-                  EmptyStateWidget(
-                    icon: Icons.person_search_rounded,
-                    title: 'Belum Ada Sesi Skrining yang Aktif',
-                    subtitle: 'Pilih pasien anak/bayi untuk memulai pengukuran antropometri dengan kamera OpenCV.',
-                    cardBg: cardBgColor,
-                    border: borderColor,
-                    textColor: textColor,
-                    subtitleColor: subtitleColor,
-                  )
-                else ...[
-                  VitaScaleStatusBar(
-                    session: session,
-                    deviceStatus: screeningState.deviceStatus,
-                    isCameraReady: screeningState.isCameraReady,
-                    cardBgColor: cardBgColor,
-                    borderColor: borderColor,
-                    textColor: textColor,
-                    subtitleColor: subtitleColor,
-                    themeAccent: const Color(0xFF1ABC9C),
-                    onModeChanged: (m) => ref.read(screeningStateProvider.notifier).changeAnthropometryMode(m),
-                    onCloseSession: () => ref.read(screeningStateProvider.notifier).closeSession(),
-                  ),
-                  const SizedBox(height: 18),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        flex: isMobile ? 1 : 3,
-                        child: Container(
-                          height: 380,
-                          decoration: BoxDecoration(
-                            color: Colors.black,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: borderColor),
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: VitaScaleCameraWidget(
-                            onStatusChanged: (isReady, label) {
-                              ref.read(screeningStateProvider.notifier).setCameraStatus(
-                                    isReady: isReady,
-                                    cameraLabel: label,
-                                  );
-                            },
-                            onMeasured: (result) {
-                              if (result.ok && result.valueCm != null) {
-                                ref.read(screeningStateProvider.notifier).updateHeight(
-                                      value: result.valueCm,
-                                      status: MeasurementStatus.stable,
-                                      source: 'opencv_web',
-                                    );
-                                CustomSnackbar.success(
-                                  context,
-                                  'Panjang/Tinggi terdeteksi: ${result.valueCm!.toStringAsFixed(1)} cm',
-                                  title: 'Deteksi Marker Berhasil',
-                                );
-                              } else {
-                                final err = result.reasons.isNotEmpty
-                                    ? result.reasons.join('\n')
-                                    : 'Deteksi marker papan ukur gagal.';
-                                ref.read(screeningStateProvider.notifier).updateHeight(
-                                      value: null,
-                                      status: MeasurementStatus.failed,
-                                      errorMessage: err,
-                                    );
-                                CustomSnackbar.warning(context, err, title: 'Kamera Gagal Mengukur');
-                              }
-                            },
-                            onSimulateFixture: () {
-                              final sampleVal = session.child.isUnder24Months ? 74.8 : 98.5;
-                              _simulator.injectCvFixtureMeasurement(fixtureHeight: sampleVal);
-                              CustomSnackbar.info(
-                                context,
-                                'Data fixture sintetis panjang/tinggi ($sampleVal cm) telah diinjeksikan.',
-                                title: 'Fixture Uji Selesai',
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        flex: isMobile ? 1 : 2,
-                        child: Column(
-                          children: [
-                            SizedBox(
-                              height: 184,
-                              child: MeasurementCard(
-                                type: MeasurementType.weight,
-                                item: session.weight,
-                                icon: Icons.monitor_weight_rounded,
-                                cardBgColor: cardBgColor,
-                                borderColor: borderColor,
-                                textColor: textColor,
-                                subtitleColor: subtitleColor,
-                                themeAccent: const Color(0xFF1ABC9C),
-                                onReset: () => ref
-                                    .read(screeningStateProvider.notifier)
-                                    .resetMeasurement(MeasurementType.weight),
-                                simulateLabel: 'Simulasi Berat',
-                                onSimulate: () {
-                                  final defaultTarget = session.child.isUnder24Months ? 9.45 : 15.20;
-                                  _simulator.simulateWeightMeasurement(targetWeight: defaultTarget);
-                                },
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            SizedBox(
-                              height: 184,
-                              child: MeasurementCard(
-                                type: MeasurementType.waist,
-                                item: session.waist,
-                                icon: Icons.straighten_rounded,
-                                cardBgColor: cardBgColor,
-                                borderColor: borderColor,
-                                textColor: textColor,
-                                subtitleColor: subtitleColor,
-                                themeAccent: const Color(0xFFE67E22),
-                                onReset: () => ref
-                                    .read(screeningStateProvider.notifier)
-                                    .resetMeasurement(MeasurementType.waist),
-                                simulateLabel: 'Simulasi Lingkar',
-                                onSimulate: () {
-                                  final defaultWaist = session.child.isUnder24Months ? 44.2 : 51.5;
-                                  _simulator.simulateWaistMeasurement(targetWaist: defaultWaist);
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                ),
+                Expanded(child: scrollContent),
               ],
-            ]
-
-            // =================================================================
-            // KONTEN TAB 2: UKUR TINGGI VIA FOTO AI (PCV API CLOUD)
-            // =================================================================
-            else if (_activeTab == 2) ...[
-              _buildTab2PcvCloudSection(
-                cardBgColor: cardBgColor,
-                borderColor: borderColor,
-                textColor: textColor,
-                subtitleColor: subtitleColor,
-                themeAccent: themeAccent,
-                isDark: isDark,
-                isMobile: isMobile,
-                redErrors: redErrors,
-                yellowWarnings: yellowWarnings,
-              ),
-            ],
-          ],
-        ),
-      ),
-    ),
-  );
-}
+            ),
+    );
+  }
 
   // ===========================================================================
   // PENCARIAN & PEMILIHAN SASARAN BALITA (SEARCH AT THE TOP)
@@ -3695,7 +4566,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
 
     return CustomCard(
       color: cardBg,
-      borderColor: _activeChild == null ? const Color(0xFF1ABC9C).withValues(alpha: 0.4) : border,
+      borderColor: _activeChild == null
+          ? const Color(0xFF1ABC9C).withValues(alpha: 0.4)
+          : border,
       padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -3817,7 +4690,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   IconButton(
                     icon: const Icon(Icons.close_rounded, size: 18),
                     color: sub,
-                    tooltip: ref.watch(landingPageProvider).language == 'en' ? 'Clear Search' : 'Hapus Pencarian',
+                    tooltip: ref.watch(landingPageProvider).language == 'en'
+                        ? 'Clear Search'
+                        : 'Hapus Pencarian',
                     onPressed: () {
                       _topSearchController.clear();
                       setState(() {
@@ -3847,7 +4722,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                     ? const Color(0xFF1E2130)
                     : Colors.white,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF1ABC9C).withValues(alpha: 0.4)),
+                border: Border.all(
+                  color: const Color(0xFF1ABC9C).withValues(alpha: 0.4),
+                ),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.08),
@@ -3861,12 +4738,19 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                       padding: const EdgeInsets.all(16),
                       child: Row(
                         children: [
-                          Icon(Icons.info_outline_rounded, size: 18, color: sub),
+                          Icon(
+                            Icons.info_outline_rounded,
+                            size: 18,
+                            color: sub,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               'Tidak ada data balita yang cocok dengan "$_topSearchQuery".',
-                              style: GoogleFonts.outfit(fontSize: 11.5, color: sub),
+                              style: GoogleFonts.outfit(
+                                fontSize: 11.5,
+                                color: sub,
+                              ),
                             ),
                           ),
                         ],
@@ -3883,9 +4767,14 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                           onTap: () => _selectChild(child),
                           borderRadius: BorderRadius.circular(10),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF1ABC9C).withValues(alpha: 0.06),
+                              color: const Color(
+                                0xFF1ABC9C,
+                              ).withValues(alpha: 0.06),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Row(
@@ -3900,7 +4789,8 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Row(
                                         children: [
@@ -3914,7 +4804,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                                           ),
                                           const SizedBox(width: 6),
                                           StatusBadge(
-                                            label: child.gender == 'L' ? 'L' : 'P',
+                                            label: child.gender == 'L'
+                                                ? 'L'
+                                                : 'P',
                                             color: child.gender == 'L'
                                                 ? const Color(0xFF3498DB)
                                                 : const Color(0xFFE91E63),
@@ -3925,7 +4817,10 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                                       ),
                                       Text(
                                         'NIK: ${child.nik} • Usia: ${child.ageLabel} (${child.ageInMonths} Bln) • Wali: ${child.parentName}',
-                                        style: GoogleFonts.outfit(fontSize: 10, color: sub),
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 10,
+                                          color: sub,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -3956,7 +4851,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                 decoration: BoxDecoration(
                   color: const Color(0xFF1ABC9C).withValues(alpha: 0.09),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFF1ABC9C).withValues(alpha: 0.35)),
+                  border: Border.all(
+                    color: const Color(0xFF1ABC9C).withValues(alpha: 0.35),
+                  ),
                 ),
                 child: Row(
                   children: [
@@ -4027,12 +4924,18 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                           const SizedBox(height: 3),
                           Text(
                             'NIK: ${_activeChild!.nik} • Usia: ${_activeChild!.ageLabel} (${_activeChild!.ageInMonths} Bulan) • Wali: ${_activeChild!.parentName}',
-                            style: GoogleFonts.outfit(fontSize: 10.5, color: sub),
+                            style: GoogleFonts.outfit(
+                              fontSize: 10.5,
+                              color: sub,
+                            ),
                             overflow: TextOverflow.ellipsis,
                           ),
                           Text(
                             'Alamat: ${_activeChild!.address} • Telp: ${_activeChild!.phone?.isNotEmpty == true ? _activeChild!.phone : "-"}',
-                            style: GoogleFonts.outfit(fontSize: 10, color: sub.withValues(alpha: 0.8)),
+                            style: GoogleFonts.outfit(
+                              fontSize: 10,
+                              color: sub.withValues(alpha: 0.8),
+                            ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ],
@@ -4047,7 +4950,10 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                       },
                       borderRadius: BorderRadius.circular(10),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 8,
+                        ),
                         decoration: BoxDecoration(
                           color: cardBg,
                           borderRadius: BorderRadius.circular(10),
@@ -4056,7 +4962,11 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.swap_horiz_rounded, size: 15, color: text),
+                            Icon(
+                              Icons.swap_horiz_rounded,
+                              size: 15,
+                              color: text,
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               'Ganti Balita',
@@ -4076,7 +4986,10 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
             else ...[
               // Panduan: Belum ada pasien dipilih, pengguna perlu melakukan pencarian pasien terdaftar
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
                   color: Theme.of(context).brightness == Brightness.dark
                       ? const Color(0xFF161924)
@@ -4172,14 +5085,21 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                     overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.outfit(
                       fontSize: 12,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.w600,
                       color: isSelected ? Colors.white : Colors.grey[700],
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5,
+                      vertical: 1,
+                    ),
                     decoration: BoxDecoration(
-                      color: isSelected ? Colors.white.withValues(alpha: 0.2) : badgeColor.withValues(alpha: 0.12),
+                      color: isSelected
+                          ? Colors.white.withValues(alpha: 0.2)
+                          : badgeColor.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
@@ -4203,7 +5123,8 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
   // ===========================================================================
   // MQTT IOT GATEWAY STATUS BAR (HC-SR04 & HX711)
   // ===========================================================================
-  ({String label, String detail, IconData icon, Color color}) _getIotDeviceStatusInfo() {
+  ({String label, String detail, IconData icon, Color color})
+  _getIotDeviceStatusInfo() {
     if (_isMqttConnecting) {
       return (
         label: 'Menghubungkan',
@@ -4239,7 +5160,8 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
       );
     }
 
-    final isStable = _lastMqttTelemetry?['weight']?['is_stable'] == true ||
+    final isStable =
+        _lastMqttTelemetry?['weight']?['is_stable'] == true ||
         _lastMqttTelemetry?['is_stable'] == true;
     final lastWeight = (_lastMqttTelemetry?['weight'] is Map)
         ? (_lastMqttTelemetry?['weight']['val_kg'] as num?)?.toDouble()
@@ -4256,7 +5178,8 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
         color: const Color(0xFF27AE60),
       );
     }
-    if ((lastWeight != null && lastWeight > 0.2) || (lastHeight != null && lastHeight > 0)) {
+    if ((lastWeight != null && lastWeight > 0.2) ||
+        (lastHeight != null && lastHeight > 0)) {
       return (
         label: 'Mengukur (Aktif)',
         detail: '${_mqttService.deviceId} • Menstabilkan...',
@@ -4272,451 +5195,447 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
     );
   }
 
-  Widget _buildMqttStatusBar(Color cardBg, Color border, Color text, Color sub) {
-    final isConnected = _mqttService.isConnected;
-    final statusColor = isConnected
-        ? const Color(0xFF27AE60)
-        : (_isMqttConnecting ? const Color(0xFFF39C12) : const Color(0xFF95A5A6));
-    final deviceStatus = _getIotDeviceStatusInfo();
-
-    final lastWeight = (_lastMqttTelemetry?['weight'] is Map)
-        ? (_lastMqttTelemetry?['weight']['val_kg'] as num?)?.toDouble()
-        : (_lastMqttTelemetry?['val_kg'] as num?)?.toDouble();
-    final isStable = _lastMqttTelemetry?['weight']?['is_stable'] == true ||
-        _lastMqttTelemetry?['is_stable'] == true;
-    final lastHeight = (_lastMqttTelemetry?['height'] is Map)
-        ? (_lastMqttTelemetry?['height']['val_cm'] as num?)?.toDouble()
-        : (_lastMqttTelemetry?['val_cm'] as num?)?.toDouble();
-    final rssi = _lastMqttTelemetry?['rssi_dbm'] as num?;
-
+  Widget _buildStandaloneAppBar({
+    required Color cardBg,
+    required Color border,
+    required Color text,
+    required bool isEn,
+    required bool isMobile,
+  }) {
+    final snapshot = _buildCurrentAppBarSnapshot();
     return Container(
-      padding: const EdgeInsets.all(14),
+      height: 50,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
         color: cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isConnected ? const Color(0xFF27AE60).withValues(alpha: 0.4) : border,
-          width: isConnected ? 1.5 : 1.0,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isNarrow = constraints.maxWidth < 760;
-
-              final infoWidget = Row(
-                mainAxisSize: isNarrow ? MainAxisSize.max : MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: statusColor.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(Icons.sensors_rounded, color: statusColor, size: 20),
-                  ),
-                  const SizedBox(width: 10),
-                  Flexible(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 4,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            Text(
-                              'GATEWAY IOT VITASCALE',
-                              style: GoogleFonts.outfit(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 0.5,
-                                color: text,
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF1ABC9C).withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: const Color(0xFF1ABC9C).withValues(alpha: 0.35)),
-                              ),
-                              child: Text(
-                                'mapotechiotmqtt.vercel.app',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 9.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: const Color(0xFF1ABC9C),
-                                ),
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: statusColor.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: statusColor.withValues(alpha: 0.4)),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    width: 6,
-                                    height: 6,
-                                    decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    isConnected
-                                        ? 'LIVE STREAM'
-                                        : (_isMqttConnecting ? 'MENGHUBUNGKAN...' : 'TERPUTUS'),
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 9.5,
-                                      fontWeight: FontWeight.w800,
-                                      color: statusColor,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Broker: ${_mqttService.broker}:${_mqttService.port} (${_mqttService.connectionProtocolLabel}) • Topik: mapotech/${_mqttService.faskesId}/vitascale/${_mqttService.deviceId} • Acuan: ${_mqttService.poleHeightCm.toStringAsFixed(1)}cm',
-                          style: GoogleFonts.outfit(fontSize: 10.5, color: sub),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              );
-
-              final settingsBtn = Tooltip(
-                message: 'Konfigurasi Fleksibel Broker & Gateway',
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(10),
-                  onTap: _showMqttSettingsDialog,
-                  child: Container(
-                    height: 36,
-                    width: 36,
-                    decoration: BoxDecoration(
-                      color: border.withValues(alpha: 0.18),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: border),
-                    ),
-                    child: Icon(Icons.settings_rounded, size: 18, color: text),
-                  ),
-                ),
-              );
-
-              final tareBtn = OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF3498DB),
-                  side: BorderSide(
-                    color: isConnected
-                        ? const Color(0xFF3498DB).withValues(alpha: 0.55)
-                        : border.withValues(alpha: 0.6),
-                    width: 1.3,
-                  ),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
-                  minimumSize: const Size(0, 36),
-                ),
-                icon: const Icon(Icons.scale_rounded, size: 15),
-                label: Text(
-                  'Nol-kan (Tare)',
-                  style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w700),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                onPressed: isConnected ? _sendMqttTare : null,
-              );
-
-              final applyBtn = (lastHeight != null || lastWeight != null)
-                  ? OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF9B59B6),
-                        side: BorderSide(
-                          color: const Color(0xFF9B59B6).withValues(alpha: 0.55),
-                          width: 1.3,
-                        ),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-                        minimumSize: const Size(0, 36),
-                      ),
-                      icon: const Icon(Icons.assignment_turned_in_rounded, size: 15),
-                      label: Text(
-                        'Terapkan',
-                        style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w700),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      onPressed: () => _applyMqttTelemetryToForm(),
-                    )
-                  : null;
-
-              final connectBtn = isConnected
-                  ? OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFFE74C3C),
-                        side: BorderSide(
-                          color: const Color(0xFFE74C3C).withValues(alpha: 0.6),
-                          width: 1.3,
-                        ),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
-                        minimumSize: const Size(0, 36),
-                      ),
-                      icon: const Icon(Icons.link_off_rounded, size: 15),
-                      label: Text(
-                        'Putuskan',
-                        style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w700),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      onPressed: _isMqttConnecting ? null : _toggleMqttConnection,
-                    )
-                  : ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF1ABC9C),
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
-                        minimumSize: const Size(0, 36),
-                      ),
-                      icon: _isMqttConnecting
-                          ? const SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                            )
-                          : const Icon(Icons.link_rounded, size: 15),
-                      label: Text(
-                        _isMqttConnecting ? 'Menghubungkan...' : 'Hubungkan MQTT',
-                        style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w700),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      onPressed: _isMqttConnecting ? null : _toggleMqttConnection,
-                    );
-
-              // Selalu dalam SATU Row agar Nol-kan (Tare) dan Putuskan sejajar rapi
-              final actionsRow = Row(
-                mainAxisSize: isNarrow ? MainAxisSize.max : MainAxisSize.min,
-                children: [
-                  settingsBtn,
-                  const SizedBox(width: 8),
-                  if (isNarrow) Expanded(child: tareBtn) else tareBtn,
-                  if (applyBtn != null) ...[
-                    const SizedBox(width: 8),
-                    if (isNarrow) Expanded(child: applyBtn) else applyBtn,
-                  ],
-                  const SizedBox(width: 8),
-                  if (isNarrow) Expanded(child: connectBtn) else connectBtn,
-                ],
-              );
-
-              if (isNarrow) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    infoWidget,
-                    const SizedBox(height: 10),
-                    actionsRow,
-                  ],
-                );
-              }
-
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(child: infoWidget),
-                  const SizedBox(width: 12),
-                  actionsRow,
-                ],
-              );
-            },
-          ),
-
-          // Strip Mini Sensor jika terkoneksi
-          if (isConnected) ...[
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: const Color(0xFF27AE60).withValues(alpha: 0.06),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF27AE60).withValues(alpha: 0.2)),
-              ),
-              child: Wrap(
-                spacing: 20,
-                runSpacing: 8,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  // Sensor TB
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.straighten_rounded, size: 18, color: Color(0xFF16A085)),
-                      const SizedBox(width: 6),
-                      Text('TB Ultrasonik: ', style: GoogleFonts.outfit(fontSize: 10.5, color: sub)),
-                      Text(
-                        lastHeight != null ? '${lastHeight.toStringAsFixed(1)} cm' : '-- cm',
-                        style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w800, color: text),
-                      ),
-                    ],
-                  ),
-
-                  // Sensor BB
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.monitor_weight_rounded, size: 18, color: Color(0xFF2980B9)),
-                      const SizedBox(width: 6),
-                      Text('BB Load Cell: ', style: GoogleFonts.outfit(fontSize: 10.5, color: sub)),
-                      Text(
-                        lastWeight != null ? '${lastWeight.toStringAsFixed(2)} kg' : '-- kg',
-                        style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w800, color: text),
-                      ),
-                      if (isStable) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF27AE60).withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text('STABIL', style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.w800, color: const Color(0xFF27AE60))),
-                        ),
-                      ],
-                    ],
-                  ),
-
-                  // Status Alat
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(deviceStatus.icon, size: 16, color: deviceStatus.color),
-                      const SizedBox(width: 4),
-                      Text('Status Alat: ', style: GoogleFonts.outfit(fontSize: 10.5, color: sub)),
-                      Text(
-                        deviceStatus.label,
-                        style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w800, color: deviceStatus.color),
-                      ),
-                    ],
-                  ),
-
-                  // Sinyal WiFi
-                  if (rssi != null)
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.wifi_rounded, size: 16, color: Color(0xFF3498DB)),
-                        const SizedBox(width: 4),
-                        Text('$rssi dBm', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700, color: text)),
-                      ],
-                    ),
-                ],
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  /// Selector Sub-Mode pada Tab 1 (Sensor IoT ESP32 vs Kamera Webcam CV)
-  Widget _buildIotSubTabSelector(Color cardBg, Color border, Color text, Color sub) {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: border.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: border),
+        border: Border(bottom: BorderSide(color: border)),
       ),
       child: Row(
         children: [
-          Expanded(
-            child: InkWell(
-              borderRadius: BorderRadius.circular(10),
-              onTap: () => setState(() => _iotSubTab = 0),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  color: _iotSubTab == 0 ? const Color(0xFF1ABC9C) : Colors.transparent,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.sensors_rounded, size: 18, color: _iotSubTab == 0 ? Colors.white : sub),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Sensor IoT ESP32 (Ultrasonik & Load Cell)',
-                      style: GoogleFonts.outfit(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w700,
-                        color: _iotSubTab == 0 ? Colors.white : text,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+          IconButton(
+            icon: Icon(Icons.arrow_back_rounded, size: 20, color: text),
+            onPressed: () => Navigator.of(context).maybePop(),
           ),
           const SizedBox(width: 6),
           Expanded(
-            child: InkWell(
-              borderRadius: BorderRadius.circular(10),
-              onTap: () => setState(() => _iotSubTab = 1),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  color: _iotSubTab == 1 ? const Color(0xFF3498DB) : Colors.transparent,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.videocam_rounded, size: 18, color: _iotSubTab == 1 ? Colors.white : sub),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Kamera OpenCV CV (Papan Ukur Marker)',
-                      style: GoogleFonts.outfit(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w700,
-                        color: _iotSubTab == 1 ? Colors.white : text,
-                      ),
-                    ),
-                  ],
-                ),
+            child: Text(
+              isEn ? 'CHILD SCREENING' : 'SCREENING ANAK & BAYI',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.outfit(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.8,
+                color: text,
               ),
             ),
+          ),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            child: _isStatusScrolledPast
+                ? VitaScaleAppBarStatusIcons(
+                    key: const ValueKey('standalone_appbar_icons'),
+                    status: snapshot,
+                    isCompact: isMobile,
+                    textColor: text,
+                    borderColor: border,
+                  )
+                : const SizedBox.shrink(key: ValueKey('standalone_appbar_empty')),
           ),
         ],
       ),
     );
   }
 
-  /// Panel Telemetri Lengkap IoT untuk Tab 1
+  /// Status bar ringkas terpadu di bawah stepper (adaptif untuk Manual, IoT MQTT, & Foto PCV).
+  Widget _buildUnifiedStatusStrip({
+    required Color cardBg,
+    required Color border,
+    required Color text,
+    required Color sub,
+    required bool isMobile,
+  }) {
+    final isCloudOnline = _serverStatus?['isOnline'] == true;
+    final cloudColor = isCloudOnline
+        ? const Color(0xFF27AE60)
+        : const Color(0xFFE74C3C);
+    final isMqttConnected = _mqttService.isConnected;
+    final deviceStatus = _getIotDeviceStatusInfo();
+    final rssi = (_lastMqttTelemetry?['rssi_dbm'] as num?)?.toInt();
+    final wifiStyle = _wifiSignalStyle(rssi);
+    final poleHeight =
+        (_lastMqttTelemetry?['height'] is Map &&
+            _lastMqttTelemetry!['height']['pole_height_cm'] != null)
+        ? (_lastMqttTelemetry!['height']['pole_height_cm'] as num).toDouble()
+        : _mqttService.poleHeightCm;
+    final poleLabel = poleHeight % 1 == 0
+        ? poleHeight.toStringAsFixed(0)
+        : poleHeight.toStringAsFixed(1);
+    final isGatewayOnline =
+        _mqttService.isGatewayHealthy || _mqttService.isConnected;
+
+    final statusPills = Wrap(
+      spacing: 10,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        _buildStripMetricChip(
+          icon: isCloudOnline
+              ? Icons.cloud_done_rounded
+              : Icons.cloud_off_rounded,
+          iconColor: cloudColor,
+          label: 'Cloud AI',
+          value: isCloudOnline ? 'Terhubung' : 'Offline',
+          tooltip: 'Backend: ${VitaScaleApiConfig.baseUrl}',
+          text: text,
+          sub: sub,
+          border: border,
+          dotColor: cloudColor,
+        ),
+        if (_activeTab == 1) ...[
+          _buildStripMetricChip(
+            icon: deviceStatus.icon,
+            iconColor: deviceStatus.color,
+            label: 'Alat',
+            value: deviceStatus.label,
+            tooltip: deviceStatus.detail,
+            text: text,
+            sub: sub,
+            border: border,
+            dotColor: deviceStatus.color,
+          ),
+          _buildStripMetricChip(
+            icon: (!isMqttConnected && rssi == null)
+                ? Icons.wifi_off_rounded
+                : wifiStyle.icon,
+            iconColor: (!isMqttConnected && rssi == null)
+                ? const Color(0xFF94A3B8)
+                : wifiStyle.color,
+            label: 'Wi-Fi',
+            value: rssi != null ? '$rssi dBm' : '--',
+            tooltip: rssi != null
+                ? 'Kekuatan sinyal Wi-Fi: $rssi dBm (${wifiStyle.quality})'
+                : 'Belum ada data sinyal Wi-Fi dari ESP32',
+            text: text,
+            sub: sub,
+            border: border,
+          ),
+          _buildStripMetricChip(
+            icon: Icons.height_rounded,
+            iconColor: const Color(0xFF16A085),
+            label: 'Tiang',
+            value: '$poleLabel cm',
+            tooltip: 'Tinggi tiang acuan ultrasonik',
+            text: text,
+            sub: sub,
+            border: border,
+            onTap: _showMqttSettingsDialog,
+          ),
+          _buildStripMetricChip(
+            icon: Icons.public_rounded,
+            iconColor: isGatewayOnline
+                ? const Color(0xFF9B59B6)
+                : const Color(0xFF64748B),
+            label: 'Gateway',
+            value: isGatewayOnline ? 'Online' : 'Siap',
+            tooltip: 'Cloud Gateway: mapotechiotmqtt.vercel.app',
+            text: text,
+            sub: sub,
+            border: border,
+          ),
+        ] else if (_activeTab == 2) ...[
+          _buildStripMetricChip(
+            icon: Icons.camera_enhance_rounded,
+            iconColor: const Color(0xFF1ABC9C),
+            label: 'PCV API',
+            value: 'Online (${_pcvSelectedScale.toStringAsFixed(1)} px/cm)',
+            tooltip: 'Endpoint: https://pcvmapotechs5.vercel.app/measure',
+            text: text,
+            sub: sub,
+            border: border,
+            dotColor: const Color(0xFF2ECC71),
+          ),
+        ],
+      ],
+    );
+
+    final pingAction = Tooltip(
+      message: 'Ping Cloud Backend (${VitaScaleApiConfig.baseUrl})',
+      child: _activeTab == 1
+          ? InkWell(
+              onTap: _isCheckingServer ? null : _checkServer,
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                height: 32,
+                width: 32,
+                decoration: BoxDecoration(
+                  color: cloudColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: cloudColor.withValues(alpha: 0.3)),
+                ),
+                child: Icon(
+                  _isCheckingServer
+                      ? Icons.sync_rounded
+                      : Icons.refresh_rounded,
+                  size: 16,
+                  color: cloudColor,
+                ),
+              ),
+            )
+          : OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: cloudColor,
+                side: BorderSide(color: cloudColor.withValues(alpha: 0.45)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                minimumSize: const Size(0, 32),
+              ),
+              icon: const Icon(Icons.refresh_rounded, size: 15),
+              label: Text(
+                _isCheckingServer ? 'Mengecek...' : 'Ping Server',
+                style: GoogleFonts.outfit(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              onPressed: _isCheckingServer ? null : _checkServer,
+            ),
+    );
+
+    final actionButtons = Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        if (_activeTab == 1) ...[
+          Tooltip(
+            message: 'Ubah Parameter & Wi-Fi Alat',
+            child: InkWell(
+              onTap: _showMqttSettingsDialog,
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                height: 32,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                decoration: BoxDecoration(
+                  color: border.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: border),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.tune_rounded, size: 15, color: text),
+                    if (!isMobile) ...[
+                      const SizedBox(width: 4),
+                      Text(
+                        'Parameter',
+                        style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: text,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF3498DB),
+              side: BorderSide(
+                color: isMqttConnected
+                    ? const Color(0xFF3498DB).withValues(alpha: 0.5)
+                    : border.withValues(alpha: 0.6),
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              minimumSize: const Size(0, 32),
+            ),
+            icon: const Icon(Icons.scale_rounded, size: 14),
+            label: Text(
+              'Tare',
+              style: GoogleFonts.outfit(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            onPressed: isMqttConnected ? _sendMqttTare : null,
+          ),
+          isMqttConnected
+              ? OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFE74C3C),
+                    side: BorderSide(
+                      color: const Color(0xFFE74C3C).withValues(alpha: 0.55),
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    minimumSize: const Size(0, 32),
+                  ),
+                  icon: const Icon(Icons.link_off_rounded, size: 14),
+                  label: Text(
+                    'Putuskan',
+                    style: GoogleFonts.outfit(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  onPressed: _isMqttConnecting ? null : _toggleMqttConnection,
+                )
+              : ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1ABC9C),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    minimumSize: const Size(0, 32),
+                  ),
+                  icon: _isMqttConnecting
+                      ? const SizedBox(
+                          width: 12,
+                          height: 12,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.link_rounded, size: 14),
+                  label: Text(
+                    _isMqttConnecting ? 'Menghubungkan...' : 'Hubungkan MQTT',
+                    style: GoogleFonts.outfit(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  onPressed: _isMqttConnecting ? null : _toggleMqttConnection,
+                ),
+        ],
+        pingAction,
+      ],
+    );
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: (_activeTab == 1 && isMqttConnected)
+              ? const Color(0xFF27AE60).withValues(alpha: 0.35)
+              : border,
+        ),
+      ),
+      child: isMobile
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                statusPills,
+                const SizedBox(height: 10),
+                Align(alignment: Alignment.centerRight, child: actionButtons),
+              ],
+            )
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(child: statusPills),
+                const SizedBox(width: 12),
+                actionButtons,
+              ],
+            ),
+    );
+  }
+
+  Widget _buildStripMetricChip({
+    required IconData icon,
+    required Color iconColor,
+    required String label,
+    required String value,
+    required String tooltip,
+    required Color text,
+    required Color sub,
+    required Color border,
+    Color? dotColor,
+    VoidCallback? onTap,
+  }) {
+    final chip = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: iconColor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(9),
+        border: Border.all(color: border.withValues(alpha: 0.7)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (dotColor != null) ...[
+            Container(
+              width: 7,
+              height: 7,
+              decoration: BoxDecoration(
+                color: dotColor,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 5),
+          ],
+          Icon(icon, size: 14, color: iconColor),
+          const SizedBox(width: 5),
+          Text(
+            '$label: ',
+            style: GoogleFonts.outfit(
+              fontSize: 10.5,
+              color: sub,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          Text(
+            value,
+            style: GoogleFonts.outfit(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: dotColor ?? text,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return Tooltip(
+      message: tooltip,
+      child: onTap != null
+          ? InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(9),
+              child: chip,
+            )
+          : chip,
+    );
+  }
+
+  /// Panel Telemetri Lengkap IoT untuk Langkah 2 pada Tab IoT (MQTT)
   Widget _buildIotTelemetryPanel({
     required Color cardBg,
     required Color border,
     required Color text,
     required Color sub,
     required bool isMobile,
-    required bool isDark,
-    required ScreeningSession? session,
   }) {
     final lastWeight = (_lastMqttTelemetry?['weight'] is Map)
         ? (_lastMqttTelemetry?['weight']['val_kg'] as num?)?.toDouble()
         : (_lastMqttTelemetry?['val_kg'] as num?)?.toDouble();
-    final isStable = _lastMqttTelemetry?['weight']?['is_stable'] == true ||
+    final isStable =
+        _lastMqttTelemetry?['weight']?['is_stable'] == true ||
         _lastMqttTelemetry?['is_stable'] == true;
     final lastHeight = (_lastMqttTelemetry?['height'] is Map)
         ? (_lastMqttTelemetry?['height']['val_cm'] as num?)?.toDouble()
@@ -4724,66 +5643,103 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
     final rawDist = (_lastMqttTelemetry?['height'] is Map)
         ? (_lastMqttTelemetry?['height']['raw_dist_cm'] as num?)?.toDouble()
         : null;
-    final poleHeight = (_lastMqttTelemetry?['height'] is Map && _lastMqttTelemetry!['height']['pole_height_cm'] != null)
+    final poleHeight =
+        (_lastMqttTelemetry?['height'] is Map &&
+            _lastMqttTelemetry!['height']['pole_height_cm'] != null)
         ? (_lastMqttTelemetry!['height']['pole_height_cm'] as num).toDouble()
         : _mqttService.poleHeightCm;
-    final rssi = _lastMqttTelemetry?['rssi_dbm'] as num?;
-    final deviceStatus = _getIotDeviceStatusInfo();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Sesi Info Banner
+        // Slim Info & Auto-Sync Bar
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: session != null
+            color: _mqttService.isConnected
                 ? const Color(0xFF1ABC9C).withValues(alpha: 0.08)
                 : border.withValues(alpha: 0.06),
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: session != null
+              color: _mqttService.isConnected
                   ? const Color(0xFF1ABC9C).withValues(alpha: 0.25)
                   : border,
             ),
           ),
-          child: Row(
+          child: Wrap(
+            spacing: 10,
+            runSpacing: 6,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            alignment: WrapAlignment.spaceBetween,
             children: [
-              Icon(
-                session != null ? Icons.face_rounded : Icons.info_outline_rounded,
-                size: 20,
-                color: session != null ? const Color(0xFF1ABC9C) : sub,
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _mqttService.isConnected
+                        ? Icons.sensors_rounded
+                        : Icons.info_outline_rounded,
+                    size: 16,
+                    color: _mqttService.isConnected
+                        ? const Color(0xFF1ABC9C)
+                        : sub,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _mqttService.isConnected
+                        ? 'Sensor IoT aktif • Siap ukur'
+                        : 'Hubungkan MQTT pada status bar di atas',
+                    style: GoogleFonts.outfit(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: text,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  session != null
-                      ? 'Pasien Aktif: ${session.child.name} (${session.child.ageInMonths} Bulan) • NIK: ${session.child.nik}'
-                      : 'Mode Uji Bebas Perangkat IoT (Tanpa Pasien Terpilih). Data siap dimonitor secara real-time.',
+              FilterChip(
+                avatar: Icon(
+                  _autoSyncIotToForm
+                      ? Icons.sync_rounded
+                      : Icons.sync_disabled_rounded,
+                  size: 14,
+                  color: _autoSyncIotToForm ? const Color(0xFF1ABC9C) : sub,
+                ),
+                label: Text(
+                  _autoSyncIotToForm ? 'Auto-Isi Form: Aktif' : 'Auto-Isi: Off',
                   style: GoogleFonts.outfit(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: text,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.bold,
+                    color: _autoSyncIotToForm ? const Color(0xFF1ABC9C) : text,
                   ),
                 ),
-              ),
-              if (session == null)
-                CustomButton(
-                  text: 'Pilih Pasien',
-                  icon: Icons.person_search_rounded,
-                  height: 30,
-                  primaryColor: const Color(0xFF1ABC9C),
-                  onPressed: _showPatientPickerModal,
+                visualDensity: VisualDensity.compact,
+                selected: _autoSyncIotToForm,
+                selectedColor: const Color(0xFF1ABC9C).withValues(alpha: 0.14),
+                backgroundColor: cardBg,
+                side: BorderSide(
+                  color: _autoSyncIotToForm ? const Color(0xFF1ABC9C) : border,
                 ),
+                onSelected: (val) => setState(() => _autoSyncIotToForm = val),
+              ),
             ],
           ),
         ),
 
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
 
         // 2 Kartu Sensor Utama: Ultrasonik HC-SR04 & Load Cell HX711
         if (isMobile) ...[
-          _buildUltrasonicCard(cardBg, border, text, sub, lastHeight, rawDist, poleHeight, isStable),
+          _buildUltrasonicCard(
+            cardBg,
+            border,
+            text,
+            sub,
+            lastHeight,
+            rawDist,
+            poleHeight,
+            isStable,
+          ),
           const SizedBox(height: 14),
           _buildLoadCellCard(cardBg, border, text, sub, lastWeight, isStable),
         ] else ...[
@@ -4791,131 +5747,61 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: _buildUltrasonicCard(cardBg, border, text, sub, lastHeight, rawDist, poleHeight, isStable),
+                child: _buildUltrasonicCard(
+                  cardBg,
+                  border,
+                  text,
+                  sub,
+                  lastHeight,
+                  rawDist,
+                  poleHeight,
+                  isStable,
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: _buildLoadCellCard(cardBg, border, text, sub, lastWeight, isStable),
+                child: _buildLoadCellCard(
+                  cardBg,
+                  border,
+                  text,
+                  sub,
+                  lastWeight,
+                  isStable,
+                ),
               ),
             ],
           ),
         ],
 
-        const SizedBox(height: 16),
-
-        // Kartu Telemetri Perangkat & Lingkungan (RSSI, Status Alat, Tiang Acuan, Gateway)
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: cardBg,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: border),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.memory_rounded, size: 18, color: Color(0xFF3498DB)),
-                      const SizedBox(width: 8),
-                      Text(
-                        'STATUS TELEMETRI PERANGKAT & JARINGAN',
-                        style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w800, color: text, letterSpacing: 0.5),
-                      ),
-                    ],
-                  ),
-                  InkWell(
-                    onTap: _showMqttSettingsDialog,
-                    borderRadius: BorderRadius.circular(6),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.tune_rounded, size: 14, color: Color(0xFF1ABC9C)),
-                          const SizedBox(width: 4),
-                          Text('Ubah Parameter', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF1ABC9C))),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 24,
-                runSpacing: 12,
-                children: [
-                  _buildTelemetryParamItem(
-                    icon: Icons.wifi_rounded,
-                    iconColor: const Color(0xFF2980B9),
-                    title: 'Sinyal Wi-Fi (RSSI)',
-                    value: rssi != null ? '$rssi dBm' : '-- dBm',
-                    subvalue: rssi != null
-                        ? (rssi > -70 ? 'Sangat Kuat' : 'Stabil')
-                        : (_mqttService.isConnected ? 'Menunggu data' : 'Offline'),
-                    text: text,
-                    sub: sub,
-                  ),
-                  _buildTelemetryParamItem(
-                    icon: deviceStatus.icon,
-                    iconColor: deviceStatus.color,
-                    title: 'Status Alat',
-                    value: deviceStatus.label,
-                    subvalue: deviceStatus.detail,
-                    text: text,
-                    sub: sub,
-                  ),
-                  _buildTelemetryParamItem(
-                    icon: Icons.height_rounded,
-                    iconColor: const Color(0xFF16A085),
-                    title: 'Tiang Acuan Ultrasonik',
-                    value: '${poleHeight.toStringAsFixed(1)} cm',
-                    subvalue: 'Tinggi Maks. Stadiometer',
-                    text: text,
-                    sub: sub,
-                  ),
-                  _buildTelemetryParamItem(
-                    icon: Icons.public_rounded,
-                    iconColor: const Color(0xFF9B59B6),
-                    title: 'Cloud Gateway Vercel',
-                    value: _mqttService.isGatewayHealthy || _mqttService.isConnected ? 'Online' : 'Siap',
-                    subvalue: 'mapotechiotmqtt.vercel.app',
-                    text: text,
-                    sub: sub,
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 18),
+        const SizedBox(height: 14),
 
         // Tombol CTA Terapkan Semua
         SizedBox(
           width: double.infinity,
-          height: 48,
+          height: 44,
           child: ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF1ABC9C),
               foregroundColor: Colors.white,
-              elevation: 2,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              elevation: 1,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
-            icon: const Icon(Icons.flash_on_rounded, size: 20),
+            icon: const Icon(Icons.flash_on_rounded, size: 18),
             label: Text(
-              'Terapkan Seluruh Data Sensor IoT ke Formulir Skrining ⚡',
-              style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w800),
+              'Terapkan Data IoT ke Form',
+              style: GoogleFonts.outfit(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w800,
+              ),
             ),
             onPressed: (lastHeight != null || lastWeight != null)
-                ? () => _applyMqttTelemetryToForm(switchToManualTab: true)
+                ? () => _applyMqttTelemetryToForm()
                 : () {
                     CustomSnackbar.warning(
                       context,
-                      'Sensor belum mengirimkan data. Pastikan perangkat ESP32 menyala dan terhubung.',
+                      'Sensor belum mengirimkan data. Pastikan perangkat ESP32 terhubung.',
                       title: 'Data Belum Tersedia',
                     );
                   },
@@ -4935,8 +5821,17 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
     double poleHeight,
     bool isStable,
   ) {
+    final heightStatusLabel = lastHeight != null
+        ? 'Terukur'
+        : (_mqttService.isConnected ? 'Menunggu' : 'Offline');
+    final heightStatusColor = lastHeight != null
+        ? const Color(0xFF16A085)
+        : (_mqttService.isConnected
+              ? const Color(0xFF3498DB)
+              : const Color(0xFF94A3B8));
+
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: cardBg,
         borderRadius: BorderRadius.circular(18),
@@ -4956,17 +5851,28 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                       color: const Color(0xFF16A085).withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.straighten_rounded, color: Color(0xFF16A085), size: 20),
+                    child: const Icon(
+                      Icons.straighten_rounded,
+                      color: Color(0xFF16A085),
+                      size: 20,
+                    ),
                   ),
                   const SizedBox(width: 10),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'SENSOR TINGGI (HC-SR04)',
-                        style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w800, color: text, letterSpacing: 0.5),
+                        'Tinggi Badan',
+                        style: GoogleFonts.outfit(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: text,
+                        ),
                       ),
-                      Text('Ultrasonik Tiang Stadiometer', style: GoogleFonts.outfit(fontSize: 10, color: sub)),
+                      Text(
+                        'Sensor Ultrasonik',
+                        style: GoogleFonts.outfit(fontSize: 10.5, color: sub),
+                      ),
                     ],
                   ),
                 ],
@@ -4974,36 +5880,47 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF16A085).withValues(alpha: 0.15),
+                  color: heightStatusColor.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  'TRIG: 5 • ECHO: 18',
-                  style: GoogleFonts.outfit(fontSize: 9.5, fontWeight: FontWeight.w700, color: const Color(0xFF16A085)),
+                  heightStatusLabel,
+                  style: GoogleFonts.outfit(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w700,
+                    color: heightStatusColor,
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
           Center(
             child: Column(
               children: [
                 Text(
                   lastHeight != null ? lastHeight.toStringAsFixed(1) : '--.-',
                   style: GoogleFonts.outfit(
-                    fontSize: 44,
+                    fontSize: 42,
                     fontWeight: FontWeight.w900,
                     color: const Color(0xFF16A085),
                     letterSpacing: -1,
                   ),
                 ),
-                Text('Centimeter (cm)', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600, color: sub)),
+                Text(
+                  'cm',
+                  style: GoogleFonts.outfit(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: sub,
+                  ),
+                ),
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
               color: border.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
@@ -5013,18 +5930,29 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Tiang Acuan ($poleHeight cm)', style: GoogleFonts.outfit(fontSize: 10.5, color: sub)),
                     Text(
-                      rawDist != null ? '- Jarak Sensor: ${rawDist.toStringAsFixed(1)} cm' : '- Jarak Sensor: -- cm',
-                      style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.w700, color: text),
+                      'Acuan ${poleHeight.toStringAsFixed(1)} cm',
+                      style: GoogleFonts.outfit(fontSize: 10.5, color: sub),
+                    ),
+                    Text(
+                      rawDist != null
+                          ? 'Jarak: ${rawDist.toStringAsFixed(1)} cm'
+                          : 'Jarak: -- cm',
+                      style: GoogleFonts.outfit(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        color: text,
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 5),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(4),
                   child: LinearProgressIndicator(
-                    value: (lastHeight != null && poleHeight > 0) ? (lastHeight / poleHeight).clamp(0.0, 1.0) : 0.0,
+                    value: (lastHeight != null && poleHeight > 0)
+                        ? (lastHeight / poleHeight).clamp(0.0, 1.0)
+                        : 0.0,
                     backgroundColor: border.withValues(alpha: 0.3),
                     valueColor: const AlwaysStoppedAnimation(Color(0xFF16A085)),
                     minHeight: 6,
@@ -5033,12 +5961,12 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
               ],
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
                 child: CustomButton(
-                  text: 'Salin TB ke Form',
+                  text: 'Salin TB',
                   icon: Icons.check_circle_outline_rounded,
                   height: 36,
                   primaryColor: const Color(0xFF16A085),
@@ -5046,7 +5974,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   onPressed: lastHeight != null
                       ? () {
                           setState(() {
-                            _heightController.text = lastHeight.toStringAsFixed(1);
+                            _heightController.text = lastHeight.toStringAsFixed(
+                              1,
+                            );
                             _smartGrowthResult = null;
                             _reasoningResult = null;
                           });
@@ -5074,8 +6004,31 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
     double? lastWeight,
     bool isStable,
   ) {
+    final isConnected = _mqttService.isConnected;
+    final hasReading = lastWeight != null && lastWeight > 0.1;
+    final String badgeLabel;
+    final Color badgeColor;
+    final String hintText;
+    if (!isConnected && lastWeight == null) {
+      badgeLabel = 'Offline';
+      badgeColor = const Color(0xFF94A3B8);
+      hintText = 'Perangkat belum terhubung';
+    } else if (!hasReading) {
+      badgeLabel = 'Siap';
+      badgeColor = const Color(0xFF1ABC9C);
+      hintText = 'Timbangan kosong, naikkan balita';
+    } else if (isStable) {
+      badgeLabel = 'Stabil';
+      badgeColor = const Color(0xFF27AE60);
+      hintText = 'Pembacaan stabil • Siap disalin';
+    } else {
+      badgeLabel = 'Menimbang...';
+      badgeColor = const Color(0xFFF39C12);
+      hintText = 'Tunggu balita tenang sejenak...';
+    }
+
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: cardBg,
         borderRadius: BorderRadius.circular(18),
@@ -5095,17 +6048,28 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                       color: const Color(0xFF2980B9).withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.monitor_weight_rounded, color: Color(0xFF2980B9), size: 20),
+                    child: const Icon(
+                      Icons.monitor_weight_rounded,
+                      color: Color(0xFF2980B9),
+                      size: 20,
+                    ),
                   ),
                   const SizedBox(width: 10),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'SENSOR BERAT (HX711)',
-                        style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w800, color: text, letterSpacing: 0.5),
+                        'Berat Badan',
+                        style: GoogleFonts.outfit(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: text,
+                        ),
                       ),
-                      Text('4x 50kg Load Cell Wheatstone', style: GoogleFonts.outfit(fontSize: 10, color: sub)),
+                      Text(
+                        'Timbangan Digital',
+                        style: GoogleFonts.outfit(fontSize: 10.5, color: sub),
+                      ),
                     ],
                   ),
                 ],
@@ -5113,7 +6077,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: isStable ? const Color(0xFF27AE60).withValues(alpha: 0.15) : const Color(0xFFF39C12).withValues(alpha: 0.15),
+                  color: badgeColor.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Row(
@@ -5123,17 +6087,17 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                       width: 6,
                       height: 6,
                       decoration: BoxDecoration(
-                        color: isStable ? const Color(0xFF27AE60) : const Color(0xFFF39C12),
+                        color: badgeColor,
                         shape: BoxShape.circle,
                       ),
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      isStable ? 'STABIL (TERKUNCI)' : 'MENGUKUR (GOYANG)',
+                      badgeLabel,
                       style: GoogleFonts.outfit(
                         fontSize: 9.5,
                         fontWeight: FontWeight.w800,
-                        color: isStable ? const Color(0xFF27AE60) : const Color(0xFFF39C12),
+                        color: badgeColor,
                       ),
                     ),
                   ],
@@ -5141,62 +6105,72 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
               ),
             ],
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
           Center(
             child: Column(
               children: [
                 Text(
                   lastWeight != null ? lastWeight.toStringAsFixed(2) : '--.--',
                   style: GoogleFonts.outfit(
-                    fontSize: 44,
+                    fontSize: 42,
                     fontWeight: FontWeight.w900,
                     color: const Color(0xFF2980B9),
                     letterSpacing: -1,
                   ),
                 ),
-                Text('Kilogram (kg)', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600, color: sub)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: border.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Filter Moving Avg 10-sample', style: GoogleFonts.outfit(fontSize: 10.5, color: sub)),
                 Text(
-                  isStable ? 'Toleransi: < ±0.05 kg' : 'Menunggu balita diam...',
+                  'kg',
                   style: GoogleFonts.outfit(
-                    fontSize: 10.5,
+                    fontSize: 11.5,
                     fontWeight: FontWeight.w700,
-                    color: isStable ? const Color(0xFF27AE60) : const Color(0xFFF39C12),
+                    color: sub,
                   ),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: border.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline_rounded, size: 14, color: badgeColor),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    hintText,
+                    style: GoogleFonts.outfit(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w600,
+                      color: hasReading ? badgeColor : sub,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
                 child: CustomButton(
-                  text: 'Nol-kan (Tare)',
+                  text: 'Tare (0 kg)',
                   icon: Icons.scale_rounded,
                   height: 36,
                   primaryColor: const Color(0xFF3498DB),
                   isSecondary: true,
-                  onPressed: _mqttService.isConnected ? _sendMqttTare : null,
+                  onPressed: isConnected ? _sendMqttTare : null,
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: CustomButton(
-                  text: 'Salin BB ke Form',
+                  text: 'Salin BB',
                   icon: Icons.check_circle_outline_rounded,
                   height: 36,
                   primaryColor: const Color(0xFF2980B9),
@@ -5204,7 +6178,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   onPressed: lastWeight != null
                       ? () {
                           setState(() {
-                            _weightController.text = lastWeight.toStringAsFixed(2);
+                            _weightController.text = lastWeight.toStringAsFixed(
+                              2,
+                            );
                             _smartGrowthResult = null;
                             _reasoningResult = null;
                           });
@@ -5224,214 +6200,16 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
     );
   }
 
-  Widget _buildTelemetryParamItem({
-    required IconData icon,
-    required Color iconColor,
-    required String title,
-    required String value,
-    required String subvalue,
-    required Color text,
-    required Color sub,
-  }) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: iconColor.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(icon, size: 18, color: iconColor),
-        ),
-        const SizedBox(width: 10),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: GoogleFonts.outfit(fontSize: 10, color: sub, fontWeight: FontWeight.w600)),
-            Text(value, style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w800, color: text)),
-            Text(subvalue, style: GoogleFonts.outfit(fontSize: 9.5, color: sub)),
-          ],
-        ),
-      ],
-    );
-  }
-
-  /// Banner Ringkas Sinkronisasi IoT pada Formulir Antropometri Manual (Langkah 2)
-  Widget _buildIotQuickSyncBanner(Color cardBg, Color border, Color text, Color sub) {
-    final isConnected = _mqttService.isConnected;
-    final lastWeight = (_lastMqttTelemetry?['weight'] is Map)
-        ? (_lastMqttTelemetry?['weight']['val_kg'] as num?)?.toDouble()
-        : (_lastMqttTelemetry?['val_kg'] as num?)?.toDouble();
-    final lastHeight = (_lastMqttTelemetry?['height'] is Map)
-        ? (_lastMqttTelemetry?['height']['val_cm'] as num?)?.toDouble()
-        : (_lastMqttTelemetry?['val_cm'] as num?)?.toDouble();
-    final isStable = _lastMqttTelemetry?['weight']?['is_stable'] == true ||
-        _lastMqttTelemetry?['is_stable'] == true;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: isConnected ? const Color(0xFF1ABC9C).withValues(alpha: 0.08) : border.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isConnected ? const Color(0xFF1ABC9C).withValues(alpha: 0.3) : border,
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: isConnected ? const Color(0xFF1ABC9C).withValues(alpha: 0.15) : border.withValues(alpha: 0.2),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.sensors_rounded,
-              size: 16,
-              color: isConnected ? const Color(0xFF1ABC9C) : sub,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: isConnected
-                ? Wrap(
-                    spacing: 8,
-                    runSpacing: 4,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      Text(
-                        'Live Stream IoT:',
-                        style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700, color: text),
-                      ),
-                      Text(
-                        'TB = ${lastHeight != null ? '${lastHeight.toStringAsFixed(1)} cm' : '--'}',
-                        style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w800, color: const Color(0xFF16A085)),
-                      ),
-                      Text('•', style: GoogleFonts.outfit(color: sub)),
-                      Text(
-                        'BB = ${lastWeight != null ? '${lastWeight.toStringAsFixed(2)} kg' : '--'}',
-                        style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w800, color: const Color(0xFF2980B9)),
-                      ),
-                      if (isStable)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF27AE60).withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text('STABIL', style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.w800, color: const Color(0xFF27AE60))),
-                        ),
-                    ],
-                  )
-                : Text(
-                    'Perangkat MQTT IoT belum terhubung. Sambungkan untuk mengisi data otomatis dari sensor.',
-                    style: GoogleFonts.outfit(fontSize: 11, color: sub),
-                  ),
-          ),
-          const SizedBox(width: 8),
-          if (isConnected && (lastHeight != null || lastWeight != null))
-            CustomButton(
-              text: 'Isi Otomatis',
-              icon: Icons.flash_on_rounded,
-              height: 30,
-              primaryColor: const Color(0xFF1ABC9C),
-              onPressed: () => _applyMqttTelemetryToForm(),
-            )
-          else
-            CustomButton(
-              text: isConnected ? 'Pengaturan' : 'Hubungkan IoT',
-              icon: isConnected ? Icons.settings_rounded : Icons.link_rounded,
-              height: 30,
-              primaryColor: const Color(0xFF3498DB),
-              isSecondary: true,
-              onPressed: isConnected ? _showMqttSettingsDialog : _toggleMqttConnection,
-            ),
-        ],
-      ),
-    );
-  }
-
-  // ===========================================================================
-  // SERVER STATUS BAR
-  // ===========================================================================
-  Widget _buildServerStatusBar(Color cardBg, Color border, Color text, Color sub) {
-    final isOnline = _serverStatus?['isOnline'] == true;
-    final statusColor = isOnline ? const Color(0xFF27AE60) : const Color(0xFFE74C3C);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: statusColor.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: statusColor.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 10,
-            height: 10,
-            decoration: BoxDecoration(
-              color: statusColor,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      isOnline ? 'VitaScale Cloud Backend (Vercel): TERHUBUNG' : 'VitaScale Cloud Backend: TIDAK TERHUBUNG',
-                      style: GoogleFonts.outfit(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w800,
-                        color: statusColor,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        '(${VitaScaleApiConfig.baseUrl})',
-                        style: GoogleFonts.outfit(fontSize: 10.5, color: sub),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-                Text(
-                  isOnline
-                      ? 'Model MLP stunting (TB/U), status gizi (BB/TB), & Smart Growth aktif di cloud Vercel.'
-                      : 'Periksa koneksi internet atau status hosting di ${VitaScaleApiConfig.baseUrl}.',
-                  style: GoogleFonts.outfit(fontSize: 10, color: sub),
-                ),
-              ],
-            ),
-          ),
-          CustomButton(
-            text: _isCheckingServer ? 'Mengecek...' : 'Ping Server',
-            icon: Icons.refresh_rounded,
-            height: 32,
-            primaryColor: statusColor,
-            isSecondary: true,
-            onPressed: () {
-              if (!_isCheckingServer) {
-                _checkServer();
-              }
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
   // ===========================================================================
   // LANGKAH 1: IDENTITAS BALITA & SASARAN SKRINING
   // ===========================================================================
-  Widget _buildStep1ChildIdentity(Color cardBg, Color border, Color text, Color sub, bool isMobile) {
+  Widget _buildStep1ChildIdentity(
+    Color cardBg,
+    Color border,
+    Color text,
+    Color sub,
+    bool isMobile,
+  ) {
     final isUnder24 = _ageMonths < 24;
 
     return CustomCard(
@@ -5450,7 +6228,11 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   color: const Color(0xFF1ABC9C).withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.person_pin_rounded, size: 20, color: Color(0xFF1ABC9C)),
+                child: const Icon(
+                  Icons.person_pin_rounded,
+                  size: 20,
+                  color: Color(0xFF1ABC9C),
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -5459,7 +6241,11 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   children: [
                     Text(
                       'Langkah 1: Identitas Balita & Sasaran Skrining',
-                      style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w800, color: text),
+                      style: GoogleFonts.outfit(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: text,
+                      ),
                     ),
                     Text(
                       'Data demografi, NIK untuk SATUSEHAT Kemenkes RI, jenis kelamin, dan usia balita.',
@@ -5486,11 +6272,70 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
             runSpacing: 6,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Text('Preset Uji Cepat:', style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.bold, color: sub)),
-              _buildPresetChip('Balita Normal (24 bln)', () => _applyPreset('Normal', jk: 0, usia: 24, bb: 11.5, tb: 85.0, lk: 48.0, lila: 14.5, caraUkur: 'TB', kms: 'N')),
-              _buildPresetChip('Risiko Stunting (24 bln - 2T)', () => _applyPreset('Stunting 2T', jk: 0, usia: 24, bb: 9.2, tb: 76.0, lk: 45.0, lila: 12.0, caraUkur: 'TB', kms: '2T')),
-              _buildPresetChip('Gizi Buruk / BGM (18 bln)', () => _applyPreset('Gizi Buruk BGM', jk: 1, usia: 18, bb: 6.8, tb: 78.0, lk: 43.5, lila: 11.2, caraUkur: 'PB', kms: 'BGM')),
-              _buildPresetChip('Bayi Telentang (8 bln)', () => _applyPreset('Bayi 8 Bln', jk: 0, usia: 8, bb: 8.2, tb: 70.0, lk: 44.0, lila: 14.0, caraUkur: 'PB', kms: 'N')),
+              Text(
+                'Preset Uji Cepat:',
+                style: GoogleFonts.outfit(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.bold,
+                  color: sub,
+                ),
+              ),
+              _buildPresetChip(
+                'Balita Normal (24 bln)',
+                () => _applyPreset(
+                  'Normal',
+                  jk: 0,
+                  usia: 24,
+                  bb: 11.5,
+                  tb: 85.0,
+                  lk: 48.0,
+                  lila: 14.5,
+                  caraUkur: 'TB',
+                  kms: 'N',
+                ),
+              ),
+              _buildPresetChip(
+                'Risiko Stunting (24 bln - 2T)',
+                () => _applyPreset(
+                  'Stunting 2T',
+                  jk: 0,
+                  usia: 24,
+                  bb: 9.2,
+                  tb: 76.0,
+                  lk: 45.0,
+                  lila: 12.0,
+                  caraUkur: 'TB',
+                  kms: '2T',
+                ),
+              ),
+              _buildPresetChip(
+                'Gizi Buruk / BGM (18 bln)',
+                () => _applyPreset(
+                  'Gizi Buruk BGM',
+                  jk: 1,
+                  usia: 18,
+                  bb: 6.8,
+                  tb: 78.0,
+                  lk: 43.5,
+                  lila: 11.2,
+                  caraUkur: 'PB',
+                  kms: 'BGM',
+                ),
+              ),
+              _buildPresetChip(
+                'Bayi Telentang (8 bln)',
+                () => _applyPreset(
+                  'Bayi 8 Bln',
+                  jk: 0,
+                  usia: 8,
+                  bb: 8.2,
+                  tb: 70.0,
+                  lk: 44.0,
+                  lila: 14.0,
+                  caraUkur: 'PB',
+                  kms: 'N',
+                ),
+              ),
             ],
           ),
 
@@ -5518,21 +6363,41 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('NIK Balita (16 Digit - Wajib SATUSEHAT)', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700, color: text)),
+                        Text(
+                          'NIK Balita (16 Digit - Wajib SATUSEHAT)',
+                          style: GoogleFonts.outfit(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: text,
+                          ),
+                        ),
                         if (_satuSehatPatientId != null)
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF27AE60).withValues(alpha: 0.15),
+                              color: const Color(
+                                0xFF27AE60,
+                              ).withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.check_circle_rounded, size: 10, color: Color(0xFF27AE60)),
+                                const Icon(
+                                  Icons.check_circle_rounded,
+                                  size: 10,
+                                  color: Color(0xFF27AE60),
+                                ),
                                 const SizedBox(width: 4),
                                 Text(
                                   'IHS: $_satuSehatPatientId',
-                                  style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.bold, color: const Color(0xFF27AE60)),
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 8.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: const Color(0xFF27AE60),
+                                  ),
                                 ),
                               ],
                             ),
@@ -5558,7 +6423,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                         ),
                         const SizedBox(width: 8),
                         CustomButton(
-                          text: _isCheckingSatuSehatPatient ? 'Cek...' : 'Cek SATUSEHAT',
+                          text: _isCheckingSatuSehatPatient
+                              ? 'Cek...'
+                              : 'Cek SATUSEHAT',
                           icon: Icons.health_and_safety_rounded,
                           height: 42,
                           isSecondary: true,
@@ -5579,124 +6446,14 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
 
           const SizedBox(height: 16),
 
-          // Baris 2: Jenis Kelamin & Usia (Bulan)
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              // Segmented Jenis Kelamin
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Jenis Kelamin Balita',
-                      style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700, color: text),
-                    ),
-                    const SizedBox(height: 6),
-                    Container(
-                      height: 44,
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: border.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: border),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: _buildGenderOption(
-                              label: 'Laki-laki (0)',
-                              icon: Icons.male_rounded,
-                              isSelected: _selectedGender == 0,
-                              onTap: () => setState(() => _selectedGender = 0),
-                              color: const Color(0xFF3498DB),
-                            ),
-                          ),
-                          Expanded(
-                            child: _buildGenderOption(
-                              label: 'Perempuan (1)',
-                              icon: Icons.female_rounded,
-                              isSelected: _selectedGender == 1,
-                              onTap: () => setState(() => _selectedGender = 1),
-                              color: const Color(0xFFE91E63),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(width: 16),
-
-              // Usia dalam Bulan
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Usia Balita (Bulan)',
-                          style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700, color: text),
-                        ),
-                        StatusBadge(
-                          label: isUnder24 ? 'Target: PB Telentang' : 'Target: TB Berdiri',
-                          color: isUnder24 ? const Color(0xFF3498DB) : const Color(0xFFE67E22),
-                          fontSize: 8.5,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        _buildStepperBtn(Icons.remove, () {
-                          if (_ageMonths > 1) {
-                            setState(() {
-                              _ageMonths -= 1;
-                              _ageController.text = _ageMonths.toStringAsFixed(0);
-                              if (_ageMonths < 24 && _measurementMethod == 'TB') _measurementMethod = 'PB';
-                            });
-                          }
-                        }),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: CustomTextField(
-                            label: '',
-                            hintText: 'Bulan',
-                            controller: _ageController,
-                            keyboardType: TextInputType.number,
-                            onChanged: (val) {
-                              final numVal = double.tryParse(val);
-                              if (numVal != null && numVal >= 0) {
-                                setState(() {
-                                  _ageMonths = numVal;
-                                  if (_ageMonths < 24) {
-                                    _measurementMethod = 'PB';
-                                  } else {
-                                    _measurementMethod = 'TB';
-                                  }
-                                });
-                              }
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        _buildStepperBtn(Icons.add, () {
-                          setState(() {
-                            _ageMonths += 1;
-                            _ageController.text = _ageMonths.toStringAsFixed(0);
-                            if (_ageMonths >= 24 && _measurementMethod == 'PB') _measurementMethod = 'TB';
-                          });
-                        }),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
+          // Baris 2: Jenis Kelamin, Tanggal Lahir & Usia (Bulan Otomatis/Manual)
+          _buildGenderAndAgeSection(
+            cardBg: cardBg,
+            border: border,
+            text: text,
+            sub: sub,
+            isUnder24: isUnder24,
+            isMobile: isMobile,
           ),
 
           const SizedBox(height: 16),
@@ -5710,11 +6467,21 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                 children: [
                   Text(
                     'Cara Pengukuran Panjang / Tinggi Badan (Standar Buku KIA 2024)',
-                    style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700, color: text),
+                    style: GoogleFonts.outfit(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: text,
+                    ),
                   ),
                   Text(
-                    isUnder24 ? 'Kemenkes: Usia < 24 bln wajib Telentang (PB)' : 'Kemenkes: Usia ≥ 24 bln wajib Berdiri (TB)',
-                    style: GoogleFonts.outfit(fontSize: 9.5, color: sub, fontStyle: FontStyle.italic),
+                    isUnder24
+                        ? 'Kemenkes: Usia < 24 bln wajib Telentang (PB)'
+                        : 'Kemenkes: Usia ≥ 24 bln wajib Berdiri (TB)',
+                    style: GoogleFonts.outfit(
+                      fontSize: 9.5,
+                      color: sub,
+                      fontStyle: FontStyle.italic,
+                    ),
                   ),
                 ],
               ),
@@ -5744,25 +6511,39 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   ),
                 ],
               ),
-              if ((_ageMonths < 24 && _measurementMethod == 'TB') || (_ageMonths >= 24 && _measurementMethod == 'PB')) ...[
+              if ((_ageMonths < 24 && _measurementMethod == 'TB') ||
+                  (_ageMonths >= 24 && _measurementMethod == 'PB')) ...[
                 const SizedBox(height: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFE67E22).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFFE67E22).withValues(alpha: 0.3)),
+                    border: Border.all(
+                      color: const Color(0xFFE67E22).withValues(alpha: 0.3),
+                    ),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.info_outline_rounded, size: 14, color: Color(0xFFE67E22)),
+                      const Icon(
+                        Icons.info_outline_rounded,
+                        size: 14,
+                        color: Color(0xFFE67E22),
+                      ),
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
                           _measurementMethod == 'TB'
                               ? 'Catatan Buku KIA hal 48: Anak < 2 th diukur berdiri, hasil dikoreksi +0.7 cm agar setara panjang telentang.'
                               : 'Catatan Buku KIA hal 48: Anak ≥ 2 th diukur telentang, hasil dikoreksi -0.7 cm agar setara tinggi berdiri.',
-                          style: GoogleFonts.outfit(fontSize: 9.5, color: const Color(0xFFE67E22), fontWeight: FontWeight.w600),
+                          style: GoogleFonts.outfit(
+                            fontSize: 9.5,
+                            color: const Color(0xFFE67E22),
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ],
@@ -5776,10 +6557,307 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
     );
   }
 
+  Widget _buildGenderAndAgeSection({
+    required Color cardBg,
+    required Color border,
+    required Color text,
+    required Color sub,
+    required bool isUnder24,
+    required bool isMobile,
+  }) {
+    final genderSection = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Jenis Kelamin Balita',
+          style: GoogleFonts.outfit(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: text,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          height: 44,
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: border.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: border),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: _buildGenderOption(
+                  label: 'Laki-laki (0)',
+                  icon: Icons.male_rounded,
+                  isSelected: _selectedGender == 0,
+                  onTap: () => setState(() => _selectedGender = 0),
+                  color: const Color(0xFF3498DB),
+                ),
+              ),
+              Expanded(
+                child: _buildGenderOption(
+                  label: 'Perempuan (1)',
+                  icon: Icons.female_rounded,
+                  isSelected: _selectedGender == 1,
+                  onTap: () => setState(() => _selectedGender = 1),
+                  color: const Color(0xFFE91E63),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+
+    final birthDateSection = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Tanggal Lahir Bayi / Balita',
+          style: GoogleFonts.outfit(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: text,
+          ),
+        ),
+        const SizedBox(height: 6),
+        InkWell(
+          onTap: _pickChildBirthDate,
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            height: 44,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: border),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.cake_rounded,
+                  size: 16,
+                  color: Color(0xFF1ABC9C),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _selectedBirthDate != null
+                        ? _formatDateId(_selectedBirthDate!)
+                        : 'Pilih tanggal lahir',
+                    style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: _selectedBirthDate != null ? text : sub,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Icon(Icons.calendar_today_rounded, size: 14, color: sub),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+
+    final isAutoActive = _isAutoAgeFromBirthDate && _selectedBirthDate != null;
+
+    final ageSection = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 6,
+          runSpacing: 4,
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text(
+              'Usia Balita (Bulan)',
+              style: GoogleFonts.outfit(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: text,
+              ),
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildAgeModeTogglePill(
+                  label: 'Otomatis',
+                  isSelected: isAutoActive,
+                  border: border,
+                  text: text,
+                  onTap: () {
+                    if (_selectedBirthDate != null) {
+                      final months = ChildProfile.calculateCompletedMonths(
+                        _selectedBirthDate!,
+                      );
+                      setState(() {
+                        _isAutoAgeFromBirthDate = true;
+                        _ageMonths = months.toDouble();
+                        _ageController.text = months.toString();
+                        _measurementMethod = months < 24 ? 'PB' : 'TB';
+                      });
+                    } else {
+                      _pickChildBirthDate();
+                    }
+                  },
+                ),
+                const SizedBox(width: 4),
+                _buildAgeModeTogglePill(
+                  label: 'Manual',
+                  isSelected: !isAutoActive,
+                  border: border,
+                  text: text,
+                  onTap: () {
+                    setState(() => _isAutoAgeFromBirthDate = false);
+                  },
+                ),
+                const SizedBox(width: 6),
+                StatusBadge(
+                  label: isUnder24
+                      ? 'Target: PB Telentang'
+                      : 'Target: TB Berdiri',
+                  color: isUnder24
+                      ? const Color(0xFF3498DB)
+                      : const Color(0xFFE67E22),
+                  fontSize: 8.5,
+                ),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            _buildStepperBtn(Icons.remove, () {
+              if (_ageMonths > 0) {
+                setState(() {
+                  _isAutoAgeFromBirthDate = false;
+                  _ageMonths = (_ageMonths - 1).clamp(0, 200);
+                  _ageController.text = _ageMonths.toStringAsFixed(0);
+                  _measurementMethod = _ageMonths < 24 ? 'PB' : 'TB';
+                });
+              }
+            }),
+            const SizedBox(width: 8),
+            Expanded(
+              child: CustomTextField(
+                label: '',
+                hintText: 'Bulan',
+                controller: _ageController,
+                keyboardType: TextInputType.number,
+                onChanged: (val) {
+                  final numVal = double.tryParse(val);
+                  if (numVal != null && numVal >= 0) {
+                    setState(() {
+                      _isAutoAgeFromBirthDate = false;
+                      _ageMonths = numVal;
+                      _measurementMethod = _ageMonths < 24 ? 'PB' : 'TB';
+                    });
+                  }
+                },
+              ),
+            ),
+            const SizedBox(width: 8),
+            _buildStepperBtn(Icons.add, () {
+              setState(() {
+                _isAutoAgeFromBirthDate = false;
+                _ageMonths += 1;
+                _ageController.text = _ageMonths.toStringAsFixed(0);
+                _measurementMethod = _ageMonths < 24 ? 'PB' : 'TB';
+              });
+            }),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          isAutoActive
+              ? 'Otomatis dari tgl lahir (${_formatDateId(_selectedBirthDate!)}) — bertambah hanya saat genap 1 bulan penuh.'
+              : 'Mode manual aktif — ubah angka bulan langsung atau pilih Otomatis dari tanggal lahir.',
+          style: GoogleFonts.outfit(fontSize: 9.5, color: sub),
+        ),
+      ],
+    );
+
+    if (isMobile) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          genderSection,
+          const SizedBox(height: 12),
+          birthDateSection,
+          const SizedBox(height: 12),
+          ageSection,
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(flex: 3, child: genderSection),
+            const SizedBox(width: 14),
+            Expanded(flex: 2, child: birthDateSection),
+          ],
+        ),
+        const SizedBox(height: 14),
+        ageSection,
+      ],
+    );
+  }
+
+  Widget _buildAgeModeTogglePill({
+    required String label,
+    required bool isSelected,
+    required Color border,
+    required Color text,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(100),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? const Color(0xFF1ABC9C)
+              : border.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(100),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF1ABC9C) : border,
+          ),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.outfit(
+            fontSize: 9,
+            fontWeight: FontWeight.bold,
+            color: isSelected ? Colors.white : text,
+          ),
+        ),
+      ),
+    );
+  }
+
   // ===========================================================================
   // LANGKAH 2: PENGUKURAN ANTROPOMETRI FISIK (STANDAR BUKU KIA 2024)
   // ===========================================================================
-  Widget _buildStep2Anthropometry(Color cardBg, Color border, Color text, Color sub, bool isMobile) {
+  Widget _buildStep2Anthropometry(
+    Color cardBg,
+    Color border,
+    Color text,
+    Color sub,
+    bool isMobile,
+  ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return CustomCard(
       color: cardBg,
       borderColor: border,
@@ -5796,7 +6874,11 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   color: const Color(0xFF1ABC9C).withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.straighten_rounded, size: 20, color: Color(0xFF1ABC9C)),
+                child: const Icon(
+                  Icons.straighten_rounded,
+                  size: 20,
+                  color: Color(0xFF1ABC9C),
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -5804,11 +6886,23 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Langkah 2: Pengukuran Antropometri Fisik',
-                      style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w800, color: text),
+                      _activeTab == 1
+                          ? 'Langkah 2: Antropometri IoT'
+                          : (_activeTab == 2
+                                ? 'Langkah 2: Antropometri Foto (PCV)'
+                                : 'Langkah 2: Antropometri Fisik'),
+                      style: GoogleFonts.outfit(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: text,
+                      ),
                     ),
                     Text(
-                      'Pengukuran Berat Badan, Panjang/Tinggi Badan, LiLA, Lingkar Kepala, dan KMS (Standar Buku KIA 2024).',
+                      _activeTab == 1
+                          ? 'Data berat & tinggi terisi otomatis dari sensor MQTT; lengkapi data KIA.'
+                          : (_activeTab == 2
+                                ? 'Ambil foto/kamera lokal untuk ukur Tinggi Badan otomatis via PCV API, lalu lengkapi Berat Badan & data KIA.'
+                                : 'Pengukuran Berat Badan, Panjang/Tinggi Badan, LiLA, Lingkar Kepala, dan KMS (Standar Buku KIA 2024).'),
                       style: GoogleFonts.outfit(fontSize: 10.5, color: sub),
                     ),
                   ],
@@ -5819,8 +6913,28 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
 
           const Divider(height: 24),
 
-          // Banner Cepat Sinkronisasi IoT
-          _buildIotQuickSyncBanner(cardBg, border, text, sub),
+          // Mode-Specific Measurement Panel (IoT MQTT or Photo/Camera PCV)
+          if (_activeTab == 1) ...[
+            _buildIotTelemetryPanel(
+              cardBg: cardBg,
+              border: border,
+              text: text,
+              sub: sub,
+              isMobile: isMobile,
+            ),
+            const Divider(height: 24),
+          ] else if (_activeTab == 2) ...[
+            _buildPcvImageStudioCard(
+              cardBg,
+              border,
+              text,
+              sub,
+              const Color(0xFF1ABC9C),
+              isDark,
+              isMobile,
+            ),
+            const Divider(height: 24),
+          ],
 
           // Baris 1: Berat Badan & Tinggi Badan
           Row(
@@ -5835,19 +6949,32 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                       children: [
                         Text(
                           'Berat Badan Saat Ini (kg)',
-                          style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700, color: text),
+                          style: GoogleFonts.outfit(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: text,
+                          ),
                         ),
-                        Text('LOINC: 29463-7', style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.bold, color: const Color(0xFF009688))),
+                        Text(
+                          'LOINC: 29463-7',
+                          style: GoogleFonts.outfit(
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF009688),
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 6),
                     Row(
                       children: [
                         _buildStepperBtn(Icons.remove, () {
-                          final current = double.tryParse(_weightController.text) ?? 10.0;
+                          final current =
+                              double.tryParse(_weightController.text) ?? 10.0;
                           if (current > 1.0) {
                             setState(() {
-                              _weightController.text = (current - 0.1).toStringAsFixed(1);
+                              _weightController.text = (current - 0.1)
+                                  .toStringAsFixed(1);
                               _smartGrowthResult = null;
                               _reasoningResult = null;
                             });
@@ -5859,7 +6986,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                             label: '',
                             hintText: 'Contoh: 11.5',
                             controller: _weightController,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
                             onChanged: (val) => setState(() {
                               _smartGrowthResult = null;
                               _reasoningResult = null;
@@ -5868,9 +6997,11 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                         ),
                         const SizedBox(width: 8),
                         _buildStepperBtn(Icons.add, () {
-                          final current = double.tryParse(_weightController.text) ?? 10.0;
+                          final current =
+                              double.tryParse(_weightController.text) ?? 10.0;
                           setState(() {
-                            _weightController.text = (current + 0.1).toStringAsFixed(1);
+                            _weightController.text = (current + 0.1)
+                                .toStringAsFixed(1);
                             _smartGrowthResult = null;
                             _reasoningResult = null;
                           });
@@ -5891,16 +7022,29 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                     if (_pcvTinggiCm != null)
                       Container(
                         margin: const EdgeInsets.only(bottom: 5),
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF1ABC9C).withValues(alpha: 0.12),
+                          color: const Color(
+                            0xFF1ABC9C,
+                          ).withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: const Color(0xFF1ABC9C).withValues(alpha: 0.35)),
+                          border: Border.all(
+                            color: const Color(
+                              0xFF1ABC9C,
+                            ).withValues(alpha: 0.35),
+                          ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.auto_awesome_rounded, size: 12, color: Color(0xFF1ABC9C)),
+                            const Icon(
+                              Icons.auto_awesome_rounded,
+                              size: 12,
+                              color: Color(0xFF1ABC9C),
+                            ),
                             const SizedBox(width: 5),
                             Text(
                               'Otomatis Terisi via Foto AI PCV (${_pcvTinggiCm!.toStringAsFixed(1)} cm)',
@@ -5917,12 +7061,24 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          _measurementMethod == 'PB' ? 'Panjang Badan Telentang (cm)' : 'Tinggi Badan Berdiri (cm)',
-                          style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700, color: text),
+                          _measurementMethod == 'PB'
+                              ? 'Panjang Badan Telentang (cm)'
+                              : 'Tinggi Badan Berdiri (cm)',
+                          style: GoogleFonts.outfit(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: text,
+                          ),
                         ),
                         Text(
-                          _measurementMethod == 'PB' ? 'LOINC: 8306-3' : 'LOINC: 8302-2',
-                          style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.bold, color: const Color(0xFF009688)),
+                          _measurementMethod == 'PB'
+                              ? 'LOINC: 8306-3'
+                              : 'LOINC: 8302-2',
+                          style: GoogleFonts.outfit(
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF009688),
+                          ),
                         ),
                       ],
                     ),
@@ -5930,10 +7086,12 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                     Row(
                       children: [
                         _buildStepperBtn(Icons.remove, () {
-                          final current = double.tryParse(_heightController.text) ?? 80.0;
+                          final current =
+                              double.tryParse(_heightController.text) ?? 80.0;
                           if (current > 30.0) {
                             setState(() {
-                              _heightController.text = (current - 0.5).toStringAsFixed(1);
+                              _heightController.text = (current - 0.5)
+                                  .toStringAsFixed(1);
                               _smartGrowthResult = null;
                               _reasoningResult = null;
                             });
@@ -5945,7 +7103,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                             label: '',
                             hintText: 'Contoh: 85.0',
                             controller: _heightController,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
                             onChanged: (val) => setState(() {
                               _smartGrowthResult = null;
                               _reasoningResult = null;
@@ -5954,9 +7114,11 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                         ),
                         const SizedBox(width: 8),
                         _buildStepperBtn(Icons.add, () {
-                          final current = double.tryParse(_heightController.text) ?? 80.0;
+                          final current =
+                              double.tryParse(_heightController.text) ?? 80.0;
                           setState(() {
-                            _heightController.text = (current + 0.5).toStringAsFixed(1);
+                            _heightController.text = (current + 0.5)
+                                .toStringAsFixed(1);
                             _smartGrowthResult = null;
                             _reasoningResult = null;
                           });
@@ -5982,8 +7144,22 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Lingkar Kepala (cm)', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700, color: text)),
-                        Text('LOINC: 9843-4', style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.bold, color: const Color(0xFF009688))),
+                        Text(
+                          'Lingkar Kepala (cm)',
+                          style: GoogleFonts.outfit(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: text,
+                          ),
+                        ),
+                        Text(
+                          'LOINC: 9843-4',
+                          style: GoogleFonts.outfit(
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF009688),
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 6),
@@ -5991,7 +7167,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                       label: '',
                       hintText: 'Nellhaus: 47.0',
                       controller: _headCircumferenceController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                       onChanged: (val) => setState(() {}),
                     ),
                   ],
@@ -6006,8 +7184,22 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('LiLA (cm)', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700, color: text)),
-                        Text('LOINC: 56072-2', style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.bold, color: const Color(0xFF009688))),
+                        Text(
+                          'LiLA (cm)',
+                          style: GoogleFonts.outfit(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: text,
+                          ),
+                        ),
+                        Text(
+                          'LOINC: 56072-2',
+                          style: GoogleFonts.outfit(
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF009688),
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 6),
@@ -6015,7 +7207,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                       label: '',
                       hintText: 'Contoh: 14.5',
                       controller: _lilaController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                       onChanged: (val) => setState(() {}),
                     ),
                   ],
@@ -6030,8 +7224,22 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Lingkar Perut (cm)', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700, color: text)),
-                        Text('LOINC: 8280-0', style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.bold, color: const Color(0xFF009688))),
+                        Text(
+                          'Lingkar Perut (cm)',
+                          style: GoogleFonts.outfit(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: text,
+                          ),
+                        ),
+                        Text(
+                          'LOINC: 8280-0',
+                          style: GoogleFonts.outfit(
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF009688),
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 6),
@@ -6039,7 +7247,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                       label: '',
                       hintText: 'Contoh: 46.0',
                       controller: _waistController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                       onChanged: (val) => setState(() {}),
                     ),
                   ],
@@ -6056,7 +7266,10 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
               final status = _getLilaStatusText(val);
               return Container(
                 margin: const EdgeInsets.only(top: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
@@ -6069,7 +7282,11 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                     Expanded(
                       child: Text(
                         'Pita LiLA Buku KIA 2024: $status',
-                        style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: color),
+                        style: GoogleFonts.outfit(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: color,
+                        ),
                       ),
                     ),
                   ],
@@ -6089,11 +7306,19 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                 children: [
                   Text(
                     'Tren Pertumbuhan KMS Balita (Kartu Menuju Sehat - Buku KIA 2024)',
-                    style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700, color: text),
+                    style: GoogleFonts.outfit(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: text,
+                    ),
                   ),
                   Text(
                     'Deteksi Dini Gagal Tumbuh / Weight Faltering',
-                    style: GoogleFonts.outfit(fontSize: 9.5, color: sub, fontStyle: FontStyle.italic),
+                    style: GoogleFonts.outfit(
+                      fontSize: 9.5,
+                      color: sub,
+                      fontStyle: FontStyle.italic,
+                    ),
                   ),
                 ],
               ),
@@ -6102,11 +7327,31 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  _buildKmsOptionChip('N', 'N (Naik ≥ KBM)', const Color(0xFF27AE60)),
-                  _buildKmsOptionChip('T', 'T (Tidak Naik / Tetap)', const Color(0xFFE67E22)),
-                  _buildKmsOptionChip('2T', '2T (2x Tidak Naik - Red Flag)', const Color(0xFFE74C3C)),
-                  _buildKmsOptionChip('BGM', 'BGM (Bawah Garis Merah - Red Flag)', const Color(0xFFC0392B)),
-                  _buildKmsOptionChip('Baru', 'Pertama Kali Menimbang', const Color(0xFF3498DB)),
+                  _buildKmsOptionChip(
+                    'N',
+                    'N (Naik ≥ KBM)',
+                    const Color(0xFF27AE60),
+                  ),
+                  _buildKmsOptionChip(
+                    'T',
+                    'T (Tidak Naik / Tetap)',
+                    const Color(0xFFE67E22),
+                  ),
+                  _buildKmsOptionChip(
+                    '2T',
+                    '2T (2x Tidak Naik - Red Flag)',
+                    const Color(0xFFE74C3C),
+                  ),
+                  _buildKmsOptionChip(
+                    'BGM',
+                    'BGM (Bawah Garis Merah - Red Flag)',
+                    const Color(0xFFC0392B),
+                  ),
+                  _buildKmsOptionChip(
+                    'Baru',
+                    'Pertama Kali Menimbang',
+                    const Color(0xFF3498DB),
+                  ),
                 ],
               ),
             ],
@@ -6130,15 +7375,22 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                     contentPadding: EdgeInsets.zero,
                     title: Text(
                       'Kapsul Vitamin A',
-                      style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700, color: text),
+                      style: GoogleFonts.outfit(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: text,
+                      ),
                     ),
                     subtitle: Text(
-                      _ageMonths < 12 ? 'Kapsul Biru (100.000 IU)' : 'Kapsul Merah (200.000 IU) - Bulan Feb/Agu',
+                      _ageMonths < 12
+                          ? 'Kapsul Biru (100.000 IU)'
+                          : 'Kapsul Merah (200.000 IU) - Bulan Feb/Agu',
                       style: GoogleFonts.outfit(fontSize: 9.5, color: sub),
                     ),
                     value: _receivedVitA,
                     activeColor: const Color(0xFF1ABC9C),
-                    onChanged: (val) => setState(() => _receivedVitA = val ?? true),
+                    onChanged: (val) =>
+                        setState(() => _receivedVitA = val ?? true),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -6148,15 +7400,24 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                     contentPadding: EdgeInsets.zero,
                     title: Text(
                       'Obat Cacing (Pencegahan)',
-                      style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700, color: text),
+                      style: GoogleFonts.outfit(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: text,
+                      ),
                     ),
                     subtitle: Text(
-                      _ageMonths >= 12 ? 'Diberikan tiap 6 bulan (Usia 1-5 tahun)' : 'Belum usia target (< 12 bulan)',
+                      _ageMonths >= 12
+                          ? 'Diberikan tiap 6 bulan (Usia 1-5 tahun)'
+                          : 'Belum usia target (< 12 bulan)',
                       style: GoogleFonts.outfit(fontSize: 9.5, color: sub),
                     ),
                     value: _ageMonths >= 12 ? _receivedDeworming : false,
                     activeColor: const Color(0xFF1ABC9C),
-                    onChanged: _ageMonths >= 12 ? (val) => setState(() => _receivedDeworming = val ?? true) : null,
+                    onChanged: _ageMonths >= 12
+                        ? (val) =>
+                              setState(() => _receivedDeworming = val ?? true)
+                        : null,
                   ),
                 ),
               ],
@@ -6176,11 +7437,17 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
         decoration: BoxDecoration(
           color: const Color(0xFF1ABC9C).withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFF1ABC9C).withValues(alpha: 0.3)),
+          border: Border.all(
+            color: const Color(0xFF1ABC9C).withValues(alpha: 0.3),
+          ),
         ),
         child: Text(
           label,
-          style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF1ABC9C)),
+          style: GoogleFonts.outfit(
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            color: const Color(0xFF1ABC9C),
+          ),
         ),
       ),
     );
@@ -6252,17 +7519,23 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF1ABC9C).withValues(alpha: 0.12) : Colors.transparent,
+          color: isSelected
+              ? const Color(0xFF1ABC9C).withValues(alpha: 0.12)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? const Color(0xFF1ABC9C) : Colors.grey.withValues(alpha: 0.3),
+            color: isSelected
+                ? const Color(0xFF1ABC9C)
+                : Colors.grey.withValues(alpha: 0.3),
             width: isSelected ? 1.5 : 1.0,
           ),
         ),
         child: Row(
           children: [
             Icon(
-              isSelected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
+              isSelected
+                  ? Icons.radio_button_checked_rounded
+                  : Icons.radio_button_off_rounded,
               size: 18,
               color: isSelected ? const Color(0xFF1ABC9C) : Colors.grey,
             ),
@@ -6278,24 +7551,41 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                         label,
                         style: GoogleFonts.outfit(
                           fontSize: 11.5,
-                          fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                          fontWeight: isSelected
+                              ? FontWeight.w800
+                              : FontWeight.w600,
                         ),
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 1,
+                        ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF1ABC9C).withValues(alpha: 0.15),
+                          color: const Color(
+                            0xFF1ABC9C,
+                          ).withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           loinc,
-                          style: GoogleFonts.outfit(fontSize: 8, fontWeight: FontWeight.bold, color: const Color(0xFF1ABC9C)),
+                          style: GoogleFonts.outfit(
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF1ABC9C),
+                          ),
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 2),
-                  Text(subtext, style: GoogleFonts.outfit(fontSize: 9.5, color: Colors.grey)),
+                  Text(
+                    subtext,
+                    style: GoogleFonts.outfit(
+                      fontSize: 9.5,
+                      color: Colors.grey,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -6349,14 +7639,32 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
       decoration: BoxDecoration(
         color: const Color(0xFF1ABC9C).withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF1ABC9C).withValues(alpha: 0.2)),
+        border: Border.all(
+          color: const Color(0xFF1ABC9C).withValues(alpha: 0.2),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: GoogleFonts.outfit(fontSize: 9.5, color: Colors.grey)),
-          Text(value, style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w800)),
-          Text(code, style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.bold, color: const Color(0xFF1ABC9C))),
+          Text(
+            label,
+            style: GoogleFonts.outfit(fontSize: 9.5, color: Colors.grey),
+          ),
+          Text(
+            value,
+            style: GoogleFonts.outfit(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          Text(
+            code,
+            style: GoogleFonts.outfit(
+              fontSize: 8.5,
+              fontWeight: FontWeight.bold,
+              color: const Color(0xFF1ABC9C),
+            ),
+          ),
         ],
       ),
     );
@@ -6381,7 +7689,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
       decoration: BoxDecoration(
         color: const Color(0xFF1ABC9C).withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF1ABC9C).withValues(alpha: 0.25)),
+        border: Border.all(
+          color: const Color(0xFF1ABC9C).withValues(alpha: 0.25),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -6426,8 +7736,12 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
             child: SizedBox(
               height: 8,
               child: LinearProgressIndicator(
-                backgroundColor: const Color(0xFF1ABC9C).withValues(alpha: 0.15),
-                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF1ABC9C)),
+                backgroundColor: const Color(
+                  0xFF1ABC9C,
+                ).withValues(alpha: 0.15),
+                valueColor: const AlwaysStoppedAnimation<Color>(
+                  Color(0xFF1ABC9C),
+                ),
               ),
             ),
           ),
@@ -6442,10 +7756,13 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                 final stepColor = isDone
                     ? const Color(0xFF27AE60)
                     : isCurrent
-                        ? const Color(0xFF1ABC9C)
-                        : sub.withValues(alpha: 0.5);
+                    ? const Color(0xFF1ABC9C)
+                    : sub.withValues(alpha: 0.5);
                 return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: stepColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
@@ -6455,17 +7772,31 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (isDone)
-                        const Icon(Icons.check_rounded, size: 11, color: Color(0xFF27AE60))
+                        const Icon(
+                          Icons.check_rounded,
+                          size: 11,
+                          color: Color(0xFF27AE60),
+                        )
                       else if (isCurrent)
-                        const Icon(Icons.sync_rounded, size: 11, color: Color(0xFF1ABC9C))
+                        const Icon(
+                          Icons.sync_rounded,
+                          size: 11,
+                          color: Color(0xFF1ABC9C),
+                        )
                       else
-                        Icon(Icons.circle_outlined, size: 9, color: sub.withValues(alpha: 0.5)),
+                        Icon(
+                          Icons.circle_outlined,
+                          size: 9,
+                          color: sub.withValues(alpha: 0.5),
+                        ),
                       const SizedBox(width: 4),
                       Text(
                         steps[idx],
                         style: GoogleFonts.outfit(
                           fontSize: 9.5,
-                          fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
+                          fontWeight: isCurrent
+                              ? FontWeight.bold
+                              : FontWeight.w500,
                           color: stepColor,
                         ),
                       ),
@@ -6483,16 +7814,26 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
   // ===========================================================================
   // LANGKAH 3: KLASIFIKASI MODEL MLP (OTOMATIS) & CLINICAL REASONING (TOMBOL)
   // ===========================================================================
-  Widget _buildStep3ReasoningAndAi(Color cardBg, Color border, Color text, Color sub, bool isMobile) {
+  Widget _buildStep3ReasoningAndAi(
+    Color cardBg,
+    Color border,
+    Color text,
+    Color sub,
+    bool isMobile,
+  ) {
     final bb = double.tryParse(_weightController.text.trim()) ?? 0.0;
     final tb = double.tryParse(_heightController.text.trim()) ?? 0.0;
     final isAntroValid = bb > 0 && tb > 0;
     final isEn = ref.watch(landingPageProvider).language == 'en';
 
     // Otomatis mengeksekusi model MLP (Keras Smart Growth) jika belum dijalankan
-    if (isAntroValid && _smartGrowthResult == null && !_isLoadingClassification) {
+    if (isAntroValid &&
+        _smartGrowthResult == null &&
+        !_isLoadingClassification) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _smartGrowthResult == null && !_isLoadingClassification) {
+        if (mounted &&
+            _smartGrowthResult == null &&
+            !_isLoadingClassification) {
           _runMlpClassification(silent: true);
         }
       });
@@ -6518,7 +7859,11 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                       color: const Color(0xFF1ABC9C).withValues(alpha: 0.12),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.psychology_rounded, size: 22, color: Color(0xFF1ABC9C)),
+                    child: const Icon(
+                      Icons.psychology_rounded,
+                      size: 22,
+                      color: Color(0xFF1ABC9C),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -6531,44 +7876,61 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                               isEn
                                   ? 'Step 3: MLP Classification & Clinical AI Reasoning'
                                   : 'Langkah 3: Klasifikasi MLP & Clinical AI Reasoning',
-                              style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w800, color: text),
+                              style: GoogleFonts.outfit(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                color: text,
+                              ),
                             ),
                             const SizedBox(width: 8),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 7,
+                                vertical: 2.5,
+                              ),
                               decoration: BoxDecoration(
-                                color: (_reasoningResult != null
-                                        ? const Color(0xFF27AE60)
-                                        : (_smartGrowthResult != null
-                                            ? const Color(0xFF1ABC9C)
-                                            : const Color(0xFFF39C12)))
-                                    .withValues(alpha: 0.15),
+                                color:
+                                    (_reasoningResult != null
+                                            ? const Color(0xFF27AE60)
+                                            : (_smartGrowthResult != null
+                                                  ? const Color(0xFF1ABC9C)
+                                                  : const Color(0xFFF39C12)))
+                                        .withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(6),
                                 border: Border.all(
-                                  color: (_reasoningResult != null
-                                          ? const Color(0xFF27AE60)
-                                          : (_smartGrowthResult != null
-                                              ? const Color(0xFF1ABC9C)
-                                              : const Color(0xFFF39C12)))
-                                      .withValues(alpha: 0.3),
+                                  color:
+                                      (_reasoningResult != null
+                                              ? const Color(0xFF27AE60)
+                                              : (_smartGrowthResult != null
+                                                    ? const Color(0xFF1ABC9C)
+                                                    : const Color(0xFFF39C12)))
+                                          .withValues(alpha: 0.3),
                                 ),
                               ),
                               child: Text(
                                 _reasoningResult != null
-                                    ? (isEn ? 'AI Complete (${_reasoningPromptCount}x prompt)' : 'AI Selesai (${_reasoningPromptCount}x diprompt)')
+                                    ? (isEn
+                                          ? 'AI Complete (${_reasoningPromptCount}x prompt)'
+                                          : 'AI Selesai (${_reasoningPromptCount}x diprompt)')
                                     : (_smartGrowthResult != null
-                                        ? (isEn ? 'MLP Auto Done • Reasoning Ready' : 'MLP Selesai (Otomatis) • Reasoning Siap')
-                                        : (_isLoadingClassification
-                                            ? (isEn ? 'Auto Running MLP...' : 'Otomatis Memproses MLP...')
-                                            : (isEn ? 'Disarankan (Opsional)' : 'Disarankan (Opsional)'))),
+                                          ? (isEn
+                                                ? 'MLP Auto Done • Reasoning Ready'
+                                                : 'MLP Selesai (Otomatis) • Reasoning Siap')
+                                          : (_isLoadingClassification
+                                                ? (isEn
+                                                      ? 'Auto Running MLP...'
+                                                      : 'Otomatis Memproses MLP...')
+                                                : (isEn
+                                                      ? 'Disarankan (Opsional)'
+                                                      : 'Disarankan (Opsional)'))),
                                 style: GoogleFonts.outfit(
                                   fontSize: 8.5,
                                   fontWeight: FontWeight.bold,
                                   color: _reasoningResult != null
                                       ? const Color(0xFF27AE60)
                                       : (_smartGrowthResult != null
-                                          ? const Color(0xFF1ABC9C)
-                                          : const Color(0xFFD68910)),
+                                            ? const Color(0xFF1ABC9C)
+                                            : const Color(0xFFD68910)),
                                 ),
                               ),
                             ),
@@ -6584,16 +7946,20 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                     ),
                   ),
                   if (_smartGrowthResult != null) ...[
-                    if (_reasoningResult != null || _reasoningPromptCount > 0) ...[
+                    if (_reasoningResult != null ||
+                        _reasoningPromptCount > 0) ...[
                       CustomButton(
                         text: _isLoadingReasoning
                             ? (isEn ? 'Processing...' : 'Memproses...')
-                            : (isEn ? 'Re-Prompt AI (${_reasoningPromptCount}x)' : 'Prompt Ulang AI (${_reasoningPromptCount}x)'),
+                            : (isEn
+                                  ? 'Re-Prompt AI (${_reasoningPromptCount}x)'
+                                  : 'Prompt Ulang AI (${_reasoningPromptCount}x)'),
                         icon: Icons.refresh_rounded,
                         height: 34,
                         primaryColor: const Color(0xFF1ABC9C),
                         isSecondary: true,
-                        onPressed: (_isLoadingClassification || _isLoadingReasoning)
+                        onPressed:
+                            (_isLoadingClassification || _isLoadingReasoning)
                             ? null
                             : () => _confirmRePromptDialog(),
                       ),
@@ -6627,8 +7993,16 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   sub: sub,
                   icon: Icons.memory_rounded,
                   steps: isEn
-                      ? ['FastAPI Model Link', 'BB/TB & TB/U Inference', 'Confidence Scoring']
-                      : ['Koneksi Model FastAPI', 'Inferensi BB/TB & TB/U', 'Kalkulasi Confidence'],
+                      ? [
+                          'FastAPI Model Link',
+                          'BB/TB & TB/U Inference',
+                          'Confidence Scoring',
+                        ]
+                      : [
+                          'Koneksi Model FastAPI',
+                          'Inferensi BB/TB & TB/U',
+                          'Kalkulasi Confidence',
+                        ],
                   activeStepIndex: 1,
                 ),
               ]
@@ -6639,32 +8013,49 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   decoration: BoxDecoration(
                     color: const Color(0xFFE67E22).withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFE67E22).withValues(alpha: 0.3)),
+                    border: Border.all(
+                      color: const Color(0xFFE67E22).withValues(alpha: 0.3),
+                    ),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.warning_amber_rounded, size: 28, color: Color(0xFFE67E22)),
+                      const Icon(
+                        Icons.warning_amber_rounded,
+                        size: 28,
+                        color: Color(0xFFE67E22),
+                      ),
                       const SizedBox(width: 14),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              isEn ? 'Anthropometry Data Incomplete' : 'Data Antropometri Belum Lengkap',
-                              style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w900, color: const Color(0xFFE67E22)),
+                              isEn
+                                  ? 'Anthropometry Data Incomplete'
+                                  : 'Data Antropometri Belum Lengkap',
+                              style: GoogleFonts.outfit(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w900,
+                                color: const Color(0xFFE67E22),
+                              ),
                             ),
                             Text(
                               isEn
                                   ? 'Please input valid Weight and Height in Step 2 to run automatic MLP classification.'
                                   : 'Harap lengkapi data Berat Badan dan Tinggi/Panjang Badan di Langkah 2 terlebih dahulu agar model MLP dapat berjalan otomatis.',
-                              style: GoogleFonts.outfit(fontSize: 11, color: sub),
+                              style: GoogleFonts.outfit(
+                                fontSize: 11,
+                                color: sub,
+                              ),
                             ),
                           ],
                         ),
                       ),
                       const SizedBox(width: 12),
                       CustomButton(
-                        text: isEn ? '← Back to Step 2' : '← Kembali ke Langkah 2',
+                        text: isEn
+                            ? '← Back to Step 2'
+                            : '← Kembali ke Langkah 2',
                         height: 38,
                         onPressed: () => setState(() => _formStep = 2),
                       ),
@@ -6679,7 +8070,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   decoration: BoxDecoration(
                     color: const Color(0xFF1ABC9C).withValues(alpha: 0.06),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFF1ABC9C).withValues(alpha: 0.25)),
+                    border: Border.all(
+                      color: const Color(0xFF1ABC9C).withValues(alpha: 0.25),
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -6689,10 +8082,16 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                           Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF1ABC9C).withValues(alpha: 0.12),
+                              color: const Color(
+                                0xFF1ABC9C,
+                              ).withValues(alpha: 0.12),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.psychology_alt_rounded, size: 24, color: Color(0xFF1ABC9C)),
+                            child: const Icon(
+                              Icons.psychology_alt_rounded,
+                              size: 24,
+                              color: Color(0xFF1ABC9C),
+                            ),
                           ),
                           const SizedBox(width: 10),
                           Expanded(
@@ -6702,19 +8101,36 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                                 Row(
                                   children: [
                                     Text(
-                                      isEn ? 'Clinical AI Reasoning (Gemini 2.5 Flash)' : 'Penalaran Klinis AI (Gemini 2.5 Flash)',
-                                      style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w900, color: const Color(0xFF16A085)),
+                                      isEn
+                                          ? 'Clinical AI Reasoning (Gemini 2.5 Flash)'
+                                          : 'Penalaran Klinis AI (Gemini 2.5 Flash)',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w900,
+                                        color: const Color(0xFF16A085),
+                                      ),
                                     ),
                                     const SizedBox(width: 6),
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 1.5,
+                                      ),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFFF39C12).withValues(alpha: 0.12),
+                                        color: const Color(
+                                          0xFFF39C12,
+                                        ).withValues(alpha: 0.12),
                                         borderRadius: BorderRadius.circular(5),
                                       ),
                                       child: Text(
-                                        isEn ? 'Optional • Click to Run' : 'Opsional • Tekan Tombol',
-                                        style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.bold, color: const Color(0xFFD68910)),
+                                        isEn
+                                            ? 'Optional • Click to Run'
+                                            : 'Opsional • Tekan Tombol',
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 8.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: const Color(0xFFD68910),
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -6724,7 +8140,10 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                                   isEn
                                       ? 'MLP classification has completed automatically below. To generate pediatrician clinical chain-of-thought, risk factor analysis, and Buku KIA nutritional guidance, press the button below (or proceed to Step 4).'
                                       : 'Klasifikasi model MLP telah berjalan otomatis di bawah. Untuk menghasilkan alur berpikir medis dokter spesialis anak, analisis faktor risiko gizi, dan rekomendasi Buku KIA 2024, silakan tekan tombol di bawah (atau lewati ke Langkah 4).',
-                                  style: GoogleFonts.outfit(fontSize: 10.5, color: sub),
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 10.5,
+                                    color: sub,
+                                  ),
                                 ),
                               ],
                             ),
@@ -6739,15 +8158,32 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                         children: [
                           _buildMiniBadge('Berat Badan', '$bb kg'),
                           _buildMiniBadge('Tinggi Badan', '$tb cm'),
-                          _buildMiniBadge('Usia', '${_ageMonths.toInt()} Bulan'),
-                          _buildMiniBadge('Cara Ukur', _measurementMethod == 'PB' ? 'PB Telentang' : 'TB Berdiri'),
+                          _buildMiniBadge(
+                            'Usia',
+                            '${_ageMonths.toInt()} Bulan',
+                          ),
+                          _buildMiniBadge(
+                            'Cara Ukur',
+                            _measurementMethod == 'PB'
+                                ? 'PB Telentang'
+                                : 'TB Berdiri',
+                          ),
                           if (_lilaController.text.isNotEmpty)
-                            _buildMiniBadge('LiLA', '${_lilaController.text} cm'),
+                            _buildMiniBadge(
+                              'LiLA',
+                              '${_lilaController.text} cm',
+                            ),
                           if (_headCircumferenceController.text.isNotEmpty)
-                            _buildMiniBadge('Lingkar Kepala', '${_headCircumferenceController.text} cm'),
+                            _buildMiniBadge(
+                              'Lingkar Kepala',
+                              '${_headCircumferenceController.text} cm',
+                            ),
                           _buildMiniBadge('Tren KMS', _kmsStatus),
                           if (_smartGrowthResult != null)
-                            _buildMiniBadge('Status Gizi MLP', _smartGrowthResult!.kategoriGiziBbtb),
+                            _buildMiniBadge(
+                              'Status Gizi MLP',
+                              _smartGrowthResult!.kategoriGiziBbtb,
+                            ),
                         ],
                       ),
                       const SizedBox(height: 16),
@@ -6770,7 +8206,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                           Expanded(
                             flex: 2,
                             child: CustomButton(
-                              text: isEn ? 'Next to Step 4 (SATUSEHAT) ➔' : 'Lanjut ke Langkah 4 ➔',
+                              text: isEn
+                                  ? 'Next to Step 4 (SATUSEHAT) ➔'
+                                  : 'Lanjut ke Langkah 4 ➔',
                               isSecondary: true,
                               height: 46,
                               onPressed: () => setState(() => _formStep = 4),
@@ -6797,44 +8235,80 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   sub: sub,
                   icon: Icons.psychology_rounded,
                   steps: isEn
-                      ? ['Child Anthropometric Data', 'Gemini 2.5 Flash Reasoning', 'KIA Nutritional Action Plan']
-                      : ['Data Antropometri Balita', 'Penalaran Gemini 2.5 Flash', 'Rekomendasi Intervensi Gizi KIA'],
+                      ? [
+                          'Child Anthropometric Data',
+                          'Gemini 2.5 Flash Reasoning',
+                          'KIA Nutritional Action Plan',
+                        ]
+                      : [
+                          'Data Antropometri Balita',
+                          'Penalaran Gemini 2.5 Flash',
+                          'Rekomendasi Intervensi Gizi KIA',
+                        ],
                   activeStepIndex: 1,
                 ),
               ]
               // 5. Reasoning Completed Success Banner
               else ...[
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF27AE60).withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF27AE60).withValues(alpha: 0.3)),
+                    border: Border.all(
+                      color: const Color(0xFF27AE60).withValues(alpha: 0.3),
+                    ),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.check_circle_rounded, size: 18, color: Color(0xFF27AE60)),
+                      const Icon(
+                        Icons.check_circle_rounded,
+                        size: 18,
+                        color: Color(0xFF27AE60),
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           isEn
                               ? '✅ MLP Model Classification & Clinical AI Reasoning Complete (Prompted $_reasoningPromptCount time(s)). You may Re-Prompt or proceed to Step 4.'
                               : '✅ Klasifikasi Model MLP & Clinical Reasoning AI Selesai (Sudah diprompt $_reasoningPromptCount kali). Anda dapat melakukan Prompt Ulang atau lanjut ke Langkah 4 untuk Simpan.',
-                          style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.bold, color: const Color(0xFF27AE60)),
+                          style: GoogleFonts.outfit(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF27AE60),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 8),
                       OutlinedButton.icon(
                         style: OutlinedButton.styleFrom(
                           side: const BorderSide(color: Color(0xFF27AE60)),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
                         ),
                         onPressed: () => _confirmRePromptDialog(),
-                        icon: const Icon(Icons.refresh_rounded, size: 14, color: Color(0xFF27AE60)),
+                        icon: const Icon(
+                          Icons.refresh_rounded,
+                          size: 14,
+                          color: Color(0xFF27AE60),
+                        ),
                         label: Text(
-                          isEn ? 'Re-Prompt (${_reasoningPromptCount}x)' : 'Prompt Ulang (${_reasoningPromptCount}x)',
-                          style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF27AE60)),
+                          isEn
+                              ? 'Re-Prompt (${_reasoningPromptCount}x)'
+                              : 'Prompt Ulang (${_reasoningPromptCount}x)',
+                          style: GoogleFonts.outfit(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF27AE60),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -6842,14 +8316,27 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF27AE60),
                           foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
                         ),
                         onPressed: () => setState(() => _formStep = 4),
-                        icon: const Icon(Icons.arrow_forward_rounded, size: 14, color: Colors.white),
+                        icon: const Icon(
+                          Icons.arrow_forward_rounded,
+                          size: 14,
+                          color: Colors.white,
+                        ),
                         label: Text(
                           isEn ? 'Step 4 ➔' : 'Langkah 4 ➔',
-                          style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.white),
+                          style: GoogleFonts.outfit(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ],
@@ -6878,11 +8365,19 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
   // ===========================================================================
   // LANGKAH 4: INTEROPERABILITAS SATUSEHAT KEMENKES RI (FHIR R4) & SIMPAN
   // ===========================================================================
-  Widget _buildStep4SatuSehatAndSave(Color cardBg, Color border, Color text, Color sub, bool isMobile) {
+  Widget _buildStep4SatuSehatAndSave(
+    Color cardBg,
+    Color border,
+    Color text,
+    Color sub,
+    bool isMobile,
+  ) {
     final bb = _weightController.text;
     final tb = _heightController.text;
     final isRecumbent = _measurementMethod == 'PB';
-    final tbLoinc = isRecumbent ? '8306-3 (Body height --lying)' : '8302-2 (Body height)';
+    final tbLoinc = isRecumbent
+        ? '8306-3 (Body height --lying)'
+        : '8302-2 (Body height)';
     final syncRes = _satuSehatSyncResult;
     final hasAi = _smartGrowthResult != null && _reasoningResult != null;
 
@@ -6905,7 +8400,11 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                       color: const Color(0xFF009688).withValues(alpha: 0.12),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.cloud_sync_rounded, size: 22, color: Color(0xFF009688)),
+                    child: const Icon(
+                      Icons.cloud_sync_rounded,
+                      size: 22,
+                      color: Color(0xFF009688),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -6916,18 +8415,31 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                           children: [
                             Text(
                               'Langkah 4: Interoperabilitas SATUSEHAT Kemenkes RI',
-                              style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w900, color: text),
+                              style: GoogleFonts.outfit(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w900,
+                                color: text,
+                              ),
                             ),
                             const SizedBox(width: 8),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF009688).withValues(alpha: 0.15),
+                                color: const Color(
+                                  0xFF009688,
+                                ).withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
                                 'FHIR R4 Standard',
-                                style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.bold, color: const Color(0xFF009688)),
+                                style: GoogleFonts.outfit(
+                                  fontSize: 8.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: const Color(0xFF009688),
+                                ),
                               ),
                             ),
                           ],
@@ -6957,21 +8469,41 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   runSpacing: 10,
                   children: [
                     _buildLoincBadge('Berat Badan', '$bb kg', 'LOINC 29463-7'),
-                    _buildLoincBadge(isRecumbent ? 'Panjang Badan' : 'Tinggi Badan', '$tb cm', 'LOINC $tbLoinc'),
+                    _buildLoincBadge(
+                      isRecumbent ? 'Panjang Badan' : 'Tinggi Badan',
+                      '$tb cm',
+                      'LOINC $tbLoinc',
+                    ),
                     if (_headCircumferenceController.text.isNotEmpty)
-                      _buildLoincBadge('Lingkar Kepala', '${_headCircumferenceController.text} cm', 'LOINC 9843-4'),
+                      _buildLoincBadge(
+                        'Lingkar Kepala',
+                        '${_headCircumferenceController.text} cm',
+                        'LOINC 9843-4',
+                      ),
                     if (_lilaController.text.isNotEmpty)
-                      _buildLoincBadge('LiLA', '${_lilaController.text} cm', 'LOINC 56072-2'),
+                      _buildLoincBadge(
+                        'LiLA',
+                        '${_lilaController.text} cm',
+                        'LOINC 56072-2',
+                      ),
                     if (_waistController.text.isNotEmpty)
-                      _buildLoincBadge('Lingkar Perut', '${_waistController.text} cm', 'LOINC 8280-0'),
+                      _buildLoincBadge(
+                        'Lingkar Perut',
+                        '${_waistController.text} cm',
+                        'LOINC 8280-0',
+                      ),
                     _buildLoincBadge(
                       'Diagnosis Gizi',
                       _smartGrowthResult?.isStunting == true
                           ? 'Stunting'
-                          : (_smartGrowthResult?.isGiziBurukAtauKurang == true ? 'Gizi Kurang' : 'Normal'),
+                          : (_smartGrowthResult?.isGiziBurukAtauKurang == true
+                                ? 'Gizi Kurang'
+                                : 'Normal'),
                       _smartGrowthResult?.isStunting == true
                           ? 'ICD-10 E45'
-                          : (_smartGrowthResult?.isGiziBurukAtauKurang == true ? 'ICD-10 E44.0' : 'ICD-10 Z00.1'),
+                          : (_smartGrowthResult?.isGiziBurukAtauKurang == true
+                                ? 'ICD-10 E44.0'
+                                : 'ICD-10 Z00.1'),
                     ),
                   ],
                 ),
@@ -6986,11 +8518,17 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   decoration: BoxDecoration(
                     color: const Color(0xFF27AE60).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF27AE60).withValues(alpha: 0.3)),
+                    border: Border.all(
+                      color: const Color(0xFF27AE60).withValues(alpha: 0.3),
+                    ),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.check_circle_rounded, size: 20, color: Color(0xFF27AE60)),
+                      const Icon(
+                        Icons.check_circle_rounded,
+                        size: 20,
+                        color: Color(0xFF27AE60),
+                      ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Column(
@@ -6998,11 +8536,18 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                           children: [
                             Text(
                               'Observasi Antropometri Terverifikasi SATUSEHAT',
-                              style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color(0xFF27AE60)),
+                              style: GoogleFonts.outfit(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFF27AE60),
+                              ),
                             ),
                             Text(
                               'Mode: ${syncRes['mode']} • Encounter ID: ${syncRes['encounter_id']} • Patient ID: ${syncRes['patient_id']}',
-                              style: GoogleFonts.outfit(fontSize: 10, color: sub),
+                              style: GoogleFonts.outfit(
+                                fontSize: 10,
+                                color: sub,
+                              ),
                             ),
                           ],
                         ),
@@ -7049,7 +8594,11 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                       color: const Color(0xFF27AE60).withValues(alpha: 0.12),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.assignment_turned_in_rounded, size: 20, color: Color(0xFF27AE60)),
+                    child: const Icon(
+                      Icons.assignment_turned_in_rounded,
+                      size: 20,
+                      color: Color(0xFF27AE60),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -7058,7 +8607,11 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                       children: [
                         Text(
                           'Ringkasan Akhir & Simpan Rekam Medis',
-                          style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w800, color: text),
+                          style: GoogleFonts.outfit(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: text,
+                          ),
                         ),
                         Text(
                           'Pastikan data balita dan hasil AI telah ditinjau sebelum disimpan ke database.',
@@ -7075,12 +8628,41 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
               // Preview Data
               _buildReviewRow('Nama Balita', _nameController.text, sub, text),
               _buildReviewRow('NIK Balita', _nikController.text, sub, text),
-              _buildReviewRow('Jenis Kelamin / Usia', '${_selectedGender == 0 ? "Laki-laki" : "Perempuan"} • ${_ageMonths.toInt()} Bulan', sub, text),
+              _buildReviewRow(
+                'Jenis Kelamin / Usia',
+                '${_selectedGender == 0 ? "Laki-laki" : "Perempuan"} • ${_ageMonths.toInt()} Bulan',
+                sub,
+                text,
+              ),
               _buildReviewRow('Berat & Tinggi', '$bb kg / $tb cm', sub, text),
-              _buildReviewRow('LiLA & Lingkar Kepala', '${_lilaController.text} cm / ${_headCircumferenceController.text} cm', sub, text),
-              _buildReviewRow('Status Gizi BB/TB', _smartGrowthResult?.kategoriGiziBbtb ?? 'Belum Dianalisis', sub, text, isBold: true),
-              _buildReviewRow('Status Stunting TB/U', _smartGrowthResult?.kategoriStuntingTbu ?? 'Belum Dianalisis', sub, text, isBold: true),
-              _buildReviewRow('Clinical AI Reasoning', hasAi ? 'Tersedia (${_reasoningResult!.modelUsed} - ${_reasoningPromptCount}x diprompt)' : 'Belum Dijalankan (Opsional)', sub, text),
+              _buildReviewRow(
+                'LiLA & Lingkar Kepala',
+                '${_lilaController.text} cm / ${_headCircumferenceController.text} cm',
+                sub,
+                text,
+              ),
+              _buildReviewRow(
+                'Status Gizi BB/TB',
+                _smartGrowthResult?.kategoriGiziBbtb ?? 'Belum Dianalisis',
+                sub,
+                text,
+                isBold: true,
+              ),
+              _buildReviewRow(
+                'Status Stunting TB/U',
+                _smartGrowthResult?.kategoriStuntingTbu ?? 'Belum Dianalisis',
+                sub,
+                text,
+                isBold: true,
+              ),
+              _buildReviewRow(
+                'Clinical AI Reasoning',
+                hasAi
+                    ? 'Tersedia (${_reasoningResult!.modelUsed} - ${_reasoningPromptCount}x diprompt)'
+                    : 'Belum Dijalankan (Opsional)',
+                sub,
+                text,
+              ),
 
               const SizedBox(height: 20),
 
@@ -7124,7 +8706,11 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
           ? Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _buildScreeningValidationStatusPill(redErrors, yellowWarnings, subtitleColor),
+                _buildScreeningValidationStatusPill(
+                  redErrors,
+                  yellowWarnings,
+                  subtitleColor,
+                ),
                 const SizedBox(height: 12),
                 Row(
                   children: [
@@ -7133,18 +8719,25 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                         child: OutlinedButton.icon(
                           style: OutlinedButton.styleFrom(
                             side: BorderSide(color: borderColor),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                             padding: const EdgeInsets.symmetric(vertical: 12),
                           ),
                           onPressed: () => setState(() => _formStep--),
                           icon: const Icon(Icons.arrow_back_rounded, size: 14),
-                          label: Text('Sebelumnya', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: textColor)),
+                          label: Text(
+                            'Sebelumnya',
+                            style: GoogleFonts.outfit(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: textColor,
+                            ),
+                          ),
                         ),
                       ),
                     if (_formStep > 1) const SizedBox(width: 8),
-                    Expanded(
-                      child: _buildFooterActionButton(hasAi, redErrors),
-                    ),
+                    Expanded(child: _buildFooterActionButton(hasAi, redErrors)),
                   ],
                 ),
               ],
@@ -7157,21 +8750,34 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
                       side: BorderSide(color: borderColor),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                     ),
                     onPressed: () => setState(() => _formStep--),
                     icon: const Icon(Icons.arrow_back_rounded, size: 16),
                     label: Text(
                       '← Sebelumnya',
-                      style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: textColor),
+                      style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: textColor,
+                      ),
                     ),
                   )
                 else
                   const SizedBox.shrink(),
 
                 // Center: Clickable Validation Status Pill
-                _buildScreeningValidationStatusPill(redErrors, yellowWarnings, subtitleColor),
+                _buildScreeningValidationStatusPill(
+                  redErrors,
+                  yellowWarnings,
+                  subtitleColor,
+                ),
 
                 // Right: Action Button
                 Row(
@@ -7180,14 +8786,27 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                     OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(
                         side: const BorderSide(color: Color(0xFF1ABC9C)),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
                       ),
                       onPressed: _showReviewAndSubmitDialog,
-                      icon: const Icon(Icons.fact_check_rounded, size: 16, color: Color(0xFF1ABC9C)),
+                      icon: const Icon(
+                        Icons.fact_check_rounded,
+                        size: 16,
+                        color: Color(0xFF1ABC9C),
+                      ),
                       label: Text(
                         'Review Validasi',
-                        style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF1ABC9C)),
+                        style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF1ABC9C),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -7199,7 +8818,10 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
     );
   }
 
-  Widget _buildFooterActionButton(bool hasAi, List<Map<String, dynamic>> redErrors) {
+  Widget _buildFooterActionButton(
+    bool hasAi,
+    List<Map<String, dynamic>> redErrors,
+  ) {
     final isEn = ref.watch(landingPageProvider).language == 'en';
 
     if (_formStep < 3) {
@@ -7207,7 +8829,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFF1ABC9C),
           foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           elevation: 2,
         ),
@@ -7218,10 +8842,18 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
             _checkAndAutoRunMlp();
           }
         },
-        icon: const Icon(Icons.arrow_forward_rounded, size: 16, color: Colors.white),
+        icon: const Icon(
+          Icons.arrow_forward_rounded,
+          size: 16,
+          color: Colors.white,
+        ),
         label: Text(
           isEn ? 'Next ➔' : 'Selanjutnya ➔',
-          style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+          style: GoogleFonts.outfit(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
         ),
       );
     } else if (_formStep == 3) {
@@ -7232,16 +8864,29 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
             OutlinedButton.icon(
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: Color(0xFF1ABC9C)),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
               ),
               onPressed: () => setState(() => _formStep = 4),
-              icon: const Icon(Icons.arrow_forward_rounded, size: 16, color: Color(0xFF1ABC9C)),
+              icon: const Icon(
+                Icons.arrow_forward_rounded,
+                size: 16,
+                color: Color(0xFF1ABC9C),
+              ),
               label: Text(
                 _smartGrowthResult != null
                     ? (isEn ? 'Next to Step 4 ➔' : 'Lanjut ke Langkah 4 ➔')
                     : (isEn ? 'Skip ➔' : 'Lewati ➔'),
-                style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF1ABC9C)),
+                style: GoogleFonts.outfit(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF1ABC9C),
+                ),
               ),
             ),
             const SizedBox(width: 8),
@@ -7249,8 +8894,13 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF1ABC9C),
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 elevation: 2,
               ),
               onPressed: (_isLoadingClassification || _isLoadingReasoning)
@@ -7259,15 +8909,31 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                       _runReasoningOnly();
                     },
               icon: (_isLoadingClassification || _isLoadingReasoning)
-                  ? const Icon(Icons.sync_rounded, size: 16, color: Colors.white)
-                  : const Icon(Icons.psychology_rounded, size: 16, color: Colors.white),
+                  ? const Icon(
+                      Icons.sync_rounded,
+                      size: 16,
+                      color: Colors.white,
+                    )
+                  : const Icon(
+                      Icons.psychology_rounded,
+                      size: 16,
+                      color: Colors.white,
+                    ),
               label: Text(
                 _isLoadingReasoning
-                    ? (isEn ? 'Processing Reasoning...' : 'Memproses Reasoning...')
+                    ? (isEn
+                          ? 'Processing Reasoning...'
+                          : 'Memproses Reasoning...')
                     : (_isLoadingClassification
-                        ? (isEn ? 'Classifying MLP...' : 'Memproses MLP...')
-                        : (isEn ? 'Run Reasoning AI ➔' : 'Jalankan Reasoning Gemini ➔')),
-                style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                          ? (isEn ? 'Classifying MLP...' : 'Memproses MLP...')
+                          : (isEn
+                                ? 'Run Reasoning AI ➔'
+                                : 'Jalankan Reasoning Gemini ➔')),
+                style: GoogleFonts.outfit(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
             ),
           ],
@@ -7279,14 +8945,29 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
             OutlinedButton.icon(
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: Color(0xFF1ABC9C)),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
+                ),
               ),
               onPressed: () => _confirmRePromptDialog(),
-              icon: const Icon(Icons.refresh_rounded, size: 15, color: Color(0xFF1ABC9C)),
+              icon: const Icon(
+                Icons.refresh_rounded,
+                size: 15,
+                color: Color(0xFF1ABC9C),
+              ),
               label: Text(
-                isEn ? 'Re-Prompt (${_reasoningPromptCount}x)' : 'Prompt Ulang (${_reasoningPromptCount}x)',
-                style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF1ABC9C)),
+                isEn
+                    ? 'Re-Prompt (${_reasoningPromptCount}x)'
+                    : 'Prompt Ulang (${_reasoningPromptCount}x)',
+                style: GoogleFonts.outfit(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF1ABC9C),
+                ),
               ),
             ),
             const SizedBox(width: 8),
@@ -7294,15 +8975,28 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF1ABC9C),
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 12,
+                ),
                 elevation: 2,
               ),
               onPressed: () => setState(() => _formStep = 4),
-              icon: const Icon(Icons.arrow_forward_rounded, size: 16, color: Colors.white),
+              icon: const Icon(
+                Icons.arrow_forward_rounded,
+                size: 16,
+                color: Colors.white,
+              ),
               label: Text(
                 isEn ? 'Next (SATUSEHAT) ➔' : 'Selanjutnya (SATUSEHAT) ➔',
-                style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                style: GoogleFonts.outfit(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
             ),
           ],
@@ -7311,17 +9005,29 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
     } else {
       return ElevatedButton.icon(
         style: ElevatedButton.styleFrom(
-          backgroundColor: redErrors.isNotEmpty ? const Color(0xFFE74C3C) : const Color(0xFF27AE60),
+          backgroundColor: redErrors.isNotEmpty
+              ? const Color(0xFFE74C3C)
+              : const Color(0xFF27AE60),
           foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
           elevation: 2,
         ),
         onPressed: _showReviewAndSubmitDialog,
-        icon: const Icon(Icons.cloud_upload_rounded, color: Colors.white, size: 16),
+        icon: const Icon(
+          Icons.cloud_upload_rounded,
+          color: Colors.white,
+          size: 16,
+        ),
         label: Text(
           'Review & Simpan 💾',
-          style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+          style: GoogleFonts.outfit(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
         ),
       );
     }
@@ -7378,7 +9084,11 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
             const SizedBox(width: 6),
             Text(
               badgeText,
-              style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.bold, color: badgeColor),
+              style: GoogleFonts.outfit(
+                fontSize: 10.5,
+                fontWeight: FontWeight.bold,
+                color: badgeColor,
+              ),
             ),
           ],
         ),
@@ -7392,13 +9102,25 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
       decoration: BoxDecoration(
         color: const Color(0xFF1ABC9C).withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: const Color(0xFF1ABC9C).withValues(alpha: 0.2)),
+        border: Border.all(
+          color: const Color(0xFF1ABC9C).withValues(alpha: 0.2),
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('$label: ', style: GoogleFonts.outfit(fontSize: 9.5, color: Colors.grey)),
-          Text(value, style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF1ABC9C))),
+          Text(
+            '$label: ',
+            style: GoogleFonts.outfit(fontSize: 9.5, color: Colors.grey),
+          ),
+          Text(
+            value,
+            style: GoogleFonts.outfit(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: const Color(0xFF1ABC9C),
+            ),
+          ),
         ],
       ),
     );
@@ -7407,7 +9129,13 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
   // ===========================================================================
   // HASIL KLASIFIKASI MODEL MLP
   // ===========================================================================
-  Widget _buildMlpClassificationResult(Color cardBg, Color border, Color text, Color sub, bool isMobile) {
+  Widget _buildMlpClassificationResult(
+    Color cardBg,
+    Color border,
+    Color text,
+    Color sub,
+    bool isMobile,
+  ) {
     final sg = _smartGrowthResult;
 
     final kategoriGizi = sg?.kategoriGiziBbtb ?? 'Gizi Normal';
@@ -7424,7 +9152,8 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
       giziColor = const Color(0xFFE74C3C);
     } else if (kategoriGizi.contains('Kurang')) {
       giziColor = const Color(0xFFE67E22);
-    } else if (kategoriGizi.contains('Lebih') || kategoriGizi.contains('Obesitas')) {
+    } else if (kategoriGizi.contains('Lebih') ||
+        kategoriGizi.contains('Obesitas')) {
       giziColor = const Color(0xFF9B59B6);
     }
 
@@ -7453,7 +9182,11 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   color: const Color(0xFF27AE60).withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.verified_rounded, size: 22, color: Color(0xFF27AE60)),
+                child: const Icon(
+                  Icons.verified_rounded,
+                  size: 22,
+                  color: Color(0xFF27AE60),
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -7464,18 +9197,31 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                       children: [
                         Text(
                           'Hasil Klasifikasi Model MLP VitaScale',
-                          style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w900, color: text),
+                          style: GoogleFonts.outfit(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                            color: text,
+                          ),
                         ),
                         const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF27AE60).withValues(alpha: 0.12),
+                            color: const Color(
+                              0xFF27AE60,
+                            ).withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
                             'Keras MLP Neural Network',
-                            style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.bold, color: const Color(0xFF27AE60)),
+                            style: GoogleFonts.outfit(
+                              fontSize: 8.5,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFF27AE60),
+                            ),
                           ),
                         ),
                       ],
@@ -7506,11 +9252,17 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
               decoration: BoxDecoration(
                 color: const Color(0xFFE74C3C).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFE74C3C).withValues(alpha: 0.4)),
+                border: Border.all(
+                  color: const Color(0xFFE74C3C).withValues(alpha: 0.4),
+                ),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.warning_amber_rounded, size: 24, color: Color(0xFFE74C3C)),
+                  const Icon(
+                    Icons.warning_amber_rounded,
+                    size: 24,
+                    color: Color(0xFFE74C3C),
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -7518,7 +9270,11 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                       children: [
                         Text(
                           'PERHATIAN: Terdeteksi Indikasi Masalah Pertumbuhan',
-                          style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w900, color: const Color(0xFFE74C3C)),
+                          style: GoogleFonts.outfit(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w900,
+                            color: const Color(0xFFE74C3C),
+                          ),
                         ),
                         Text(
                           'Balita memerlukan intervensi nutrisi khusus dan penelaahan faktor etiologi melalui penalaran klinis di bawah.',
@@ -7551,16 +9307,30 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('STATUS GIZI (BB/TB)', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w800, color: sub)),
+                          Text(
+                            'STATUS GIZI (BB/TB)',
+                            style: GoogleFonts.outfit(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: sub,
+                            ),
+                          ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: giziColor.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
                               '${confGizi.toStringAsFixed(1)}% Keyakinan',
-                              style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.bold, color: giziColor),
+                              style: GoogleFonts.outfit(
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                                color: giziColor,
+                              ),
                             ),
                           ),
                         ],
@@ -7568,7 +9338,11 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                       const SizedBox(height: 6),
                       Text(
                         kategoriGizi,
-                        style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w900, color: giziColor),
+                        style: GoogleFonts.outfit(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          color: giziColor,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -7589,7 +9363,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   decoration: BoxDecoration(
                     color: stuntingColor.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: stuntingColor.withValues(alpha: 0.3)),
+                    border: Border.all(
+                      color: stuntingColor.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -7597,16 +9373,30 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('STATUS PERTUMBUHAN (TB/U)', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w800, color: sub)),
+                          Text(
+                            'STATUS PERTUMBUHAN (TB/U)',
+                            style: GoogleFonts.outfit(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: sub,
+                            ),
+                          ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: stuntingColor.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
                               '${confStunt.toStringAsFixed(1)}% Keyakinan',
-                              style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.bold, color: stuntingColor),
+                              style: GoogleFonts.outfit(
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                                color: stuntingColor,
+                              ),
                             ),
                           ),
                         ],
@@ -7614,7 +9404,11 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                       const SizedBox(height: 6),
                       Text(
                         kategoriStunting,
-                        style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w900, color: stuntingColor),
+                        style: GoogleFonts.outfit(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          color: stuntingColor,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -7633,7 +9427,11 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
             const SizedBox(height: 18),
             Text(
               'Distribusi Probabilitas Kelas Model MLP:',
-              style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: text),
+              style: GoogleFonts.outfit(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: text,
+              ),
             ),
             const SizedBox(height: 8),
             Wrap(
@@ -7649,8 +9447,21 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(entry.key, style: GoogleFonts.outfit(fontSize: 10, color: text)),
-                          Text('${pct.toStringAsFixed(1)}%', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: sub)),
+                          Text(
+                            entry.key,
+                            style: GoogleFonts.outfit(
+                              fontSize: 10,
+                              color: text,
+                            ),
+                          ),
+                          Text(
+                            '${pct.toStringAsFixed(1)}%',
+                            style: GoogleFonts.outfit(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: sub,
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 3),
@@ -7661,7 +9472,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                           minHeight: 5,
                           backgroundColor: border.withValues(alpha: 0.2),
                           valueColor: AlwaysStoppedAnimation<Color>(
-                            entry.key == kategoriGizi ? giziColor : Colors.grey.withValues(alpha: 0.4),
+                            entry.key == kategoriGizi
+                                ? giziColor
+                                : Colors.grey.withValues(alpha: 0.4),
                           ),
                         ),
                       ),
@@ -7679,7 +9492,13 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
   // ===========================================================================
   // CLINICAL AI REASONING MODEL (GEMINI 2.5 FLASH)
   // ===========================================================================
-  Widget _buildReasoningSection(Color cardBg, Color border, Color text, Color sub, bool isMobile) {
+  Widget _buildReasoningSection(
+    Color cardBg,
+    Color border,
+    Color text,
+    Color sub,
+    bool isMobile,
+  ) {
     final isEn = ref.watch(landingPageProvider).language == 'en';
     if (_isLoadingReasoning) {
       return _buildProgressBarLoadingCard(
@@ -7695,8 +9514,16 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
         sub: sub,
         icon: Icons.psychology_rounded,
         steps: isEn
-            ? ['Child Anthropometric Data', 'Gemini 2.5 Flash Reasoning', 'KIA Nutritional Action Plan']
-            : ['Data Antropometri Balita', 'Penalaran Gemini 2.5 Flash', 'Rekomendasi Intervensi Gizi KIA'],
+            ? [
+                'Child Anthropometric Data',
+                'Gemini 2.5 Flash Reasoning',
+                'KIA Nutritional Action Plan',
+              ]
+            : [
+                'Data Antropometri Balita',
+                'Penalaran Gemini 2.5 Flash',
+                'Rekomendasi Intervensi Gizi KIA',
+              ],
         activeStepIndex: 1,
       );
     }
@@ -7722,7 +9549,11 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   ),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.psychology_alt_rounded, size: 22, color: Colors.white),
+                child: const Icon(
+                  Icons.psychology_alt_rounded,
+                  size: 22,
+                  color: Colors.white,
+                ),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -7733,19 +9564,36 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                       children: [
                         Text(
                           'Clinical AI Reasoning Engine',
-                          style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w900, color: text),
+                          style: GoogleFonts.outfit(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                            color: text,
+                          ),
                         ),
                         const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF1ABC9C).withValues(alpha: 0.12),
+                            color: const Color(
+                              0xFF1ABC9C,
+                            ).withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: const Color(0xFF1ABC9C).withValues(alpha: 0.3)),
+                            border: Border.all(
+                              color: const Color(
+                                0xFF1ABC9C,
+                              ).withValues(alpha: 0.3),
+                            ),
                           ),
                           child: Text(
                             reasoning.modelUsed,
-                            style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.bold, color: const Color(0xFF1ABC9C)),
+                            style: GoogleFonts.outfit(
+                              fontSize: 8.5,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFF1ABC9C),
+                            ),
                           ),
                         ),
                       ],
@@ -7758,7 +9606,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                 ),
               ),
               CustomButton(
-                text: _reasoningPromptCount > 0 ? 'Prompt Ulang AI (${_reasoningPromptCount}x)' : 'Analisis Ulang AI',
+                text: _reasoningPromptCount > 0
+                    ? 'Prompt Ulang AI (${_reasoningPromptCount}x)'
+                    : 'Analisis Ulang AI',
                 icon: Icons.refresh_rounded,
                 height: 34,
                 primaryColor: const Color(0xFF1ABC9C),
@@ -7778,18 +9628,34 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
             decoration: BoxDecoration(
               color: const Color(0xFF1ABC9C).withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFF1ABC9C).withValues(alpha: 0.2)),
+              border: Border.all(
+                color: const Color(0xFF1ABC9C).withValues(alpha: 0.2),
+              ),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.format_quote_rounded, size: 20, color: Color(0xFF1ABC9C)),
+                const Icon(
+                  Icons.format_quote_rounded,
+                  size: 20,
+                  color: Color(0xFF1ABC9C),
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: FormattedMarkdownText(
                     text: reasoning.reasoningSummary,
-                    style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w600, color: text, height: 1.4),
-                    boldStyle: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w800, color: const Color(0xFF1ABC9C), height: 1.4),
+                    style: GoogleFonts.outfit(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: text,
+                      height: 1.4,
+                    ),
+                    boldStyle: GoogleFonts.outfit(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFF1ABC9C),
+                      height: 1.4,
+                    ),
                   ),
                 ),
               ],
@@ -7807,11 +9673,31 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
             ),
             child: Row(
               children: [
-                _buildReasoningTabItem(0, 'Alur Berpikir (Chain-of-Thought)', Icons.account_tree_rounded),
-                _buildReasoningTabItem(1, 'Faktor Risiko & Etiologi', Icons.search_rounded),
-                _buildReasoningTabItem(2, 'Intervensi Gizi & PMT', Icons.restaurant_rounded),
-                _buildReasoningTabItem(3, 'Tindak Lanjut Faskes', Icons.local_hospital_rounded),
-                _buildReasoningTabItem(4, 'Edukasi Orang Tua', Icons.family_restroom_rounded),
+                _buildReasoningTabItem(
+                  0,
+                  'Alur Berpikir (Chain-of-Thought)',
+                  Icons.account_tree_rounded,
+                ),
+                _buildReasoningTabItem(
+                  1,
+                  'Faktor Risiko & Etiologi',
+                  Icons.search_rounded,
+                ),
+                _buildReasoningTabItem(
+                  2,
+                  'Intervensi Gizi & PMT',
+                  Icons.restaurant_rounded,
+                ),
+                _buildReasoningTabItem(
+                  3,
+                  'Tindak Lanjut Faskes',
+                  Icons.local_hospital_rounded,
+                ),
+                _buildReasoningTabItem(
+                  4,
+                  'Edukasi Orang Tua',
+                  Icons.family_restroom_rounded,
+                ),
               ],
             ),
           ),
@@ -7843,7 +9729,11 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 14, color: isSelected ? Colors.white : Colors.grey),
+              Icon(
+                icon,
+                size: 14,
+                color: isSelected ? Colors.white : Colors.grey,
+              ),
               const SizedBox(width: 6),
               Flexible(
                 child: Text(
@@ -7863,7 +9753,12 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
     );
   }
 
-  Widget _buildActiveReasoningContent(VitaScaleReasoningResult r, Color text, Color sub, Color border) {
+  Widget _buildActiveReasoningContent(
+    VitaScaleReasoningResult r,
+    Color text,
+    Color sub,
+    Color border,
+  ) {
     switch (_activeReasoningTab) {
       case 0:
         return Column(
@@ -7887,15 +9782,28 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                     alignment: Alignment.center,
                     child: Text(
                       '$idx',
-                      style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.bold, color: const Color(0xFF1ABC9C)),
+                      style: GoogleFonts.outfit(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF1ABC9C),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: FormattedMarkdownText(
                       text: stepText,
-                      style: GoogleFonts.outfit(fontSize: 11.5, color: text, height: 1.4),
-                      boldStyle: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color(0xFF1ABC9C), height: 1.4),
+                      style: GoogleFonts.outfit(
+                        fontSize: 11.5,
+                        color: text,
+                        height: 1.4,
+                      ),
+                      boldStyle: GoogleFonts.outfit(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF1ABC9C),
+                        height: 1.4,
+                      ),
                     ),
                   ),
                 ],
@@ -7918,16 +9826,36 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
             children: [
               Row(
                 children: [
-                  const Icon(Icons.crisis_alert_rounded, size: 18, color: Colors.amber),
+                  const Icon(
+                    Icons.crisis_alert_rounded,
+                    size: 18,
+                    color: Colors.amber,
+                  ),
                   const SizedBox(width: 8),
-                  Text('Identifikasi Faktor Risiko & Etiologi:', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: text)),
+                  Text(
+                    'Identifikasi Faktor Risiko & Etiologi:',
+                    style: GoogleFonts.outfit(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: text,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 8),
               FormattedMarkdownText(
                 text: r.riskAndEtiology,
-                style: GoogleFonts.outfit(fontSize: 11.5, color: text, height: 1.5),
-                boldStyle: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: Colors.amber[800], height: 1.5),
+                style: GoogleFonts.outfit(
+                  fontSize: 11.5,
+                  color: text,
+                  height: 1.5,
+                ),
+                boldStyle: GoogleFonts.outfit(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.amber[800],
+                  height: 1.5,
+                ),
               ),
             ],
           ),
@@ -7940,23 +9868,45 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
           decoration: BoxDecoration(
             color: const Color(0xFF27AE60).withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFF27AE60).withValues(alpha: 0.25)),
+            border: Border.all(
+              color: const Color(0xFF27AE60).withValues(alpha: 0.25),
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  const Icon(Icons.egg_alt_rounded, size: 18, color: Color(0xFF27AE60)),
+                  const Icon(
+                    Icons.egg_alt_rounded,
+                    size: 18,
+                    color: Color(0xFF27AE60),
+                  ),
                   const SizedBox(width: 8),
-                  Text('Rencana Intervensi Gizi & Menu Protein Hewani (PMT):', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: text)),
+                  Text(
+                    'Rencana Intervensi Gizi & Menu Protein Hewani (PMT):',
+                    style: GoogleFonts.outfit(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: text,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 8),
               FormattedMarkdownText(
                 text: r.nutritionalIntervention,
-                style: GoogleFonts.outfit(fontSize: 11.5, color: text, height: 1.5),
-                boldStyle: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color(0xFF27AE60), height: 1.5),
+                style: GoogleFonts.outfit(
+                  fontSize: 11.5,
+                  color: text,
+                  height: 1.5,
+                ),
+                boldStyle: GoogleFonts.outfit(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF27AE60),
+                  height: 1.5,
+                ),
               ),
             ],
           ),
@@ -7969,23 +9919,45 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
           decoration: BoxDecoration(
             color: const Color(0xFF3498DB).withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFF3498DB).withValues(alpha: 0.25)),
+            border: Border.all(
+              color: const Color(0xFF3498DB).withValues(alpha: 0.25),
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  const Icon(Icons.medical_services_rounded, size: 18, color: Color(0xFF3498DB)),
+                  const Icon(
+                    Icons.medical_services_rounded,
+                    size: 18,
+                    color: Color(0xFF3498DB),
+                  ),
                   const SizedBox(width: 8),
-                  Text('Protokol Tindak Lanjut Faskes & Kriteria Rujukan:', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: text)),
+                  Text(
+                    'Protokol Tindak Lanjut Faskes & Kriteria Rujukan:',
+                    style: GoogleFonts.outfit(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: text,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 8),
               FormattedMarkdownText(
                 text: r.medicalProtocol,
-                style: GoogleFonts.outfit(fontSize: 11.5, color: text, height: 1.5),
-                boldStyle: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color(0xFF3498DB), height: 1.5),
+                style: GoogleFonts.outfit(
+                  fontSize: 11.5,
+                  color: text,
+                  height: 1.5,
+                ),
+                boldStyle: GoogleFonts.outfit(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF3498DB),
+                  height: 1.5,
+                ),
               ),
             ],
           ),
@@ -7999,23 +9971,45 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
           decoration: BoxDecoration(
             color: const Color(0xFFE91E63).withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE91E63).withValues(alpha: 0.25)),
+            border: Border.all(
+              color: const Color(0xFFE91E63).withValues(alpha: 0.25),
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  const Icon(Icons.favorite_rounded, size: 18, color: Color(0xFFE91E63)),
+                  const Icon(
+                    Icons.favorite_rounded,
+                    size: 18,
+                    color: Color(0xFFE91E63),
+                  ),
                   const SizedBox(width: 8),
-                  Text('Panduan & Pesan Suportif untuk Orang Tua:', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: text)),
+                  Text(
+                    'Panduan & Pesan Suportif untuk Orang Tua:',
+                    style: GoogleFonts.outfit(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: text,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 8),
               FormattedMarkdownText(
                 text: r.parentEducation,
-                style: GoogleFonts.outfit(fontSize: 11.5, color: text, height: 1.5),
-                boldStyle: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color(0xFFE91E63), height: 1.5),
+                style: GoogleFonts.outfit(
+                  fontSize: 11.5,
+                  color: text,
+                  height: 1.5,
+                ),
+                boldStyle: GoogleFonts.outfit(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFFE91E63),
+                  height: 1.5,
+                ),
               ),
             ],
           ),
@@ -8060,7 +10054,11 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
     } catch (e) {
       debugPrint('[PCV] _pickLocalPcvImage error: $e');
       if (mounted) {
-        CustomSnackbar.error(context, 'Gagal memilih file: $e', title: 'File Picker Gagal');
+        CustomSnackbar.error(
+          context,
+          'Gagal memilih file: $e',
+          title: 'File Picker Gagal',
+        );
       }
     }
   }
@@ -8069,11 +10067,19 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
   Future<void> _fetchPcvImageFromUrl(String url) async {
     final cleanUrl = url.trim();
     if (cleanUrl.isEmpty) {
-      CustomSnackbar.warning(context, 'Masukkan link URL gambar balita yang valid.', title: 'URL Kosong');
+      CustomSnackbar.warning(
+        context,
+        'Masukkan link URL gambar balita yang valid.',
+        title: 'URL Kosong',
+      );
       return;
     }
     if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
-      CustomSnackbar.warning(context, 'URL harus diawali dengan http:// atau https://', title: 'URL Tidak Valid');
+      CustomSnackbar.warning(
+        context,
+        'URL harus diawali dengan http:// atau https://',
+        title: 'URL Tidak Valid',
+      );
       return;
     }
 
@@ -8084,7 +10090,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
     });
 
     _pcvProgressTimer?.cancel();
-    _pcvProgressTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
+    _pcvProgressTimer = Timer.periodic(const Duration(milliseconds: 100), (
+      timer,
+    ) {
       if (_pcvProgress < 0.85) {
         setState(() => _pcvProgress += 0.08);
       }
@@ -8097,7 +10105,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
 
       if (response.statusCode == 200) {
         final bytes = response.bodyBytes;
-        String fileName = uri.pathSegments.isNotEmpty ? uri.pathSegments.last : 'citra_web.jpg';
+        String fileName = uri.pathSegments.isNotEmpty
+            ? uri.pathSegments.last
+            : 'citra_web.jpg';
         if (!fileName.contains('.')) fileName = '$fileName.jpg';
 
         setState(() {
@@ -8124,10 +10134,15 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
       } else {
         setState(() {
           _isLoadingPcvImage = false;
-          _pcvErrorMessage = 'Gagal mengunduh gambar (HTTP ${response.statusCode})';
+          _pcvErrorMessage =
+              'Gagal mengunduh gambar (HTTP ${response.statusCode})';
         });
         if (mounted) {
-          CustomSnackbar.error(context, 'Server mengembalikan kode HTTP ${response.statusCode}', title: 'Unduh Gagal');
+          CustomSnackbar.error(
+            context,
+            'Server mengembalikan kode HTTP ${response.statusCode}',
+            title: 'Unduh Gagal',
+          );
         }
       }
     } catch (e) {
@@ -8137,49 +10152,44 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
         _pcvErrorMessage = 'Gagal memuat URL: $e';
       });
       if (mounted) {
-        CustomSnackbar.error(context, 'Koneksi gagal atau URL tidak dapat diakses: $e', title: 'Gagal Memuat Gambar');
+        CustomSnackbar.error(
+          context,
+          'Koneksi gagal atau URL tidak dapat diakses: $e',
+          title: 'Gagal Memuat Gambar',
+        );
       }
     }
   }
 
-  /// 3. Ambil snapshot langsung dari Kamera / Webcam
+  /// 3. Ambil snapshot langsung dari Kamera Lokal / Webcam
   Future<void> _captureCameraPcvImage() async {
     try {
-      final picker = ImagePicker();
-      final photo = await picker.pickImage(
-        source: ImageSource.camera,
-        maxWidth: 1920,
-        maxHeight: 1080,
-        imageQuality: 92,
-      );
+      final photo = await capturePcvCameraSnapshot(context);
+      if (photo == null || !mounted) return;
 
-      if (photo != null) {
-        final bytes = await photo.readAsBytes();
-        setState(() {
-          _pcvSelectedImageBytes = bytes;
-          _pcvSelectedImageName = photo.name.isNotEmpty ? photo.name : 'kamera_${DateTime.now().millisecondsSinceEpoch}.jpg';
-          _pcvResultData = null;
-          _pcvTinggiCm = null;
-          _pcvPanjangPx = null;
-          _pcvSkalaEfektif = null;
-          _pcvAnnotatedImageBase64 = null;
-          _pcvErrorMessage = null;
-          _pcvMessage = null;
-        });
-        if (mounted) {
-          CustomSnackbar.success(
-            context,
-            'Snapshot kamera berhasil diambil (${(bytes.lengthInBytes / 1024).toStringAsFixed(1)} KB).',
-            title: 'Foto Kamera Siap',
-          );
-        }
-      }
+      setState(() {
+        _pcvSelectedImageBytes = photo.bytes;
+        _pcvSelectedImageName = photo.fileName;
+        _pcvResultData = null;
+        _pcvTinggiCm = null;
+        _pcvPanjangPx = null;
+        _pcvSkalaEfektif = null;
+        _pcvAnnotatedImageBase64 = null;
+        _pcvErrorMessage = null;
+        _pcvMessage = null;
+      });
+
+      CustomSnackbar.success(
+        context,
+        'Snapshot kamera berhasil diambil (${(photo.bytes.lengthInBytes / 1024).toStringAsFixed(1)} KB).',
+        title: 'Foto Kamera Siap',
+      );
     } catch (e) {
       debugPrint('[PCV] _captureCameraPcvImage error: $e');
       if (mounted) {
         CustomSnackbar.warning(
           context,
-          'Kamera perangkat tidak dapat diakses langsung ($e). Silakan gunakan mode "File Lokal" atau "Link URL".',
+          'Kamera lokal tidak dapat diakses ($e). Silakan gunakan mode "File Lokal" atau "Link URL".',
           title: 'Kamera Tidak Tersedia',
         );
       }
@@ -8189,7 +10199,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
   /// 4. Muat citra sampel klinis bawaan
   Future<void> _loadSampleLocalPcvImage() async {
     try {
-      final byteData = await rootBundle.load('assets/images/anc_home_visit_evidence.png');
+      final byteData = await rootBundle.load(
+        'assets/images/anc_home_visit_evidence.png',
+      );
       final bytes = byteData.buffer.asUint8List();
       setState(() {
         _pcvSelectedImageBytes = bytes;
@@ -8212,7 +10224,11 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
     } catch (e) {
       debugPrint('[PCV] _loadSampleLocalPcvImage error: $e');
       if (mounted) {
-        CustomSnackbar.error(context, 'Gagal memuat sampel bawaan: $e', title: 'Gagal Memuat');
+        CustomSnackbar.error(
+          context,
+          'Gagal memuat sampel bawaan: $e',
+          title: 'Gagal Memuat',
+        );
       }
     }
   }
@@ -8246,7 +10262,11 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
     } catch (e) {
       debugPrint('[PCV] _loadBonekaSampleImage error: $e');
       if (mounted) {
-        CustomSnackbar.error(context, 'Gagal memuat sampel boneka: $e', title: 'Gagal Memuat');
+        CustomSnackbar.error(
+          context,
+          'Gagal memuat sampel boneka: $e',
+          title: 'Gagal Memuat',
+        );
       }
     }
   }
@@ -8254,7 +10274,11 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
   /// 5. Kirim citra ke API https://pcvmapotechs5.vercel.app/measure
   Future<void> _measurePcvHeight() async {
     if (_pcvSelectedImageBytes == null) {
-      CustomSnackbar.warning(context, 'Pilih atau unggah foto balita terlebih dahulu.', title: 'Foto Belum Ada');
+      CustomSnackbar.warning(
+        context,
+        'Pilih atau unggah foto balita terlebih dahulu.',
+        title: 'Foto Belum Ada',
+      );
       return;
     }
 
@@ -8266,7 +10290,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
     });
 
     _pcvProgressTimer?.cancel();
-    _pcvProgressTimer = Timer.periodic(const Duration(milliseconds: 140), (timer) {
+    _pcvProgressTimer = Timer.periodic(const Duration(milliseconds: 140), (
+      timer,
+    ) {
       if (_pcvProgress < 0.90) {
         setState(() => _pcvProgress += 0.05);
       }
@@ -8305,12 +10331,8 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
           // Isi otomatis ke kontroler Tinggi Badan
           _heightController.text = tinggi.toStringAsFixed(1);
 
-          // Tentukan PB vs TB
-          if ((_activeChild?.isUnder24Months ?? (tinggi < 85.0))) {
-            _measurementMethod = 'PB';
-          } else {
-            _measurementMethod = 'TB';
-          }
+          // Tentukan PB vs TB sesuai usia anak di Langkah 1
+          _measurementMethod = _ageMonths < 24 ? 'PB' : 'TB';
 
           // Reset hasil klasifikasi agar user memperbarui
           _smartGrowthResult = null;
@@ -8325,7 +10347,8 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
           );
         }
       } else {
-        final errMsg = res['message'] ?? 'Gagal memproses citra pada OpenCV server.';
+        final errMsg =
+            res['message'] ?? 'Gagal memproses citra pada OpenCV server.';
         setState(() {
           _isMeasuringPcv = false;
           _pcvProgress = 0.0;
@@ -8363,185 +10386,6 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
   }
 
   // ===========================================================================
-  // KONTEN TAB 2: PENGUKURAN TINGGI VIA FOTO AI (PCV CLOUD API)
-  // ===========================================================================
-  Widget _buildTab2PcvCloudSection({
-    required Color cardBgColor,
-    required Color borderColor,
-    required Color textColor,
-    required Color subtitleColor,
-    required Color themeAccent,
-    required bool isDark,
-    required bool isMobile,
-    required List<Map<String, dynamic>> redErrors,
-    required List<Map<String, dynamic>> yellowWarnings,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // 1. Status Banner PCV API Hosting
-        _buildPcvServerBanner(cardBgColor, borderColor, textColor, subtitleColor, isDark),
-
-        const SizedBox(height: 16),
-
-        // 2. Studio Unggah Citra & Pengukuran PCV
-        _buildPcvImageStudioCard(cardBgColor, borderColor, textColor, subtitleColor, themeAccent, isDark, isMobile),
-
-        const SizedBox(height: 20),
-
-        // 3. Custom Form Stepper (1 Card Per Step - Identik dengan Manual)
-        CustomFormStepper(
-          steps: [
-            FormStepItem(
-              step: 1,
-              label: '1. Identitas Balita',
-              icon: Icons.badge_rounded,
-              hasError: redErrors.any((e) => e['step'] == 1),
-              hasWarning: yellowWarnings.any((w) => w['step'] == 1),
-              isCompleted: _nikController.text.trim().length == 16 && _nameController.text.trim().isNotEmpty && _ageMonths > 0,
-            ),
-            FormStepItem(
-              step: 2,
-              label: '2. Antropometri (Tinggi Foto PCV)',
-              icon: Icons.straighten_rounded,
-              hasError: redErrors.any((e) => e['step'] == 2),
-              hasWarning: yellowWarnings.any((w) => w['step'] == 2),
-              isCompleted: double.tryParse(_weightController.text.trim()) != null && double.tryParse(_heightController.text.trim()) != null,
-            ),
-            FormStepItem(
-              step: 3,
-              label: '3. Reasoning AI',
-              icon: Icons.psychology_rounded,
-              hasError: redErrors.any((e) => e['step'] == 3),
-              hasWarning: yellowWarnings.any((w) => w['step'] == 3),
-              isCompleted: _smartGrowthResult != null,
-            ),
-            FormStepItem(
-              step: 4,
-              label: '4. SATUSEHAT & Simpan',
-              icon: Icons.cloud_sync_rounded,
-              hasError: false,
-              hasWarning: false,
-              isCompleted: _satuSehatSyncResult != null,
-            ),
-          ],
-          currentStep: _formStep,
-          onStepTapped: (step) {
-            setState(() => _formStep = step);
-            if (step == 3) {
-              _checkAndAutoRunMlp();
-            }
-          },
-          themeAccent: const Color(0xFF1ABC9C),
-          textColor: textColor,
-          subtitleColor: subtitleColor,
-          borderColor: borderColor,
-          cardBgColor: cardBgColor,
-          isDark: isDark,
-        ),
-
-        const SizedBox(height: 16),
-
-        // 4. Tampilan 1 Kartu Form Aktif Sesuai Step
-        if (_formStep == 1)
-          _buildStep1ChildIdentity(cardBgColor, borderColor, textColor, subtitleColor, isMobile)
-        else if (_formStep == 2)
-          _buildStep2Anthropometry(cardBgColor, borderColor, textColor, subtitleColor, isMobile)
-        else if (_formStep == 3)
-          _buildStep3ReasoningAndAi(cardBgColor, borderColor, textColor, subtitleColor, isMobile)
-        else if (_formStep == 4)
-          _buildStep4SatuSehatAndSave(cardBgColor, borderColor, textColor, subtitleColor, isMobile),
-
-        const SizedBox(height: 16),
-
-        // 5. Stepper Navigation Footer & Real-Time Validation Pill
-        _buildScreeningStepperFooter(
-          cardBgColor: cardBgColor,
-          borderColor: borderColor,
-          textColor: textColor,
-          subtitleColor: subtitleColor,
-          isMobile: isMobile,
-          redErrors: redErrors,
-          yellowWarnings: yellowWarnings,
-        ),
-
-        const SizedBox(height: 24),
-      ],
-    );
-  }
-
-  // ===========================================================================
-  // WIDGET: BANNER STATUS SERVER PCV CLOUD VERCEL
-  // ===========================================================================
-  Widget _buildPcvServerBanner(Color cardBg, Color border, Color text, Color sub, bool isDark) {
-    return CustomCard(
-      color: cardBg,
-      borderColor: border,
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1ABC9C).withValues(alpha: 0.12),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.cloud_done_rounded, size: 22, color: Color(0xFF1ABC9C)),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Wrap(
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 8,
-                  runSpacing: 4,
-                  children: [
-                    Text(
-                      'PCV Computer Vision Cloud API',
-                      style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w800, color: text),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF2ECC71).withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: const Color(0xFF2ECC71).withValues(alpha: 0.4)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 6,
-                            height: 6,
-                            decoration: const BoxDecoration(color: Color(0xFF2ECC71), shape: BoxShape.circle),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'ONLINE (Vercel Serverless)',
-                            style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.bold, color: const Color(0xFF2ECC71)),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  'Endpoint: https://pcvmapotechs5.vercel.app/measure • Classical OpenCV 7-Tahap (Undistort, Otsu, Morfologi Elips, minAreaRect, Skala 9.09 px/cm)',
-                  style: GoogleFonts.outfit(fontSize: 10, color: sub),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ===========================================================================
   // WIDGET: STUDIO INPUT CITRA & PENGUKURAN TINGGI BADAN (PCV API)
   // ===========================================================================
   Widget _buildPcvImageStudioCard(
@@ -8569,7 +10413,11 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   color: const Color(0xFF1ABC9C).withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.camera_enhance_rounded, size: 20, color: Color(0xFF1ABC9C)),
+                child: const Icon(
+                  Icons.camera_enhance_rounded,
+                  size: 20,
+                  color: Color(0xFF1ABC9C),
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -8578,7 +10426,11 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   children: [
                     Text(
                       'Studio Pengukuran Tinggi Badan via Citra Foto (PCV AI)',
-                      style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w800, color: text),
+                      style: GoogleFonts.outfit(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: text,
+                      ),
                     ),
                     Text(
                       'Pilih sumber foto balita (File Lokal, Link URL, atau Kamera). OpenCV akan menghitung panjang badan dan mengisi formulir antropometri secara otomatis.',
@@ -8646,7 +10498,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF161924) : const Color(0xFFF8FAFC),
+                color: isDark
+                    ? const Color(0xFF161924)
+                    : const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: border),
               ),
@@ -8668,12 +10522,6 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                         isSecondary: true,
                         onPressed: _loadBonekaSampleImage,
                       ),
-                      CustomButton(
-                        text: 'Gunakan Sampel Klinis Uji',
-                        icon: Icons.science_rounded,
-                        isSecondary: true,
-                        onPressed: _loadSampleLocalPcvImage,
-                      ),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -8689,7 +10537,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF161924) : const Color(0xFFF8FAFC),
+                color: isDark
+                    ? const Color(0xFF161924)
+                    : const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: border),
               ),
@@ -8712,7 +10562,8 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                         child: CustomButton(
                           text: 'Muat dari URL',
                           icon: Icons.cloud_download_rounded,
-                          onPressed: () => _fetchPcvImageFromUrl(_pcvUrlController.text),
+                          onPressed: () =>
+                              _fetchPcvImageFromUrl(_pcvUrlController.text),
                         ),
                       ),
                     ],
@@ -8723,39 +10574,73 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                     runSpacing: 6,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      Text('Preset Cepat:', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: sub)),
+                      Text(
+                        'Preset Cepat:',
+                        style: GoogleFonts.outfit(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: sub,
+                        ),
+                      ),
                       InkWell(
                         onTap: () {
                           _loadBonekaSampleImage();
                         },
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFE67E22).withValues(alpha: 0.12),
+                            color: const Color(
+                              0xFFE67E22,
+                            ).withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: const Color(0xFFE67E22).withValues(alpha: 0.3)),
+                            border: Border.all(
+                              color: const Color(
+                                0xFFE67E22,
+                              ).withValues(alpha: 0.3),
+                            ),
                           ),
                           child: Text(
                             '🧸 Sampel Boneka (47.2 cm)',
-                            style: GoogleFonts.outfit(fontSize: 9.5, fontWeight: FontWeight.w600, color: const Color(0xFFE67E22)),
+                            style: GoogleFonts.outfit(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFFE67E22),
+                            ),
                           ),
                         ),
                       ),
                       InkWell(
                         onTap: () {
-                          _pcvUrlController.text = 'https://images.unsplash.com/photo-1519689680058-324335c77eba?w=800';
+                          _pcvUrlController.text =
+                              'https://images.unsplash.com/photo-1519689680058-324335c77eba?w=800';
                           _fetchPcvImageFromUrl(_pcvUrlController.text);
                         },
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF3498DB).withValues(alpha: 0.12),
+                            color: const Color(
+                              0xFF3498DB,
+                            ).withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: const Color(0xFF3498DB).withValues(alpha: 0.3)),
+                            border: Border.all(
+                              color: const Color(
+                                0xFF3498DB,
+                              ).withValues(alpha: 0.3),
+                            ),
                           ),
                           child: Text(
                             '🔗 Demo Bayi Online (Unsplash)',
-                            style: GoogleFonts.outfit(fontSize: 9.5, fontWeight: FontWeight.w600, color: const Color(0xFF3498DB)),
+                            style: GoogleFonts.outfit(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF3498DB),
+                            ),
                           ),
                         ),
                       ),
@@ -8764,15 +10649,28 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                           _loadSampleLocalPcvImage();
                         },
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF1ABC9C).withValues(alpha: 0.12),
+                            color: const Color(
+                              0xFF1ABC9C,
+                            ).withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: const Color(0xFF1ABC9C).withValues(alpha: 0.3)),
+                            border: Border.all(
+                              color: const Color(
+                                0xFF1ABC9C,
+                              ).withValues(alpha: 0.3),
+                            ),
                           ),
                           child: Text(
                             '🔗 Sampel Validasi PCV (72 cm)',
-                            style: GoogleFonts.outfit(fontSize: 9.5, fontWeight: FontWeight.w600, color: const Color(0xFF1ABC9C)),
+                            style: GoogleFonts.outfit(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF1ABC9C),
+                            ),
                           ),
                         ),
                       ),
@@ -8786,26 +10684,23 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF161924) : const Color(0xFFF8FAFC),
+                color: isDark
+                    ? const Color(0xFF161924)
+                    : const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: border),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
                     children: [
                       CustomButton(
                         text: 'Buka Kamera / Ambil Snapshot',
                         icon: Icons.photo_camera_rounded,
                         onPressed: _captureCameraPcvImage,
-                      ),
-                      const SizedBox(width: 10),
-                      CustomButton(
-                        text: 'Gunakan Sampel Klinis',
-                        icon: Icons.science_rounded,
-                        isSecondary: true,
-                        onPressed: _loadSampleLocalPcvImage,
                       ),
                     ],
                   ),
@@ -8836,7 +10731,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
             const SizedBox(height: 16),
             Container(
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF12141D) : const Color(0xFFF8FAFC),
+                color: isDark
+                    ? const Color(0xFF12141D)
+                    : const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: border),
               ),
@@ -8846,8 +10743,13 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                 children: [
                   // Top Toolbar Preview Citra
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    color: isDark ? const Color(0xFF1E2130) : const Color(0xFFEEF2F6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    color: isDark
+                        ? const Color(0xFF1E2130)
+                        : const Color(0xFFEEF2F6),
                     child: Row(
                       children: [
                         Icon(
@@ -8861,27 +10763,44 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                         Expanded(
                           child: Text(
                             '${_pcvSelectedImageName ?? "Citra Balita"} (${(_pcvSelectedImageBytes!.lengthInBytes / 1024).toStringAsFixed(1)} KB)',
-                            style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: text),
+                            style: GoogleFonts.outfit(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: text,
+                            ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         if (_pcvAnnotatedImageBase64 != null) ...[
                           InkWell(
-                            onTap: () => setState(() => _pcvShowAnnotated = !_pcvShowAnnotated),
+                            onTap: () => setState(
+                              () => _pcvShowAnnotated = !_pcvShowAnnotated,
+                            ),
                             borderRadius: BorderRadius.circular(6),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
-                                color: _pcvShowAnnotated ? const Color(0xFF1ABC9C) : Colors.transparent,
+                                color: _pcvShowAnnotated
+                                    ? const Color(0xFF1ABC9C)
+                                    : Colors.transparent,
                                 borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: const Color(0xFF1ABC9C)),
+                                border: Border.all(
+                                  color: const Color(0xFF1ABC9C),
+                                ),
                               ),
                               child: Text(
-                                _pcvShowAnnotated ? '🎯 Deteksi OpenCV' : '📸 Citra Asli',
+                                _pcvShowAnnotated
+                                    ? '🎯 Deteksi OpenCV'
+                                    : '📸 Citra Asli',
                                 style: GoogleFonts.outfit(
                                   fontSize: 9.5,
                                   fontWeight: FontWeight.bold,
-                                  color: _pcvShowAnnotated ? Colors.white : const Color(0xFF1ABC9C),
+                                  color: _pcvShowAnnotated
+                                      ? Colors.white
+                                      : const Color(0xFF1ABC9C),
                                 ),
                               ),
                             ),
@@ -8901,20 +10820,37 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                           }),
                           borderRadius: BorderRadius.circular(6),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFE74C3C).withValues(alpha: 0.12),
+                              color: const Color(
+                                0xFFE74C3C,
+                              ).withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: const Color(0xFFE74C3C).withValues(alpha: 0.4)),
+                              border: Border.all(
+                                color: const Color(
+                                  0xFFE74C3C,
+                                ).withValues(alpha: 0.4),
+                              ),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Icons.close_rounded, size: 12, color: Color(0xFFE74C3C)),
+                                const Icon(
+                                  Icons.close_rounded,
+                                  size: 12,
+                                  color: Color(0xFFE74C3C),
+                                ),
                                 const SizedBox(width: 4),
                                 Text(
                                   'Hapus',
-                                  style: GoogleFonts.outfit(fontSize: 9.5, fontWeight: FontWeight.bold, color: const Color(0xFFE74C3C)),
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: const Color(0xFFE74C3C),
+                                  ),
                                 ),
                               ],
                             ),
@@ -8932,13 +10868,22 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                     alignment: Alignment.center,
                     child: Builder(
                       builder: (context) {
-                        if (_pcvShowAnnotated && _pcvAnnotatedImageBase64 != null) {
-                          final annotatedBytes = _getAnnotatedBytes(_pcvAnnotatedImageBase64!);
+                        if (_pcvShowAnnotated &&
+                            _pcvAnnotatedImageBase64 != null) {
+                          final annotatedBytes = _getAnnotatedBytes(
+                            _pcvAnnotatedImageBase64!,
+                          );
                           if (annotatedBytes != null) {
-                            return Image.memory(annotatedBytes, fit: BoxFit.contain);
+                            return Image.memory(
+                              annotatedBytes,
+                              fit: BoxFit.contain,
+                            );
                           }
                         }
-                        return Image.memory(_pcvSelectedImageBytes!, fit: BoxFit.contain);
+                        return Image.memory(
+                          _pcvSelectedImageBytes!,
+                          fit: BoxFit.contain,
+                        );
                       },
                     ),
                   ),
@@ -8952,7 +10897,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF161924) : const Color(0xFFF1F5F9),
+                color: isDark
+                    ? const Color(0xFF161924)
+                    : const Color(0xFFF1F5F9),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: border),
               ),
@@ -8961,11 +10908,19 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.tune_rounded, size: 16, color: Color(0xFF1ABC9C)),
+                      const Icon(
+                        Icons.tune_rounded,
+                        size: 16,
+                        color: Color(0xFF1ABC9C),
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         'Pengaturan Kalibrasi Skala & Area ROI',
-                        style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: text),
+                        style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: text,
+                        ),
                       ),
                     ],
                   ),
@@ -8982,14 +10937,22 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                           style: GoogleFonts.outfit(
                             fontSize: 10.5,
                             fontWeight: FontWeight.w600,
-                            color: (_pcvSelectedScale - 11.0).abs() < 0.01 ? const Color(0xFF1ABC9C) : text,
+                            color: (_pcvSelectedScale - 11.0).abs() < 0.01
+                                ? const Color(0xFF1ABC9C)
+                                : text,
                           ),
                         ),
                         selected: (_pcvSelectedScale - 11.0).abs() < 0.01,
-                        selectedColor: const Color(0xFF1ABC9C).withValues(alpha: 0.18),
-                        backgroundColor: isDark ? const Color(0xFF1E2130) : Colors.white,
+                        selectedColor: const Color(
+                          0xFF1ABC9C,
+                        ).withValues(alpha: 0.18),
+                        backgroundColor: isDark
+                            ? const Color(0xFF1E2130)
+                            : Colors.white,
                         side: BorderSide(
-                          color: (_pcvSelectedScale - 11.0).abs() < 0.01 ? const Color(0xFF1ABC9C) : border,
+                          color: (_pcvSelectedScale - 11.0).abs() < 0.01
+                              ? const Color(0xFF1ABC9C)
+                              : border,
                         ),
                         onSelected: (val) {
                           if (val) {
@@ -9007,14 +10970,22 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                           style: GoogleFonts.outfit(
                             fontSize: 10.5,
                             fontWeight: FontWeight.w600,
-                            color: (_pcvSelectedScale - 9.09).abs() < 0.01 ? const Color(0xFF1ABC9C) : text,
+                            color: (_pcvSelectedScale - 9.09).abs() < 0.01
+                                ? const Color(0xFF1ABC9C)
+                                : text,
                           ),
                         ),
                         selected: (_pcvSelectedScale - 9.09).abs() < 0.01,
-                        selectedColor: const Color(0xFF1ABC9C).withValues(alpha: 0.18),
-                        backgroundColor: isDark ? const Color(0xFF1E2130) : Colors.white,
+                        selectedColor: const Color(
+                          0xFF1ABC9C,
+                        ).withValues(alpha: 0.18),
+                        backgroundColor: isDark
+                            ? const Color(0xFF1E2130)
+                            : Colors.white,
                         side: BorderSide(
-                          color: (_pcvSelectedScale - 9.09).abs() < 0.01 ? const Color(0xFF1ABC9C) : border,
+                          color: (_pcvSelectedScale - 9.09).abs() < 0.01
+                              ? const Color(0xFF1ABC9C)
+                              : border,
                         ),
                         onSelected: (val) {
                           if (val) {
@@ -9028,18 +10999,34 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                       // Toggle ROI Full Frame vs Crop
                       FilterChip(
                         avatar: Icon(
-                          !_pcvUseRoi ? Icons.fullscreen_rounded : Icons.crop_rounded,
+                          !_pcvUseRoi
+                              ? Icons.fullscreen_rounded
+                              : Icons.crop_rounded,
                           size: 14,
-                          color: !_pcvUseRoi ? const Color(0xFF2ECC71) : const Color(0xFFF39C12),
+                          color: !_pcvUseRoi
+                              ? const Color(0xFF2ECC71)
+                              : const Color(0xFFF39C12),
                         ),
                         label: Text(
-                          !_pcvUseRoi ? 'Mode: Full Frame (Kaki & Kepala Utuh)' : 'Mode: Crop ROI Kuning',
-                          style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.w600, color: text),
+                          !_pcvUseRoi
+                              ? 'Mode: Full Frame (Kaki & Kepala Utuh)'
+                              : 'Mode: Crop ROI Kuning',
+                          style: GoogleFonts.outfit(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w600,
+                            color: text,
+                          ),
                         ),
                         selected: !_pcvUseRoi,
-                        selectedColor: const Color(0xFF2ECC71).withValues(alpha: 0.18),
-                        backgroundColor: isDark ? const Color(0xFF1E2130) : Colors.white,
-                        side: BorderSide(color: !_pcvUseRoi ? const Color(0xFF2ECC71) : border),
+                        selectedColor: const Color(
+                          0xFF2ECC71,
+                        ).withValues(alpha: 0.18),
+                        backgroundColor: isDark
+                            ? const Color(0xFF1E2130)
+                            : Colors.white,
+                        side: BorderSide(
+                          color: !_pcvUseRoi ? const Color(0xFF2ECC71) : border,
+                        ),
                         onSelected: (val) {
                           setState(() {
                             _pcvUseRoi = !val;
@@ -9071,9 +11058,18 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
             Builder(
               builder: (context) {
                 String stageText = 'Mengunggah citra ke cloud serverless...';
-                if (_pcvProgress > 0.3) stageText = 'Tahap 1-2: Grayscale & Segmentasi Biner (Otsu)...';
-                if (_pcvProgress > 0.6) stageText = 'Tahap 3-5: Morfologi Elips & Kontur minAreaRect...';
-                if (_pcvProgress > 0.85) stageText = 'Tahap 6-7: Kalkulasi Skala ${_pcvSelectedScale.toStringAsFixed(2)} px/cm & Anotasi Garis Hijau...';
+                if (_pcvProgress > 0.3) {
+                  stageText =
+                      'Tahap 1-2: Grayscale & Segmentasi Biner (Otsu)...';
+                }
+                if (_pcvProgress > 0.6) {
+                  stageText =
+                      'Tahap 3-5: Morfologi Elips & Kontur minAreaRect...';
+                }
+                if (_pcvProgress > 0.85) {
+                  stageText =
+                      'Tahap 6-7: Kalkulasi Skala ${_pcvSelectedScale.toStringAsFixed(2)} px/cm & Anotasi Garis Hijau...';
+                }
 
                 return CustomProgressBar(
                   value: _pcvProgress,
@@ -9094,23 +11090,37 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
               decoration: BoxDecoration(
                 color: const Color(0xFFE74C3C).withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFE74C3C).withValues(alpha: 0.35)),
+                border: Border.all(
+                  color: const Color(0xFFE74C3C).withValues(alpha: 0.35),
+                ),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.error_outline_rounded, color: Color(0xFFE74C3C), size: 18),
+                  const Icon(
+                    Icons.error_outline_rounded,
+                    color: Color(0xFFE74C3C),
+                    size: 18,
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       _pcvErrorMessage!,
-                      style: GoogleFonts.outfit(fontSize: 11, color: const Color(0xFFE74C3C)),
+                      style: GoogleFonts.outfit(
+                        fontSize: 11,
+                        color: const Color(0xFFE74C3C),
+                      ),
                     ),
                   ),
                   InkWell(
                     onTap: _measurePcvHeight,
                     child: Text(
                       'Coba Lagi',
-                      style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.bold, color: const Color(0xFFE74C3C), decoration: TextDecoration.underline),
+                      style: GoogleFonts.outfit(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFFE74C3C),
+                        decoration: TextDecoration.underline,
+                      ),
                     ),
                   ),
                 ],
@@ -9126,7 +11136,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
               decoration: BoxDecoration(
                 color: const Color(0xFF1ABC9C).withValues(alpha: 0.07),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF1ABC9C).withValues(alpha: 0.4)),
+                border: Border.all(
+                  color: const Color(0xFF1ABC9C).withValues(alpha: 0.4),
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -9139,7 +11151,11 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                           color: Color(0xFF1ABC9C),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.check_rounded, size: 16, color: Colors.white),
+                        child: const Icon(
+                          Icons.check_rounded,
+                          size: 16,
+                          color: Colors.white,
+                        ),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -9148,11 +11164,19 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                           children: [
                             Text(
                               'Pengukuran Panjang/Tinggi Badan Berhasil!',
-                              style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w800, color: text),
+                              style: GoogleFonts.outfit(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: text,
+                              ),
                             ),
                             Text(
-                              _pcvMessage ?? 'Data telah disinkronkan otomatis ke Formulir Antropometri di bawah.',
-                              style: GoogleFonts.outfit(fontSize: 10, color: sub),
+                              _pcvMessage ??
+                                  'Data telah disinkronkan otomatis ke Formulir Antropometri di bawah.',
+                              style: GoogleFonts.outfit(
+                                fontSize: 10,
+                                color: sub,
+                              ),
                             ),
                           ],
                         ),
@@ -9166,18 +11190,30 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                         child: Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF1A1D27) : Colors.white,
+                            color: isDark
+                                ? const Color(0xFF1A1D27)
+                                : Colors.white,
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(color: border),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Tinggi / Panjang Badan', style: GoogleFonts.outfit(fontSize: 9.5, color: sub)),
+                              Text(
+                                'Tinggi / Panjang Badan',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 9.5,
+                                  color: sub,
+                                ),
+                              ),
                               const SizedBox(height: 2),
                               Text(
                                 '${_pcvTinggiCm!.toStringAsFixed(1)} cm',
-                                style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w900, color: const Color(0xFF1ABC9C)),
+                                style: GoogleFonts.outfit(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                  color: const Color(0xFF1ABC9C),
+                                ),
                               ),
                             ],
                           ),
@@ -9188,18 +11224,32 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                         child: Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF1A1D27) : Colors.white,
+                            color: isDark
+                                ? const Color(0xFF1A1D27)
+                                : Colors.white,
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(color: border),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Metode Standar KIA', style: GoogleFonts.outfit(fontSize: 9.5, color: sub)),
+                              Text(
+                                'Metode Standar KIA',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 9.5,
+                                  color: sub,
+                                ),
+                              ),
                               const SizedBox(height: 2),
                               Text(
-                                _measurementMethod == 'PB' ? 'PB Telentang' : 'TB Berdiri',
-                                style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w800, color: const Color(0xFF3498DB)),
+                                _measurementMethod == 'PB'
+                                    ? 'PB Telentang'
+                                    : 'TB Berdiri',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: const Color(0xFF3498DB),
+                                ),
                               ),
                             ],
                           ),
@@ -9210,18 +11260,30 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                         child: Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF1A1D27) : Colors.white,
+                            color: isDark
+                                ? const Color(0xFF1A1D27)
+                                : Colors.white,
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(color: border),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Panjang Piksel Kontur', style: GoogleFonts.outfit(fontSize: 9.5, color: sub)),
+                              Text(
+                                'Panjang Piksel Kontur',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 9.5,
+                                  color: sub,
+                                ),
+                              ),
                               const SizedBox(height: 2),
                               Text(
                                 '${_pcvPanjangPx?.toStringAsFixed(1) ?? "-"} px',
-                                style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w800, color: text),
+                                style: GoogleFonts.outfit(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: text,
+                                ),
                               ),
                             ],
                           ),
@@ -9232,18 +11294,30 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                         child: Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF1A1D27) : Colors.white,
+                            color: isDark
+                                ? const Color(0xFF1A1D27)
+                                : Colors.white,
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(color: border),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Skala Kalibrasi', style: GoogleFonts.outfit(fontSize: 9.5, color: sub)),
+                              Text(
+                                'Skala Kalibrasi',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 9.5,
+                                  color: sub,
+                                ),
+                              ),
                               const SizedBox(height: 2),
                               Text(
                                 '${_pcvSkalaEfektif?.toStringAsFixed(2) ?? "9.09"} px/cm',
-                                style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w800, color: text),
+                                style: GoogleFonts.outfit(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: text,
+                                ),
                               ),
                             ],
                           ),
@@ -9307,7 +11381,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   sublabel,
                   style: GoogleFonts.outfit(
                     fontSize: 8.5,
-                    color: isSelected ? Colors.white.withValues(alpha: 0.85) : Colors.grey,
+                    color: isSelected
+                        ? Colors.white.withValues(alpha: 0.85)
+                        : Colors.grey,
                   ),
                 ),
               ],
