@@ -11,6 +11,7 @@ Modul Skrining Antropometri Berbasis IoT & Computer Vision Zero-Install untuk An
 | 3 | `supabase_flutter` | `^2.8.4` | Akses data pasien Puskesmas, penyimpanan sesi skrining, dan audit trail klinis. |
 | 4 | `uuid` | `^4.5.3` | Pembuatan session ID, idempotency key event sensor, dan pairing code transaksi. |
 | 5 | `OpenCV.js (Vendored)` | `4.9.0` (Lokal di `web/vitascale/`) | Computer Vision zero-install di browser untuk deteksi marker fisik papan ukur anak tanpa Python atau Local Agent. |
+| 6 | `http_parser` | `^4.1.2` | Menetapkan tipe JPEG pada unggahan foto multipart ke API PCV. |
 
 ## 2. Struktur Modul
 
