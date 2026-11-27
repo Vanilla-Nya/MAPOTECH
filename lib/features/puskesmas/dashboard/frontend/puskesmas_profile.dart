@@ -17,6 +17,7 @@ import 'package:mapotech/shared/widgets/animated_transitions.dart';
 import 'package:mapotech/shared/widgets/revgeo_wilayah_map_widget.dart';
 import 'package:image/image.dart' as img;
 import 'package:mapotech/features/puskesmas/dlc/vitascale/vitascale_dlc_gate.dart';
+import 'package:mapotech/features/puskesmas/dashboard/backend/puskesmas_satusehat_bookkeeping_service.dart';
 
 class PuskesmasProfile extends ConsumerStatefulWidget {
   final ValueChanged<String>? onNavigate;
@@ -52,8 +53,11 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
   late TextEditingController _ssOrgIdController;
   late TextEditingController _ssClientIdController;
   late TextEditingController _ssClientSecretController;
+  late TextEditingController _ssLocationIdController;
+  late TextEditingController _ssPractitionerIdController;
   late TextEditingController _bpjsApiKeyController;
   late TextEditingController _jknApiKeyController;
+  String _ssEnv = 'production';
 
   // Selected dropdown states
   String _selectedGender = 'Male';
@@ -143,6 +147,8 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
     _ssOrgIdController = TextEditingController();
     _ssClientIdController = TextEditingController();
     _ssClientSecretController = TextEditingController();
+    _ssLocationIdController = TextEditingController();
+    _ssPractitionerIdController = TextEditingController();
     _bpjsApiKeyController = TextEditingController();
     _jknApiKeyController = TextEditingController();
 
@@ -163,6 +169,8 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
     _ssOrgIdController.dispose();
     _ssClientIdController.dispose();
     _ssClientSecretController.dispose();
+    _ssLocationIdController.dispose();
+    _ssPractitionerIdController.dispose();
     _bpjsApiKeyController.dispose();
     _jknApiKeyController.dispose();
     super.dispose();
@@ -190,6 +198,10 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
 
       final db = SupabaseService();
       final detail = await db.fetchPuskesmasDetail(userId);
+      final ssCfg = await PuskesmasSatuSehatBookkeepingService().loadConfig(
+        facilityId: userId.toString(),
+        fallbackFacilityName: state.loggedInName ?? 'Puskesmas',
+      );
 
       final user = await SupabaseService.client
           .from('user')
@@ -245,11 +257,13 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
 
           _bpjsApiKeyController.text = detail?['bpjs_api_key'] ?? '';
           _jknApiKeyController.text = detail?['jkn_api_key'] ?? '';
-          _ssClientIdController.text = detail?['satusehat_client_id'] ?? '';
-          _ssClientSecretController.text =
-              detail?['satusehat_client_secret'] ?? '';
-          _ssOrgIdController.text = detail?['satusehat_org_id'] ?? '';
-          _ssAutoSync = detail?['satusehat_auto_sync'] as bool? ?? true;
+          _ssClientIdController.text = ssCfg.clientId;
+          _ssClientSecretController.text = ssCfg.clientSecret;
+          _ssOrgIdController.text = ssCfg.organizationId;
+          _ssLocationIdController.text = ssCfg.locationId;
+          _ssPractitionerIdController.text = ssCfg.practitionerId;
+          _ssEnv = ssCfg.isStaging ? 'staging' : 'production';
+          _ssAutoSync = ssCfg.autoSync;
           _showProfileInSearch = detail?['is_visible'] as bool? ?? true;
           _serveBPJSPatients = detail?['is_bpjs'] as bool? ?? true;
           _mapsLinkController.text = detail?['google_maps_link'] ?? '';
@@ -410,6 +424,20 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
       };
 
       await db.savePuskesmasDetail(userId, detailData);
+      await PuskesmasSatuSehatBookkeepingService().saveConfig(
+        PuskesmasSatuSehatConfig(
+          facilityId: userId.toString(),
+          facilityName: _nameController.text.trim(),
+          clientId: _ssClientIdController.text.trim(),
+          clientSecret: _ssClientSecretController.text.trim(),
+          organizationId: _ssOrgIdController.text.trim(),
+          locationId: _ssLocationIdController.text.trim(),
+          practitionerId: _ssPractitionerIdController.text.trim(),
+          env: _ssEnv,
+          autoSync: _ssAutoSync,
+        ),
+      );
+      notifier.setSatusehatAutoSync(_ssAutoSync);
 
       // Update user table
       await SupabaseService.client
@@ -3146,20 +3174,60 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
               ),
             ),
             const SizedBox(height: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE8F6F3),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                'PRODUCTION ENVIRONMENT',
-                style: GoogleFonts.outfit(
-                  fontSize: 8,
-                  fontWeight: FontWeight.w900,
-                  color: const Color(0xFF00A67E),
+            Row(
+              children: [
+                GestureDetector(
+                  onTap: () => setState(() => _ssEnv = 'production'),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _ssEnv == 'production'
+                          ? const Color(0xFF00A67E)
+                          : const Color(0xFFE8F6F3),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'PRODUCTION ENVIRONMENT',
+                      style: GoogleFonts.outfit(
+                        fontSize: 8.5,
+                        fontWeight: FontWeight.w900,
+                        color: _ssEnv == 'production'
+                            ? Colors.white
+                            : const Color(0xFF00A67E),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: () => setState(() => _ssEnv = 'staging'),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _ssEnv == 'staging'
+                          ? Colors.blueAccent
+                          : Colors.blueAccent.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'STAGING / SANDBOX',
+                      style: GoogleFonts.outfit(
+                        fontSize: 8.5,
+                        fontWeight: FontWeight.w900,
+                        color: _ssEnv == 'staging'
+                            ? Colors.white
+                            : Colors.blueAccent,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 20),
 
@@ -3188,6 +3256,32 @@ class _PuskesmasProfileState extends ConsumerState<PuskesmasProfile> {
               textColor,
               borderColor,
               obscureText: true,
+            ),
+            const SizedBox(height: 16),
+
+            _buildInputLabel(
+              isEn ? 'Location ID (Puskesmas)' : 'Location ID (Lokasi Puskesmas)',
+              subtitleColor,
+            ),
+            _buildTextField(
+              _ssLocationIdController,
+              'e.g. b017aa54-f1df-4ec2-9529-81788148b1d9',
+              textColor,
+              borderColor,
+            ),
+            const SizedBox(height: 16),
+
+            _buildInputLabel(
+              isEn
+                  ? 'Practitioner ID (SATUSEHAT Nakes ID)'
+                  : 'Practitioner ID (ID SATUSEHAT Nakes)',
+              subtitleColor,
+            ),
+            _buildTextField(
+              _ssPractitionerIdController,
+              'e.g. 10009880728',
+              textColor,
+              borderColor,
             ),
           ] else if (_activeApiSubTab == 1) ...[
             Text(

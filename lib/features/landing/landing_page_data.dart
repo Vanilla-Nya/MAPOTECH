@@ -409,6 +409,15 @@ class LandingPageNotifier extends StateNotifier<LandingPageState> {
       } catch (e) {
         debugPrint('Failed to save satusehat_auto_sync: $e');
       }
+    } else if (userId != null && state.loggedInRole == 'puskesmas') {
+      try {
+        await SupabaseService.client
+            .from('user_detail_public_health_center')
+            .update({'satusehat_auto_sync': val})
+            .eq('id', userId);
+      } catch (e) {
+        debugPrint('Failed to save puskesmas satusehat_auto_sync: $e');
+      }
     }
   }
 

@@ -346,9 +346,23 @@ final Map<String, Map<String, PageTutorialData>> _idTutorials = {
       ],
     ),
   },
+  'puskesmas': {
+    'pembukuan': const PageTutorialData(
+      title: 'Pembukuan & Pengiriman SATUSEHAT Puskesmas',
+      description: 'Kelola sinkronisasi rekam medis Puskesmas (MomiCare KIA, VitaScale Anak, dan Poli) ke platform SATUSEHAT Kemenkes RI.',
+      steps: [
+        TutorialStep(
+          title: 'Konfigurasi API Puskesmas',
+          description: 'Atur Organization ID, Client ID, Client Secret, Location ID, dan Practitioner ID milik Puskesmas pada tombol Konfigurasi SATUSEHAT atau menu Profil.',
+        ),
+        TutorialStep(
+          title: 'Daftar Pasien & Sinkronisasi',
+          description: 'Klik baris kunjungan pasien untuk melihat tanda vital, diagnosis ICD-10, dan mengirim data FHIR R4 secara satuan atau massal.',
+        ),
+      ],
+    ),
+  },
 };
-
-/// Localized English Page Tutorials
 final Map<String, Map<String, PageTutorialData>> _enTutorials = {
   'dokter': {
     'dashboard': const PageTutorialData(
@@ -670,6 +684,22 @@ final Map<String, Map<String, PageTutorialData>> _enTutorials = {
         TutorialStep(
           title: 'Drug Allergies',
           description: 'List all drug allergies to ensure doctors do not issue incompatible prescriptions.',
+        ),
+      ],
+    ),
+  },
+  'puskesmas': {
+    'pembukuan': const PageTutorialData(
+      title: 'Puskesmas Bookkeeping & SATUSEHAT Dispatch',
+      description: 'Manage Puskesmas clinical record synchronization (MomiCare ANC, VitaScale Child, and Outpatient) to Kemenkes RI SATUSEHAT.',
+      steps: [
+        TutorialStep(
+          title: 'Puskesmas API Configuration',
+          description: 'Set your Puskesmas Organization ID, Client ID, Client Secret, Location ID, and Practitioner ID using SATUSEHAT Config or Profile.',
+        ),
+        TutorialStep(
+          title: 'Patient List & Sync',
+          description: 'Tap any patient visit row to inspect vital signs, ICD-10 diagnosis, and dispatch FHIR R4 payloads individually or in bulk.',
         ),
       ],
     ),

@@ -277,6 +277,14 @@ class VitaScaleRepository implements IVitaScaleRepository {
 
   static final List<ScreeningSession> _mockHistory = [];
 
+  /// Snapshot riwayat skrining lokal sesi aktif untuk sinkronisasi Puskesmas
+  static List<ScreeningSession> get localScreeningHistory =>
+      List.unmodifiable(_mockHistory);
+
+  /// Snapshot profil anak bawaan faskes Puskesmas
+  static List<ChildProfile> get registeredChildrenSnapshot =>
+      List.unmodifiable(_sampleChildren);
+
   // Pool gabungan seluruh pasien balita terdaftar hardcode (sample faskes + katalog master Mapotech)
   static List<ChildProfile> get _allRegisteredChildren {
     final Map<String, ChildProfile> map = {};

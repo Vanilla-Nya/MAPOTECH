@@ -32,4 +32,5 @@ export 'custom_form_stepper.dart';
 export 'formatted_markdown_text.dart';
 export 'medical_letter_preview_dialog.dart';
 export 'letter_verification_page.dart';
+export 'segera_hadir_mockup.dart';
 export 'package:mapotech/shared/l10n/app_translations.dart';

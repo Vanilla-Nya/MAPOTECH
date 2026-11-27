@@ -43,6 +43,7 @@ import 'package:mapotech/features/puskesmas/dashboard/frontend/puskesmas_pasien.
 import 'package:mapotech/features/puskesmas/dashboard/frontend/puskesmas_pantauan_ibu_hamil.dart';
 import 'package:mapotech/features/puskesmas/dashboard/frontend/puskesmas_form_ibu_hamil.dart';
 import 'package:mapotech/features/puskesmas/dashboard/frontend/puskesmas_profile.dart';
+import 'package:mapotech/features/puskesmas/dashboard/frontend/puskesmas_pembukuan.dart';
 import 'package:mapotech/features/ponkesdes/dashboard/frontend/ponkesdes_profile.dart';
 import 'package:mapotech/features/ponkesdes/dashboard/frontend/ponkesdes_dashboard.dart';
 import 'package:mapotech/features/pekerja/dashboard/frontend/management_pekerja.dart';
@@ -902,8 +903,9 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
           );
         case 'settings':
           return const DokterSettings();
-        case 'pemeriksaan':
         case 'pembukuan':
+          return const PuskesmasPembukuan();
+        case 'pemeriksaan':
         case 'obat':
         case 'antrian':
         case 'asisten_praktik':
