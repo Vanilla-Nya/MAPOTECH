@@ -981,7 +981,7 @@ class CommunityHealthCenterService {
         final detailRows = await client
             .schema('public')
             .from('user_detail_public_health_center')
-            .select('id, nama_faskes')
+            .select('id, facility_name, facility_code')
             .eq('id', cleanFacilityId)
             .limit(1);
         final deviceRows = await client
@@ -1006,7 +1006,8 @@ class CommunityHealthCenterService {
             deviceMap['user_role'] ??= userMap['role'];
           }
           if (detailMap != null) {
-            deviceMap['facility_name'] ??= detailMap['nama_faskes'];
+            deviceMap['facility_name'] ??=
+                detailMap['facility_name'] ?? detailMap['nama_faskes'];
           }
           _writeLocalJsonList(_userMqttCfgCacheKey(cacheScope), [deviceMap]);
           return deviceMap;
@@ -1019,18 +1020,28 @@ class CommunityHealthCenterService {
             ...localUserCfg.first,
             if (userMap != null) 'user_name': userMap['name'],
             if (userMap != null) 'user_role': userMap['role'],
-            if (detailMap != null) 'facility_name': detailMap['nama_faskes'],
+            if (detailMap != null)
+              'facility_name':
+                  detailMap['facility_name'] ?? detailMap['nama_faskes'],
           };
         }
 
         if (userMap != null || detailMap != null) {
+          final detailFaskesCode =
+              detailMap?['facility_code']?.toString().trim();
           return {
             'facility_id': cleanFacilityId,
-            'faskes_code': normalizedFallbackCode,
+            'faskes_code':
+                (detailFaskesCode != null && detailFaskesCode.isNotEmpty)
+                    ? detailFaskesCode
+                    : normalizedFallbackCode,
             'device_id': normalizedFallbackDevice,
             'user_name': userMap?['name'],
             'user_role': userMap?['role'],
-            'facility_name': detailMap?['nama_faskes'] ?? userMap?['name'],
+            'facility_name':
+                detailMap?['facility_name'] ??
+                detailMap?['nama_faskes'] ??
+                userMap?['name'],
           };
         }
       } catch (e) {

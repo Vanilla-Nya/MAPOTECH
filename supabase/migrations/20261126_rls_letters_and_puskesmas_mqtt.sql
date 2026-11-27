@@ -1,25 +1,24 @@
 -- ============================================================================
 -- MIGRATION: 20261126_rls_letters_and_puskesmas_mqtt.sql
 -- Purpose:
---   1. Public Health Center (Puskesmas/Ponkesdes) MQTT & IoT device settings
---      with RLS & RPCs anchored directly to `public."user"` (`id`, `role`).
---   2. Medical Letter (Surat Rujukan, Surat Keterangan Sehat, Surat Keterangan
---      Sakit) QR Verification SECURITY DEFINER RPC (`get_medical_letter_verification`)
---      with masked NIK & safe doctor public profile + scoped RLS policies on
---      `private_doctor.*` and `public` doctor tables.
---
--- Auth Note:
---   MAPOTECH currently authenticates users via `public."user"` + client BCrypt
---   using the Supabase `anon` key (`auth.uid()` is NULL unless Supabase Auth is
---   active). Policies below therefore validate membership directly against
---   `public."user"` while staying forward-compatible with `auth.uid()`.
+--   1. Ensure `community_health_center.vitascale_iot_devices` and
+--      `community_health_center.vitascale_saved_wifi` exist with MQTT fields
+--      (`ws_path`, `cloud_gateway_url`, `use_wildcard`) and RLS + RPCs anchored
+--      directly to `public."user"`.
+--   2. Configure Medical Letter (Surat Rujukan, Surat Keterangan Sehat, Surat
+--      Keterangan Sakit) QR Verification RPC (`get_medical_letter_verification`)
+--      with masked NIK & safe public doctor profile, plus scoped RLS policies
+--      on `private_doctor.*` and `public` doctor tables + missing FK indexes.
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
--- 0. SCHEMA USAGE GRANTS
+-- 0. SCHEMAS & GRANTS
 -- ----------------------------------------------------------------------------
+CREATE SCHEMA IF NOT EXISTS private;
 CREATE SCHEMA IF NOT EXISTS community_health_center;
+
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+GRANT USAGE ON SCHEMA private TO anon, authenticated, service_role;
 GRANT USAGE ON SCHEMA community_health_center TO anon, authenticated, service_role;
 
 DO $$
@@ -32,29 +31,19 @@ BEGIN
 END $$;
 
 -- ============================================================================
--- PART 1: PUSKESMAS / PUBLIC HEALTH CENTER MQTT SETTINGS (ANCHORED TO public.user)
+-- PART 1: INTERNAL RLS HELPER FUNCTIONS (PRIVATE SCHEMA, NOT EXPOSED TO API)
 -- ============================================================================
 
-ALTER TABLE IF EXISTS community_health_center.vitascale_iot_devices
-  ADD COLUMN IF NOT EXISTS ws_path TEXT NOT NULL DEFAULT '/mqtt',
-  ADD COLUMN IF NOT EXISTS cloud_gateway_url TEXT NOT NULL DEFAULT 'https://mapotechiotmqtt.vercel.app',
-  ADD COLUMN IF NOT EXISTS use_wildcard BOOLEAN NOT NULL DEFAULT true;
-
-CREATE INDEX IF NOT EXISTS idx_vitascale_iot_devices_facility_updated
-  ON community_health_center.vitascale_iot_devices(facility_id, updated_at DESC);
-
--- Helper: validates that `p_user_id` is a valid Puskesmas / Ponkesdes account
--- in `public."user"` (or active `auth.uid()`).
-CREATE OR REPLACE FUNCTION public.is_valid_public_health_center_user(p_user_id uuid)
+CREATE OR REPLACE FUNCTION private.is_valid_public_health_center_user(p_user_id uuid)
 RETURNS boolean
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET search_path = public
+SET search_path = ''
 AS $$
   SELECT p_user_id IS NOT NULL
     AND (
-      (auth.uid() IS NOT NULL AND auth.uid() = p_user_id)
+      ((SELECT auth.uid()) IS NOT NULL AND (SELECT auth.uid()) = p_user_id)
       OR EXISTS (
         SELECT 1
         FROM public."user" u
@@ -70,20 +59,16 @@ AS $$
     );
 $$;
 
-REVOKE ALL ON FUNCTION public.is_valid_public_health_center_user(uuid) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.is_valid_public_health_center_user(uuid) TO anon, authenticated, service_role;
-
--- Helper: validates `p_doctor_id` is a valid Doctor / Private Practice user in `public."user"`.
-CREATE OR REPLACE FUNCTION public.is_valid_doctor_user(p_doctor_id uuid)
+CREATE OR REPLACE FUNCTION private.is_valid_doctor_user(p_doctor_id uuid)
 RETURNS boolean
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET search_path = public
+SET search_path = ''
 AS $$
   SELECT p_doctor_id IS NOT NULL
     AND (
-      (auth.uid() IS NOT NULL AND auth.uid() = p_doctor_id)
+      ((SELECT auth.uid()) IS NOT NULL AND (SELECT auth.uid()) = p_doctor_id)
       OR EXISTS (
         SELECT 1
         FROM public."user" u
@@ -101,28 +86,82 @@ AS $$
     );
 $$;
 
-REVOKE ALL ON FUNCTION public.is_valid_doctor_user(uuid) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.is_valid_doctor_user(uuid) TO anon, authenticated, service_role;
-
--- Helper: validates `p_user_id` exists in `public."user"` (doctor/patient/facility).
-CREATE OR REPLACE FUNCTION public.is_existing_public_user(p_user_id uuid)
+CREATE OR REPLACE FUNCTION private.is_existing_public_user(p_user_id uuid)
 RETURNS boolean
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET search_path = public
+SET search_path = ''
 AS $$
   SELECT p_user_id IS NOT NULL
     AND (
-      (auth.uid() IS NOT NULL AND auth.uid() = p_user_id)
+      ((SELECT auth.uid()) IS NOT NULL AND (SELECT auth.uid()) = p_user_id)
       OR EXISTS (SELECT 1 FROM public."user" u WHERE u.id = p_user_id)
     );
 $$;
 
-REVOKE ALL ON FUNCTION public.is_existing_public_user(uuid) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.is_existing_public_user(uuid) TO anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION private.is_valid_public_health_center_user(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION private.is_valid_public_health_center_user(uuid) TO anon, authenticated, service_role;
 
--- RLS on `community_health_center.vitascale_iot_devices` & `vitascale_saved_wifi`
+REVOKE ALL ON FUNCTION private.is_valid_doctor_user(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION private.is_valid_doctor_user(uuid) TO anon, authenticated, service_role;
+
+REVOKE ALL ON FUNCTION private.is_existing_public_user(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION private.is_existing_public_user(uuid) TO anon, authenticated, service_role;
+
+-- ============================================================================
+-- PART 2: PUSKESMAS / PUBLIC HEALTH CENTER MQTT & WI-FI SETTINGS + RLS
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS community_health_center.vitascale_iot_devices (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  facility_id       UUID REFERENCES public."user"(id) ON DELETE CASCADE,
+  faskes_code       TEXT NOT NULL DEFAULT 'PUSKESMAS-001',
+  device_id         TEXT NOT NULL DEFAULT 'timbangan-01',
+  broker_host       TEXT NOT NULL DEFAULT 'broker.emqx.io',
+  broker_port       INTEGER NOT NULL DEFAULT 8084,
+  ws_path           TEXT NOT NULL DEFAULT '/mqtt',
+  cloud_gateway_url TEXT NOT NULL DEFAULT 'https://mapotechiotmqtt.vercel.app',
+  tripod_height_cm  NUMERIC(6,2) NOT NULL DEFAULT 200.0,
+  cal_factor        NUMERIC(10,2) DEFAULT 420.0,
+  use_wildcard      BOOLEAN NOT NULL DEFAULT true,
+  active_wifi_ssid  TEXT,
+  last_rssi_dbm     INTEGER,
+  last_status       TEXT DEFAULT 'offline',
+  last_seen_at      TIMESTAMPTZ,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (faskes_code, device_id)
+);
+
+ALTER TABLE IF EXISTS community_health_center.vitascale_iot_devices
+  ADD COLUMN IF NOT EXISTS ws_path TEXT NOT NULL DEFAULT '/mqtt',
+  ADD COLUMN IF NOT EXISTS cloud_gateway_url TEXT NOT NULL DEFAULT 'https://mapotechiotmqtt.vercel.app',
+  ADD COLUMN IF NOT EXISTS use_wildcard BOOLEAN NOT NULL DEFAULT true;
+
+CREATE INDEX IF NOT EXISTS idx_vitascale_iot_devices_facility_updated
+  ON community_health_center.vitascale_iot_devices(facility_id, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS community_health_center.vitascale_saved_wifi (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  facility_id       UUID REFERENCES public."user"(id) ON DELETE CASCADE,
+  faskes_code       TEXT NOT NULL DEFAULT 'PUSKESMAS-001',
+  device_id         TEXT NOT NULL DEFAULT 'timbangan-01',
+  ssid              TEXT NOT NULL,
+  saved_password    TEXT DEFAULT '',
+  security_type     TEXT DEFAULT 'WPA2',
+  last_rssi_dbm     INTEGER,
+  is_active         BOOLEAN NOT NULL DEFAULT false,
+  last_connected_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (faskes_code, ssid)
+);
+
+CREATE INDEX IF NOT EXISTS idx_vitascale_saved_wifi_facility
+  ON community_health_center.vitascale_saved_wifi(facility_id);
+CREATE INDEX IF NOT EXISTS idx_vitascale_saved_wifi_faskes
+  ON community_health_center.vitascale_saved_wifi(faskes_code);
+
 ALTER TABLE community_health_center.vitascale_iot_devices ENABLE ROW LEVEL SECURITY;
 ALTER TABLE community_health_center.vitascale_saved_wifi ENABLE ROW LEVEL SECURITY;
 
@@ -141,26 +180,26 @@ CREATE POLICY "vitascale_iot_devices_puskesmas_select"
   ON community_health_center.vitascale_iot_devices
   FOR SELECT
   TO anon, authenticated
-  USING (public.is_valid_public_health_center_user(facility_id));
+  USING ((SELECT private.is_valid_public_health_center_user(facility_id)));
 
 CREATE POLICY "vitascale_iot_devices_puskesmas_insert"
   ON community_health_center.vitascale_iot_devices
   FOR INSERT
   TO anon, authenticated
-  WITH CHECK (public.is_valid_public_health_center_user(facility_id));
+  WITH CHECK ((SELECT private.is_valid_public_health_center_user(facility_id)));
 
 CREATE POLICY "vitascale_iot_devices_puskesmas_update"
   ON community_health_center.vitascale_iot_devices
   FOR UPDATE
   TO anon, authenticated
-  USING (public.is_valid_public_health_center_user(facility_id))
-  WITH CHECK (public.is_valid_public_health_center_user(facility_id));
+  USING ((SELECT private.is_valid_public_health_center_user(facility_id)))
+  WITH CHECK ((SELECT private.is_valid_public_health_center_user(facility_id)));
 
 CREATE POLICY "vitascale_iot_devices_puskesmas_delete"
   ON community_health_center.vitascale_iot_devices
   FOR DELETE
   TO anon, authenticated
-  USING (public.is_valid_public_health_center_user(facility_id));
+  USING ((SELECT private.is_valid_public_health_center_user(facility_id)));
 
 DROP POLICY IF EXISTS "policy_all_access_vitascale_saved_wifi"
   ON community_health_center.vitascale_saved_wifi;
@@ -177,26 +216,26 @@ CREATE POLICY "vitascale_saved_wifi_puskesmas_select"
   ON community_health_center.vitascale_saved_wifi
   FOR SELECT
   TO anon, authenticated
-  USING (public.is_valid_public_health_center_user(facility_id));
+  USING ((SELECT private.is_valid_public_health_center_user(facility_id)));
 
 CREATE POLICY "vitascale_saved_wifi_puskesmas_insert"
   ON community_health_center.vitascale_saved_wifi
   FOR INSERT
   TO anon, authenticated
-  WITH CHECK (public.is_valid_public_health_center_user(facility_id));
+  WITH CHECK ((SELECT private.is_valid_public_health_center_user(facility_id)));
 
 CREATE POLICY "vitascale_saved_wifi_puskesmas_update"
   ON community_health_center.vitascale_saved_wifi
   FOR UPDATE
   TO anon, authenticated
-  USING (public.is_valid_public_health_center_user(facility_id))
-  WITH CHECK (public.is_valid_public_health_center_user(facility_id));
+  USING ((SELECT private.is_valid_public_health_center_user(facility_id)))
+  WITH CHECK ((SELECT private.is_valid_public_health_center_user(facility_id)));
 
 CREATE POLICY "vitascale_saved_wifi_puskesmas_delete"
   ON community_health_center.vitascale_saved_wifi
   FOR DELETE
   TO anon, authenticated
-  USING (public.is_valid_public_health_center_user(facility_id));
+  USING ((SELECT private.is_valid_public_health_center_user(facility_id)));
 
 GRANT SELECT, INSERT, UPDATE, DELETE
   ON TABLE community_health_center.vitascale_iot_devices
@@ -205,27 +244,29 @@ GRANT SELECT, INSERT, UPDATE, DELETE
   ON TABLE community_health_center.vitascale_saved_wifi
   TO anon, authenticated, service_role;
 
--- RLS on `public.user_detail_public_health_center` anchored to `public."user"`
+-- Replace permissive policies on `public.user_detail_public_health_center` with user-anchored policies
 DO $$
 BEGIN
   IF to_regclass('public.user_detail_public_health_center') IS NOT NULL THEN
     EXECUTE 'ALTER TABLE public.user_detail_public_health_center ENABLE ROW LEVEL SECURITY';
 
+    EXECUTE 'DROP POLICY IF EXISTS "Allow public select user_detail_public_health_center" ON public.user_detail_public_health_center';
+    EXECUTE 'DROP POLICY IF EXISTS "Allow public insert user_detail_public_health_center" ON public.user_detail_public_health_center';
+    EXECUTE 'DROP POLICY IF EXISTS "Allow public update user_detail_public_health_center" ON public.user_detail_public_health_center';
+    EXECUTE 'DROP POLICY IF EXISTS "Allow public delete user_detail_public_health_center" ON public.user_detail_public_health_center';
     EXECUTE 'DROP POLICY IF EXISTS "puskesmas_detail_public_select" ON public.user_detail_public_health_center';
-    EXECUTE 'CREATE POLICY "puskesmas_detail_public_select" ON public.user_detail_public_health_center FOR SELECT TO anon, authenticated USING (true)';
-
     EXECUTE 'DROP POLICY IF EXISTS "puskesmas_detail_owner_insert" ON public.user_detail_public_health_center';
-    EXECUTE 'CREATE POLICY "puskesmas_detail_owner_insert" ON public.user_detail_public_health_center FOR INSERT TO anon, authenticated WITH CHECK (public.is_valid_public_health_center_user(id))';
-
     EXECUTE 'DROP POLICY IF EXISTS "puskesmas_detail_owner_update" ON public.user_detail_public_health_center';
-    EXECUTE 'CREATE POLICY "puskesmas_detail_owner_update" ON public.user_detail_public_health_center FOR UPDATE TO anon, authenticated USING (public.is_valid_public_health_center_user(id)) WITH CHECK (public.is_valid_public_health_center_user(id))';
-
     EXECUTE 'DROP POLICY IF EXISTS "puskesmas_detail_owner_delete" ON public.user_detail_public_health_center';
-    EXECUTE 'CREATE POLICY "puskesmas_detail_owner_delete" ON public.user_detail_public_health_center FOR DELETE TO anon, authenticated USING (public.is_valid_public_health_center_user(id))';
+
+    EXECUTE 'CREATE POLICY "puskesmas_detail_public_select" ON public.user_detail_public_health_center FOR SELECT TO anon, authenticated USING (true)';
+    EXECUTE 'CREATE POLICY "puskesmas_detail_owner_insert" ON public.user_detail_public_health_center FOR INSERT TO anon, authenticated WITH CHECK ((SELECT private.is_valid_public_health_center_user(id)))';
+    EXECUTE 'CREATE POLICY "puskesmas_detail_owner_update" ON public.user_detail_public_health_center FOR UPDATE TO anon, authenticated USING ((SELECT private.is_valid_public_health_center_user(id))) WITH CHECK ((SELECT private.is_valid_public_health_center_user(id)))';
+    EXECUTE 'CREATE POLICY "puskesmas_detail_owner_delete" ON public.user_detail_public_health_center FOR DELETE TO anon, authenticated USING ((SELECT private.is_valid_public_health_center_user(id)))';
   END IF;
 END $$;
 
--- RPC: Fetch Puskesmas MQTT settings anchored to `public."user"`
+-- RPC: Fetch Puskesmas MQTT settings anchored directly to `public."user"`
 CREATE OR REPLACE FUNCTION public.get_puskesmas_mqtt_config(
   p_user_id uuid,
   p_device_id text DEFAULT NULL
@@ -234,19 +275,20 @@ RETURNS jsonb
 LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
-SET search_path = public, community_health_center
+SET search_path = ''
 AS $$
 DECLARE
   v_user jsonb;
   v_detail jsonb;
   v_device community_health_center.vitascale_iot_devices%ROWTYPE;
   v_has_device boolean := false;
+  v_default_code text;
 BEGIN
   IF p_user_id IS NULL THEN
     RETURN NULL;
   END IF;
 
-  SELECT to_jsonb(u) - 'password_hash' - 'password'
+  SELECT to_jsonb(u) - 'password' - 'password_hash' - 'two_factor_secret' - 'two_factor_recovery_codes'
     INTO v_user
   FROM public."user" u
   WHERE u.id = p_user_id
@@ -269,6 +311,11 @@ BEGIN
       USING p_user_id;
   END IF;
 
+  v_default_code := COALESCE(
+    NULLIF(TRIM(COALESCE(v_detail->>'facility_code', '')), ''),
+    'PUSKESMAS-001'
+  );
+
   SELECT d.*
     INTO v_device
   FROM community_health_center.vitascale_iot_devices d
@@ -289,8 +336,13 @@ BEGIN
     'facility_id', p_user_id,
     'user_name', COALESCE(v_user->>'name', ''),
     'user_role', COALESCE(v_user->>'role', 'puskesmas'),
-    'facility_name', COALESCE(NULLIF(v_detail->>'nama_faskes', ''), v_user->>'name', 'Puskesmas'),
-    'faskes_code', CASE WHEN v_has_device THEN v_device.faskes_code ELSE 'PUSKESMAS-001' END,
+    'facility_name', COALESCE(
+      NULLIF(v_detail->>'facility_name', ''),
+      NULLIF(v_detail->>'nama_faskes', ''),
+      v_user->>'name',
+      'Puskesmas'
+    ),
+    'faskes_code', CASE WHEN v_has_device THEN v_device.faskes_code ELSE v_default_code END,
     'device_id', CASE WHEN v_has_device THEN v_device.device_id ELSE COALESCE(NULLIF(TRIM(COALESCE(p_device_id, '')), ''), 'timbangan-01') END,
     'broker_host', CASE WHEN v_has_device THEN v_device.broker_host ELSE 'broker.emqx.io' END,
     'broker_port', CASE WHEN v_has_device THEN v_device.broker_port ELSE 8084 END,
@@ -312,7 +364,7 @@ $$;
 REVOKE ALL ON FUNCTION public.get_puskesmas_mqtt_config(uuid, text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_puskesmas_mqtt_config(uuid, text) TO anon, authenticated, service_role;
 
--- RPC: Save/Upsert Puskesmas MQTT settings anchored to `public."user"`
+-- RPC: Save/Upsert Puskesmas MQTT settings anchored directly to `public."user"`
 CREATE OR REPLACE FUNCTION public.save_puskesmas_mqtt_config(
   p_user_id uuid,
   p_faskes_code text DEFAULT 'PUSKESMAS-001',
@@ -328,7 +380,7 @@ CREATE OR REPLACE FUNCTION public.save_puskesmas_mqtt_config(
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, community_health_center
+SET search_path = ''
 AS $$
 DECLARE
   v_code text := COALESCE(NULLIF(TRIM(p_faskes_code), ''), 'PUSKESMAS-001');
@@ -341,19 +393,30 @@ DECLARE
   v_existing_id uuid;
   v_saved community_health_center.vitascale_iot_devices%ROWTYPE;
 BEGIN
-  IF NOT public.is_valid_public_health_center_user(p_user_id) THEN
+  IF NOT private.is_valid_public_health_center_user(p_user_id) THEN
     RAISE EXCEPTION 'Unauthorized: facility_id % bukan user puskesmas/ponkesdes yang valid di public.user', p_user_id;
   END IF;
 
-  SELECT id
+  SELECT d.id
     INTO v_existing_id
-  FROM community_health_center.vitascale_iot_devices
-  WHERE facility_id = p_user_id
-    AND lower(device_id) = lower(v_device)
-  ORDER BY updated_at DESC
+  FROM community_health_center.vitascale_iot_devices d
+  WHERE d.facility_id = p_user_id
+    AND lower(d.device_id) = lower(v_device)
+  ORDER BY d.updated_at DESC
   LIMIT 1;
 
   IF v_existing_id IS NOT NULL THEN
+    IF EXISTS (
+      SELECT 1 FROM community_health_center.vitascale_iot_devices d
+      WHERE d.faskes_code = v_code
+        AND d.device_id = v_device
+        AND d.id <> v_existing_id
+        AND d.facility_id IS NOT NULL
+        AND d.facility_id <> p_user_id
+    ) THEN
+      RAISE EXCEPTION 'Device (%, %) sudah terdaftar pada faskes lain.', v_code, v_device;
+    END IF;
+
     UPDATE community_health_center.vitascale_iot_devices
        SET faskes_code = v_code,
            device_id = v_device,
@@ -368,6 +431,16 @@ BEGIN
      WHERE id = v_existing_id
      RETURNING * INTO v_saved;
   ELSE
+    IF EXISTS (
+      SELECT 1 FROM community_health_center.vitascale_iot_devices d
+      WHERE d.faskes_code = v_code
+        AND d.device_id = v_device
+        AND d.facility_id IS NOT NULL
+        AND d.facility_id <> p_user_id
+    ) THEN
+      RAISE EXCEPTION 'Device (%, %) sudah terdaftar pada faskes lain.', v_code, v_device;
+    END IF;
+
     INSERT INTO community_health_center.vitascale_iot_devices (
       facility_id,
       faskes_code,
@@ -415,13 +488,9 @@ REVOKE ALL ON FUNCTION public.save_puskesmas_mqtt_config(uuid, text, text, text,
 GRANT EXECUTE ON FUNCTION public.save_puskesmas_mqtt_config(uuid, text, text, text, integer, text, text, numeric, boolean, text) TO anon, authenticated, service_role;
 
 -- ============================================================================
--- PART 2: MEDICAL LETTER QR VERIFICATION RPC & RLS (SURAT RUJUKAN / SEHAT / SAKIT)
+-- PART 3: MEDICAL LETTER QR VERIFICATION RPC & RLS (SURAT RUJUKAN / SEHAT / SAKIT)
 -- ============================================================================
 
--- Safe public QR verification RPC (`SECURITY DEFINER`):
--- Only exposes issued letters (`is_rujukan = true` OR non-empty
--- `surat_keterangan_type`), masks patient NIK, never exposes `password_hash`,
--- and returns public doctor profile + schedules + encounter clinical hash.
 CREATE OR REPLACE FUNCTION public.get_medical_letter_verification(
   p_encounter_id uuid
 )
@@ -429,7 +498,7 @@ RETURNS jsonb
 LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
-SET search_path = public, private_doctor
+SET search_path = ''
 AS $$
 DECLARE
   v_ce jsonb;
@@ -458,8 +527,8 @@ BEGIN
   FROM private_doctor.clinical_encounters ce
   WHERE ce.id = p_encounter_id
     AND (
-      COALESCE((to_jsonb(ce)->>'is_rujukan')::boolean, false) = true
-      OR NULLIF(TRIM(COALESCE(to_jsonb(ce)->>'surat_keterangan_type', '')), '') IS NOT NULL
+      COALESCE(ce.is_rujukan, false) = true
+      OR NULLIF(TRIM(COALESCE(ce.surat_keterangan_type, '')), '') IS NOT NULL
     )
   LIMIT 1;
 
@@ -496,20 +565,46 @@ BEGIN
   IF NULLIF(v_q->>'id_doctor', '') IS NOT NULL THEN
     v_doctor_id := (v_q->>'id_doctor')::uuid;
 
-    SELECT to_jsonb(u) - 'password_hash' - 'password'
+    SELECT jsonb_build_object(
+      'id', u.id,
+      'name', u.name,
+      'avatar_url', u.avatar_url,
+      'phone_number', u.phone_number,
+      'address', u.address,
+      'province', u.province,
+      'district', u.district,
+      'sub_district', u.sub_district,
+      'village', u.village
+    )
       INTO v_doc_user
     FROM public."user" u
     WHERE u.id = v_doctor_id
     LIMIT 1;
 
     IF to_regclass('public.user_detail_doctor') IS NOT NULL THEN
-      EXECUTE 'SELECT to_jsonb(udd) FROM public.user_detail_doctor udd WHERE udd.id = $1 LIMIT 1'
+      EXECUTE 'SELECT jsonb_build_object(
+        ''profession'', udd.profession,
+        ''nama_faskes'', udd.nama_faskes,
+        ''whatsapp_number'', udd.whatsapp_number,
+        ''about'', udd.about,
+        ''google_maps_link'', udd.google_maps_link,
+        ''latitude'', udd.latitude,
+        ''longitude'', udd.longitude,
+        ''qr_token'', udd.qr_token,
+        ''practice_licenses'', udd.practice_licenses
+      ) FROM public.user_detail_doctor udd WHERE udd.id = $1 LIMIT 1'
         INTO v_doc_detail
         USING v_doctor_id;
     END IF;
 
     IF to_regclass('public.doctor_schedules') IS NOT NULL THEN
-      EXECUTE 'SELECT COALESCE(jsonb_agg(to_jsonb(ds)), ''[]''::jsonb) FROM public.doctor_schedules ds WHERE ds.id_doctor = $1'
+      EXECUTE 'SELECT COALESCE(jsonb_agg(jsonb_build_object(
+        ''id'', ds.id,
+        ''day'', ds.day,
+        ''open_time'', ds.open_time,
+        ''close_time'', ds.close_time,
+        ''is_off'', ds.is_off
+      )), ''[]''::jsonb) FROM public.doctor_schedules ds WHERE ds.id_doctor = $1'
         INTO v_doc_schedules
         USING v_doctor_id;
     END IF;
@@ -519,12 +614,12 @@ BEGIN
     v_patient_id := (v_q->>'id_patient')::uuid;
     SELECT jsonb_build_object(
       'id', u.id,
-      'name', to_jsonb(u)->>'name',
-      'nik', to_jsonb(u)->>'nik',
-      'gender', to_jsonb(u)->>'gender',
-      'birth_date', to_jsonb(u)->>'birth_date',
-      'birth_place', to_jsonb(u)->>'birth_place',
-      'address', to_jsonb(u)->>'address'
+      'name', u.name,
+      'nik', u.nik,
+      'gender', u.gender,
+      'birth_date', u.birth_date,
+      'birth_place', u.birth_place,
+      'address', u.address
     )
       INTO v_patient_user
     FROM public."user" u
@@ -532,7 +627,14 @@ BEGIN
     LIMIT 1;
   ELSIF NULLIF(v_q->>'id_guest_patient', '') IS NOT NULL THEN
     v_guest_id := (v_q->>'id_guest_patient')::uuid;
-    SELECT to_jsonb(gp)
+    SELECT jsonb_build_object(
+      'id', gp.id,
+      'name', gp.name,
+      'nik', gp.nik,
+      'gender', gp.gender,
+      'birth_date', gp.birth_date,
+      'address', gp.address
+    )
       INTO v_guest
     FROM private_doctor.guest_patients gp
     WHERE gp.id = v_guest_id
@@ -560,19 +662,21 @@ BEGIN
       'nik_masked', v_masked_nik,
       'gender', COALESCE(v_patient_user->>'gender', v_guest->>'gender', '-'),
       'birth_date', COALESCE(v_patient_user->>'birth_date', v_guest->>'birth_date', ''),
-      'birth_place', COALESCE(v_patient_user->>'birth_place', v_guest->>'birth_place', ''),
+      'birth_place', COALESCE(v_patient_user->>'birth_place', ''),
       'address', COALESCE(v_patient_user->>'address', v_guest->>'address', '-')
     ),
     'doctor', COALESCE(v_doc_detail, '{}'::jsonb) || jsonb_build_object(
       'id', COALESCE(v_doctor_id::text, v_doc_user->>'id', ''),
-      'name', COALESCE(NULLIF(v_doc_detail->>'name', ''), v_doc_user->>'name', 'Dokter'),
-      'avatar_url', COALESCE(NULLIF(v_doc_detail->>'avatar_url', ''), v_doc_user->>'avatar_url'),
+      'name', COALESCE(v_doc_user->>'name', 'Dokter'),
+      'avatar_url', v_doc_user->>'avatar_url',
+      'profession', COALESCE(NULLIF(v_doc_detail->>'profession', ''), 'Dokter Praktik Mandiri'),
+      'nama_faskes', COALESCE(NULLIF(v_doc_detail->>'nama_faskes', ''), 'Praktik Dokter Mandiri'),
       'whatsapp_number', COALESCE(NULLIF(v_doc_detail->>'whatsapp_number', ''), v_doc_user->>'phone_number', ''),
-      'address', COALESCE(NULLIF(v_doc_detail->>'address', ''), v_doc_user->>'address', ''),
-      'province', COALESCE(NULLIF(v_doc_detail->>'province', ''), v_doc_user->>'province', ''),
-      'district', COALESCE(NULLIF(v_doc_detail->>'district', ''), v_doc_user->>'district', ''),
-      'sub_district', COALESCE(NULLIF(v_doc_detail->>'sub_district', ''), v_doc_user->>'sub_district', ''),
-      'village', COALESCE(NULLIF(v_doc_detail->>'village', ''), v_doc_user->>'village', '')
+      'address', COALESCE(v_doc_user->>'address', ''),
+      'province', COALESCE(v_doc_user->>'province', ''),
+      'district', COALESCE(v_doc_user->>'district', ''),
+      'sub_district', COALESCE(v_doc_user->>'sub_district', ''),
+      'village', COALESCE(v_doc_user->>'village', '')
     ),
     'doctor_schedules', COALESCE(v_doc_schedules, '[]'::jsonb)
   );
@@ -582,293 +686,443 @@ $$;
 REVOKE ALL ON FUNCTION public.get_medical_letter_verification(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_medical_letter_verification(uuid) TO anon, authenticated, service_role;
 
--- RLS on `private_doctor.*` & `public` doctor tables
-DO $$
-BEGIN
-  -- 1. private_doctor.queue
-  IF to_regclass('private_doctor.queue') IS NOT NULL THEN
-    EXECUTE 'ALTER TABLE private_doctor.queue ENABLE ROW LEVEL SECURITY';
-    EXECUTE 'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE private_doctor.queue TO anon, authenticated, service_role';
+-- Performance indexes on FK/RLS columns
+CREATE INDEX IF NOT EXISTS idx_queue_id_doctor ON private_doctor.queue(id_doctor);
+CREATE INDEX IF NOT EXISTS idx_queue_id_patient ON private_doctor.queue(id_patient);
+CREATE INDEX IF NOT EXISTS idx_queue_id_guest_patient ON private_doctor.queue(id_guest_patient);
+CREATE INDEX IF NOT EXISTS idx_clinical_encounters_id_queue ON private_doctor.clinical_encounters(id_queue);
+CREATE INDEX IF NOT EXISTS idx_vital_signs_id_clinical_ecounter ON private_doctor.vital_signs(id_clinical_ecounter);
+CREATE INDEX IF NOT EXISTS idx_anamnesis_id_clinical_ecounter ON private_doctor.anamnesis_ecounter(id_clinical_ecounter);
+CREATE INDEX IF NOT EXISTS idx_icdx_id_clinical_ecounters ON private_doctor.icdx_ecounter(id_clinical_ecounters);
+CREATE INDEX IF NOT EXISTS idx_guest_patients_id_doctor ON private_doctor.guest_patients(id_doctor);
+CREATE INDEX IF NOT EXISTS idx_doctor_schedules_id_doctor ON public.doctor_schedules(id_doctor);
 
-    EXECUTE 'DROP POLICY IF EXISTS "queue_user_scoped_select" ON private_doctor.queue';
-    EXECUTE $p$
-      CREATE POLICY "queue_user_scoped_select"
-        ON private_doctor.queue
-        FOR SELECT
-        TO anon, authenticated
-        USING (
-          public.is_valid_doctor_user(id_doctor)
-          OR public.is_existing_public_user(id_patient)
+-- Scoped RLS on `private_doctor.*` (clean per-operation policies, no overlapping SELECT/ALL)
+ALTER TABLE private_doctor.queue ENABLE ROW LEVEL SECURITY;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE private_doctor.queue TO anon, authenticated, service_role;
+
+DROP POLICY IF EXISTS "queue_user_scoped_select" ON private_doctor.queue;
+DROP POLICY IF EXISTS "queue_user_scoped_insert" ON private_doctor.queue;
+DROP POLICY IF EXISTS "queue_user_scoped_update" ON private_doctor.queue;
+DROP POLICY IF EXISTS "queue_user_scoped_delete" ON private_doctor.queue;
+
+CREATE POLICY "queue_user_scoped_select"
+  ON private_doctor.queue
+  FOR SELECT
+  TO anon, authenticated
+  USING (
+    (SELECT private.is_valid_doctor_user(id_doctor))
+    OR (SELECT private.is_existing_public_user(id_patient))
+  );
+
+CREATE POLICY "queue_user_scoped_insert"
+  ON private_doctor.queue
+  FOR INSERT
+  TO anon, authenticated
+  WITH CHECK ((SELECT private.is_valid_doctor_user(id_doctor)));
+
+CREATE POLICY "queue_user_scoped_update"
+  ON private_doctor.queue
+  FOR UPDATE
+  TO anon, authenticated
+  USING (
+    (SELECT private.is_valid_doctor_user(id_doctor))
+    OR (SELECT private.is_existing_public_user(id_patient))
+  )
+  WITH CHECK ((SELECT private.is_valid_doctor_user(id_doctor)));
+
+CREATE POLICY "queue_user_scoped_delete"
+  ON private_doctor.queue
+  FOR DELETE
+  TO anon, authenticated
+  USING ((SELECT private.is_valid_doctor_user(id_doctor)));
+
+ALTER TABLE private_doctor.clinical_encounters ENABLE ROW LEVEL SECURITY;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE private_doctor.clinical_encounters TO anon, authenticated, service_role;
+
+DROP POLICY IF EXISTS "clinical_encounters_letter_and_doctor_select" ON private_doctor.clinical_encounters;
+DROP POLICY IF EXISTS "clinical_encounters_doctor_insert" ON private_doctor.clinical_encounters;
+DROP POLICY IF EXISTS "clinical_encounters_doctor_update" ON private_doctor.clinical_encounters;
+DROP POLICY IF EXISTS "clinical_encounters_doctor_delete" ON private_doctor.clinical_encounters;
+
+CREATE POLICY "clinical_encounters_letter_and_doctor_select"
+  ON private_doctor.clinical_encounters
+  FOR SELECT
+  TO anon, authenticated
+  USING (
+    COALESCE(is_rujukan, false) = true
+    OR NULLIF(TRIM(COALESCE(surat_keterangan_type, '')), '') IS NOT NULL
+    OR EXISTS (
+      SELECT 1
+      FROM private_doctor.queue q
+      WHERE q.id = clinical_encounters.id_queue
+        AND (
+          (SELECT private.is_valid_doctor_user(q.id_doctor))
+          OR (SELECT private.is_existing_public_user(q.id_patient))
         )
-    $p$;
+    )
+  );
 
-    EXECUTE 'DROP POLICY IF EXISTS "queue_user_scoped_write" ON private_doctor.queue';
-    EXECUTE $p$
-      CREATE POLICY "queue_user_scoped_write"
-        ON private_doctor.queue
-        FOR ALL
-        TO anon, authenticated
-        USING (public.is_valid_doctor_user(id_doctor))
-        WITH CHECK (public.is_valid_doctor_user(id_doctor))
-    $p$;
-  END IF;
+CREATE POLICY "clinical_encounters_doctor_insert"
+  ON private_doctor.clinical_encounters
+  FOR INSERT
+  TO anon, authenticated
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM private_doctor.queue q
+      WHERE q.id = clinical_encounters.id_queue
+        AND (SELECT private.is_valid_doctor_user(q.id_doctor))
+    )
+  );
 
-  -- 2. private_doctor.clinical_encounters
-  IF to_regclass('private_doctor.clinical_encounters') IS NOT NULL THEN
-    EXECUTE 'ALTER TABLE private_doctor.clinical_encounters ENABLE ROW LEVEL SECURITY';
-    EXECUTE 'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE private_doctor.clinical_encounters TO anon, authenticated, service_role';
+CREATE POLICY "clinical_encounters_doctor_update"
+  ON private_doctor.clinical_encounters
+  FOR UPDATE
+  TO anon, authenticated
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM private_doctor.queue q
+      WHERE q.id = clinical_encounters.id_queue
+        AND (SELECT private.is_valid_doctor_user(q.id_doctor))
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM private_doctor.queue q
+      WHERE q.id = clinical_encounters.id_queue
+        AND (SELECT private.is_valid_doctor_user(q.id_doctor))
+    )
+  );
 
-    EXECUTE 'DROP POLICY IF EXISTS "clinical_encounters_letter_and_doctor_select" ON private_doctor.clinical_encounters';
-    EXECUTE $p$
-      CREATE POLICY "clinical_encounters_letter_and_doctor_select"
-        ON private_doctor.clinical_encounters
-        FOR SELECT
-        TO anon, authenticated
-        USING (
-          COALESCE(is_rujukan, false) = true
-          OR NULLIF(TRIM(COALESCE(surat_keterangan_type, '')), '') IS NOT NULL
-          OR EXISTS (
-            SELECT 1
-            FROM private_doctor.queue q
-            WHERE q.id = clinical_encounters.id_queue
-              AND (
-                public.is_valid_doctor_user(q.id_doctor)
-                OR public.is_existing_public_user(q.id_patient)
-              )
-          )
-        )
-    $p$;
+CREATE POLICY "clinical_encounters_doctor_delete"
+  ON private_doctor.clinical_encounters
+  FOR DELETE
+  TO anon, authenticated
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM private_doctor.queue q
+      WHERE q.id = clinical_encounters.id_queue
+        AND (SELECT private.is_valid_doctor_user(q.id_doctor))
+    )
+  );
 
-    EXECUTE 'DROP POLICY IF EXISTS "clinical_encounters_doctor_insert" ON private_doctor.clinical_encounters';
-    EXECUTE $p$
-      CREATE POLICY "clinical_encounters_doctor_insert"
-        ON private_doctor.clinical_encounters
-        FOR INSERT
-        TO anon, authenticated
-        WITH CHECK (
-          EXISTS (
-            SELECT 1
-            FROM private_doctor.queue q
-            WHERE q.id = clinical_encounters.id_queue
-              AND public.is_valid_doctor_user(q.id_doctor)
-          )
-        )
-    $p$;
+-- vital_signs
+ALTER TABLE private_doctor.vital_signs ENABLE ROW LEVEL SECURITY;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE private_doctor.vital_signs TO anon, authenticated, service_role;
 
-    EXECUTE 'DROP POLICY IF EXISTS "clinical_encounters_doctor_update" ON private_doctor.clinical_encounters';
-    EXECUTE $p$
-      CREATE POLICY "clinical_encounters_doctor_update"
-        ON private_doctor.clinical_encounters
-        FOR UPDATE
-        TO anon, authenticated
-        USING (
-          EXISTS (
-            SELECT 1
-            FROM private_doctor.queue q
-            WHERE q.id = clinical_encounters.id_queue
-              AND public.is_valid_doctor_user(q.id_doctor)
-          )
-        )
-        WITH CHECK (
-          EXISTS (
-            SELECT 1
-            FROM private_doctor.queue q
-            WHERE q.id = clinical_encounters.id_queue
-              AND public.is_valid_doctor_user(q.id_doctor)
-          )
-        )
-    $p$;
-  END IF;
+DROP POLICY IF EXISTS "vital_signs_encounter_select" ON private_doctor.vital_signs;
+DROP POLICY IF EXISTS "vital_signs_doctor_insert" ON private_doctor.vital_signs;
+DROP POLICY IF EXISTS "vital_signs_doctor_update" ON private_doctor.vital_signs;
+DROP POLICY IF EXISTS "vital_signs_doctor_delete" ON private_doctor.vital_signs;
 
-  -- 3. private_doctor.vital_signs
-  IF to_regclass('private_doctor.vital_signs') IS NOT NULL THEN
-    EXECUTE 'ALTER TABLE private_doctor.vital_signs ENABLE ROW LEVEL SECURITY';
-    EXECUTE 'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE private_doctor.vital_signs TO anon, authenticated, service_role';
+CREATE POLICY "vital_signs_encounter_select"
+  ON private_doctor.vital_signs
+  FOR SELECT
+  TO anon, authenticated
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM private_doctor.clinical_encounters ce
+      WHERE ce.id = vital_signs.id_clinical_ecounter
+    )
+  );
 
-    EXECUTE 'DROP POLICY IF EXISTS "vital_signs_encounter_select" ON private_doctor.vital_signs';
-    EXECUTE $p$
-      CREATE POLICY "vital_signs_encounter_select"
-        ON private_doctor.vital_signs
-        FOR SELECT
-        TO anon, authenticated
-        USING (
-          EXISTS (
-            SELECT 1
-            FROM private_doctor.clinical_encounters ce
-            WHERE ce.id = vital_signs.id_clinical_ecounter
-          )
-        )
-    $p$;
+CREATE POLICY "vital_signs_doctor_insert"
+  ON private_doctor.vital_signs
+  FOR INSERT
+  TO anon, authenticated
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM private_doctor.clinical_encounters ce
+      JOIN private_doctor.queue q ON q.id = ce.id_queue
+      WHERE ce.id = vital_signs.id_clinical_ecounter
+        AND (SELECT private.is_valid_doctor_user(q.id_doctor))
+    )
+  );
 
-    EXECUTE 'DROP POLICY IF EXISTS "vital_signs_doctor_write" ON private_doctor.vital_signs';
-    EXECUTE $p$
-      CREATE POLICY "vital_signs_doctor_write"
-        ON private_doctor.vital_signs
-        FOR ALL
-        TO anon, authenticated
-        USING (
-          EXISTS (
-            SELECT 1
-            FROM private_doctor.clinical_encounters ce
-            JOIN private_doctor.queue q ON q.id = ce.id_queue
-            WHERE ce.id = vital_signs.id_clinical_ecounter
-              AND public.is_valid_doctor_user(q.id_doctor)
-          )
-        )
-        WITH CHECK (
-          EXISTS (
-            SELECT 1
-            FROM private_doctor.clinical_encounters ce
-            JOIN private_doctor.queue q ON q.id = ce.id_queue
-            WHERE ce.id = vital_signs.id_clinical_ecounter
-              AND public.is_valid_doctor_user(q.id_doctor)
-          )
-        )
-    $p$;
-  END IF;
+CREATE POLICY "vital_signs_doctor_update"
+  ON private_doctor.vital_signs
+  FOR UPDATE
+  TO anon, authenticated
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM private_doctor.clinical_encounters ce
+      JOIN private_doctor.queue q ON q.id = ce.id_queue
+      WHERE ce.id = vital_signs.id_clinical_ecounter
+        AND (SELECT private.is_valid_doctor_user(q.id_doctor))
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM private_doctor.clinical_encounters ce
+      JOIN private_doctor.queue q ON q.id = ce.id_queue
+      WHERE ce.id = vital_signs.id_clinical_ecounter
+        AND (SELECT private.is_valid_doctor_user(q.id_doctor))
+    )
+  );
 
-  -- 4. private_doctor.anamnesis_ecounter
-  IF to_regclass('private_doctor.anamnesis_ecounter') IS NOT NULL THEN
-    EXECUTE 'ALTER TABLE private_doctor.anamnesis_ecounter ENABLE ROW LEVEL SECURITY';
-    EXECUTE 'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE private_doctor.anamnesis_ecounter TO anon, authenticated, service_role';
+CREATE POLICY "vital_signs_doctor_delete"
+  ON private_doctor.vital_signs
+  FOR DELETE
+  TO anon, authenticated
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM private_doctor.clinical_encounters ce
+      JOIN private_doctor.queue q ON q.id = ce.id_queue
+      WHERE ce.id = vital_signs.id_clinical_ecounter
+        AND (SELECT private.is_valid_doctor_user(q.id_doctor))
+    )
+  );
 
-    EXECUTE 'DROP POLICY IF EXISTS "anamnesis_encounter_select" ON private_doctor.anamnesis_ecounter';
-    EXECUTE $p$
-      CREATE POLICY "anamnesis_encounter_select"
-        ON private_doctor.anamnesis_ecounter
-        FOR SELECT
-        TO anon, authenticated
-        USING (
-          EXISTS (
-            SELECT 1
-            FROM private_doctor.clinical_encounters ce
-            WHERE ce.id = anamnesis_ecounter.id_clinical_ecounter
-          )
-        )
-    $p$;
+-- anamnesis_ecounter
+ALTER TABLE private_doctor.anamnesis_ecounter ENABLE ROW LEVEL SECURITY;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE private_doctor.anamnesis_ecounter TO anon, authenticated, service_role;
 
-    EXECUTE 'DROP POLICY IF EXISTS "anamnesis_doctor_write" ON private_doctor.anamnesis_ecounter';
-    EXECUTE $p$
-      CREATE POLICY "anamnesis_doctor_write"
-        ON private_doctor.anamnesis_ecounter
-        FOR ALL
-        TO anon, authenticated
-        USING (
-          EXISTS (
-            SELECT 1
-            FROM private_doctor.clinical_encounters ce
-            JOIN private_doctor.queue q ON q.id = ce.id_queue
-            WHERE ce.id = anamnesis_ecounter.id_clinical_ecounter
-              AND public.is_valid_doctor_user(q.id_doctor)
-          )
-        )
-        WITH CHECK (
-          EXISTS (
-            SELECT 1
-            FROM private_doctor.clinical_encounters ce
-            JOIN private_doctor.queue q ON q.id = ce.id_queue
-            WHERE ce.id = anamnesis_ecounter.id_clinical_ecounter
-              AND public.is_valid_doctor_user(q.id_doctor)
-          )
-        )
-    $p$;
-  END IF;
+DROP POLICY IF EXISTS "anamnesis_encounter_select" ON private_doctor.anamnesis_ecounter;
+DROP POLICY IF EXISTS "anamnesis_doctor_insert" ON private_doctor.anamnesis_ecounter;
+DROP POLICY IF EXISTS "anamnesis_doctor_update" ON private_doctor.anamnesis_ecounter;
+DROP POLICY IF EXISTS "anamnesis_doctor_delete" ON private_doctor.anamnesis_ecounter;
 
-  -- 5. private_doctor.icdx_ecounter
-  IF to_regclass('private_doctor.icdx_ecounter') IS NOT NULL THEN
-    EXECUTE 'ALTER TABLE private_doctor.icdx_ecounter ENABLE ROW LEVEL SECURITY';
-    EXECUTE 'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE private_doctor.icdx_ecounter TO anon, authenticated, service_role';
+CREATE POLICY "anamnesis_encounter_select"
+  ON private_doctor.anamnesis_ecounter
+  FOR SELECT
+  TO anon, authenticated
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM private_doctor.clinical_encounters ce
+      WHERE ce.id = anamnesis_ecounter.id_clinical_ecounter
+    )
+  );
 
-    EXECUTE 'DROP POLICY IF EXISTS "icdx_encounter_select" ON private_doctor.icdx_ecounter';
-    EXECUTE $p$
-      CREATE POLICY "icdx_encounter_select"
-        ON private_doctor.icdx_ecounter
-        FOR SELECT
-        TO anon, authenticated
-        USING (
-          EXISTS (
-            SELECT 1
-            FROM private_doctor.clinical_encounters ce
-            WHERE ce.id = icdx_ecounter.id_clinical_ecounters
-          )
-        )
-    $p$;
+CREATE POLICY "anamnesis_doctor_insert"
+  ON private_doctor.anamnesis_ecounter
+  FOR INSERT
+  TO anon, authenticated
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM private_doctor.clinical_encounters ce
+      JOIN private_doctor.queue q ON q.id = ce.id_queue
+      WHERE ce.id = anamnesis_ecounter.id_clinical_ecounter
+        AND (SELECT private.is_valid_doctor_user(q.id_doctor))
+    )
+  );
 
-    EXECUTE 'DROP POLICY IF EXISTS "icdx_doctor_write" ON private_doctor.icdx_ecounter';
-    EXECUTE $p$
-      CREATE POLICY "icdx_doctor_write"
-        ON private_doctor.icdx_ecounter
-        FOR ALL
-        TO anon, authenticated
-        USING (
-          EXISTS (
-            SELECT 1
-            FROM private_doctor.clinical_encounters ce
-            JOIN private_doctor.queue q ON q.id = ce.id_queue
-            WHERE ce.id = icdx_ecounter.id_clinical_ecounters
-              AND public.is_valid_doctor_user(q.id_doctor)
-          )
-        )
-        WITH CHECK (
-          EXISTS (
-            SELECT 1
-            FROM private_doctor.clinical_encounters ce
-            JOIN private_doctor.queue q ON q.id = ce.id_queue
-            WHERE ce.id = icdx_ecounter.id_clinical_ecounters
-              AND public.is_valid_doctor_user(q.id_doctor)
-          )
-        )
-    $p$;
-  END IF;
+CREATE POLICY "anamnesis_doctor_update"
+  ON private_doctor.anamnesis_ecounter
+  FOR UPDATE
+  TO anon, authenticated
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM private_doctor.clinical_encounters ce
+      JOIN private_doctor.queue q ON q.id = ce.id_queue
+      WHERE ce.id = anamnesis_ecounter.id_clinical_ecounter
+        AND (SELECT private.is_valid_doctor_user(q.id_doctor))
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM private_doctor.clinical_encounters ce
+      JOIN private_doctor.queue q ON q.id = ce.id_queue
+      WHERE ce.id = anamnesis_ecounter.id_clinical_ecounter
+        AND (SELECT private.is_valid_doctor_user(q.id_doctor))
+    )
+  );
 
-  -- 6. private_doctor.guest_patients
-  IF to_regclass('private_doctor.guest_patients') IS NOT NULL THEN
-    EXECUTE 'ALTER TABLE private_doctor.guest_patients ENABLE ROW LEVEL SECURITY';
-    EXECUTE 'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE private_doctor.guest_patients TO anon, authenticated, service_role';
+CREATE POLICY "anamnesis_doctor_delete"
+  ON private_doctor.anamnesis_ecounter
+  FOR DELETE
+  TO anon, authenticated
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM private_doctor.clinical_encounters ce
+      JOIN private_doctor.queue q ON q.id = ce.id_queue
+      WHERE ce.id = anamnesis_ecounter.id_clinical_ecounter
+        AND (SELECT private.is_valid_doctor_user(q.id_doctor))
+    )
+  );
 
-    EXECUTE 'DROP POLICY IF EXISTS "guest_patients_queue_select" ON private_doctor.guest_patients';
-    EXECUTE $p$
-      CREATE POLICY "guest_patients_queue_select"
-        ON private_doctor.guest_patients
-        FOR SELECT
-        TO anon, authenticated
-        USING (
-          EXISTS (
-            SELECT 1
-            FROM private_doctor.queue q
-            WHERE q.id_guest_patient = guest_patients.id
-          )
-        )
-    $p$;
+-- icdx_ecounter
+ALTER TABLE private_doctor.icdx_ecounter ENABLE ROW LEVEL SECURITY;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE private_doctor.icdx_ecounter TO anon, authenticated, service_role;
 
-    EXECUTE 'DROP POLICY IF EXISTS "guest_patients_doctor_write" ON private_doctor.guest_patients';
-    EXECUTE $p$
-      CREATE POLICY "guest_patients_doctor_write"
-        ON private_doctor.guest_patients
-        FOR INSERT
-        TO anon, authenticated
-        WITH CHECK (true)
-    $p$;
-  END IF;
+DROP POLICY IF EXISTS "icdx_encounter_select" ON private_doctor.icdx_ecounter;
+DROP POLICY IF EXISTS "icdx_doctor_insert" ON private_doctor.icdx_ecounter;
+DROP POLICY IF EXISTS "icdx_doctor_update" ON private_doctor.icdx_ecounter;
+DROP POLICY IF EXISTS "icdx_doctor_delete" ON private_doctor.icdx_ecounter;
 
-  -- 7. public.user_detail_doctor & public.doctor_schedules (public doctor profile for QR verification)
-  IF to_regclass('public.user_detail_doctor') IS NOT NULL THEN
-    EXECUTE 'ALTER TABLE public.user_detail_doctor ENABLE ROW LEVEL SECURITY';
+CREATE POLICY "icdx_encounter_select"
+  ON private_doctor.icdx_ecounter
+  FOR SELECT
+  TO anon, authenticated
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM private_doctor.clinical_encounters ce
+      WHERE ce.id = icdx_ecounter.id_clinical_ecounters
+    )
+  );
 
-    EXECUTE 'DROP POLICY IF EXISTS "doctor_detail_public_select" ON public.user_detail_doctor';
-    EXECUTE 'CREATE POLICY "doctor_detail_public_select" ON public.user_detail_doctor FOR SELECT TO anon, authenticated USING (true)';
+CREATE POLICY "icdx_doctor_insert"
+  ON private_doctor.icdx_ecounter
+  FOR INSERT
+  TO anon, authenticated
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM private_doctor.clinical_encounters ce
+      JOIN private_doctor.queue q ON q.id = ce.id_queue
+      WHERE ce.id = icdx_ecounter.id_clinical_ecounters
+        AND (SELECT private.is_valid_doctor_user(q.id_doctor))
+    )
+  );
 
-    EXECUTE 'DROP POLICY IF EXISTS "doctor_detail_owner_write" ON public.user_detail_doctor';
-    EXECUTE 'CREATE POLICY "doctor_detail_owner_write" ON public.user_detail_doctor FOR ALL TO anon, authenticated USING (public.is_valid_doctor_user(id)) WITH CHECK (public.is_valid_doctor_user(id))';
-  END IF;
+CREATE POLICY "icdx_doctor_update"
+  ON private_doctor.icdx_ecounter
+  FOR UPDATE
+  TO anon, authenticated
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM private_doctor.clinical_encounters ce
+      JOIN private_doctor.queue q ON q.id = ce.id_queue
+      WHERE ce.id = icdx_ecounter.id_clinical_ecounters
+        AND (SELECT private.is_valid_doctor_user(q.id_doctor))
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM private_doctor.clinical_encounters ce
+      JOIN private_doctor.queue q ON q.id = ce.id_queue
+      WHERE ce.id = icdx_ecounter.id_clinical_ecounters
+        AND (SELECT private.is_valid_doctor_user(q.id_doctor))
+    )
+  );
 
-  IF to_regclass('public.doctor_schedules') IS NOT NULL THEN
-    EXECUTE 'ALTER TABLE public.doctor_schedules ENABLE ROW LEVEL SECURITY';
+CREATE POLICY "icdx_doctor_delete"
+  ON private_doctor.icdx_ecounter
+  FOR DELETE
+  TO anon, authenticated
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM private_doctor.clinical_encounters ce
+      JOIN private_doctor.queue q ON q.id = ce.id_queue
+      WHERE ce.id = icdx_ecounter.id_clinical_ecounters
+        AND (SELECT private.is_valid_doctor_user(q.id_doctor))
+    )
+  );
 
-    EXECUTE 'DROP POLICY IF EXISTS "doctor_schedules_public_select" ON public.doctor_schedules';
-    EXECUTE 'CREATE POLICY "doctor_schedules_public_select" ON public.doctor_schedules FOR SELECT TO anon, authenticated USING (true)';
+-- guest_patients (replace old authenticated-only unindexed auth.uid() policies cleanly)
+ALTER TABLE private_doctor.guest_patients ENABLE ROW LEVEL SECURITY;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE private_doctor.guest_patients TO anon, authenticated, service_role;
 
-    EXECUTE 'DROP POLICY IF EXISTS "doctor_schedules_owner_write" ON public.doctor_schedules';
-    EXECUTE 'CREATE POLICY "doctor_schedules_owner_write" ON public.doctor_schedules FOR ALL TO anon, authenticated USING (public.is_valid_doctor_user(id_doctor)) WITH CHECK (public.is_valid_doctor_user(id_doctor))';
-  END IF;
-END $$;
+DROP POLICY IF EXISTS "Allow doctors to read their guest patients" ON private_doctor.guest_patients;
+DROP POLICY IF EXISTS "Allow doctors to insert their guest patients" ON private_doctor.guest_patients;
+DROP POLICY IF EXISTS "Allow doctors to update their guest patients" ON private_doctor.guest_patients;
+DROP POLICY IF EXISTS "guest_patients_queue_select" ON private_doctor.guest_patients;
+DROP POLICY IF EXISTS "guest_patients_doctor_insert" ON private_doctor.guest_patients;
+DROP POLICY IF EXISTS "guest_patients_doctor_update" ON private_doctor.guest_patients;
+
+CREATE POLICY "guest_patients_queue_select"
+  ON private_doctor.guest_patients
+  FOR SELECT
+  TO anon, authenticated
+  USING (
+    (SELECT private.is_valid_doctor_user(id_doctor))
+    OR EXISTS (
+      SELECT 1
+      FROM private_doctor.queue q
+      WHERE q.id_guest_patient = guest_patients.id
+    )
+  );
+
+CREATE POLICY "guest_patients_doctor_insert"
+  ON private_doctor.guest_patients
+  FOR INSERT
+  TO anon, authenticated
+  WITH CHECK ((SELECT private.is_valid_doctor_user(id_doctor)));
+
+CREATE POLICY "guest_patients_doctor_update"
+  ON private_doctor.guest_patients
+  FOR UPDATE
+  TO anon, authenticated
+  USING ((SELECT private.is_valid_doctor_user(id_doctor)))
+  WITH CHECK ((SELECT private.is_valid_doctor_user(id_doctor)));
+
+-- Clean up duplicate SELECT policies & enforce user-anchored writes on `public.doctor_schedules` & `public.user_detail_doctor`
+ALTER TABLE public.doctor_schedules ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow public read access" ON public.doctor_schedules;
+DROP POLICY IF EXISTS "Allow public insert doctor schedules" ON public.doctor_schedules;
+DROP POLICY IF EXISTS "Allow public update doctor schedules" ON public.doctor_schedules;
+DROP POLICY IF EXISTS "Allow public delete doctor schedules" ON public.doctor_schedules;
+DROP POLICY IF EXISTS "doctor_schedules_public_select" ON public.doctor_schedules;
+DROP POLICY IF EXISTS "doctor_schedules_owner_insert" ON public.doctor_schedules;
+DROP POLICY IF EXISTS "doctor_schedules_owner_update" ON public.doctor_schedules;
+DROP POLICY IF EXISTS "doctor_schedules_owner_delete" ON public.doctor_schedules;
+
+CREATE POLICY "doctor_schedules_public_select"
+  ON public.doctor_schedules
+  FOR SELECT
+  TO anon, authenticated
+  USING (true);
+
+CREATE POLICY "doctor_schedules_owner_insert"
+  ON public.doctor_schedules
+  FOR INSERT
+  TO anon, authenticated
+  WITH CHECK ((SELECT private.is_valid_doctor_user(id_doctor)));
+
+CREATE POLICY "doctor_schedules_owner_update"
+  ON public.doctor_schedules
+  FOR UPDATE
+  TO anon, authenticated
+  USING ((SELECT private.is_valid_doctor_user(id_doctor)))
+  WITH CHECK ((SELECT private.is_valid_doctor_user(id_doctor)));
+
+CREATE POLICY "doctor_schedules_owner_delete"
+  ON public.doctor_schedules
+  FOR DELETE
+  TO anon, authenticated
+  USING ((SELECT private.is_valid_doctor_user(id_doctor)));
+
+ALTER TABLE public.user_detail_doctor ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow authenticated doctors to read their own detail" ON public.user_detail_doctor;
+DROP POLICY IF EXISTS "Allow authenticated to read doctor details" ON public.user_detail_doctor;
+DROP POLICY IF EXISTS "Allow public read doctor details" ON public.user_detail_doctor;
+DROP POLICY IF EXISTS "Allow public update doctor details" ON public.user_detail_doctor;
+DROP POLICY IF EXISTS "doctor_detail_public_select" ON public.user_detail_doctor;
+DROP POLICY IF EXISTS "doctor_detail_owner_insert" ON public.user_detail_doctor;
+DROP POLICY IF EXISTS "doctor_detail_owner_update" ON public.user_detail_doctor;
+
+CREATE POLICY "doctor_detail_public_select"
+  ON public.user_detail_doctor
+  FOR SELECT
+  TO anon, authenticated
+  USING (true);
+
+CREATE POLICY "doctor_detail_owner_insert"
+  ON public.user_detail_doctor
+  FOR INSERT
+  TO anon, authenticated
+  WITH CHECK ((SELECT private.is_valid_doctor_user(id)));
+
+CREATE POLICY "doctor_detail_owner_update"
+  ON public.user_detail_doctor
+  FOR UPDATE
+  TO anon, authenticated
+  USING ((SELECT private.is_valid_doctor_user(id)))
+  WITH CHECK ((SELECT private.is_valid_doctor_user(id)));
