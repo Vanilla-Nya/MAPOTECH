@@ -21,6 +21,48 @@ class SupabaseService {
       dotenv.env['SUPABASE_ANON_KEY'] ??
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFiZGJ1cnhocXF3c29ibXp1d216Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0OTMyNjYsImV4cCI6MjA5MjA2OTI2Nn0.mB3qIJAHjtWe5UKxE9Oj-RNLQCbQKFYHUZBLaF4nQwk';
 
+  /// Lightweight connectivity probe against the Supabase REST endpoint.
+  /// Returns true when the server responds (< 500), false when unreachable/offline.
+  static Future<bool> checkReachability({http.Client? httpClient}) async {
+    final clientToUse = httpClient ?? http.Client();
+    final ownsClient = httpClient == null;
+    try {
+      final uri = Uri.parse('$_baseUrl/user?select=id&limit=1');
+      final response = await clientToUse
+          .get(
+            uri,
+            headers: {
+              'apikey': _anonKey,
+              'Authorization': 'Bearer $_anonKey',
+              'Accept-Profile': 'public',
+            },
+          )
+          .timeout(const Duration(seconds: 4));
+      return response.statusCode >= 200 && response.statusCode < 500;
+    } catch (_) {
+      return false;
+    } finally {
+      if (ownsClient) {
+        clientToUse.close();
+      }
+    }
+  }
+
+  /// Returns true when an error indicates a network/connection interruption rather than a server response.
+  static bool isNetworkError(Object error) {
+    final msg = error.toString().toLowerCase();
+    return msg.contains('socketexception') ||
+        msg.contains('timeoutexception') ||
+        msg.contains('clientexception') ||
+        msg.contains('failed to fetch') ||
+        msg.contains('failed to connect') ||
+        msg.contains('xmlhttprequest') ||
+        msg.contains('network') ||
+        msg.contains('connection closed') ||
+        msg.contains('connection refused') ||
+        msg.contains('handshake');
+  }
+
   /// Convenience getter for the Supabase client (requires Supabase.initialize() called at startup)
   static SupabaseClient get client => Supabase.instance.client;
 
@@ -1784,10 +1826,15 @@ class SupabaseService {
 
   // Fetch a user record by ID
   Future<Map<String, dynamic>?> fetchUserById(String userId) async {
+    final cleanId = userId.trim();
+    if (cleanId.isEmpty) return null;
     try {
-      final users = await _get('user?select=*&id=eq.$userId', schema: 'public');
+      final users = await _get(
+        'user?select=*&id=eq.${Uri.encodeComponent(cleanId)}&limit=1',
+        schema: 'public',
+      );
       if (users.isNotEmpty) {
-        return users.first as Map<String, dynamic>;
+        return Map<String, dynamic>.from(users.first as Map);
       }
     } catch (_) {}
     return null;

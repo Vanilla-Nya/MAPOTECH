@@ -9,6 +9,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/satusehat_service.dart';
+import 'package:mapotech/shared/session_connection_service.dart';
 import 'package:mapotech/shared/widgets/ui.dart';
 
 import '../cv/pcv_camera_capture_bridge.dart';
@@ -4119,6 +4120,15 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
   @override
   Widget build(BuildContext context) {
     _scheduleAppBarStatusSync();
+    ref.listen<int>(
+      sessionConnectionProvider.select((s) => s.reconnectVersion),
+      (prev, next) {
+        if (prev != null && next > prev && mounted) {
+          _checkServer();
+          _syncDeviceAndWifiFromDatabase();
+        }
+      },
+    );
     final landingState = ref.watch(landingPageProvider);
     final notifier = ref.read(landingPageProvider.notifier);
     final isDark = landingState.appearance == 'dark';

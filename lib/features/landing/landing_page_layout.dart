@@ -40,7 +40,16 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
   void initState() {
     super.initState();
     _scrollController.addListener(_scrollListener);
-    _startFirstTimeLoad();
+    if (ref.read(landingPageProvider).isLoggedIn) {
+      _isFirstTimeLoading = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ref.read(landingPageProvider.notifier).refreshSessionFromServer();
+        }
+      });
+    } else {
+      _startFirstTimeLoad();
+    }
   }
 
   void _startFirstTimeLoad() {

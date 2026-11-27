@@ -3,12 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/apotek/dashboard/frontend/apotek_pesanan.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
+import 'package:mapotech/shared/session_connection_service.dart';
 import 'package:mapotech/shared/supabase_service.dart';
 import 'dart:ui' as ui;
+import 'package:mapotech/shared/widgets/custom_snackbar.dart';
 import 'package:mapotech/shared/widgets/page_tutorial_data.dart';
 import 'package:mapotech/shared/widgets/page_tutorial_dialog.dart';
 import 'package:mapotech/shared/widgets/animated_portal_switcher.dart';
 import 'package:mapotech/shared/widgets/celestial_theme_transition.dart';
+import 'package:mapotech/shared/widgets/session_connection_banner.dart';
 // Import split widgets and views
 import 'package:mapotech/features/dashboard/widgets/dashboard_drawer.dart';
 import 'package:mapotech/features/pasien/dashboard/frontend/pasien_dashboard.dart';
@@ -68,7 +71,7 @@ class DashboardShell extends ConsumerStatefulWidget {
 }
 
 class _DashboardShellState extends ConsumerState<DashboardShell> {
-  String _activeMenu = 'dashboard';
+  late String _activeMenu;
   bool _isGuideActive = false;
   PageTutorialData? _activeGuideTutorial;
   int _activeGuideStepIndex = 0;
@@ -76,6 +79,83 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   String? _lastCheckedUserId;
   bool _hasShownSubNotice = false;
   ChildProfile? _selectedVitascaleChild;
+  int _lastNotifiedDisconnectCount = 0;
+  int _lastNotifiedReconnectVersion = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _activeMenu = ref.read(landingPageProvider).activeDashboardMenu;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final currentConn = ref.read(sessionConnectionProvider);
+      if (currentConn.isDisconnected &&
+          currentConn.disconnectCount > _lastNotifiedDisconnectCount) {
+        _handleConnectionChange(null, currentConn);
+      }
+    });
+  }
+
+  void _selectMenu(String menu) {
+    setState(() {
+      _activeMenu = menu;
+    });
+    ref.read(landingPageProvider.notifier).setDashboardMenu(menu);
+  }
+
+  Future<void> _handleManualReconnect() async {
+    await ref.read(sessionConnectionProvider.notifier).reconnect();
+  }
+
+  void _handleConnectionChange(
+    SessionConnectionState? previous,
+    SessionConnectionState next,
+  ) {
+    if (!mounted) return;
+    final state = ref.read(landingPageProvider);
+    if (!state.isLoggedIn) return;
+    final isEn = state.language == 'en';
+
+    if (next.isDisconnected) {
+      if (next.disconnectCount > _lastNotifiedDisconnectCount) {
+        _lastNotifiedDisconnectCount = next.disconnectCount;
+        CustomSnackbar.show(
+          context,
+          type: CustomSnackbarType.error,
+          title: isEn ? 'You Are Disconnected' : 'Anda Terputus',
+          message: isEn
+              ? 'Connection lost. Your login session is saved — click Reconnect without logging in again.'
+              : 'Koneksi terputus. Sesi login Anda tetap tersimpan — klik Hubungkan Ulang tanpa login dari awal.',
+          duration: const Duration(seconds: 6),
+          actionLabel: isEn ? 'Reconnect' : 'Hubungkan Ulang',
+          onAction: _handleManualReconnect,
+        );
+      } else if (previous?.isReconnecting == true) {
+        CustomSnackbar.warning(
+          context,
+          isEn
+              ? 'Still disconnected. Please check your internet connection and try Reconnect again.'
+              : 'Masih terputus. Periksa koneksi internet Anda lalu coba Hubungkan Ulang lagi.',
+          title: isEn ? 'Still Disconnected' : 'Masih Terputus',
+        );
+      }
+      return;
+    }
+
+    if (next.isConnected &&
+        next.reconnectVersion > _lastNotifiedReconnectVersion) {
+      _lastNotifiedReconnectVersion = next.reconnectVersion;
+      CustomSnackbar.success(
+        context,
+        isEn
+            ? 'You are reconnected! Your session resumed without logging in again.'
+            : 'Berhasil terhubung kembali! Sesi Anda dilanjutkan tanpa login ulang.',
+        title: isEn ? 'Reconnected' : 'Terhubung Kembali',
+      );
+      ref.read(landingPageProvider.notifier).refreshSessionFromServer();
+      _checkSubscription(force: true);
+    }
+  }
 
   bool _shouldUseShellScroll(String menu) {
     if (menu == 'ai_assistant' || menu == 'penjualan' || menu.startsWith('dlc_vitascale')) {
@@ -147,9 +227,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
               TextButton(
                 onPressed: () {
                   Navigator.pop(ctx);
-                  setState(() {
-                    _activeMenu = 'profile';
-                  });
+                  _selectMenu('profile');
                 },
                 child: Text(
                   isEn ? 'Go to Profile' : 'Ke Profil',
@@ -205,9 +283,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                 TextButton(
                   onPressed: () {
                     Navigator.pop(ctx);
-                    setState(() {
-                      _activeMenu = 'profile';
-                    });
+                    _selectMenu('profile');
                   },
                   child: Text(
                     isEn ? 'Renew Now' : 'Perbarui Sekarang',
@@ -225,13 +301,16 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     }
   }
 
-  Future<void> _checkSubscription() async {
+  Future<void> _checkSubscription({bool force = false}) async {
     final state = ref.read(landingPageProvider);
     if (!state.isLoggedIn) return;
     final userId = state.loggedInUser?['id'];
-    if (userId == _lastCheckedUserId) return;
+    if (!force && userId == _lastCheckedUserId) return;
+    final isNewUser = userId != _lastCheckedUserId;
     _lastCheckedUserId = userId;
-    _hasShownSubNotice = false; // reset for new user session
+    if (isNewUser) {
+      _hasShownSubNotice = false; // reset for new user session
+    }
 
     final role = state.loggedInRole;
     if (role != 'dokter' &&
@@ -328,6 +407,11 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
       }
     } catch (e) {
       debugPrint('Error checking subscription: $e');
+      if (SupabaseService.isNetworkError(e) ||
+          !ref.read(sessionConnectionProvider).isConnected) {
+        ref.read(sessionConnectionProvider.notifier).reportNetworkFailure();
+        return;
+      }
     }
     ref.read(landingPageProvider.notifier).setSubscribed(false);
     _showSubscriptionNotice(false, null, role ?? 'dokter');
@@ -337,6 +421,14 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   Widget build(BuildContext context) {
     final state = ref.watch(landingPageProvider);
     final notifier = ref.read(landingPageProvider.notifier);
+    final connState = ref.watch(sessionConnectionProvider);
+
+    ref.listen<SessionConnectionState>(sessionConnectionProvider, (
+      previous,
+      next,
+    ) {
+      _handleConnectionChange(previous, next);
+    });
 
     // Check subscription status if user changes
     if (state.isLoggedIn && state.loggedInUser?['id'] != _lastCheckedUserId) {
@@ -352,9 +444,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
       if (_activeMenu != 'profile') {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
-            setState(() {
-              _activeMenu = 'profile';
-            });
+            _selectMenu('profile');
           }
         });
       }
@@ -372,9 +462,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
           _activeMenu != 'settings') {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
-            setState(() {
-              _activeMenu = menuItems.first.id;
-            });
+            _selectMenu(menuItems.first.id);
           }
         });
       }
@@ -412,11 +500,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                   height: double.infinity,
                   child: DashboardDrawer(
                     activeMenu: _activeMenu,
-                    onMenuSelected: (menu) {
-                      setState(() {
-                        _activeMenu = menu;
-                      });
-                    },
+                    onMenuSelected: _selectMenu,
                   ),
                 ),
 
@@ -428,9 +512,31 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                     _buildTopBar(
                       state,
                       notifier,
+                      connState,
                       textColor,
                       borderColor,
                       isMobile,
+                    ),
+
+                    // Post-login disconnect / reconnect notification banner
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 220),
+                      alignment: Alignment.topCenter,
+                      curve: Curves.easeOutCubic,
+                      child: (!connState.isConnected &&
+                              !connState.isBannerDismissed)
+                          ? SessionConnectionBanner(
+                              connectionState: connState,
+                              isEnglish: state.language == 'en',
+                              isDark: isDark,
+                              onReconnect: _handleManualReconnect,
+                              onDismiss: () {
+                                ref
+                                    .read(sessionConnectionProvider.notifier)
+                                    .dismissBanner();
+                              },
+                            )
+                          : const SizedBox.shrink(),
                     ),
 
                     // Inner Scrollable Panel
@@ -474,11 +580,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
             Positioned.fill(
               child: FullScreenDrawerOverlay(
                 activeMenu: _activeMenu,
-                onMenuSelected: (menu) {
-                  setState(() {
-                    _activeMenu = menu;
-                  });
-                },
+                onMenuSelected: _selectMenu,
               ),
             ),
 
@@ -508,6 +610,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   Widget _buildTopBar(
     LandingPageState state,
     LandingPageNotifier notifier,
+    SessionConnectionState connState,
     Color textColor,
     Color borderColor,
     bool isMobile,
@@ -670,6 +773,13 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      if (!connState.isConnected)
+                        SessionConnectionTopBarPill(
+                          connectionState: connState,
+                          isEnglish: state.language == 'en',
+                          isCompact: isMobile,
+                          onReconnect: _handleManualReconnect,
+                        ),
                       if (_activeMenu == 'dlc_vitascale_screening')
                         Consumer(
                           builder: (context, ref, _) {
@@ -709,9 +819,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                             ),
                             tooltip: state.language == 'en' ? 'Scan Doctor / Pharmacy QR' : 'Scan QR Dokter / Apotek',
                             onPressed: () {
-                              setState(() {
-                                _activeMenu = 'qr_scanner';
-                              });
+                              _selectMenu('qr_scanner');
                             },
                           ),
                         ),
@@ -846,17 +954,19 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
           return const DokterDashboard();
         case 'dlc_vitascale_data_anak':
           return VitaScaleDataAnakPage(
-            onNavigateToMenu: (menu) => setState(() => _activeMenu = menu),
-            onNavigateWithChild: (menu, child) => setState(() {
-              _selectedVitascaleChild = child;
-              _activeMenu = menu;
-            }),
+            onNavigateToMenu: _selectMenu,
+            onNavigateWithChild: (menu, child) {
+              setState(() {
+                _selectedVitascaleChild = child;
+              });
+              _selectMenu(menu);
+            },
           );
         case 'dlc_vitascale_screening':
           return VitaScaleScreeningPage(
             selectedChild: _selectedVitascaleChild,
             embedInDashboardShell: true,
-            onNavigateToMenu: (menu) => setState(() => _activeMenu = menu),
+            onNavigateToMenu: _selectMenu,
           );
         default:
           return SegeraHadirMockup(portalPath: 'DOKTER/$_activeMenu');
@@ -869,37 +979,25 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
           return const PuskesmasPasien();
         case 'dlc_pantauan_ibu_hamil':
           return PuskesmasPantauanIbuHamil(
-            onNavigateToForm: (menu) {
-              setState(() {
-                _activeMenu = menu;
-              });
-            },
+            onNavigateToForm: _selectMenu,
           );
         case 'dlc_form_ibu_hamil':
           return const PuskesmasFormIbuHamil();
         case 'dlc_vitascale_data_anak':
           return VitaScaleDataAnakPage(
-            onNavigateToMenu: (menu) {
-              setState(() {
-                _activeMenu = menu;
-              });
-            },
+            onNavigateToMenu: _selectMenu,
             onNavigateWithChild: (menu, child) {
               setState(() {
                 _selectedVitascaleChild = child;
-                _activeMenu = menu;
               });
+              _selectMenu(menu);
             },
           );
         case 'dlc_vitascale_screening':
           return VitaScaleScreeningPage(
             selectedChild: _selectedVitascaleChild,
             embedInDashboardShell: true,
-            onNavigateToMenu: (menu) {
-              setState(() {
-                _activeMenu = menu;
-              });
-            },
+            onNavigateToMenu: _selectMenu,
           );
         case 'management_pekerja':
           return const ManagementPekerjaWidget();
@@ -907,11 +1005,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
           return const ManagementPustuPonkesdesWidget();
         case 'profile':
           return PuskesmasProfile(
-            onNavigate: (menu) {
-              setState(() {
-                _activeMenu = menu;
-              });
-            },
+            onNavigate: _selectMenu,
           );
         case 'settings':
           return const DokterSettings();
@@ -946,43 +1040,33 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
           return const ManagementPekerjaWidget();
         case 'dashboard':
           return PonkesdesDashboard(
-            onNavigate: (menu) {
-              setState(() {
-                _activeMenu = menu;
-              });
-            },
+            onNavigate: _selectMenu,
           );
         case 'dlc_pantauan_ibu_hamil':
           return PuskesmasPantauanIbuHamil(
-            onNavigateToForm: (menu) {
-              setState(() {
-                _activeMenu = menu;
-              });
-            },
+            onNavigateToForm: _selectMenu,
           );
         case 'dlc_form_ibu_hamil':
           return const PuskesmasFormIbuHamil();
         case 'dlc_vitascale_data_anak':
           return VitaScaleDataAnakPage(
-            onNavigateToMenu: (menu) => setState(() => _activeMenu = menu),
-            onNavigateWithChild: (menu, child) => setState(() {
-              _selectedVitascaleChild = child;
-              _activeMenu = menu;
-            }),
+            onNavigateToMenu: _selectMenu,
+            onNavigateWithChild: (menu, child) {
+              setState(() {
+                _selectedVitascaleChild = child;
+              });
+              _selectMenu(menu);
+            },
           );
         case 'dlc_vitascale_screening':
           return VitaScaleScreeningPage(
             selectedChild: _selectedVitascaleChild,
             embedInDashboardShell: true,
-            onNavigateToMenu: (menu) => setState(() => _activeMenu = menu),
+            onNavigateToMenu: _selectMenu,
           );
         default:
           return PonkesdesDashboard(
-            onNavigate: (menu) {
-              setState(() {
-                _activeMenu = menu;
-              });
-            },
+            onNavigate: _selectMenu,
           );
       }
     } else if (role == 'apotek') {
@@ -1011,19 +1095,11 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
       switch (_activeMenu) {
         case 'ai_assistant':
           return PasienAiAssistantView(
-            onNavigate: (menu) {
-              setState(() {
-                _activeMenu = menu;
-              });
-            },
+            onNavigate: _selectMenu,
           );
         case 'qr_scanner':
           return PasienQrScannerPage(
-            onNavigate: (menu) {
-              setState(() {
-                _activeMenu = menu;
-              });
-            },
+            onNavigate: _selectMenu,
           );
         case 'dokter_search':
           return const PasienDokterSearch(initialFilter: 'dokter');
@@ -1039,20 +1115,12 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
           return const PasienPrescription();
         case 'momicare_pregnancy':
           return PasienMomicareView(
-            onNavigate: (menu) {
-              setState(() {
-                _activeMenu = menu;
-              });
-            },
+            onNavigate: _selectMenu,
           );
         case 'my_family':
         case 'children':
           return PasienChildren(
-            onNavigate: (menu) {
-              setState(() {
-                _activeMenu = menu;
-              });
-            },
+            onNavigate: _selectMenu,
           );
         case 'profile':
           return const PasienProfile();
@@ -1061,11 +1129,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
         case 'dashboard':
         default:
           return PasienDashboard(
-            onNavigate: (menu) {
-              setState(() {
-                _activeMenu = menu;
-              });
-            },
+            onNavigate: _selectMenu,
           );
       }
     }

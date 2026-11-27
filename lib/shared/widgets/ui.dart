@@ -9,6 +9,7 @@ export 'custom_dropdown.dart';
 export 'custom_dialog.dart';
 export 'custom_date_field.dart';
 export 'custom_snackbar.dart';
+export 'session_connection_banner.dart';
 export 'custom_search_bar.dart';
 export 'custom_filter_chip.dart';
 export 'empty_state_widget.dart';

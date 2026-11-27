@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:ui' as ui;
 import 'package:mapotech/shared/supabase_service.dart';
+import 'package:mapotech/shared/web_helpers.dart';
 import 'package:mapotech/shared/widgets/celestial_theme_transition.dart';
 
 
@@ -101,6 +103,7 @@ class LandingPageState {
   final String receiptPaperSize; // 'A4', 'A5', 'Thermal 58mm', 'Thermal 80mm'
   final bool isSubscribed;
   final Set<String> favoriteMenuItems;
+  final String activeDashboardMenu;
 
   bool get isAssistant =>
       loggedInUser?['role'] == 'asisten_dokter' ||
@@ -143,6 +146,7 @@ class LandingPageState {
     this.defaultServiceFee = 0.0,
     this.receiptPaperSize = 'A4',
     this.isSubscribed = true,
+    this.activeDashboardMenu = 'dashboard',
     this.favoriteMenuItems = const {
       'dashboard',
       'ai_assistant',
@@ -194,16 +198,18 @@ class LandingPageState {
     double? defaultServiceFee,
     String? receiptPaperSize,
     bool? isSubscribed,
+    String? activeDashboardMenu,
     Set<String>? favoriteMenuItems,
+    bool clearSession = false,
   }) {
     return LandingPageState(
       activeTab: activeTab ?? this.activeTab,
       language: language ?? this.language,
       appearance: appearance ?? this.appearance,
       isLoggedIn: isLoggedIn ?? this.isLoggedIn,
-      loggedInRole: loggedInRole ?? this.loggedInRole,
-      loggedInName: loggedInName ?? this.loggedInName,
-      loggedInUser: loggedInUser ?? this.loggedInUser,
+      loggedInRole: clearSession ? null : (loggedInRole ?? this.loggedInRole),
+      loggedInName: clearSession ? null : (loggedInName ?? this.loggedInName),
+      loggedInUser: clearSession ? null : (loggedInUser ?? this.loggedInUser),
       drawerSize: drawerSize ?? this.drawerSize,
       blurProfileEffectEnabled: blurProfileEffectEnabled ?? this.blurProfileEffectEnabled,
       satusehatAutoSync: satusehatAutoSync ?? this.satusehatAutoSync,
@@ -211,25 +217,127 @@ class LandingPageState {
       defaultServiceFee: defaultServiceFee ?? this.defaultServiceFee,
       receiptPaperSize: receiptPaperSize ?? this.receiptPaperSize,
       isSubscribed: isSubscribed ?? this.isSubscribed,
+      activeDashboardMenu: activeDashboardMenu ?? this.activeDashboardMenu,
       favoriteMenuItems: favoriteMenuItems ?? this.favoriteMenuItems,
     );
   }
 }
 
 class LandingPageNotifier extends StateNotifier<LandingPageState> {
-  LandingPageNotifier()
-      : super(LandingPageState(
-            activeTab: 'mapotek',
-            language: _detectSystemLanguage(),
-            appearance: 'light',
-            isLoggedIn: false,
-            loggedInRole: null,
-            loggedInName: null,
-            loggedInUser: null,
-            drawerSize: 1,
-            blurProfileEffectEnabled: true,
-            satusehatAutoSync: true,
-            syncedTransactions: const {}));
+  static const String sessionStorageKey = 'mapotech_auth_session_v1';
+
+  LandingPageNotifier() : super(_buildInitialState());
+
+  static LandingPageState _buildInitialState() {
+    final baseState = LandingPageState(
+      activeTab: 'mapotek',
+      language: _detectSystemLanguage(),
+      appearance: 'light',
+      isLoggedIn: false,
+      loggedInRole: null,
+      loggedInName: null,
+      loggedInUser: null,
+      drawerSize: 1,
+      blurProfileEffectEnabled: true,
+      satusehatAutoSync: true,
+      syncedTransactions: const {},
+    );
+
+    try {
+      final raw = WebStorageHelper.getItem(sessionStorageKey);
+      if (raw == null || raw.isEmpty) return baseState;
+
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) {
+        WebStorageHelper.removeItem(sessionStorageKey);
+        return baseState;
+      }
+
+      final map = Map<String, dynamic>.from(decoded);
+      final isLoggedIn = map['isLoggedIn'] == true;
+      final role = map['loggedInRole']?.toString();
+      final rawUser = map['loggedInUser'];
+      if (!isLoggedIn ||
+          role == null ||
+          role.isEmpty ||
+          rawUser is! Map) {
+        WebStorageHelper.removeItem(sessionStorageKey);
+        return baseState;
+      }
+
+      final sanitizedUser = Map<String, dynamic>.from(rawUser)
+        ..remove('password');
+      final favoritesRaw = map['favoriteMenuItems'];
+      final syncedRaw = map['syncedTransactions'];
+
+      return baseState.copyWith(
+        activeTab: map['activeTab']?.toString() ?? baseState.activeTab,
+        language: map['language']?.toString() ?? baseState.language,
+        appearance: map['appearance']?.toString() ?? baseState.appearance,
+        isLoggedIn: true,
+        loggedInRole: role,
+        loggedInName:
+            map['loggedInName']?.toString() ??
+            sanitizedUser['name']?.toString(),
+        loggedInUser: sanitizedUser,
+        drawerSize: (map['drawerSize'] as num?)?.toInt() ?? 1,
+        blurProfileEffectEnabled:
+            map['blurProfileEffectEnabled'] as bool? ?? true,
+        satusehatAutoSync: map['satusehatAutoSync'] as bool? ?? true,
+        syncedTransactions: syncedRaw is List
+            ? syncedRaw.map((e) => e.toString()).toSet()
+            : const {},
+        defaultServiceFee:
+            (map['defaultServiceFee'] as num?)?.toDouble() ?? 0.0,
+        receiptPaperSize: map['receiptPaperSize']?.toString() ?? 'A4',
+        isSubscribed: map['isSubscribed'] as bool? ?? true,
+        activeDashboardMenu:
+            map['activeDashboardMenu']?.toString() ?? 'dashboard',
+        favoriteMenuItems: favoritesRaw is List
+            ? favoritesRaw.map((e) => e.toString()).toSet()
+            : baseState.favoriteMenuItems,
+      );
+    } catch (_) {
+      WebStorageHelper.removeItem(sessionStorageKey);
+      return baseState;
+    }
+  }
+
+  static Map<String, dynamic>? _sanitizeUser(Map<String, dynamic>? user) {
+    if (user == null) return null;
+    return Map<String, dynamic>.from(user)..remove('password');
+  }
+
+  void _persistSession() {
+    if (!state.isLoggedIn ||
+        state.loggedInRole == null ||
+        state.loggedInUser == null) {
+      return;
+    }
+    try {
+      final payload = <String, dynamic>{
+        'isLoggedIn': true,
+        'loggedInRole': state.loggedInRole,
+        'loggedInName': state.loggedInName,
+        'loggedInUser': _sanitizeUser(state.loggedInUser),
+        'activeTab': state.activeTab,
+        'activeDashboardMenu': state.activeDashboardMenu,
+        'language': state.language,
+        'appearance': state.appearance,
+        'drawerSize': state.drawerSize,
+        'blurProfileEffectEnabled': state.blurProfileEffectEnabled,
+        'satusehatAutoSync': state.satusehatAutoSync,
+        'syncedTransactions': state.syncedTransactions.toList(),
+        'defaultServiceFee': state.defaultServiceFee,
+        'receiptPaperSize': state.receiptPaperSize,
+        'isSubscribed': state.isSubscribed,
+        'favoriteMenuItems': state.favoriteMenuItems.toList(),
+      };
+      WebStorageHelper.setItem(sessionStorageKey, jsonEncode(payload));
+    } catch (e) {
+      debugPrint('Failed to persist session: $e');
+    }
+  }
 
   static String _detectSystemLanguage() {
     try {
@@ -250,19 +358,24 @@ class LandingPageNotifier extends StateNotifier<LandingPageState> {
     String? language,
     Set<String>? favoriteMenuItems,
   }) {
+    final sanitizedUser = _sanitizeUser(user);
     state = state.copyWith(
       isLoggedIn: true,
       loggedInRole: role,
-      loggedInName: user?['name'] ?? (role == 'pasien' ? 'Alvin' : (role == 'dokter' ? 'dr. Agoes Soetanto' : 'CyrenElysia~♪')),
-      loggedInUser: user,
+      loggedInName: sanitizedUser?['name'] ?? (role == 'pasien' ? 'Alvin' : (role == 'dokter' ? 'dr. Agoes Soetanto' : 'CyrenElysia~♪')),
+      loggedInUser: sanitizedUser,
       blurProfileEffectEnabled: blurProfileEffectEnabled ?? state.blurProfileEffectEnabled,
       defaultServiceFee: defaultServiceFee ?? state.defaultServiceFee,
       satusehatAutoSync: satusehatAutoSync ?? state.satusehatAutoSync,
-      language: language ?? (user?['language'] as String?) ?? state.language,
+      language: language ?? (sanitizedUser?['language'] as String?) ?? state.language,
+      activeDashboardMenu: 'dashboard',
       favoriteMenuItems: favoriteMenuItems ?? state.favoriteMenuItems,
     );
+    _persistSession();
 
-    if (favoriteMenuItems == null && user != null && user['id'] != null) {
+    if (favoriteMenuItems == null &&
+        sanitizedUser != null &&
+        sanitizedUser['id'] != null) {
       loadFavoriteMenusFromDb();
     }
   }
@@ -270,46 +383,101 @@ class LandingPageNotifier extends StateNotifier<LandingPageState> {
   Future<void> loadFavoriteMenusFromDb() async {
     final userId = state.loggedInUser?['id'];
     final userRole = state.loggedInUser?['role']?.toString() ?? state.loggedInRole;
-    if (userId != null && userRole != null) {
+    if (userId != null &&
+        userRole != null &&
+        !userId.toString().startsWith('mock-')) {
       final db = SupabaseService();
       final favs = await db.fetchFavoriteMenusFromUserDetail(userId, userRole);
-      if (favs != null) {
+      if (favs != null && mounted) {
         state = state.copyWith(favoriteMenuItems: favs);
+        _persistSession();
       }
     }
   }
 
+  /// Refreshes the logged-in user's profile and preferences from Supabase
+  /// after reconnection or reload without ever logging the user out on error.
+  Future<void> refreshSessionFromServer() async {
+    if (!state.isLoggedIn) return;
+    final userId = state.loggedInUser?['id']?.toString();
+    if (userId == null || userId.isEmpty || userId.startsWith('mock-')) {
+      return;
+    }
+
+    try {
+      final db = SupabaseService();
+      final freshUser = await db.fetchUserById(userId);
+      if (!mounted || !state.isLoggedIn) return;
+      if (freshUser != null) {
+        final sanitized = _sanitizeUser(freshUser)!;
+        final mergedUser = Map<String, dynamic>.from(state.loggedInUser ?? {});
+        mergedUser.addAll(sanitized);
+        state = state.copyWith(
+          loggedInUser: mergedUser,
+          loggedInName: mergedUser['name']?.toString() ?? state.loggedInName,
+          blurProfileEffectEnabled:
+              mergedUser['is_blur_enabled'] as bool? ??
+              state.blurProfileEffectEnabled,
+          language: mergedUser['language']?.toString() ?? state.language,
+        );
+        _persistSession();
+      }
+      await loadFavoriteMenusFromDb();
+    } catch (e) {
+      debugPrint('Non-fatal session refresh error: $e');
+    }
+  }
+
+  void setDashboardMenu(String menu) {
+    if (menu == state.activeDashboardMenu) return;
+    state = state.copyWith(activeDashboardMenu: menu);
+    _persistSession();
+  }
+
   void logout() {
-    state = state.copyWith(isLoggedIn: false, loggedInRole: null, loggedInName: null, loggedInUser: null, drawerSize: 1, isSubscribed: true);
+    WebStorageHelper.removeItem(sessionStorageKey);
+    state = state.copyWith(
+      isLoggedIn: false,
+      clearSession: true,
+      drawerSize: 1,
+      isSubscribed: true,
+      activeDashboardMenu: 'dashboard',
+    );
   }
 
   void setSubscribed(bool val) {
     state = state.copyWith(isSubscribed: val);
+    _persistSession();
   }
 
   void updateUser(Map<String, dynamic> updatedFields) {
     if (state.loggedInUser != null) {
       final nextUser = Map<String, dynamic>.from(state.loggedInUser!);
       nextUser.addAll(updatedFields);
+      nextUser.remove('password');
       state = state.copyWith(
         loggedInUser: nextUser,
         loggedInName: nextUser['name'],
       );
+      _persistSession();
     }
   }
 
   void setDrawerSize(int size) {
     state = state.copyWith(drawerSize: size);
+    _persistSession();
   }
 
   void toggleDrawerSize() {
     // Cycles: 0 -> 1 -> 0
     state = state.copyWith(drawerSize: state.drawerSize == 0 ? 1 : 0);
+    _persistSession();
   }
 
   void toggleFullScreenDrawer() {
     // Toggles between full-screen (2) and expanded (1)
     state = state.copyWith(drawerSize: state.drawerSize == 2 ? 1 : 2);
+    _persistSession();
   }
 
   void toggleFavoriteMenuItem(String menuId) async {
@@ -320,6 +488,7 @@ class LandingPageNotifier extends StateNotifier<LandingPageState> {
       currentFavorites.add(menuId);
     }
     state = state.copyWith(favoriteMenuItems: currentFavorites);
+    _persistSession();
 
     final userId = state.loggedInUser?['id'];
     final userRole = state.loggedInUser?['role']?.toString() ?? state.loggedInRole;
@@ -338,6 +507,7 @@ class LandingPageNotifier extends StateNotifier<LandingPageState> {
     if (!currentFavorites.contains(menuId)) {
       currentFavorites.add(menuId);
       state = state.copyWith(favoriteMenuItems: currentFavorites);
+      _persistSession();
 
       final userId = state.loggedInUser?['id'];
       final userRole = state.loggedInUser?['role']?.toString() ?? state.loggedInRole;
@@ -358,10 +528,12 @@ class LandingPageNotifier extends StateNotifier<LandingPageState> {
 
   void setActiveTab(String tab) {
     state = state.copyWith(activeTab: tab);
+    _persistSession();
   }
 
   void setLanguage(String lang) async {
     state = state.copyWith(language: lang);
+    _persistSession();
     final userId = state.loggedInUser?['id'];
     if (userId != null) {
       try {
@@ -387,12 +559,14 @@ class LandingPageNotifier extends StateNotifier<LandingPageState> {
       origin: transitionOrigin,
       commitState: () {
         state = state.copyWith(appearance: value);
+        _persistSession();
       },
     );
   }
 
   void setBlurProfileEffect(bool enabled) async {
     state = state.copyWith(blurProfileEffectEnabled: enabled);
+    _persistSession();
     final userId = state.loggedInUser?['id'];
     if (userId != null) {
       try {
@@ -408,6 +582,7 @@ class LandingPageNotifier extends StateNotifier<LandingPageState> {
 
   void setSatusehatAutoSync(bool val) async {
     state = state.copyWith(satusehatAutoSync: val);
+    _persistSession();
     final userId = state.loggedInUser?['id'];
     if (userId != null && state.loggedInRole == 'dokter') {
       try {
@@ -432,6 +607,7 @@ class LandingPageNotifier extends StateNotifier<LandingPageState> {
 
   void setDefaultServiceFee(double val) async {
     state = state.copyWith(defaultServiceFee: val);
+    _persistSession();
     final userId = state.loggedInUser?['id'];
     if (userId != null && state.loggedInRole == 'dokter') {
       try {
@@ -447,6 +623,7 @@ class LandingPageNotifier extends StateNotifier<LandingPageState> {
 
   void setReceiptPaperSize(String val) async {
     state = state.copyWith(receiptPaperSize: val);
+    _persistSession();
     final userId = state.loggedInUser?['id'];
     if (userId != null && state.loggedInRole == 'dokter') {
       try {
@@ -462,6 +639,7 @@ class LandingPageNotifier extends StateNotifier<LandingPageState> {
 
   void markTransactionSynced(String id) {
     state = state.copyWith(syncedTransactions: {...state.syncedTransactions, id});
+    _persistSession();
   }
 
   // --- THEME COLOR GETTERS ---
