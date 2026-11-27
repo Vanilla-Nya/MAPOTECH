@@ -7,6 +7,7 @@ import 'package:mapotech/features/landing/landing_page_layout.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/letter_models.dart';
 import 'package:mapotech/shared/widgets/letter_verification_page.dart';
+import 'package:mapotech/shared/widgets/celestial_theme_transition.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -65,6 +66,13 @@ class _MyAppState extends ConsumerState<MyApp> {
       debugShowCheckedModeBanner: false,
       locale: Locale(state.language),
       themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
+      themeAnimationDuration: Duration.zero,
+      builder: (context, child) {
+        return CelestialThemeTransitionHost(
+          appearance: state.appearance,
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       theme: ThemeData(
         brightness: Brightness.light,
         scaffoldBackgroundColor: backgroundColor,

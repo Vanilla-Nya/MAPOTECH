@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:mapotech/shared/widgets/celestial_theme_transition.dart';
 
 class SettingsSection extends StatelessWidget {
   final String title;
@@ -46,7 +47,8 @@ class SettingsChip extends StatelessWidget {
   final String label;
   final IconData? icon;
   final bool isSelected;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
+  final ValueChanged<Offset?>? onTapWithOrigin;
   final Color purple;
   final Color teal;
   final bool isDark;
@@ -58,7 +60,8 @@ class SettingsChip extends StatelessWidget {
     required this.label,
     this.icon,
     required this.isSelected,
-    required this.onTap,
+    this.onTap,
+    this.onTapWithOrigin,
     required this.purple,
     required this.teal,
     required this.isDark,
@@ -74,9 +77,17 @@ class SettingsChip extends StatelessWidget {
         : (isDark ? const Color(0xFF1E1E22) : Colors.white);
     final Color fg = isSelected ? activeColor : (isDark ? Colors.grey[400]! : const Color(0xFF6F6A8A));
 
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
+    return Builder(
+      builder: (chipContext) => GestureDetector(
+        onTap: () {
+          if (onTapWithOrigin != null) {
+            onTapWithOrigin!(
+              CelestialThemeCoordinator.globalCenterOf(chipContext),
+            );
+          }
+          onTap?.call();
+        },
+        child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: padding,
         decoration: BoxDecoration(
@@ -105,6 +116,7 @@ class SettingsChip extends StatelessWidget {
           ],
         ),
       ),
+    ),
     );
   }
 }

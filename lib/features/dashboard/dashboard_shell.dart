@@ -8,6 +8,7 @@ import 'dart:ui' as ui;
 import 'package:mapotech/shared/widgets/page_tutorial_data.dart';
 import 'package:mapotech/shared/widgets/page_tutorial_dialog.dart';
 import 'package:mapotech/shared/widgets/animated_portal_switcher.dart';
+import 'package:mapotech/shared/widgets/celestial_theme_transition.dart';
 // Import split widgets and views
 import 'package:mapotech/features/dashboard/widgets/dashboard_drawer.dart';
 import 'package:mapotech/features/pasien/dashboard/frontend/pasien_dashboard.dart';
@@ -434,22 +435,33 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
 
                     // Inner Scrollable Panel
                     Expanded(
-                      child: (!_shouldUseShellScroll(_activeMenu))
-                          ? AnimatedPortalSwitcher(
-                              switcherKey: _activeMenu,
-                              child: _buildRoleDashboardBody(
-                                state.loggedInRole ?? 'pasien',
-                              ),
-                            )
-                          : SingleChildScrollView(
-                              padding: EdgeInsets.all(isMobile ? 16 : 28),
-                              child: AnimatedPortalSwitcher(
-                                switcherKey: _activeMenu,
-                                child: _buildRoleDashboardBody(
-                                  state.loggedInRole ?? 'pasien',
-                                ),
-                              ),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          IgnorePointer(
+                            child: CelestialSkyBackdrop(
+                              appearance: state.appearance,
+                              isDashboard: true,
                             ),
+                          ),
+                          (!_shouldUseShellScroll(_activeMenu))
+                              ? AnimatedPortalSwitcher(
+                                  switcherKey: _activeMenu,
+                                  child: _buildRoleDashboardBody(
+                                    state.loggedInRole ?? 'pasien',
+                                  ),
+                                )
+                              : SingleChildScrollView(
+                                  padding: EdgeInsets.all(isMobile ? 16 : 28),
+                                  child: AnimatedPortalSwitcher(
+                                    switcherKey: _activeMenu,
+                                    child: _buildRoleDashboardBody(
+                                      state.loggedInRole ?? 'pasien',
+                                    ),
+                                  ),
+                                ),
+                        ],
+                      ),
                     ),
                   ],
                 ),

@@ -114,9 +114,7 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
       }
     });
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 400),
-      curve: Curves.easeInOut,
+    return Container(
       color: backgroundColor,
       child: Scaffold(
         key: _scaffoldKey,
@@ -128,8 +126,7 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
             Positioned(
               top: -150,
               right: -150,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 400),
+              child: Container(
                 width: 500,
                 height: 500,
                 decoration: BoxDecoration(
@@ -141,8 +138,7 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
             Positioned(
               top: 400,
               left: -200,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 400),
+              child: Container(
                 width: 600,
                 height: 600,
                 decoration: BoxDecoration(
@@ -152,9 +148,18 @@ class _LandingPageLayoutState extends ConsumerState<LandingPageLayout> {
               ),
             ),
 
+            // Persistent Celestial Sky Backdrop (Sun / Moon / Relva Sun+Moon)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: CelestialSkyBackdrop(
+                  appearance: state.appearance,
+                ),
+              ),
+            ),
+
             // Main Content
             FadeTransitionOnChange(
-              animationKey: '${state.appearance}_${state.language}',
+              animationKey: state.language,
               child: SafeArea(
             top: false,
             child: CustomScrollView(

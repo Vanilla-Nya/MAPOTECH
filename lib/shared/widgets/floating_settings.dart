@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapotech/features/landing/landing_page_data.dart';
+import 'package:mapotech/shared/widgets/celestial_theme_transition.dart';
 
 class FloatingSettings extends ConsumerStatefulWidget {
   const FloatingSettings({super.key});
@@ -173,7 +174,7 @@ class _FloatingSettingsState extends ConsumerState<FloatingSettings>
                             borderColor: borderColor,
                             textColor: textColor,
                             state: state,
-                            onTap: () => notifier.updateAppearance('light'),
+                            onTap: (_) => notifier.updateAppearance('light'),
                           ),
                           const SizedBox(width: 8),
 
@@ -186,7 +187,7 @@ class _FloatingSettingsState extends ConsumerState<FloatingSettings>
                             borderColor: borderColor,
                             textColor: textColor,
                             state: state,
-                            onTap: () => notifier.updateAppearance('dark'),
+                            onTap: (_) => notifier.updateAppearance('dark'),
                           ),
                           const SizedBox(width: 8),
 
@@ -199,7 +200,7 @@ class _FloatingSettingsState extends ConsumerState<FloatingSettings>
                             borderColor: borderColor,
                             textColor: textColor,
                             state: state,
-                            onTap: () => notifier.updateAppearance('rev'),
+                            onTap: (_) => notifier.updateAppearance('rev'),
                           ),
                           const SizedBox(width: 8),
 
@@ -341,7 +342,7 @@ class _FloatingSettingsState extends ConsumerState<FloatingSettings>
     required Color borderColor,
     required Color textColor,
     required LandingPageState state,
-    required VoidCallback onTap,
+    required ValueChanged<Offset?> onTap,
   }) {
     Color bg;
     Color fg;
@@ -363,9 +364,10 @@ class _FloatingSettingsState extends ConsumerState<FloatingSettings>
       border = BorderSide(color: borderColor);
     }
 
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
+    return Builder(
+      builder: (btnContext) => GestureDetector(
+        onTap: () => onTap(CelestialThemeCoordinator.globalCenterOf(btnContext)),
+        child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         width: 44,
         height: 44,
@@ -385,6 +387,7 @@ class _FloatingSettingsState extends ConsumerState<FloatingSettings>
         alignment: Alignment.center,
         child: Icon(icon, color: fg, size: 18),
       ),
+    ),
     );
   }
 }

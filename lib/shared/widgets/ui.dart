@@ -20,6 +20,7 @@ export 'custom_lazy_loader.dart';
 export 'common_pagination.dart';
 export 'animated_portal_switcher.dart';
 export 'animated_transitions.dart';
+export 'celestial_theme_transition.dart';
 export 'mapotech_loading_screen.dart';
 export 'portal_widgets.dart';
 export 'viewport_overlay.dart';

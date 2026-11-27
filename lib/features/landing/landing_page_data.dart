@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:ui' as ui;
 import 'package:mapotech/shared/supabase_service.dart';
+import 'package:mapotech/shared/widgets/celestial_theme_transition.dart';
 
 
 // --- MODELS ---
@@ -378,8 +379,16 @@ class LandingPageNotifier extends StateNotifier<LandingPageState> {
     setLanguage(state.language == 'id' ? 'en' : 'id');
   }
 
-  void updateAppearance(String value) {
-    state = state.copyWith(appearance: value);
+  void updateAppearance(String value, {Offset? transitionOrigin}) {
+    if (value == state.appearance) return;
+    CelestialThemeCoordinator.instance.requestAppearanceChange(
+      currentAppearance: state.appearance,
+      targetAppearance: value,
+      origin: transitionOrigin,
+      commitState: () {
+        state = state.copyWith(appearance: value);
+      },
+    );
   }
 
   void setBlurProfileEffect(bool enabled) async {
