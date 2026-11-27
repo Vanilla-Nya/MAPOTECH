@@ -21,7 +21,8 @@ class VitaScaleAppBarStatus {
   final int? wifiRssiDbm;
   final double poleHeightCm;
   final bool isGatewayHealthy;
-  final double pcvScalePxPerCm;
+  final bool usesPcv;
+  final double? pcvScalePxPerCm;
   final VoidCallback? onPingCloud;
   final VoidCallback? onOpenApiHost;
   final VoidCallback? onToggleMqtt;
@@ -45,7 +46,8 @@ class VitaScaleAppBarStatus {
     this.wifiRssiDbm,
     required this.poleHeightCm,
     required this.isGatewayHealthy,
-    required this.pcvScalePxPerCm,
+    required this.usesPcv,
+    this.pcvScalePxPerCm,
     this.onPingCloud,
     this.onOpenApiHost,
     this.onToggleMqtt,
@@ -71,6 +73,7 @@ class VitaScaleAppBarStatus {
         wifiRssiDbm == other.wifiRssiDbm &&
         poleHeightCm == other.poleHeightCm &&
         isGatewayHealthy == other.isGatewayHealthy &&
+        usesPcv == other.usesPcv &&
         pcvScalePxPerCm == other.pcvScalePxPerCm;
   }
 }
@@ -101,8 +104,14 @@ class VitaScaleAppBarStatusIcons extends StatelessWidget {
     final cloudColor = status.isCloudOnline
         ? const Color(0xFF27AE60)
         : const Color(0xFFE74C3C);
-    final wifiColor = _resolveWifiColor(status.wifiRssiDbm, status.isMqttConnected);
-    final wifiIcon = _resolveWifiIcon(status.wifiRssiDbm, status.isMqttConnected);
+    final wifiColor = _resolveWifiColor(
+      status.wifiRssiDbm,
+      status.isMqttConnected,
+    );
+    final wifiIcon = _resolveWifiIcon(
+      status.wifiRssiDbm,
+      status.isMqttConnected,
+    );
     final gatewayColor = status.isGatewayHealthy
         ? const Color(0xFF9B59B6)
         : const Color(0xFF64748B);
@@ -126,7 +135,9 @@ class VitaScaleAppBarStatusIcons extends StatelessWidget {
                       : Icons.cloud_off_rounded),
             color: cloudColor,
             dotColor: cloudColor,
-            label: isCompact ? null : (status.isCloudOnline ? 'Cloud' : 'Offline'),
+            label: isCompact
+                ? null
+                : (status.isCloudOnline ? 'Cloud' : 'Offline'),
             tooltip:
                 'Cloud AI: ${status.isCloudOnline ? "Terhubung" : "Terputus"} (${status.cloudBaseUrl})\nKlik untuk Ping ulang',
             textColor: textColor,
@@ -158,7 +169,7 @@ class VitaScaleAppBarStatusIcons extends StatelessWidget {
               textColor: textColor,
               onTap: status.onOpenIotSettings,
             ),
-            if (!isCompact) ...[
+            if (!isCompact && !status.usesPcv) ...[
               const SizedBox(width: 4),
               _StatusIconPill(
                 icon: Icons.height_rounded,
@@ -190,15 +201,16 @@ class VitaScaleAppBarStatusIcons extends StatelessWidget {
                 onTap: status.onSendTare,
               ),
             ],
-          ] else if (status.activeTab == 2) ...[
+          ],
+          if (status.usesPcv) ...[
             const SizedBox(width: 4),
             _StatusIconPill(
               icon: Icons.camera_enhance_rounded,
               color: const Color(0xFF1ABC9C),
-              dotColor: const Color(0xFF2ECC71),
-              label: isCompact ? null : 'PCV API',
-              tooltip:
-                  'PCV Vision Cloud API: Online (${status.pcvScalePxPerCm.toStringAsFixed(2)} px/cm)',
+              label: isCompact ? null : 'PCV',
+              tooltip: status.pcvScalePxPerCm == null
+                  ? 'PCV · Kalibrasi kamera / Camera calibration'
+                  : 'PCV · ${status.pcvScalePxPerCm!.toStringAsFixed(2)} px/cm',
               textColor: textColor,
               onTap: status.onScrollToStatus,
             ),

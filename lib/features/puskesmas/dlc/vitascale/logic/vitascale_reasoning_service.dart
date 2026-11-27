@@ -78,7 +78,6 @@ class VitaScaleReasoningService {
     double? lilaCm,
     double? headCircumferenceCm,
     String? measurementMethod,
-    String? kmsStatus,
     bool? receivedVitA,
     bool? receivedDeworming,
     String language = 'id',
@@ -147,19 +146,14 @@ ATURAN KLINIS MUTLAK (GOLDEN RULES BUKU KIA 2024 & SATUSEHAT) - TIDAK BOLEH DILA
    - Prioritas utama: Telur ayam (minimal 1 butir utuh/hari), hati ayam/sapi (sumber zat besi terbaik pencegah anemia/stunting), ikan lokal (kembung, lele, bandeng), dan daging ayam/sapi.
    - LARANGAN KLINIS: JANGAN menyarankan menu rendah lemak/rendah kalori atau memperbanyak porsi kuah/sayur bening pada balita gizi kurang/stunting, karena kapasitas lambung balita terbatas dan membutuhkan makanan padat energi.
 
-4. EVALUASI GRAFIK KMS (KARTU MENUJU SEHAT) & KENAIKAN BERAT BADAN:
-   - Evaluasi tren kenaikan berat badan minimal (KBM) sesuai usia balita.
-   - N (Naik): BB naik sesuai atau melebihi KBM.
-   - T (Tidak Naik): BB mendatar atau turun.
-   - 2T (Dua kali tidak naik berturut-turut): Tanda Bahaya (Red Flag) wajib dirujuk ke faskes.
-   - BGM (Bawah Garis Merah): Tanda Bahaya gizi buruk akut / stunting berat wajib dirujuk ke faskes.
+4. BATAS DATA PERTUMBUHAN:
+   - Gunakan hasil pengukuran saat ini. Riwayat penimbangan tidak tersedia, sehingga tren pertumbuhan tidak dapat dinilai.
 
 5. INDIKASI RUJUKAN & TANDA BAHAYA (RED FLAGS):
    - Wajib cantumkan rekomendasi rujukan ke Puskesmas / Dokter Spesialis Anak jika:
-     a. Status balita: Stunting (TB/U < -2 SD), Gizi Kurang/Buruk (BB/TB < -2 SD), atau Berada di Bawah Garis Merah (BGM) KMS.
-     b. Indikasi 2T (dua kali penimbangan berturut-turut berat badan tidak naik atau turun).
-     c. Tanda bahaya klinis: Edema simetris pada kedua punggung kaki (tanda Kwashiorkor), anak tampak sangat kurus/iga gambang (tanda Marasmus), tidak nafsu makan/anoreksia, muntah berulang, lemas/letargis.
-     d. Penyakit penyerta kronis: Batuk tidak kunjung sembuh > 2 minggu (skrining TB anak), demam berulang, atau diare berulang/kronis > 14 hari.
+     a. Status balita: Stunting (TB/U < -2 SD), atau Gizi Kurang/Buruk (BB/TB < -2 SD).
+     b. Tanda bahaya klinis: Edema simetris pada kedua punggung kaki (tanda Kwashiorkor), anak tampak sangat kurus/iga gambang (tanda Marasmus), tidak nafsu makan/anoreksia, muntah berulang, lemas/letargis.
+     c. Penyakit penyerta kronis: Batuk tidak kunjung sembuh > 2 minggu (skrining TB anak), demam berulang, atau diare berulang/kronis > 14 hari.
 
 6. PANDUAN EDUKASI ORANG TUA & SUPLEMEN:
    - Evaluasi kelengkapan Kapsul Vitamin A (Februari/Agustus) dan Obat Cacing (anak ≥ 12 bulan).
@@ -168,12 +162,12 @@ ATURAN KLINIS MUTLAK (GOLDEN RULES BUKU KIA 2024 & SATUSEHAT) - TIDAK BOLEH DILA
 
 WAJIB mengembalikan HANYA format JSON valid berikut (tanpa markdown atau teks pembuka/penutup):
 {
-  "reasoning_summary": "Ringkasan penalaran klinis dokter dalam 2-3 kalimat padat mengenai status gizi (BB/TB), stunting (TB/U), dan tren KMS balita sesuai acuan Buku KIA 2024 & SATUSEHAT.",
+  "reasoning_summary": "Ringkasan penalaran klinis dokter dalam 2-3 kalimat padat mengenai status gizi (BB/TB), stunting (TB/U) sesuai acuan Buku KIA 2024 & SATUSEHAT.",
   "chain_of_thought_steps": [
     "Langkah 1: Analisis data antropometri (usia, jenis kelamin, BB, PB/TB, LK, LiLA) terhadap median baku WHO, grafik Nellhaus, & Buku KIA 2024.",
     "Langkah 2: Evaluasi hasil prediksi model MLP (klasifikasi gizi BB/TB dan stunting TB/U) serta tingkat keyakinannya.",
     "Langkah 3: Analisis diferensial antara defisit berat badan akut (wasting/gizi kurang) dan gangguan pertumbuhan linier kronis (stunting).",
-    "Langkah 4: Penilaian tren kurva pertumbuhan KMS (N/T/2T/BGM), risiko weight faltering, dan faktor infeksi penyerta."
+    "Langkah 4: Penilaian faktor risiko yang tersedia dari data pemeriksaan."
   ],
   "risk_and_etiology": "Analisis potensi faktor risiko utama berbasis usia balita (kualitas/tekstur MP-ASI, defisiensi protein hewani, anemia defisiensi besi, riwayat infeksi ISPA/diare/TB, sanitasi, status imunisasi).",
   "nutritional_intervention": "Rencana intervensi gizi terperinci sesuai usia spesifik anak berdasar Buku KIA 2024 (tekstur makan, porsi mangkuk 250ml, frekuensi makan, target protein hewani spesifik seperti 1 telur/hari, hati ayam, ikan, dan lemak tambahan).",
@@ -195,7 +189,6 @@ Profil Balita:
 ${headCircumferenceCm != null ? '- Lingkar Kepala (LK): $headCircumferenceCm cm (Evaluasi Grafik Nellhaus)' : ''}
 ${lilaCm != null ? '- LiLA (Lingkar Lengan Atas): $lilaCm cm' : ''}
 ${waistCm != null ? '- Lingkar Perut: $waistCm cm' : ''}
-${kmsStatus != null ? '- Tren Pertumbuhan KMS Buku KIA: $kmsStatus' : ''}
 ${receivedVitA != null ? '- Status Vitamin A: ${receivedVitA ? "Sudah Diberikan" : "Belum Diberikan"}' : ''}
 ${receivedDeworming != null ? '- Status Obat Cacing: ${receivedDeworming ? "Sudah Diberikan" : "Belum Diberikan"}' : ''}
 
@@ -207,7 +200,7 @@ Hasil Prediksi Model Machine Learning VitaScale (Keras MLP):
 - Distribusi Probabilitas BB/TB: ${mlpResult.probabilitasBbtb}
 - Distribusi Probabilitas TB/U: ${mlpResult.probabilitasTbu}
 
-Berikan alur penalaran klinis terstruktur (Chain of Thought), evaluasi tren KMS dan parameter antropometri Buku KIA, identifikasi faktor risiko etiologi sesuai usia, rekomendasi nutrisi protein hewani & tekstur MP-ASI Buku KIA 2024, protokol tindakan faskes, serta edukasi orang tua dalam format JSON.
+Berikan alur penalaran klinis terstruktur (Chain of Thought), evaluasi parameter antropometri Buku KIA, identifikasi faktor risiko etiologi sesuai usia, rekomendasi nutrisi protein hewani & tekstur MP-ASI Buku KIA 2024, protokol tindakan faskes, serta edukasi orang tua dalam format JSON.
 ''';
 
     try {
@@ -234,7 +227,6 @@ Berikan alur penalaran klinis terstruktur (Chain of Thought), evaluasi tren KMS 
         mlpResult: mlpResult,
         headCircumferenceCm: headCircumferenceCm,
         measurementMethod: measurementMethod,
-        kmsStatus: kmsStatus,
         language: language,
       );
     }
@@ -250,14 +242,11 @@ Berikan alur penalaran klinis terstruktur (Chain of Thought), evaluasi tren KMS 
     required HasilSmartGrowthBalita mlpResult,
     double? headCircumferenceCm,
     String? measurementMethod,
-    String? kmsStatus,
     String language = 'id',
   }) {
     final isEn = language == 'en';
     final isStunting = mlpResult.isStunting;
     final isGiziKurang = mlpResult.isGiziBurukAtauKurang;
-    final is2T = kmsStatus?.contains('2T') ?? false;
-    final isBgm = kmsStatus?.contains('BGM') ?? false;
 
     String summary;
     List<String> steps = [];
@@ -294,17 +283,14 @@ Berikan alur penalaran klinis terstruktur (Chain of Thought), evaluasi tren KMS 
       }
     }
 
-    if (isStunting || isGiziKurang || is2T || isBgm) {
+    if (isStunting || isGiziKurang) {
       if (isEn) {
-        final flagLabel = is2T ? '2T trend (faltering)' : (isBgm ? 'below red line (BGM)' : 'malnutrition indicators');
-        summary = 'Anthropometric screening indicates ${mlpResult.kategoriStuntingTbu} (HAZ) and ${mlpResult.kategoriGiziBbtb} (WHZ) with $flagLabel. Guided by WHO & KIA 2024 protocols, this condition requires accelerated calorie-dense animal protein nutrition and close monitoring.';
+        summary = 'Anthropometric screening indicates ${mlpResult.kategoriStuntingTbu} (HAZ) and ${mlpResult.kategoriGiziBbtb} (WHZ). Guided by WHO & KIA 2024 protocols, this condition requires accelerated calorie-dense animal protein nutrition and close monitoring.';
         steps = [
           'Weight-to-height ratio evaluation ($weightKg kg / $heightCm cm) shows growth deviation for ${genderLabel.toLowerCase()} child at ${ageMonths.toStringAsFixed(0)} months old.',
           'Linear growth curve shows deviation classified as ${mlpResult.kategoriStuntingTbu} with MLP model confidence ${mlpResult.confidenceTbu.toStringAsFixed(1)}%.',
           if (headCircumferenceCm != null)
             'Head circumference $headCircumferenceCm cm recorded for Nellhaus curve verification.',
-          if (is2T || isBgm)
-            'RED FLAG: Growth trajectory detected as $kmsStatus requiring prompt medical attention.',
           'Following protocol, regular anthropometric monitoring is required at the primary healthcare center.'
         ];
         etiology = 'Common risk factors include: suboptimal calorie density and animal protein in complementary feeding, delayed food texture progression, recurrent childhood infections, or sanitation.';
@@ -312,16 +298,13 @@ Berikan alur penalaran klinis terstruktur (Chain of Thought), evaluasi tren KMS 
         protocol = 'Schedule follow-up weight measurement in 14 days at Puskesmas/clinic. If weight fails to gain (2T) or child remains below red line, refer immediately to a Pediatrician.';
         parent = 'Do not be discouraged. During these golden early years, nutritional recovery is very effective when children receive adequate daily animal protein with every meal. Prioritize eggs and fish before sweet snacks.';
       } else {
-        final flagLabel = is2T ? 'tren 2T (dua kali tidak naik)' : (isBgm ? 'posisi BGM (Bawah Garis Merah)' : 'indikasi malnutrisi');
         summary = 'Hasil penapisan antropometri menunjukkan status ${mlpResult.kategoriStuntingTbu} (TB/U) '
-            'dan ${mlpResult.kategoriGiziBbtb} (BB/TB) dengan $flagLabel. Mengacu pada Buku KIA 2024, kondisi ini memerlukan akselerasi nutrisi protein hewani padat kalori serta evaluasi tanda gagal tumbuh (weight faltering).';
+            'dan ${mlpResult.kategoriGiziBbtb} (BB/TB). Mengacu pada Buku KIA 2024, kondisi ini memerlukan akselerasi nutrisi protein hewani padat kalori serta evaluasi tanda gagal tumbuh (weight faltering).';
         steps = [
           'Evaluasi rasio berat badan terhadap panjang/tinggi ($weightKg kg / $heightCm cm) menunjukkan deviasi pada anak ${genderLabel.toLowerCase()} usia ${ageMonths.toStringAsFixed(0)} bulan.',
           'Pertumbuhan linier menunjukkan deviasi yang mengarah pada status ${mlpResult.kategoriStuntingTbu} dengan tingkat keyakinan model MLP ${mlpResult.confidenceTbu.toStringAsFixed(1)}%.',
           if (headCircumferenceCm != null)
             'Pengukuran lingkar kepala $headCircumferenceCm cm dicatat untuk verifikasi grafik Nellhaus Buku KIA 2024.',
-          if (is2T || isBgm)
-            'PERINGATAN KMS: Terdeteksi status $kmsStatus. Buku KIA 2024 menetapkan status ini sebagai Tanda Bahaya (Red Flag) rujukan medis segera.',
           'Sesuai protokol Buku KIA 2024 & SATUSEHAT, anak dengan deviasi pertumbuhan wajib dipantau ketat di faskes primer/Puskesmas.'
         ];
         etiology = 'Faktor risiko yang sering menjadi penyebab: kepadatan kalori dan protein hewani MP-ASI yang kurang optimal, tekstur makanan yang terlambat dinaikkan, riwayat sakit berulang (ISPA, diare, atau TBC balita), atau sanitasi lingkungan.';
@@ -338,7 +321,7 @@ Berikan alur penalaran klinis terstruktur (Chain of Thought), evaluasi tren KMS 
           if (headCircumferenceCm != null)
             'Head circumference $headCircumferenceCm cm is within normal limits on the Nellhaus growth curve.',
           'MLP model confidence reached ${mlpResult.confidenceBbtb.toStringAsFixed(1)}% for WHZ and ${mlpResult.confidenceTbu.toStringAsFixed(1)}% for HAZ.',
-          'Growth remains on track on the green trajectory. Maintain steady monthly weight gains.'
+          'Assess growth over time with follow-up measurements.'
         ];
         etiology = 'Growth and developmental milestones are proceeding optimally without acute or chronic malnutrition indicators.';
         nutrition = '$ageBasedNutrition Maintain balanced intake combining carbohydrates, high-quality animal proteins, healthy fats, and adequate fruits and vegetables.';
@@ -346,18 +329,18 @@ Berikan alur penalaran klinis terstruktur (Chain of Thought), evaluasi tren KMS 
         parent = 'Great job parents! Your feeding practices and nurturing care are exemplary. Keep up regular monthly visits to monitor continued healthy development.';
       } else {
         summary = 'Status pertumbuhan $childName tergolong ${mlpResult.kategoriGiziBbtb} (BB/TB) dan ${mlpResult.kategoriStuntingTbu} (TB/U). '
-            'Indikator antropometri berada dalam batas aman grafik KMS Buku KIA 2024 dan standar WHO.';
+            'Kesimpulan ini didasarkan pada pengukuran saat ini.';
         steps = [
           'Panjang/tinggi badan $heightCm cm proporsional dan sesuai median kurva pertumbuhan untuk balita usia ${ageMonths.toStringAsFixed(0)} bulan.',
           'Berat badan $weightKg kg seimbang dengan tinggi badan saat ini (${mlpResult.kategoriGiziBbtb}), menandakan status nutrisi akut yang baik.',
           if (headCircumferenceCm != null)
             'Lingkar kepala $headCircumferenceCm cm berada dalam batas normal kurva pertumbuhan kepala Nellhaus.',
           'Confidence model MLP mencapai ${mlpResult.confidenceBbtb.toStringAsFixed(1)}% untuk status gizi BB/TB dan ${mlpResult.confidenceTbu.toStringAsFixed(1)}% untuk status stunting TB/U.',
-          'Pertumbuhan anak berada pada pita hijau KMS, pertahankan tren kenaikan berat badan tiap bulan (N).'
+          'Pengukuran lanjutan diperlukan untuk menilai perubahan berat badan.'
         ];
         etiology = 'Pertumbuhan dan perkembangan berlangsung optimal tanpa tanda-tanda malnutrisi akut maupun kronis.';
         nutrition = '$ageBasedNutrition Pertahankan pola asupan bergizi dengan kombinasi karbohidrat, protein hewani berkualitas tinggi, lemak sehat, serta sayur dan buah secukupnya.';
-        protocol = 'Lanjutkan pemantauan rutin bulanan di Posyandu/Puskesmas terdekat untuk memastikan kurva KMS anak selalu naik mengikuti pita hijau (indikator N). Berikan kapsul Vitamin A pada bulan Februari dan Agustus.';
+        protocol = 'Lanjutkan pemantauan rutin bulanan di Posyandu/Puskesmas terdekat untuk memantau perubahan berat dan panjang atau tinggi badan. Berikan kapsul Vitamin A pada bulan Februari dan Agustus.';
         parent = 'Hebat sekali Bunda & Ayah! Pola asuh dan pemberian makan yang diterapkan sudah sangat tepat. Tetap rutin datang ke Posyandu setiap bulan untuk menimbang dan memantau perkembangan ananda.';
       }
     }

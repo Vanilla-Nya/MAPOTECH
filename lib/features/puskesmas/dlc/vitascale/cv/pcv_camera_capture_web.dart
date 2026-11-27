@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
 import 'dart:ui_web' as ui_web;
@@ -7,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:web/web.dart' as web;
 import 'pcv_camera_capture_types.dart';
+import 'pcv_photo_processing_web.dart' show encodePcvCanvasJpeg;
 
 /// Opens a live local webcam dialog in the browser and returns a captured JPEG snapshot.
 Future<PcvCapturedPhoto?> capturePcvCameraSnapshot(BuildContext context) {
@@ -344,7 +344,7 @@ class _WebPcvCameraDialogState extends State<_WebPcvCameraDialog> {
     } catch (_) {}
   }
 
-  void _captureSnapshot() {
+  Future<void> _captureSnapshot() async {
     if (_isCapturing || _isInitializing || _errorMessage != null) return;
 
     final vw = _videoElement.videoWidth;
@@ -378,16 +378,10 @@ class _WebPcvCameraDialogState extends State<_WebPcvCameraDialog> {
       }
 
       ctx.drawImage(_videoElement, 0, 0, cw, ch);
-      final dataUrl = canvas.toDataURL('image/jpeg', 0.92.toJS);
-      final commaIdx = dataUrl.indexOf(',');
-      if (commaIdx < 0 || commaIdx + 1 >= dataUrl.length) {
-        throw StateError('Data snapshot tidak valid.');
-      }
+      final bytes = await encodePcvCanvasJpeg(canvas, quality: 0.92);
 
-      final bytes = base64Decode(dataUrl.substring(commaIdx + 1));
-      _stopCurrentStream();
-
-      if (mounted && !_isDisposed) {
+      if (mounted && !_isDisposed && ModalRoute.of(context)?.isCurrent == true) {
+        _stopCurrentStream();
         Navigator.of(context).pop(
           PcvCapturedPhoto(
             bytes: bytes,

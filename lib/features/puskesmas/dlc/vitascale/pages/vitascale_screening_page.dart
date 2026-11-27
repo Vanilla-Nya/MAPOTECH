@@ -1,17 +1,13 @@
 import 'dart:async';
-import 'dart:convert';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:http/http.dart' as http;
 import 'package:mapotech/features/landing/landing_page_data.dart';
 import 'package:mapotech/shared/satusehat_service.dart';
 import 'package:mapotech/shared/widgets/ui.dart';
 
-import '../cv/pcv_camera_capture_bridge.dart';
 import '../data/community_health_center_service.dart';
 import '../data/provisioning/vitascale_esp_provisioning_bridge.dart';
 import '../data/vitascale_api_service.dart';
@@ -22,6 +18,7 @@ import '../logic/screening_state_machine.dart';
 import '../logic/vitascale_appbar_status.dart';
 import '../logic/vitascale_reasoning_service.dart';
 import '../vitascale_dlc_gate.dart';
+import '../widgets/pcv_measurement_panel.dart';
 
 class VitaScaleScreeningPage extends ConsumerStatefulWidget {
   final ChildProfile? selectedChild;
@@ -42,7 +39,7 @@ class VitaScaleScreeningPage extends ConsumerStatefulWidget {
 
 class _VitaScaleScreeningPageState
     extends ConsumerState<VitaScaleScreeningPage> {
-  // Mode Tab: 0 = Uji Ukur Manual & AI, 1 = Perangkat IoT (MQTT), 2 = Ukur Tinggi via Foto (PCV)
+  // Mode: 0 = manual, 1 = IoT. Posisi pengukuran menentukan sumber tinggi.
   int _activeTab = 0;
   int _formStep =
       1; // 1: Identitas Balita, 2: Antropometri Fisik, 3: Reasoning AI, 4: SATUSEHAT & Database
@@ -71,15 +68,6 @@ class _VitaScaleScreeningPageState
   final TextEditingController _heightController = TextEditingController(
     text: '85.0',
   );
-  final TextEditingController _waistController = TextEditingController(
-    text: '46.0',
-  );
-  final TextEditingController _lilaController = TextEditingController(
-    text: '14.5',
-  );
-  final TextEditingController _headCircumferenceController =
-      TextEditingController(text: '47.0');
-
   int _selectedGender = 0; // 0 = Laki-laki, 1 = Perempuan
   double _ageMonths = 24.0;
   DateTime? _selectedBirthDate;
@@ -88,7 +76,6 @@ class _VitaScaleScreeningPageState
   // Parameter Khusus Buku KIA 2024 & SATUSEHAT
   String _measurementMethod =
       'TB'; // 'PB' = Telentang (<24 bln), 'TB' = Berdiri (≥24 bln)
-  String _kmsStatus = 'N'; // 'N', 'T', '2T', 'BGM', 'Baru'
   bool _receivedVitA = true;
   bool _receivedDeworming = true;
 
@@ -104,6 +91,9 @@ class _VitaScaleScreeningPageState
 
   // Prediction & Reasoning State
   bool _isLoadingClassification = false;
+  bool _mlpFailed = false;
+  (int, int, double, double, double)? _mlpAttemptedInput;
+  int _mlpInputRevision = 0;
   HasilSmartGrowthBalita? _smartGrowthResult;
 
   bool _isLoadingReasoning = false;
@@ -111,33 +101,10 @@ class _VitaScaleScreeningPageState
   int _activeReasoningTab = 0;
   int _reasoningPromptCount = 0;
 
-  // ===========================================================================
-  // STATE PCV COMPUTER VISION CLOUD API (https://pcvmapotechs5.vercel.app/)
-  // ===========================================================================
-  int _pcvInputMode = 0; // 0 = File Lokal, 1 = Link / URL, 2 = Kamera
-  Uint8List? _pcvSelectedImageBytes;
-  String? _pcvSelectedImageName;
-  final TextEditingController _pcvUrlController = TextEditingController();
-  final TextEditingController _pcvCustomScaleController = TextEditingController(
-    text: '11.00',
-  );
-  double _pcvSelectedScale =
-      11.00; // Default 11.00 px/cm (Dataset Boneka & Infantometer standar)
-  bool _pcvUseRoi =
-      false; // Default false (Full Frame agar tidak memotong tubuh/kaki)
-  final bool _pcvUseK1 = false; // Koreksi distorsi lensa
-  bool _isLoadingPcvImage = false;
-  bool _isMeasuringPcv = false;
-  double _pcvProgress = 0.0;
-  Timer? _pcvProgressTimer;
-  Map<String, dynamic>? _pcvResultData;
-  double? _pcvTinggiCm;
-  double? _pcvPanjangPx;
-  double? _pcvSkalaEfektif;
-  String? _pcvAnnotatedImageBase64;
-  String? _pcvMessage;
-  String? _pcvErrorMessage;
-  bool _pcvShowAnnotated = true;
+  PcvCalibration? _pcvCalibration;
+  double? _pcvLengthCm;
+  bool get _usesPcv => _activeTab == 1 && _measurementMethod == 'PB';
+  String get _iotHeightSource => _usesPcv ? 'pcv_cloud_cv' : 'esp32_ultrasonic_mqtt';
 
   // ===========================================================================
   // STATE MQTT IOT TELEMETRY (Sensor Ultrasonik HC-SR04 & Load Cell HX711)
@@ -148,7 +115,7 @@ class _VitaScaleScreeningPageState
   StreamSubscription? _mqttTelemetrySub;
   StreamSubscription? _mqttStatusSub;
   bool _isMqttConnecting = false;
-  bool _autoSyncIotToForm = true;
+  bool _iotMeasurementApplied = false;
   Map<String, dynamic>? _lastMqttTelemetry;
   String? _activeSavedWifiSsid;
 
@@ -282,9 +249,9 @@ class _VitaScaleScreeningPageState
     final computedMonths = ChildProfile.calculateCompletedMonths(child.birthDate);
     setState(() {
       _formStep = 1;
+      _clearIotCapture();
       _reasoningPromptCount = 0;
-      _smartGrowthResult = null;
-      _reasoningResult = null;
+      _invalidateMlp();
       _nameController.text = child.name;
       _nikController.text = child.nik == '-' ? '' : child.nik;
       _selectedGender = child.gender == 'L' ? 0 : 1;
@@ -292,19 +259,17 @@ class _VitaScaleScreeningPageState
       _isAutoAgeFromBirthDate = true;
       _ageMonths = computedMonths.toDouble();
       _ageController.text = computedMonths.toString();
-      _measurementMethod = computedMonths < 24 ? 'PB' : 'TB';
+      _setMeasurementMethod(computedMonths < 24 ? 'PB' : 'TB');
       _satuSehatPatientId = null;
       _satuSehatSyncResult = null;
 
-      // Estimasi default BB, TB, LK realistis sesuai standar Buku KIA 2024
+      // Estimasi default BB dan TB sesuai standar Buku KIA 2024
       if (computedMonths < 24) {
         _weightController.text = '9.5';
         _heightController.text = '76.0';
-        _headCircumferenceController.text = '45.5';
       } else {
         _weightController.text = '12.0';
         _heightController.text = '88.0';
-        _headCircumferenceController.text = '48.0';
       }
     });
   }
@@ -358,9 +323,8 @@ class _VitaScaleScreeningPageState
       _isAutoAgeFromBirthDate = true;
       _ageMonths = months.toDouble();
       _ageController.text = months.toString();
-      _measurementMethod = months < 24 ? 'PB' : 'TB';
-      _smartGrowthResult = null;
-      _reasoningResult = null;
+      _setMeasurementMethod(months < 24 ? 'PB' : 'TB');
+      _invalidateMlp();
     });
   }
 
@@ -442,7 +406,8 @@ class _VitaScaleScreeningPageState
       wifiRssiDbm: rssi,
       poleHeightCm: poleHeight,
       isGatewayHealthy: _mqttService.isGatewayHealthy || _mqttService.isConnected,
-      pcvScalePxPerCm: _pcvSelectedScale,
+      usesPcv: _usesPcv,
+      pcvScalePxPerCm: _pcvCalibration?.pixelsPerCm,
       onPingCloud: () {
         if (mounted && !_isCheckingServer) {
           _checkServer();
@@ -508,9 +473,6 @@ class _VitaScaleScreeningPageState
     });
     _mqttTelemetrySub?.cancel();
     _mqttStatusSub?.cancel();
-    _pcvProgressTimer?.cancel();
-    _pcvUrlController.dispose();
-    _pcvCustomScaleController.dispose();
     _notesController.dispose();
     _topSearchController.dispose();
     _nameController.dispose();
@@ -518,9 +480,6 @@ class _VitaScaleScreeningPageState
     _ageController.dispose();
     _weightController.dispose();
     _heightController.dispose();
-    _waistController.dispose();
-    _lilaController.dispose();
-    _headCircumferenceController.dispose();
     super.dispose();
   }
 
@@ -538,6 +497,10 @@ class _VitaScaleScreeningPageState
       if (mounted) {
         setState(() {
           _isMqttConnecting = (status == DeviceConnectionStatus.connecting);
+          if ((!_mqttService.isConnected || _mqttService.isDeviceOnline == false) &&
+              !_iotMeasurementApplied) {
+            _lastMqttTelemetry = null;
+          }
         });
         ref.read(screeningStateProvider.notifier).setDeviceStatus(status);
       }
@@ -545,147 +508,90 @@ class _VitaScaleScreeningPageState
   }
 
   void _handleMqttTelemetry(Map<String, dynamic> data) {
-    setState(() {
-      _lastMqttTelemetry = data;
-    });
-
-    // Parse data berat badan dari Load Cell HX711 (Mendukung berbagai format JSON)
-    double? valKg;
-    bool isStable = false;
-    if (data.containsKey('weight') && data['weight'] is Map) {
-      final weightMap = data['weight'] as Map<String, dynamic>;
-      valKg = (weightMap['val_kg'] as num?)?.toDouble();
-      isStable = weightMap['is_stable'] == true;
-    } else if (data.containsKey('weight') && data['weight'] is num) {
-      valKg = (data['weight'] as num).toDouble();
-      isStable = data['is_stable'] == true;
-    } else if (data.containsKey('val_kg') && data['val_kg'] is num) {
-      valKg = (data['val_kg'] as num).toDouble();
-      isStable = data['is_stable'] == true;
-    } else if (data.containsKey('berat') && data['berat'] is num) {
-      valKg = (data['berat'] as num).toDouble();
-      isStable = data['is_stable'] == true;
-    }
-
-    if (valKg != null && valKg > 0) {
-      ref
-          .read(screeningStateProvider.notifier)
-          .updateWeight(
-            value: valKg,
-            status: isStable
-                ? MeasurementStatus.stable
-                : MeasurementStatus.measuring,
-            source: 'esp32_hx711_mqtt',
-          );
-    }
-
-    // Parse data tinggi/panjang badan dari Ultrasonik HC-SR04
-    double? valCm;
-    if (data.containsKey('height') && data['height'] is Map) {
-      final heightMap = data['height'] as Map<String, dynamic>;
-      valCm = (heightMap['val_cm'] as num?)?.toDouble();
-      final rawDist = (heightMap['raw_dist_cm'] as num?)?.toDouble();
-      final pole =
-          (heightMap['pole_height_cm'] as num?)?.toDouble() ??
-          _mqttService.poleHeightCm;
-      if (valCm == null && rawDist != null) {
-        valCm = pole - rawDist;
-      }
-    } else if (data.containsKey('height') && data['height'] is num) {
-      valCm = (data['height'] as num).toDouble();
-    } else if (data.containsKey('val_cm') && data['val_cm'] is num) {
-      valCm = (data['val_cm'] as num).toDouble();
-    } else if (data.containsKey('tinggi') && data['tinggi'] is num) {
-      valCm = (data['tinggi'] as num).toDouble();
-    }
-
-    if (valCm != null && valCm > 0) {
-      ref
-          .read(screeningStateProvider.notifier)
-          .updateHeight(
-            value: valCm,
-            status: MeasurementStatus.stable,
-            source: 'esp32_ultrasonic_mqtt',
-          );
-    }
-
-    if (_activeTab == 1 && _autoSyncIotToForm) {
-      final newBbStr = (valKg != null && valKg > 0) ? valKg.toStringAsFixed(2) : null;
-      final newTbStr = (valCm != null && valCm > 0) ? valCm.toStringAsFixed(1) : null;
-      final bbChanged = newBbStr != null && newBbStr != _weightController.text;
-      final tbChanged = newTbStr != null && newTbStr != _heightController.text;
-
-      if (bbChanged || tbChanged) {
-        setState(() {
-          if (bbChanged) _weightController.text = newBbStr;
-          if (tbChanged) _heightController.text = newTbStr;
-          _smartGrowthResult = null;
-          _reasoningResult = null;
-        });
-      }
-    }
+    if (_iotMeasurementApplied) return;
+    setState(() => _lastMqttTelemetry = data);
   }
 
-  /// Menerapkan hasil pembacaan MQTT live ke formulir skrining
+  ({double? weight, double? height, bool stable}) get _mqttReading {
+    final data = _lastMqttTelemetry;
+    final weight = data?['weight'];
+    final height = data?['height'];
+    final kg = weight is Map
+        ? weight['val_kg']
+        : weight ?? data?['val_kg'] ?? data?['berat'];
+    num? cm;
+    if (height is Map) {
+      final distance = height['raw_dist_cm'] as num?;
+      final pole = (height['pole_height_cm'] as num?) ?? _mqttService.poleHeightCm;
+      cm = (height['val_cm'] as num?) ??
+          (distance == null ? null : pole - distance);
+    } else {
+      final value = height ?? data?['val_cm'] ?? data?['tinggi'];
+      cm = value is num ? value : null;
+    }
+    final stable = weight is Map
+        ? weight['is_stable'] == true
+        : data?['is_stable'] == true;
+    return (
+      weight: kg is num && kg.isFinite
+          ? (kg <= 0 ? 0.0 : kg.toDouble())
+          : null,
+      height: cm != null && cm.isFinite && cm > 0 ? cm.toDouble() : null,
+      stable: stable,
+    );
+  }
+
+  bool get _waitingForIotMeasurement => _activeTab == 1 && !_iotMeasurementApplied;
+
+  bool get _canApplyIotMeasurement {
+    final reading = _mqttReading;
+    return _waitingForIotMeasurement &&
+        _mqttService.isConnected &&
+        _mqttService.isDeviceOnline != false &&
+        (reading.weight ?? 0) > 0 &&
+        (_usesPcv ? _pcvLengthCm != null : reading.height != null);
+  }
+
   void _applyMqttTelemetryToForm() {
-    if (_lastMqttTelemetry == null) {
-      CustomSnackbar.warning(
-        context,
-        'Belum ada data telemetri yang diterima dari perangkat IoT.',
-        title: 'Data Belum Tersedia',
-      );
-      return;
-    }
-
-    final data = _lastMqttTelemetry!;
-    double? extractedBb;
-    double? extractedTb;
-
-    // Extract BB
-    if (data['weight'] is Map) {
-      extractedBb = (data['weight']['val_kg'] as num?)?.toDouble();
-    } else if (data['weight'] is num) {
-      extractedBb = (data['weight'] as num).toDouble();
-    } else if (data['val_kg'] is num) {
-      extractedBb = (data['val_kg'] as num).toDouble();
-    } else if (data['berat'] is num) {
-      extractedBb = (data['berat'] as num).toDouble();
-    }
-
-    // Extract TB
-    if (data['height'] is Map) {
-      extractedTb = (data['height']['val_cm'] as num?)?.toDouble();
-      final rawDist = (data['height']['raw_dist_cm'] as num?)?.toDouble();
-      final pole =
-          (data['height']['pole_height_cm'] as num?)?.toDouble() ??
-          _mqttService.poleHeightCm;
-      if (extractedTb == null && rawDist != null) {
-        extractedTb = pole - rawDist;
-      }
-    } else if (data['height'] is num) {
-      extractedTb = (data['height'] as num).toDouble();
-    } else if (data['val_cm'] is num) {
-      extractedTb = (data['val_cm'] as num).toDouble();
-    } else if (data['tinggi'] is num) {
-      extractedTb = (data['tinggi'] as num).toDouble();
-    }
+    if (!_canApplyIotMeasurement) return;
+    final reading = _mqttReading;
+    final weight = reading.weight!;
+    final height = (_usesPcv ? _pcvLengthCm : reading.height)!;
 
     setState(() {
-      if (extractedBb != null && extractedBb > 0) {
-        _weightController.text = extractedBb.toStringAsFixed(2);
-      }
-      if (extractedTb != null && extractedTb > 0) {
-        _heightController.text = extractedTb.toStringAsFixed(1);
-      }
-      _smartGrowthResult = null;
-      _reasoningResult = null;
+      _weightController.text = weight.toStringAsFixed(2);
+      _heightController.text = height.toStringAsFixed(1);
+      _iotMeasurementApplied = true;
+      _invalidateMlp();
     });
-
-    CustomSnackbar.success(
-      context,
-      'Data sensor diterapkan ke formulir: TB = ${_heightController.text} cm, BB = ${_weightController.text} kg',
-      title: 'Data IoT Diterapkan',
+    final screening = ref.read(screeningStateProvider.notifier);
+    screening.updateWeight(
+      value: weight,
+      status: reading.stable ? MeasurementStatus.stable : MeasurementStatus.measuring,
+      source: 'esp32_hx711_mqtt',
     );
+    screening.updateHeight(value: height, source: _iotHeightSource);
+  }
+
+  void _clearIotCapture() {
+    _iotMeasurementApplied = false;
+    _lastMqttTelemetry = null;
+    _pcvLengthCm = null;
+  }
+
+  void _setMeasurementMethod(String method) {
+    if (method == _measurementMethod) return;
+    _measurementMethod = method;
+    if (_activeTab == 1) _clearIotCapture();
+    _invalidateMlp();
+  }
+
+  void _retakeIotMeasurement() {
+    setState(() {
+      _clearIotCapture();
+      _formStep = 2;
+      _invalidateMlp();
+    });
   }
 
   Future<void> _toggleMqttConnection() async {
@@ -2475,10 +2381,7 @@ class _VitaScaleScreeningPageState
     required double usia,
     required double bb,
     required double tb,
-    double lk = 47.0,
-    double lila = 14.5,
     String? caraUkur,
-    String kms = 'N',
   }) {
     setState(() {
       _selectedGender = jk;
@@ -2488,19 +2391,16 @@ class _VitaScaleScreeningPageState
       _ageController.text = usia.toStringAsFixed(0);
       _weightController.text = bb.toStringAsFixed(1);
       _heightController.text = tb.toStringAsFixed(1);
-      _headCircumferenceController.text = lk.toStringAsFixed(1);
-      _lilaController.text = lila.toStringAsFixed(1);
-      _measurementMethod = caraUkur ?? (usia < 24 ? 'PB' : 'TB');
-      _kmsStatus = kms;
+      _setMeasurementMethod(caraUkur ?? (usia < 24 ? 'PB' : 'TB'));
+      if (_activeTab == 1) _clearIotCapture();
       _satuSehatSyncResult = null;
-      _smartGrowthResult = null;
-      _reasoningResult = null;
+      _invalidateMlp();
       _reasoningPromptCount = 0;
     });
 
     CustomSnackbar.info(
       context,
-      'Data preset "$label" telah dimuat: JK ${jk == 0 ? "L" : "P"}, Usia $usia bln, BB $bb kg, TB $tb cm, LK $lk cm.',
+      'Data preset "$label" telah dimuat: JK ${jk == 0 ? "L" : "P"}, Usia $usia bln, BB $bb kg, TB $tb cm.',
       title: 'Preset Uji Dimuat',
     );
   }
@@ -2508,42 +2408,6 @@ class _VitaScaleScreeningPageState
   // ===========================================================================
   // HELPER BUKU KIA 2024 & SATUSEHAT
   // ===========================================================================
-  Color _getLilaColor(double? val) {
-    if (val == null) return Colors.grey;
-    if (val < 11.5) {
-      return const Color(0xFFE74C3C); // Merah - Gizi Buruk / Wasting Akut
-    }
-    if (val <= 12.5) {
-      return const Color(0xFFE67E22); // Kuning - Risiko Gizi Kurang
-    }
-    return const Color(0xFF27AE60); // Hijau - Pita Normal
-  }
-
-  String _getLilaStatusText(double? val) {
-    if (val == null) return 'Belum Diukur';
-    if (val < 11.5) {
-      return 'Merah (<11.5 cm) • Indikasi Gizi Buruk / Wasting Akut';
-    }
-    if (val <= 12.5) return 'Kuning (11.5-12.5 cm) • Risiko Gizi Kurang';
-    return 'Hijau (>12.5 cm) • Status Gizi Normal';
-  }
-
-  String _getKmsLabel(String code) {
-    switch (code) {
-      case 'N':
-        return 'N (Naik Sesuai KBM)';
-      case 'T':
-        return 'T (Tidak Naik / Tetap / Turun)';
-      case '2T':
-        return '2T (Dua Kali Tidak Naik Berturut-turut - Red Flag)';
-      case 'BGM':
-        return 'BGM (Bawah Garis Merah - Red Flag)';
-      case 'Baru':
-      default:
-        return 'Penimbangan Pertama Kali';
-    }
-  }
-
   SatuSehatService _getSatuSehatService() {
     final state = ref.read(landingPageProvider);
     return SatuSehatService(
@@ -2654,9 +2518,6 @@ class _VitaScaleScreeningPageState
         ? 'Balita Sasaran'
         : _nameController.text.trim();
     final isRecumbent = _measurementMethod == 'PB';
-    final lk = double.tryParse(_headCircumferenceController.text.trim());
-    final lila = double.tryParse(_lilaController.text.trim());
-    final waist = double.tryParse(_waistController.text.trim());
 
     // Tentukan diagnosis ICD-10 berdasar hasil MLP / Buku KIA
     String diagCode = 'Z00.1';
@@ -2687,11 +2548,7 @@ class _VitaScaleScreeningPageState
               'encounter_id': encounterUuid,
               'patient_id': patientId,
               'synced_at': DateTime.now().toIso8601String(),
-              'observations_count':
-                  2 +
-                  (lk != null ? 1 : 0) +
-                  (lila != null ? 1 : 0) +
-                  (waist != null ? 1 : 0),
+              'observations_count': 2,
               'diagnosis_code': diagCode,
               'diagnosis_desc': diagDesc,
             };
@@ -2726,9 +2583,6 @@ class _VitaScaleScreeningPageState
         weightKg: bb,
         heightCm: tb,
         isRecumbent: isRecumbent,
-        headCircumferenceCm: lk,
-        lilaCm: lila,
-        waistCm: waist,
         diagnosisCode: diagCode,
         diagnosisDesc: diagDesc,
       );
@@ -2854,39 +2708,6 @@ class _VitaScaleScreeningPageState
         'field': 'Tinggi/Panjang Badan',
         'message': 'Tinggi/Panjang Badan Belum Diisi',
         'isError': true, // 🔴 Red
-      });
-    }
-
-    final lila = double.tryParse(_lilaController.text.trim());
-    if (lila == null || lila <= 0) {
-      issues.add({
-        'step': 2,
-        'stepName': '2. Antropometri',
-        'field': 'LiLA Balita',
-        'message': 'Pengukuran LiLA Belum Diisi',
-        'isError': false, // 🟡 Yellow Opsional
-      });
-    }
-
-    final lk = double.tryParse(_headCircumferenceController.text.trim());
-    if (lk == null || lk <= 0) {
-      issues.add({
-        'step': 2,
-        'stepName': '2. Antropometri',
-        'field': 'Lingkar Kepala',
-        'message': 'Lingkar Kepala Belum Diisi',
-        'isError': false, // 🟡 Yellow Opsional
-      });
-    }
-
-    final lp = double.tryParse(_waistController.text.trim());
-    if (lp == null || lp <= 0) {
-      issues.add({
-        'step': 2,
-        'stepName': '2. Antropometri',
-        'field': 'Lingkar Perut',
-        'message': 'Lingkar Perut Belum Diisi',
-        'isError': false, // 🟡 Yellow Opsional
       });
     }
 
@@ -3111,9 +2932,7 @@ class _VitaScaleScreeningPageState
                           ),
                           onPressed: () {
                             Navigator.pop(ctx);
-                            setState(() {
-                              _formStep = err['step'] as int;
-                            });
+                            _goToFormStep(err['step'] as int);
                           },
                         );
                       }).toList(),
@@ -3159,9 +2978,7 @@ class _VitaScaleScreeningPageState
                           ),
                           onPressed: () {
                             Navigator.pop(ctx);
-                            setState(() {
-                              _formStep = warn['step'] as int;
-                            });
+                            _goToFormStep(warn['step'] as int);
                           },
                         );
                       }).toList(),
@@ -3206,14 +3023,9 @@ class _VitaScaleScreeningPageState
                     textColor,
                   ),
                   _buildReviewRow(
-                    'LiLA / Lingkar Kepala',
-                    '${_lilaController.text} cm / ${_headCircumferenceController.text} cm',
-                    subtitleColor,
-                    textColor,
-                  ),
-                  _buildReviewRow(
-                    'KMS Balita / Suplemen',
-                    '$_kmsStatus • Vit A: ${_receivedVitA ? "Ya" : "Tidak"}',
+                    'Vitamin A / Obat Cacing',
+                    '${_receivedVitA ? "Ya" : "Tidak"} / '
+                        '${_ageMonths < 12 ? "Belum usia target" : (_receivedDeworming ? "Ya" : "Tidak")}',
                     subtitleColor,
                     textColor,
                   ),
@@ -3276,9 +3088,7 @@ class _VitaScaleScreeningPageState
                 ),
                 onPressed: () {
                   Navigator.pop(ctx);
-                  setState(() {
-                    _formStep = redErrors.first['step'] as int;
-                  });
+                  _goToFormStep(redErrors.first['step'] as int);
                 },
                 icon: const Icon(
                   Icons.arrow_forward_rounded,
@@ -3348,9 +3158,6 @@ class _VitaScaleScreeningPageState
     final nik = _nikController.text.trim();
     final bb = double.tryParse(_weightController.text.trim()) ?? 10.0;
     final tb = double.tryParse(_heightController.text.trim()) ?? 80.0;
-    final waist = double.tryParse(_waistController.text.trim()) ?? 46.0;
-    final lk = double.tryParse(_headCircumferenceController.text.trim());
-    final lila = double.tryParse(_lilaController.text.trim());
     final genderCode = _selectedGender == 0 ? 'L' : 'P';
     final effectiveBirthDate = (_isAutoAgeFromBirthDate && _selectedBirthDate != null)
         ? _selectedBirthDate!
@@ -3363,9 +3170,10 @@ class _VitaScaleScreeningPageState
         ref.read(landingPageProvider).loggedInName ?? 'Petugas Gizi Puskesmas';
 
     final weightSource = _activeTab == 1 ? 'esp32_hx711_mqtt' : 'manual_input';
-    final heightSource = _activeTab == 1
-        ? 'esp32_ultrasonic_mqtt'
-        : (_activeTab == 2 ? 'pcv_cloud_cv' : 'manual_input');
+    final heightSource = _activeTab == 1 ? _iotHeightSource : 'manual_input';
+    final measurementSource = _activeTab == 0
+        ? 'Manual'
+        : (_usesPcv ? 'IoT MQTT + Kamera PCV' : 'IoT MQTT + Ultrasonik');
 
     final childProfile = _activeChild != null
         ? ChildProfile(
@@ -3393,7 +3201,7 @@ class _VitaScaleScreeningPageState
           );
 
     final summaryNotes =
-        'Metode: ${_activeTab == 1 ? "IoT MQTT" : (_activeTab == 2 ? "Foto PCV" : "Manual")} | Status Gizi: ${_smartGrowthResult?.kategoriGiziBbtb ?? "Normal"} | Stunting: ${_smartGrowthResult?.kategoriStuntingTbu ?? "Normal"} | SATUSEHAT: ${_satuSehatPatientId ?? "Simulasi"}';
+        'Metode: $measurementSource | Status Gizi: ${_smartGrowthResult?.kategoriGiziBbtb ?? "Normal"} | Stunting: ${_smartGrowthResult?.kategoriStuntingTbu ?? "Normal"} | SATUSEHAT: ${_satuSehatPatientId ?? "Simulasi"}';
 
     final session = ScreeningSession(
       sessionId: 'VITA-${DateTime.now().millisecondsSinceEpoch}',
@@ -3417,13 +3225,6 @@ class _VitaScaleScreeningPageState
         status: MeasurementStatus.verified,
         capturedAt: DateTime.now(),
         source: heightSource,
-      ),
-      waist: MeasurementItem(
-        type: MeasurementType.waist,
-        value: waist,
-        status: MeasurementStatus.verified,
-        capturedAt: DateTime.now(),
-        source: 'manual_input',
       ),
       isDemo: false,
       isFinalized: true,
@@ -3452,12 +3253,8 @@ class _VitaScaleScreeningPageState
       beratBadanKg: bb,
       panjangTinggiCm: tb,
       metodeUkur: _measurementMethod,
-      lingkarKepalaCm: lk,
-      lilaCm: lila,
-      lingkarPerutCm: waist,
       statusGizi: _smartGrowthResult?.kategoriGiziBbtb ?? 'Gizi Baik',
       statusStunting: _smartGrowthResult?.kategoriStuntingTbu ?? 'Normal',
-      kmsStatus: _kmsStatus,
       dapatVitA: _receivedVitA,
       dapatObatCacing: _ageMonths >= 12 ? _receivedDeworming : false,
       iotSource: heightSource,
@@ -3483,73 +3280,74 @@ class _VitaScaleScreeningPageState
   // ===========================================================================
   // EKSEKUSI KLASIFIKASI MODEL MLP (OTOMATIS) & REASONING (DENGAN TOMBOL)
   // ===========================================================================
-  void _checkAndAutoRunMlp() {
-    final bb = double.tryParse(_weightController.text.trim()) ?? 0.0;
-    final tb = double.tryParse(_heightController.text.trim()) ?? 0.0;
-    if (bb > 0 &&
-        tb > 0 &&
-        _smartGrowthResult == null &&
-        !_isLoadingClassification) {
-      _runMlpClassification(silent: true);
-    }
+  void _invalidateMlp() {
+    _mlpInputRevision++;
+    _mlpAttemptedInput = null;
+    _mlpFailed = false;
+    _smartGrowthResult = null;
+    _reasoningResult = null;
   }
 
-  Future<void> _runMlpClassification({bool silent = false}) async {
-    final bb = double.tryParse(_weightController.text.trim());
-    final tb = double.tryParse(_heightController.text.trim());
-
-    if (bb == null || bb <= 0 || tb == null || tb <= 0) {
-      if (!silent) {
-        CustomSnackbar.warning(
-          context,
-          'Harap masukkan angka Berat Badan dan Tinggi Badan yang valid.',
-          title: 'Input Tidak Lengkap',
-        );
+  void _goToFormStep(int step) {
+    final target = _waitingForIotMeasurement && step > 2 ? 2 : step;
+    setState(() {
+      if (_formStep == 2 && target == 1 && _waitingForIotMeasurement) {
+        _clearIotCapture();
       }
+      _formStep = target;
+    });
+    if (target == 3) _runMlpClassification();
+  }
+
+  (int, int, double, double, double)? get _mlpFormInput {
+    final weight = double.tryParse(_weightController.text.trim());
+    final height = double.tryParse(_heightController.text.trim());
+    if (_waitingForIotMeasurement ||
+        weight == null || !weight.isFinite || weight <= 0 ||
+        height == null || !height.isFinite || height <= 0 ||
+        !_ageMonths.isFinite || _ageMonths < 0) {
+      return null;
+    }
+    return (_mlpInputRevision, _selectedGender, _ageMonths, weight, height);
+  }
+
+  Future<void> _runMlpClassification({bool retry = false}) async {
+    final input = _mlpFormInput;
+    if (input == null || _isLoadingClassification || _smartGrowthResult != null ||
+        (retry ? !_mlpFailed : _mlpAttemptedInput == input)) {
       return;
     }
 
-    if (_isLoadingClassification) return;
-
     setState(() {
+      _mlpAttemptedInput = input;
+      _mlpFailed = false;
       _isLoadingClassification = true;
     });
 
+    HasilSmartGrowthBalita? result;
     try {
-      final inputSG = InputSmartGrowthBalita(
-        jk: _selectedGender,
-        usiaBulan: _ageMonths,
-        berat: bb,
-        tinggi: tb,
+      result = await VitaScaleApiService.prediksiSmartGrowth(
+        InputSmartGrowthBalita(
+          jk: input.$2,
+          usiaBulan: input.$3,
+          berat: input.$4,
+          tinggi: input.$5,
+        ),
       );
-
-      final result = await VitaScaleApiService.prediksiSmartGrowth(inputSG);
-      if (mounted) {
-        setState(() {
-          _smartGrowthResult = result;
-          _isLoadingClassification = false;
-        });
-
-        if (!silent) {
-          CustomSnackbar.success(
-            context,
-            'Klasifikasi model MLP selesai! Status gizi & pertumbuhan teridentifikasi.',
-            title: 'Prediksi MLP Berhasil',
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoadingClassification = false);
-        if (!silent) {
-          CustomSnackbar.error(
-            context,
-            'Gagal menghubungkan ke backend FastAPI: $e\nPastikan python main.py berjalan di ${VitaScaleApiConfig.baseUrl}',
-            title: 'Koneksi API Gagal',
-          );
-        }
-      }
+    } catch (error) {
+      debugPrint('[VitaScale MLP] $error');
     }
+    if (!mounted) return;
+
+    final inputStillCurrent = _mlpFormInput == input;
+    setState(() {
+      _isLoadingClassification = false;
+      if (inputStillCurrent) {
+        _smartGrowthResult = result;
+        _mlpFailed = result == null;
+      }
+    });
+    if (!inputStillCurrent && _formStep == 3) _runMlpClassification();
   }
 
   Future<void> _runReasoningOnly() async {
@@ -3565,19 +3363,7 @@ class _VitaScaleScreeningPageState
       return;
     }
 
-    if (_smartGrowthResult == null) {
-      await _runMlpClassification(silent: true);
-      if (_smartGrowthResult == null) {
-        if (mounted) {
-          CustomSnackbar.error(
-            context,
-            'Gagal menjalankan klasifikasi MLP. Pastikan server AI aktif.',
-            title: 'Klasifikasi Gagal',
-          );
-        }
-        return;
-      }
-    }
+    if (_smartGrowthResult == null) return;
 
     final mlpResult = _smartGrowthResult!;
     await _runReasoning(mlpResult, bb, tb);
@@ -3590,9 +3376,6 @@ class _VitaScaleScreeningPageState
   ) async {
     setState(() => _isLoadingReasoning = true);
 
-    final waist = double.tryParse(_waistController.text.trim());
-    final lila = double.tryParse(_lilaController.text.trim());
-    final lk = double.tryParse(_headCircumferenceController.text.trim());
 
     try {
       final reasoning = await VitaScaleReasoningService.generateReasoning(
@@ -3604,22 +3387,19 @@ class _VitaScaleScreeningPageState
         weightKg: bb,
         heightCm: tb,
         mlpResult: mlpResult,
-        waistCm: waist,
-        lilaCm: lila,
-        headCircumferenceCm: lk,
         measurementMethod: _measurementMethod == 'PB'
             ? 'PB Telentang (Infantometer - Buku KIA)'
             : 'TB Berdiri (Stadiometer - Buku KIA)',
-        kmsStatus: _getKmsLabel(_kmsStatus),
         receivedVitA: _receivedVitA,
         receivedDeworming: _ageMonths >= 12 ? _receivedDeworming : null,
         language: ref.read(appLanguageProvider),
       );
 
       if (mounted) {
+        setState(() => _isLoadingReasoning = false);
+        if (!identical(_smartGrowthResult, mlpResult)) return;
         setState(() {
           _reasoningResult = reasoning;
-          _isLoadingReasoning = false;
           _reasoningPromptCount++;
         });
 
@@ -4040,16 +3820,12 @@ class _VitaScaleScreeningPageState
 
     final bb = _weightController.text;
     final tb = _heightController.text;
-    final lk = _headCircumferenceController.text;
-    final lila = _lilaController.text;
-    final lp = _waistController.text;
     final name = _nameController.text;
     final age = _ageMonths.toStringAsFixed(0);
     final gender = _selectedGender == 0 ? 'Laki-laki' : 'Perempuan';
     final caraUkur = _measurementMethod == 'PB'
         ? 'Panjang Badan Telentang (< 24 Bln)'
         : 'Tinggi Badan Berdiri (≥ 24 Bln)';
-    final kms = _getKmsLabel(_kmsStatus);
 
     final gizi = _smartGrowthResult?.kategoriGiziBbtb ?? '-';
     final stunting = _smartGrowthResult?.kategoriStuntingTbu ?? '-';
@@ -4072,10 +3848,6 @@ Usia           : $age Bulan
 Cara Pengukuran: $caraUkur
 Berat Badan    : $bb kg (LOINC: 29463-7)
 Panjang/Tinggi : $tb cm (LOINC: ${_measurementMethod == 'PB' ? '8306-3' : '8302-2'})
-Lingkar Kepala : ${lk.isNotEmpty ? '$lk cm (LOINC: 9843-4 - Nellhaus)' : '-'}
-LiLA           : ${lila.isNotEmpty ? '$lila cm (LOINC: 56072-2 - ${_getLilaStatusText(double.tryParse(lila))})' : '-'}
-Lingkar Perut  : ${lp.isNotEmpty ? '$lp cm (LOINC: 8280-0)' : '-'}
-Tren KMS KIA   : $kms
 Vitamin A      : ${_receivedVitA ? 'Sudah Diberikan' : 'Belum'}
 Obat Cacing    : ${_ageMonths >= 12 ? (_receivedDeworming ? 'Sudah Diberikan' : 'Belum') : 'Belum Usia Target (≥ 12 Bln)'}
 
@@ -4350,7 +4122,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
               const SizedBox(height: 16),
 
               // =================================================================
-              // TAB SELECTOR: 3 Mode Pengukuran (Manual, IoT MQTT, Foto PCV)
+              // TAB SELECTOR: Manual & Perangkat IoT
               // Diletakkan langsung di bawah card pilih pasien / pasien terpilih
               // =================================================================
               Container(
@@ -4365,26 +4137,18 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                       children: [
                         _buildTabButton(
                           index: 0,
-                          label: 'Uji Ukur Manual & AI',
+                          label: 'Manual',
                           icon: Icons.tune_rounded,
-                          badge: 'Input Manual',
+                          badge: isEn ? 'Manual entry' : 'Input Manual',
                           badgeColor: const Color(0xFF1ABC9C),
                         ),
                         const SizedBox(height: 4),
                         _buildTabButton(
                           index: 1,
-                          label: 'Perangkat IoT (MQTT)',
+                          label: isEn ? 'IoT Device' : 'Perangkat IoT',
                           icon: Icons.sensors_rounded,
-                          badge: 'ESP32 MQTT Live',
+                          badge: isEn ? 'Scale · Camera / Ultrasonic' : 'Timbangan · Kamera / Ultrasonik',
                           badgeColor: const Color(0xFF3498DB),
-                        ),
-                        const SizedBox(height: 4),
-                        _buildTabButton(
-                          index: 2,
-                          label: 'Ukur Tinggi via Foto (PCV)',
-                          icon: Icons.photo_camera_rounded,
-                          badge: 'Kamera & OpenCV API',
-                          badgeColor: const Color(0xFFE91E63),
                         ),
                       ],
                     )
@@ -4393,9 +4157,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                         Expanded(
                           child: _buildTabButton(
                             index: 0,
-                            label: 'Uji Ukur Manual & AI',
+                            label: 'Manual',
                             icon: Icons.tune_rounded,
-                            badge: 'Input Manual',
+                            badge: isEn ? 'Manual entry' : 'Input Manual',
                             badgeColor: const Color(0xFF1ABC9C),
                           ),
                         ),
@@ -4403,20 +4167,10 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                         Expanded(
                           child: _buildTabButton(
                             index: 1,
-                            label: 'Perangkat IoT (MQTT)',
+                            label: isEn ? 'IoT Device' : 'Perangkat IoT',
                             icon: Icons.sensors_rounded,
-                            badge: 'ESP32 MQTT Live',
+                            badge: isEn ? 'Scale · Camera / Ultrasonic' : 'Timbangan · Kamera / Ultrasonik',
                             badgeColor: const Color(0xFF3498DB),
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: _buildTabButton(
-                            index: 2,
-                            label: 'Ukur Tinggi via Foto (PCV)',
-                            icon: Icons.photo_camera_rounded,
-                            badge: 'Kamera & OpenCV API',
-                            badgeColor: const Color(0xFFE91E63),
                           ),
                         ),
                       ],
@@ -4426,7 +4180,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
               const SizedBox(height: 16),
 
               // =================================================================
-              // STEPPER TERPADU UNTUK SEMUA MODE (Manual, IoT MQTT, Foto PCV)
+              // STEPPER TERPADU UNTUK MANUAL & PERANGKAT IOT
               // =================================================================
               CustomFormStepper(
                 steps: [
@@ -4444,15 +4198,12 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   ),
                   FormStepItem(
                     step: 2,
-                    label: _activeTab == 1
-                        ? '2. Antropometri (IoT MQTT)'
-                        : (_activeTab == 2
-                              ? '2. Antropometri (Foto PCV)'
-                              : '2. Antropometri'),
+                    label: isEn ? '2. Anthropometry' : '2. Antropometri',
                     icon: Icons.straighten_rounded,
                     hasError: redErrors.any((e) => e['step'] == 2),
                     hasWarning: yellowWarnings.any((w) => w['step'] == 2),
                     isCompleted:
+                        !_waitingForIotMeasurement &&
                         double.tryParse(_weightController.text.trim()) != null &&
                         double.tryParse(_heightController.text.trim()) != null,
                   ),
@@ -4474,12 +4225,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   ),
                 ],
                 currentStep: _formStep,
-                onStepTapped: (step) {
-                  setState(() => _formStep = step);
-                  if (step == 3) {
-                    _checkAndAutoRunMlp();
-                  }
-                },
+                onStepTapped: _goToFormStep,
                 themeAccent: const Color(0xFF1ABC9C),
                 textColor: textColor,
                 subtitleColor: subtitleColor,
@@ -4653,7 +4399,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Cari nama anak atau NIK balita di bawah ini untuk memuat otomatis data KMS, usia, dan riwayat.',
+                      'Cari nama anak atau NIK balita di bawah ini untuk memuat data usia dan riwayat.',
                       style: GoogleFonts.outfit(fontSize: 10.5, color: sub),
                     ),
                   ],
@@ -5095,7 +4841,17 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
   }) {
     final isSelected = _activeTab == index;
     return InkWell(
-      onTap: () => setState(() => _activeTab = index),
+      onTap: () {
+        if (_activeTab == index) return;
+        setState(() {
+          _activeTab = index;
+          if (index == 1) {
+            _clearIotCapture();
+            _invalidateMlp();
+            if (_formStep > 2) _formStep = 2;
+          }
+        });
+      },
       borderRadius: BorderRadius.circular(10),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
@@ -5163,6 +4919,17 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
   // ===========================================================================
   ({String label, String detail, IconData icon, Color color})
   _getIotDeviceStatusInfo() {
+    if (_activeTab == 1 && _iotMeasurementApplied) {
+      final isEn = ref.read(isEnglishProvider);
+      return (
+        label: isEn ? 'Reading captured' : 'Pengukuran diambil',
+        detail: isEn
+            ? 'Form uses captured readings'
+            : 'Formulir memakai hasil yang diambil',
+        icon: Icons.lock_outline_rounded,
+        color: const Color(0xFF27AE60),
+      );
+    }
     if (_isMqttConnecting) {
       return (
         label: 'Menghubungkan',
@@ -5198,15 +4965,10 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
       );
     }
 
-    final isStable =
-        _lastMqttTelemetry?['weight']?['is_stable'] == true ||
-        _lastMqttTelemetry?['is_stable'] == true;
-    final lastWeight = (_lastMqttTelemetry?['weight'] is Map)
-        ? (_lastMqttTelemetry?['weight']['val_kg'] as num?)?.toDouble()
-        : (_lastMqttTelemetry?['val_kg'] as num?)?.toDouble();
-    final lastHeight = (_lastMqttTelemetry?['height'] is Map)
-        ? (_lastMqttTelemetry?['height']['val_cm'] as num?)?.toDouble()
-        : (_lastMqttTelemetry?['val_cm'] as num?)?.toDouble();
+    final reading = _mqttReading;
+    final isStable = reading.stable;
+    final lastWeight = reading.weight;
+    final lastHeight = reading.height;
 
     if (isStable) {
       return (
@@ -5381,13 +5143,16 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
             sub: sub,
             border: border,
           ),
-        ] else if (_activeTab == 2) ...[
+        ],
+        if (_usesPcv) ...[
           _buildStripMetricChip(
             icon: Icons.camera_enhance_rounded,
             iconColor: const Color(0xFF1ABC9C),
-            label: 'PCV API',
-            value: 'Online (${_pcvSelectedScale.toStringAsFixed(1)} px/cm)',
-            tooltip: 'Endpoint: https://pcvmapotechs5.vercel.app/measure',
+            label: 'PCV',
+            value: _pcvCalibration == null
+                ? ref.tr(id: 'Perlu kalibrasi', en: 'Needs calibration')
+                : '${_pcvCalibration!.pixelsPerCm.toStringAsFixed(3)} px/cm',
+            tooltip: VitaScaleApiConfig.pcvBaseUrl,
             text: text,
             sub: sub,
             border: border,
@@ -5669,15 +5434,10 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
     required Color sub,
     required bool isMobile,
   }) {
-    final lastWeight = (_lastMqttTelemetry?['weight'] is Map)
-        ? (_lastMqttTelemetry?['weight']['val_kg'] as num?)?.toDouble()
-        : (_lastMqttTelemetry?['val_kg'] as num?)?.toDouble();
-    final isStable =
-        _lastMqttTelemetry?['weight']?['is_stable'] == true ||
-        _lastMqttTelemetry?['is_stable'] == true;
-    final lastHeight = (_lastMqttTelemetry?['height'] is Map)
-        ? (_lastMqttTelemetry?['height']['val_cm'] as num?)?.toDouble()
-        : (_lastMqttTelemetry?['val_cm'] as num?)?.toDouble();
+    final reading = _mqttReading;
+    final lastWeight = reading.weight;
+    final isStable = reading.stable;
+    final lastHeight = reading.height;
     final rawDist = (_lastMqttTelemetry?['height'] is Map)
         ? (_lastMqttTelemetry?['height']['raw_dist_cm'] as num?)?.toDouble()
         : null;
@@ -5686,6 +5446,28 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
             _lastMqttTelemetry!['height']['pole_height_cm'] != null)
         ? (_lastMqttTelemetry!['height']['pole_height_cm'] as num).toDouble()
         : _mqttService.poleHeightCm;
+
+    final isEn = ref.watch(isEnglishProvider);
+    final heightPanel = _usesPcv
+        ? PcvMeasurementPanel(
+            calibration: _pcvCalibration,
+            cardColor: cardBg,
+            borderColor: border,
+            isEnglish: isEn,
+            onCalibrationChanged: (calibration) => setState(() {
+              _pcvCalibration = calibration;
+              _pcvLengthCm = null;
+            }),
+            onMeasurementChanged: (length) => setState(() => _pcvLengthCm = length),
+          )
+        : _buildUltrasonicCard(
+            cardBg, border, text, sub, lastHeight, rawDist, poleHeight, isStable,
+          );
+    if (_usesPcv && _pcvCalibration == null) return heightPanel;
+
+    final weightPanel = _buildLoadCellCard(
+      cardBg, border, text, sub, lastWeight, isStable,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -5725,8 +5507,14 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   const SizedBox(width: 8),
                   Text(
                     _mqttService.isConnected
-                        ? 'Sensor IoT aktif • Siap ukur'
-                        : 'Hubungkan MQTT pada status bar di atas',
+                        ? (_mqttService.isDeviceOnline == false
+                              ? (isEn ? 'Scale offline' : 'Timbangan offline')
+                              : lastWeight == 0
+                                  ? (isEn ? 'Scale empty · 0.00 kg' : 'Timbangan kosong · 0,00 kg')
+                                  : lastWeight != null
+                                      ? (isEn ? 'Weight received from the scale' : 'Berat diterima dari timbangan')
+                                      : (isEn ? 'Waiting for scale data' : 'Menunggu data timbangan'))
+                        : (isEn ? 'Connect MQTT using the status bar' : 'Hubungkan MQTT melalui status bar'),
                     style: GoogleFonts.outfit(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
@@ -5735,81 +5523,25 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   ),
                 ],
               ),
-              FilterChip(
-                avatar: Icon(
-                  _autoSyncIotToForm
-                      ? Icons.sync_rounded
-                      : Icons.sync_disabled_rounded,
-                  size: 14,
-                  color: _autoSyncIotToForm ? const Color(0xFF1ABC9C) : sub,
-                ),
-                label: Text(
-                  _autoSyncIotToForm ? 'Auto-Isi Form: Aktif' : 'Auto-Isi: Off',
-                  style: GoogleFonts.outfit(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.bold,
-                    color: _autoSyncIotToForm ? const Color(0xFF1ABC9C) : text,
-                  ),
-                ),
-                visualDensity: VisualDensity.compact,
-                selected: _autoSyncIotToForm,
-                selectedColor: const Color(0xFF1ABC9C).withValues(alpha: 0.14),
-                backgroundColor: cardBg,
-                side: BorderSide(
-                  color: _autoSyncIotToForm ? const Color(0xFF1ABC9C) : border,
-                ),
-                onSelected: (val) => setState(() => _autoSyncIotToForm = val),
-              ),
             ],
           ),
         ),
 
         const SizedBox(height: 14),
 
-        // 2 Kartu Sensor Utama: Ultrasonik HC-SR04 & Load Cell HX711
         if (isMobile) ...[
-          _buildUltrasonicCard(
-            cardBg,
-            border,
-            text,
-            sub,
-            lastHeight,
-            rawDist,
-            poleHeight,
-            isStable,
-          ),
+          heightPanel,
           const SizedBox(height: 14),
-          _buildLoadCellCard(cardBg, border, text, sub, lastWeight, isStable),
-        ] else ...[
+          weightPanel,
+        ] else
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: _buildUltrasonicCard(
-                  cardBg,
-                  border,
-                  text,
-                  sub,
-                  lastHeight,
-                  rawDist,
-                  poleHeight,
-                  isStable,
-                ),
-              ),
+              Expanded(child: heightPanel),
               const SizedBox(width: 16),
-              Expanded(
-                child: _buildLoadCellCard(
-                  cardBg,
-                  border,
-                  text,
-                  sub,
-                  lastWeight,
-                  isStable,
-                ),
-              ),
+              Expanded(child: weightPanel),
             ],
           ),
-        ],
 
         const SizedBox(height: 14),
 
@@ -5828,21 +5560,13 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
             ),
             icon: const Icon(Icons.flash_on_rounded, size: 18),
             label: Text(
-              'Terapkan Data IoT ke Form',
+              isEn ? 'Apply Measurements' : 'Terapkan Data IoT ke Form',
               style: GoogleFonts.outfit(
                 fontSize: 12.5,
                 fontWeight: FontWeight.w800,
               ),
             ),
-            onPressed: (lastHeight != null || lastWeight != null)
-                ? () => _applyMqttTelemetryToForm()
-                : () {
-                    CustomSnackbar.warning(
-                      context,
-                      'Sensor belum mengirimkan data. Pastikan perangkat ESP32 terhubung.',
-                      title: 'Data Belum Tersedia',
-                    );
-                  },
+            onPressed: _canApplyIotMeasurement ? _applyMqttTelemetryToForm : null,
           ),
         ),
       ],
@@ -5999,36 +5723,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
               ],
             ),
           ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: CustomButton(
-                  text: 'Salin TB',
-                  icon: Icons.check_circle_outline_rounded,
-                  height: 36,
-                  primaryColor: const Color(0xFF16A085),
-                  isSecondary: true,
-                  onPressed: lastHeight != null
-                      ? () {
-                          setState(() {
-                            _heightController.text = lastHeight.toStringAsFixed(
-                              1,
-                            );
-                            _smartGrowthResult = null;
-                            _reasoningResult = null;
-                          });
-                          CustomSnackbar.success(
-                            context,
-                            'Tinggi Badan ${lastHeight.toStringAsFixed(1)} cm disalin ke formulir.',
-                            title: 'TB Disalin',
-                          );
-                        }
-                      : null,
-                ),
-              ),
-            ],
-          ),
+
         ],
       ),
     );
@@ -6042,15 +5737,20 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
     double? lastWeight,
     bool isStable,
   ) {
-    final isConnected = _mqttService.isConnected;
-    final hasReading = lastWeight != null && lastWeight > 0.1;
+    final isConnected =
+        _mqttService.isConnected && _mqttService.isDeviceOnline != false;
+    final hasReading = lastWeight != null && lastWeight > 0;
     final String badgeLabel;
     final Color badgeColor;
     final String hintText;
-    if (!isConnected && lastWeight == null) {
+    if (!isConnected) {
       badgeLabel = 'Offline';
       badgeColor = const Color(0xFF94A3B8);
       hintText = 'Perangkat belum terhubung';
+    } else if (lastWeight == null) {
+      badgeLabel = 'Menunggu';
+      badgeColor = const Color(0xFF94A3B8);
+      hintText = 'Menunggu data timbangan';
     } else if (!hasReading) {
       badgeLabel = 'Siap';
       badgeColor = const Color(0xFF1ABC9C);
@@ -6148,7 +5848,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
             child: Column(
               children: [
                 Text(
-                  lastWeight != null ? lastWeight.toStringAsFixed(2) : '--.--',
+                  isConnected && lastWeight != null
+                      ? lastWeight.toStringAsFixed(2)
+                      : '--.--',
                   style: GoogleFonts.outfit(
                     fontSize: 42,
                     fontWeight: FontWeight.w900,
@@ -6205,32 +5907,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   onPressed: isConnected ? _sendMqttTare : null,
                 ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: CustomButton(
-                  text: 'Salin BB',
-                  icon: Icons.check_circle_outline_rounded,
-                  height: 36,
-                  primaryColor: const Color(0xFF2980B9),
-                  isSecondary: true,
-                  onPressed: lastWeight != null
-                      ? () {
-                          setState(() {
-                            _weightController.text = lastWeight.toStringAsFixed(
-                              2,
-                            );
-                            _smartGrowthResult = null;
-                            _reasoningResult = null;
-                          });
-                          CustomSnackbar.success(
-                            context,
-                            'Berat Badan ${lastWeight.toStringAsFixed(2)} kg disalin ke formulir.',
-                            title: 'BB Disalin',
-                          );
-                        }
-                      : null,
-                ),
-              ),
+
             ],
           ),
         ],
@@ -6326,38 +6003,32 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   usia: 24,
                   bb: 11.5,
                   tb: 85.0,
-                  lk: 48.0,
-                  lila: 14.5,
                   caraUkur: 'TB',
-                  kms: 'N',
+
                 ),
               ),
               _buildPresetChip(
-                'Risiko Stunting (24 bln - 2T)',
+                'Risiko Stunting (24 bln)',
                 () => _applyPreset(
-                  'Stunting 2T',
+                  'Risiko Stunting',
                   jk: 0,
                   usia: 24,
                   bb: 9.2,
                   tb: 76.0,
-                  lk: 45.0,
-                  lila: 12.0,
                   caraUkur: 'TB',
-                  kms: '2T',
+
                 ),
               ),
               _buildPresetChip(
-                'Gizi Buruk / BGM (18 bln)',
+                'Gizi Buruk (18 bln)',
                 () => _applyPreset(
-                  'Gizi Buruk BGM',
+                  'Gizi Buruk',
                   jk: 1,
                   usia: 18,
                   bb: 6.8,
                   tb: 78.0,
-                  lk: 43.5,
-                  lila: 11.2,
                   caraUkur: 'PB',
-                  kms: 'BGM',
+
                 ),
               ),
               _buildPresetChip(
@@ -6368,10 +6039,8 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   usia: 8,
                   bb: 8.2,
                   tb: 70.0,
-                  lk: 44.0,
-                  lila: 14.0,
                   caraUkur: 'PB',
-                  kms: 'N',
+
                 ),
               ),
             ],
@@ -6533,7 +6202,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                       loinc: 'LOINC: 8306-3',
                       subtext: 'Buku KIA: Untuk bayi 0-23 bulan',
                       isSelected: _measurementMethod == 'PB',
-                      onTap: () => setState(() => _measurementMethod = 'PB'),
+                      onTap: () => setState(() => _setMeasurementMethod('PB')),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -6544,7 +6213,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                       loinc: 'LOINC: 8302-2',
                       subtext: 'Buku KIA: Untuk balita 24-59 bulan',
                       isSelected: _measurementMethod == 'TB',
-                      onTap: () => setState(() => _measurementMethod = 'TB'),
+                      onTap: () => setState(() => _setMeasurementMethod('TB')),
                     ),
                   ),
                 ],
@@ -6630,7 +6299,11 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   label: 'Laki-laki (0)',
                   icon: Icons.male_rounded,
                   isSelected: _selectedGender == 0,
-                  onTap: () => setState(() => _selectedGender = 0),
+                  onTap: () => setState(() {
+                    if (_selectedGender == 0) return;
+                    _selectedGender = 0;
+                    _invalidateMlp();
+                  }),
                   color: const Color(0xFF3498DB),
                 ),
               ),
@@ -6639,7 +6312,11 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   label: 'Perempuan (1)',
                   icon: Icons.female_rounded,
                   isSelected: _selectedGender == 1,
-                  onTap: () => setState(() => _selectedGender = 1),
+                  onTap: () => setState(() {
+                    if (_selectedGender == 1) return;
+                    _selectedGender = 1;
+                    _invalidateMlp();
+                  }),
                   color: const Color(0xFFE91E63),
                 ),
               ),
@@ -6736,8 +6413,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                       setState(() {
                         _isAutoAgeFromBirthDate = true;
                         _ageMonths = months.toDouble();
+                        _invalidateMlp();
                         _ageController.text = months.toString();
-                        _measurementMethod = months < 24 ? 'PB' : 'TB';
+                        _setMeasurementMethod(months < 24 ? 'PB' : 'TB');
                       });
                     } else {
                       _pickChildBirthDate();
@@ -6776,8 +6454,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                 setState(() {
                   _isAutoAgeFromBirthDate = false;
                   _ageMonths = (_ageMonths - 1).clamp(0, 200);
+                  _invalidateMlp();
                   _ageController.text = _ageMonths.toStringAsFixed(0);
-                  _measurementMethod = _ageMonths < 24 ? 'PB' : 'TB';
+                  _setMeasurementMethod(_ageMonths < 24 ? 'PB' : 'TB');
                 });
               }
             }),
@@ -6794,7 +6473,8 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                     setState(() {
                       _isAutoAgeFromBirthDate = false;
                       _ageMonths = numVal;
-                      _measurementMethod = _ageMonths < 24 ? 'PB' : 'TB';
+                  _invalidateMlp();
+                      _setMeasurementMethod(_ageMonths < 24 ? 'PB' : 'TB');
                     });
                   }
                 },
@@ -6805,8 +6485,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
               setState(() {
                 _isAutoAgeFromBirthDate = false;
                 _ageMonths += 1;
+                  _invalidateMlp();
                 _ageController.text = _ageMonths.toStringAsFixed(0);
-                _measurementMethod = _ageMonths < 24 ? 'PB' : 'TB';
+                _setMeasurementMethod(_ageMonths < 24 ? 'PB' : 'TB');
               });
             }),
           ],
@@ -6894,7 +6575,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
     Color sub,
     bool isMobile,
   ) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isEn = ref.watch(landingPageProvider).language == 'en';
 
     return CustomCard(
       color: cardBg,
@@ -6925,10 +6606,8 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   children: [
                     Text(
                       _activeTab == 1
-                          ? 'Langkah 2: Antropometri IoT'
-                          : (_activeTab == 2
-                                ? 'Langkah 2: Antropometri Foto (PCV)'
-                                : 'Langkah 2: Antropometri Fisik'),
+                          ? (isEn ? 'Step 2: IoT Anthropometry' : 'Langkah 2: Antropometri IoT')
+                          : (isEn ? 'Step 2: Manual Anthropometry' : 'Langkah 2: Antropometri Fisik'),
                       style: GoogleFonts.outfit(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
@@ -6936,11 +6615,13 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                       ),
                     ),
                     Text(
-                      _activeTab == 1
-                          ? 'Data berat & tinggi terisi otomatis dari sensor MQTT; lengkapi data KIA.'
-                          : (_activeTab == 2
-                                ? 'Ambil foto/kamera lokal untuk ukur Tinggi Badan otomatis via PCV API, lalu lengkapi Berat Badan & data KIA.'
-                                : 'Pengukuran Berat Badan, Panjang/Tinggi Badan, LiLA, Lingkar Kepala, dan KMS (Standar Buku KIA 2024).'),
+                      _activeTab == 0
+                          ? (isEn ? 'Enter the anthropometric measurements.' : 'Isi hasil pengukuran antropometri.')
+                          : (_iotMeasurementApplied
+                                ? (isEn ? 'Measurements locked. Complete the form.' : 'Hasil pengukuran dikunci. Lengkapi formulir.')
+                                : (_usesPcv
+                                      ? (isEn ? 'Lying down · PCV camera' : 'Telentang · Kamera PCV')
+                                      : (isEn ? 'Standing · Ultrasonic sensor' : 'Berdiri · Sensor ultrasonik'))),
                       style: GoogleFonts.outfit(fontSize: 10.5, color: sub),
                     ),
                   ],
@@ -6952,7 +6633,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
           const Divider(height: 24),
 
           // Mode-Specific Measurement Panel (IoT MQTT or Photo/Camera PCV)
-          if (_activeTab == 1) ...[
+          if (_waitingForIotMeasurement) ...[
             _buildIotTelemetryPanel(
               cardBg: cardBg,
               border: border,
@@ -6960,507 +6641,241 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
               sub: sub,
               isMobile: isMobile,
             ),
-            const Divider(height: 24),
-          ] else if (_activeTab == 2) ...[
-            _buildPcvImageStudioCard(
-              cardBg,
-              border,
-              text,
-              sub,
-              const Color(0xFF1ABC9C),
-              isDark,
-              isMobile,
-            ),
-            const Divider(height: 24),
-          ],
-
-          // Baris 1: Berat Badan & Tinggi Badan
-          Row(
-            children: [
-              // Berat Badan (kg)
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Berat Badan Saat Ini (kg)',
-                          style: GoogleFonts.outfit(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: text,
-                          ),
-                        ),
-                        Text(
-                          'LOINC: 29463-7',
-                          style: GoogleFonts.outfit(
-                            fontSize: 8.5,
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF009688),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        _buildStepperBtn(Icons.remove, () {
-                          final current =
-                              double.tryParse(_weightController.text) ?? 10.0;
-                          if (current > 1.0) {
-                            setState(() {
-                              _weightController.text = (current - 0.1)
-                                  .toStringAsFixed(1);
-                              _smartGrowthResult = null;
-                              _reasoningResult = null;
-                            });
-                          }
-                        }),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: CustomTextField(
-                            label: '',
-                            hintText: 'Contoh: 11.5',
-                            controller: _weightController,
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            onChanged: (val) => setState(() {
-                              _smartGrowthResult = null;
-                              _reasoningResult = null;
-                            }),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        _buildStepperBtn(Icons.add, () {
-                          final current =
-                              double.tryParse(_weightController.text) ?? 10.0;
-                          setState(() {
-                            _weightController.text = (current + 0.1)
-                                .toStringAsFixed(1);
-                            _smartGrowthResult = null;
-                            _reasoningResult = null;
-                          });
-                        }),
-                      ],
-                    ),
-                  ],
+          ] else ...[
+            if (_activeTab == 1) ...[
+              Align(
+                alignment: Alignment.centerLeft,
+                child: CustomButton(
+                  text: isEn ? 'Reopen Measurement' : 'Buka Ulang Pengukuran',
+                  icon: Icons.refresh_rounded,
+                  isSecondary: true,
+                  height: 36,
+                  onPressed: _retakeIotMeasurement,
                 ),
               ),
-
-              const SizedBox(width: 16),
-
-              // Tinggi Badan (cm)
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (_pcvTinggiCm != null)
-                      Container(
-                        margin: const EdgeInsets.only(bottom: 5),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(
-                            0xFF1ABC9C,
-                          ).withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: const Color(
-                              0xFF1ABC9C,
-                            ).withValues(alpha: 0.35),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.auto_awesome_rounded,
-                              size: 12,
-                              color: Color(0xFF1ABC9C),
-                            ),
-                            const SizedBox(width: 5),
-                            Text(
-                              'Otomatis Terisi via Foto AI PCV (${_pcvTinggiCm!.toStringAsFixed(1)} cm)',
-                              style: GoogleFonts.outfit(
-                                fontSize: 9.5,
-                                fontWeight: FontWeight.bold,
-                                color: const Color(0xFF1ABC9C),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          _measurementMethod == 'PB'
-                              ? 'Panjang Badan Telentang (cm)'
-                              : 'Tinggi Badan Berdiri (cm)',
-                          style: GoogleFonts.outfit(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: text,
-                          ),
-                        ),
-                        Text(
-                          _measurementMethod == 'PB'
-                              ? 'LOINC: 8306-3'
-                              : 'LOINC: 8302-2',
-                          style: GoogleFonts.outfit(
-                            fontSize: 8.5,
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF009688),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        _buildStepperBtn(Icons.remove, () {
-                          final current =
-                              double.tryParse(_heightController.text) ?? 80.0;
-                          if (current > 30.0) {
-                            setState(() {
-                              _heightController.text = (current - 0.5)
-                                  .toStringAsFixed(1);
-                              _smartGrowthResult = null;
-                              _reasoningResult = null;
-                            });
-                          }
-                        }),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: CustomTextField(
-                            label: '',
-                            hintText: 'Contoh: 85.0',
-                            controller: _heightController,
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            onChanged: (val) => setState(() {
-                              _smartGrowthResult = null;
-                              _reasoningResult = null;
-                            }),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        _buildStepperBtn(Icons.add, () {
-                          final current =
-                              double.tryParse(_heightController.text) ?? 80.0;
-                          setState(() {
-                            _heightController.text = (current + 0.5)
-                                .toStringAsFixed(1);
-                            _smartGrowthResult = null;
-                            _reasoningResult = null;
-                          });
-                        }),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
+              const Divider(height: 24),
             ],
-          ),
 
-          const SizedBox(height: 16),
-
-          // Baris 2: Parameter Antropometri Tambahan Buku KIA (LK, LiLA, LP)
-          Row(
-            children: [
-              // Lingkar Kepala
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Lingkar Kepala (cm)',
-                          style: GoogleFonts.outfit(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: text,
-                          ),
-                        ),
-                        Text(
-                          'LOINC: 9843-4',
-                          style: GoogleFonts.outfit(
-                            fontSize: 8.5,
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF009688),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    CustomTextField(
-                      label: '',
-                      hintText: 'Nellhaus: 47.0',
-                      controller: _headCircumferenceController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      onChanged: (val) => setState(() {}),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 14),
-              // LiLA (Lingkar Lengan Atas)
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'LiLA (cm)',
-                          style: GoogleFonts.outfit(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: text,
-                          ),
-                        ),
-                        Text(
-                          'LOINC: 56072-2',
-                          style: GoogleFonts.outfit(
-                            fontSize: 8.5,
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF009688),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    CustomTextField(
-                      label: '',
-                      hintText: 'Contoh: 14.5',
-                      controller: _lilaController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      onChanged: (val) => setState(() {}),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 14),
-              // Lingkar Perut
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Lingkar Perut (cm)',
-                          style: GoogleFonts.outfit(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: text,
-                          ),
-                        ),
-                        Text(
-                          'LOINC: 8280-0',
-                          style: GoogleFonts.outfit(
-                            fontSize: 8.5,
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF009688),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    CustomTextField(
-                      label: '',
-                      hintText: 'Contoh: 46.0',
-                      controller: _waistController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      onChanged: (val) => setState(() {}),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-
-          // Indikator Visual Pita LiLA Buku KIA
-          Builder(
-            builder: (context) {
-              final val = double.tryParse(_lilaController.text.trim());
-              final color = _getLilaColor(val);
-              final status = _getLilaStatusText(val);
-              return Container(
-                margin: const EdgeInsets.only(top: 8),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: color.withValues(alpha: 0.3)),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.straighten_rounded, size: 14, color: color),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Pita LiLA Buku KIA 2024: $status',
-                        style: GoogleFonts.outfit(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: color,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-
-          const SizedBox(height: 16),
-
-          // Baris 3: Tren Pertumbuhan KMS Balita (Kartu Menuju Sehat)
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Tren Pertumbuhan KMS Balita (Kartu Menuju Sehat - Buku KIA 2024)',
-                    style: GoogleFonts.outfit(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: text,
-                    ),
-                  ),
-                  Text(
-                    'Deteksi Dini Gagal Tumbuh / Weight Faltering',
-                    style: GoogleFonts.outfit(
-                      fontSize: 9.5,
-                      color: sub,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _buildKmsOptionChip(
-                    'N',
-                    'N (Naik ≥ KBM)',
-                    const Color(0xFF27AE60),
-                  ),
-                  _buildKmsOptionChip(
-                    'T',
-                    'T (Tidak Naik / Tetap)',
-                    const Color(0xFFE67E22),
-                  ),
-                  _buildKmsOptionChip(
-                    '2T',
-                    '2T (2x Tidak Naik - Red Flag)',
-                    const Color(0xFFE74C3C),
-                  ),
-                  _buildKmsOptionChip(
-                    'BGM',
-                    'BGM (Bawah Garis Merah - Red Flag)',
-                    const Color(0xFFC0392B),
-                  ),
-                  _buildKmsOptionChip(
-                    'Baru',
-                    'Pertama Kali Menimbang',
-                    const Color(0xFF3498DB),
-                  ),
-                ],
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 14),
-
-          // Baris 4: Suplementasi Buku KIA 2024
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: border.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: border),
-            ),
-            child: Row(
+            // Baris 1: Berat Badan & Tinggi Badan
+            Row(
               children: [
+                // Berat Badan (kg)
                 Expanded(
-                  child: CheckboxListTile(
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(
-                      'Kapsul Vitamin A',
-                      style: GoogleFonts.outfit(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: text,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Berat Badan Saat Ini (kg)',
+                            style: GoogleFonts.outfit(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: text,
+                            ),
+                          ),
+                          Text(
+                            'LOINC: 29463-7',
+                            style: GoogleFonts.outfit(
+                              fontSize: 8.5,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFF009688),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    subtitle: Text(
-                      _ageMonths < 12
-                          ? 'Kapsul Biru (100.000 IU)'
-                          : 'Kapsul Merah (200.000 IU) - Bulan Feb/Agu',
-                      style: GoogleFonts.outfit(fontSize: 9.5, color: sub),
-                    ),
-                    value: _receivedVitA,
-                    activeColor: const Color(0xFF1ABC9C),
-                    onChanged: (val) =>
-                        setState(() => _receivedVitA = val ?? true),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          if (!_iotMeasurementApplied || _activeTab == 0) _buildStepperBtn(Icons.remove, () {
+                            final current =
+                                double.tryParse(_weightController.text) ?? 10.0;
+                            if (current > 1.0) {
+                              setState(() {
+                                _weightController.text = (current - 0.1)
+                                    .toStringAsFixed(1);
+                                _invalidateMlp();
+                              });
+                            }
+                          }),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: CustomTextField(
+                              label: '',
+                              hintText: 'Contoh: 11.5',
+                              controller: _weightController,
+                              readOnly: _activeTab == 1 && _iotMeasurementApplied,
+                              keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true,
+                              ),
+                              onChanged: (val) => setState(() {
+                                _invalidateMlp();
+                              }),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          if (!_iotMeasurementApplied || _activeTab == 0) _buildStepperBtn(Icons.add, () {
+                            final current =
+                                double.tryParse(_weightController.text) ?? 10.0;
+                            setState(() {
+                              _weightController.text = (current + 0.1)
+                                  .toStringAsFixed(1);
+                              _invalidateMlp();
+                            });
+                          }),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 12),
+
+                const SizedBox(width: 16),
+
+                // Tinggi Badan (cm)
                 Expanded(
-                  child: CheckboxListTile(
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(
-                      'Obat Cacing (Pencegahan)',
-                      style: GoogleFonts.outfit(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: text,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            _measurementMethod == 'PB'
+                                ? 'Panjang Badan Telentang (cm)'
+                                : 'Tinggi Badan Berdiri (cm)',
+                            style: GoogleFonts.outfit(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: text,
+                            ),
+                          ),
+                          Text(
+                            _measurementMethod == 'PB'
+                                ? 'LOINC: 8306-3'
+                                : 'LOINC: 8302-2',
+                            style: GoogleFonts.outfit(
+                              fontSize: 8.5,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFF009688),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    subtitle: Text(
-                      _ageMonths >= 12
-                          ? 'Diberikan tiap 6 bulan (Usia 1-5 tahun)'
-                          : 'Belum usia target (< 12 bulan)',
-                      style: GoogleFonts.outfit(fontSize: 9.5, color: sub),
-                    ),
-                    value: _ageMonths >= 12 ? _receivedDeworming : false,
-                    activeColor: const Color(0xFF1ABC9C),
-                    onChanged: _ageMonths >= 12
-                        ? (val) =>
-                              setState(() => _receivedDeworming = val ?? true)
-                        : null,
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          if (!_iotMeasurementApplied || _activeTab == 0) _buildStepperBtn(Icons.remove, () {
+                            final current =
+                                double.tryParse(_heightController.text) ?? 80.0;
+                            if (current > 30.0) {
+                              setState(() {
+                                _heightController.text = (current - 0.5)
+                                    .toStringAsFixed(1);
+                                _invalidateMlp();
+                              });
+                            }
+                          }),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: CustomTextField(
+                              label: '',
+                              hintText: 'Contoh: 85.0',
+                              controller: _heightController,
+                              readOnly: _activeTab == 1 && _iotMeasurementApplied,
+                              keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true,
+                              ),
+                              onChanged: (val) => setState(() {
+                                _invalidateMlp();
+                              }),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          if (!_iotMeasurementApplied || _activeTab == 0) _buildStepperBtn(Icons.add, () {
+                            final current =
+                                double.tryParse(_heightController.text) ?? 80.0;
+                            setState(() {
+                              _heightController.text = (current + 0.5)
+                                  .toStringAsFixed(1);
+                              _invalidateMlp();
+                            });
+                          }),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-          ),
+
+            const SizedBox(height: 16),
+
+            // Baris 2: Suplementasi Buku KIA 2024
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: border.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: border),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: CheckboxListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        'Kapsul Vitamin A',
+                        style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: text,
+                        ),
+                      ),
+                      subtitle: Text(
+                        _ageMonths < 12
+                            ? 'Kapsul Biru (100.000 IU)'
+                            : 'Kapsul Merah (200.000 IU) - Bulan Feb/Agu',
+                        style: GoogleFonts.outfit(fontSize: 9.5, color: sub),
+                      ),
+                      value: _receivedVitA,
+                      activeColor: const Color(0xFF1ABC9C),
+                      onChanged: (val) =>
+                          setState(() => _receivedVitA = val ?? true),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: CheckboxListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        'Obat Cacing (Pencegahan)',
+                        style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: text,
+                        ),
+                      ),
+                      subtitle: Text(
+                        _ageMonths >= 12
+                            ? 'Diberikan tiap 6 bulan (Usia 1-5 tahun)'
+                            : 'Belum usia target (< 12 bulan)',
+                        style: GoogleFonts.outfit(fontSize: 9.5, color: sub),
+                      ),
+                      value: _ageMonths >= 12 ? _receivedDeworming : false,
+                      activeColor: const Color(0xFF1ABC9C),
+                      onChanged: _ageMonths >= 12
+                          ? (val) =>
+                                setState(() => _receivedDeworming = val ?? true)
+                          : null,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -7625,44 +7040,6 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                     ),
                   ),
                 ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildKmsOptionChip(String code, String label, Color color) {
-    final isSelected = _kmsStatus == code;
-    return InkWell(
-      onTap: () => setState(() => _kmsStatus = code),
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected ? color : color.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isSelected ? color : color.withValues(alpha: 0.3),
-            width: isSelected ? 1.5 : 1.0,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              isSelected ? Icons.check_circle_rounded : Icons.circle_outlined,
-              size: 14,
-              color: isSelected ? Colors.white : color,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: GoogleFonts.outfit(
-                fontSize: 10,
-                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                color: isSelected ? Colors.white : color,
               ),
             ),
           ],
@@ -7864,19 +7241,6 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
     final isAntroValid = bb > 0 && tb > 0;
     final isEn = ref.watch(landingPageProvider).language == 'en';
 
-    // Otomatis mengeksekusi model MLP (Keras Smart Growth) jika belum dijalankan
-    if (isAntroValid &&
-        _smartGrowthResult == null &&
-        !_isLoadingClassification) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted &&
-            _smartGrowthResult == null &&
-            !_isLoadingClassification) {
-          _runMlpClassification(silent: true);
-        }
-      });
-    }
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -8044,6 +7408,20 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   activeStepIndex: 1,
                 ),
               ]
+              else if (_mlpFailed) ...[
+                Text(isEn
+                    ? 'MLP classification failed.'
+                    : 'Klasifikasi MLP gagal.'),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: CustomButton(
+                    text: isEn ? 'Retry MLP' : 'Coba Ulang MLP',
+                    icon: Icons.refresh_rounded,
+                    onPressed: () => _runMlpClassification(retry: true),
+                  ),
+                ),
+              ]
               // 2. Data Not Valid Warning
               else if (!isAntroValid) ...[
                 Container(
@@ -8206,17 +7584,6 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                                 ? 'PB Telentang'
                                 : 'TB Berdiri',
                           ),
-                          if (_lilaController.text.isNotEmpty)
-                            _buildMiniBadge(
-                              'LiLA',
-                              '${_lilaController.text} cm',
-                            ),
-                          if (_headCircumferenceController.text.isNotEmpty)
-                            _buildMiniBadge(
-                              'Lingkar Kepala',
-                              '${_headCircumferenceController.text} cm',
-                            ),
-                          _buildMiniBadge('Tren KMS', _kmsStatus),
                           if (_smartGrowthResult != null)
                             _buildMiniBadge(
                               'Status Gizi MLP',
@@ -8512,24 +7879,6 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                       '$tb cm',
                       'LOINC $tbLoinc',
                     ),
-                    if (_headCircumferenceController.text.isNotEmpty)
-                      _buildLoincBadge(
-                        'Lingkar Kepala',
-                        '${_headCircumferenceController.text} cm',
-                        'LOINC 9843-4',
-                      ),
-                    if (_lilaController.text.isNotEmpty)
-                      _buildLoincBadge(
-                        'LiLA',
-                        '${_lilaController.text} cm',
-                        'LOINC 56072-2',
-                      ),
-                    if (_waistController.text.isNotEmpty)
-                      _buildLoincBadge(
-                        'Lingkar Perut',
-                        '${_waistController.text} cm',
-                        'LOINC 8280-0',
-                      ),
                     _buildLoincBadge(
                       'Diagnosis Gizi',
                       _smartGrowthResult?.isStunting == true
@@ -8674,12 +8023,6 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
               ),
               _buildReviewRow('Berat & Tinggi', '$bb kg / $tb cm', sub, text),
               _buildReviewRow(
-                'LiLA & Lingkar Kepala',
-                '${_lilaController.text} cm / ${_headCircumferenceController.text} cm',
-                sub,
-                text,
-              ),
-              _buildReviewRow(
                 'Status Gizi BB/TB',
                 _smartGrowthResult?.kategoriGiziBbtb ?? 'Belum Dianalisis',
                 sub,
@@ -8731,6 +8074,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
     required List<Map<String, dynamic>> redErrors,
     required List<Map<String, dynamic>> yellowWarnings,
   }) {
+    final waiting = _formStep == 2 && _waitingForIotMeasurement;
     final hasAi = _smartGrowthResult != null && _reasoningResult != null;
 
     return Container(
@@ -8744,12 +8088,13 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
           ? Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _buildScreeningValidationStatusPill(
+                if (!waiting)
+                  _buildScreeningValidationStatusPill(
                   redErrors,
                   yellowWarnings,
                   subtitleColor,
                 ),
-                const SizedBox(height: 12),
+                if (!waiting) const SizedBox(height: 12),
                 Row(
                   children: [
                     if (_formStep > 1)
@@ -8762,7 +8107,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                             ),
                             padding: const EdgeInsets.symmetric(vertical: 12),
                           ),
-                          onPressed: () => setState(() => _formStep--),
+                          onPressed: () => _goToFormStep(_formStep - 1),
                           icon: const Icon(Icons.arrow_back_rounded, size: 14),
                           label: Text(
                             'Sebelumnya',
@@ -8774,8 +8119,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                           ),
                         ),
                       ),
-                    if (_formStep > 1) const SizedBox(width: 8),
-                    Expanded(child: _buildFooterActionButton(hasAi, redErrors)),
+                    if (_formStep > 1 && !waiting) const SizedBox(width: 8),
+                    if (!waiting)
+                      Expanded(child: _buildFooterActionButton(hasAi, redErrors)),
                   ],
                 ),
               ],
@@ -8796,7 +8142,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                         vertical: 12,
                       ),
                     ),
-                    onPressed: () => setState(() => _formStep--),
+                    onPressed: () => _goToFormStep(_formStep - 1),
                     icon: const Icon(Icons.arrow_back_rounded, size: 16),
                     label: Text(
                       '← Sebelumnya',
@@ -8811,14 +8157,16 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                   const SizedBox.shrink(),
 
                 // Center: Clickable Validation Status Pill
-                _buildScreeningValidationStatusPill(
+                if (!waiting)
+                  _buildScreeningValidationStatusPill(
                   redErrors,
                   yellowWarnings,
                   subtitleColor,
                 ),
 
                 // Right: Action Button
-                Row(
+                if (!waiting)
+                  Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     OutlinedButton.icon(
@@ -8873,13 +8221,9 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           elevation: 2,
         ),
-        onPressed: () {
-          final next = _formStep + 1;
-          setState(() => _formStep = next);
-          if (next == 3) {
-            _checkAndAutoRunMlp();
-          }
-        },
+        onPressed: _formStep == 2 && _waitingForIotMeasurement
+            ? null
+            : () => _goToFormStep(_formStep + 1),
         icon: const Icon(
           Icons.arrow_forward_rounded,
           size: 16,
@@ -8941,7 +8285,7 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
                 ),
                 elevation: 2,
               ),
-              onPressed: (_isLoadingClassification || _isLoadingReasoning)
+              onPressed: (_smartGrowthResult == null || _isLoadingClassification || _isLoadingReasoning)
                   ? null
                   : () {
                       _runReasoningOnly();
@@ -10053,1382 +9397,5 @@ Interoperabilitas SATUSEHAT Kemenkes RI (FHIR R4)
           ),
         );
     }
-  }
-
-  // ===========================================================================
-  // METODE HELPER OPERASI PCV COMPUTER VISION CLOUD (https://pcvmapotechs5.vercel.app/)
-  // ===========================================================================
-
-  /// 1. Pilih gambar dari penyimpanan lokal perangkat via FilePicker
-  Future<void> _pickLocalPcvImage() async {
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.image,
-        withData: true,
-      );
-      if (result != null && result.files.isNotEmpty) {
-        final file = result.files.first;
-        if (file.bytes != null) {
-          setState(() {
-            _pcvSelectedImageBytes = file.bytes;
-            _pcvSelectedImageName = file.name;
-            _pcvResultData = null;
-            _pcvTinggiCm = null;
-            _pcvPanjangPx = null;
-            _pcvSkalaEfektif = null;
-            _pcvAnnotatedImageBase64 = null;
-            _pcvErrorMessage = null;
-            _pcvMessage = null;
-          });
-          if (mounted) {
-            CustomSnackbar.success(
-              context,
-              'Foto "${file.name}" (${(file.bytes!.lengthInBytes / 1024).toStringAsFixed(1)} KB) berhasil dipilih.',
-              title: 'File Gambar Dipilih',
-            );
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('[PCV] _pickLocalPcvImage error: $e');
-      if (mounted) {
-        CustomSnackbar.error(
-          context,
-          'Gagal memilih file: $e',
-          title: 'File Picker Gagal',
-        );
-      }
-    }
-  }
-
-  /// 2. Unduh citra balita via Link / URL Web
-  Future<void> _fetchPcvImageFromUrl(String url) async {
-    final cleanUrl = url.trim();
-    if (cleanUrl.isEmpty) {
-      CustomSnackbar.warning(
-        context,
-        'Masukkan link URL gambar balita yang valid.',
-        title: 'URL Kosong',
-      );
-      return;
-    }
-    if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
-      CustomSnackbar.warning(
-        context,
-        'URL harus diawali dengan http:// atau https://',
-        title: 'URL Tidak Valid',
-      );
-      return;
-    }
-
-    setState(() {
-      _isLoadingPcvImage = true;
-      _pcvProgress = 0.15;
-      _pcvErrorMessage = null;
-    });
-
-    _pcvProgressTimer?.cancel();
-    _pcvProgressTimer = Timer.periodic(const Duration(milliseconds: 100), (
-      timer,
-    ) {
-      if (_pcvProgress < 0.85) {
-        setState(() => _pcvProgress += 0.08);
-      }
-    });
-
-    try {
-      final uri = Uri.parse(cleanUrl);
-      final response = await http.get(uri).timeout(const Duration(seconds: 15));
-      _pcvProgressTimer?.cancel();
-
-      if (response.statusCode == 200) {
-        final bytes = response.bodyBytes;
-        String fileName = uri.pathSegments.isNotEmpty
-            ? uri.pathSegments.last
-            : 'citra_web.jpg';
-        if (!fileName.contains('.')) fileName = '$fileName.jpg';
-
-        setState(() {
-          _pcvSelectedImageBytes = bytes;
-          _pcvSelectedImageName = fileName;
-          _isLoadingPcvImage = false;
-          _pcvProgress = 1.0;
-          _pcvResultData = null;
-          _pcvTinggiCm = null;
-          _pcvPanjangPx = null;
-          _pcvSkalaEfektif = null;
-          _pcvAnnotatedImageBase64 = null;
-          _pcvErrorMessage = null;
-          _pcvMessage = null;
-        });
-
-        if (mounted) {
-          CustomSnackbar.success(
-            context,
-            'Gambar berhasil diunduh dari URL (${(bytes.lengthInBytes / 1024).toStringAsFixed(1)} KB).',
-            title: 'Gambar Berhasil Dimuat',
-          );
-        }
-      } else {
-        setState(() {
-          _isLoadingPcvImage = false;
-          _pcvErrorMessage =
-              'Gagal mengunduh gambar (HTTP ${response.statusCode})';
-        });
-        if (mounted) {
-          CustomSnackbar.error(
-            context,
-            'Server mengembalikan kode HTTP ${response.statusCode}',
-            title: 'Unduh Gagal',
-          );
-        }
-      }
-    } catch (e) {
-      _pcvProgressTimer?.cancel();
-      setState(() {
-        _isLoadingPcvImage = false;
-        _pcvErrorMessage = 'Gagal memuat URL: $e';
-      });
-      if (mounted) {
-        CustomSnackbar.error(
-          context,
-          'Koneksi gagal atau URL tidak dapat diakses: $e',
-          title: 'Gagal Memuat Gambar',
-        );
-      }
-    }
-  }
-
-  /// 3. Ambil snapshot langsung dari Kamera Lokal / Webcam
-  Future<void> _captureCameraPcvImage() async {
-    try {
-      final photo = await capturePcvCameraSnapshot(context);
-      if (photo == null || !mounted) return;
-
-      setState(() {
-        _pcvSelectedImageBytes = photo.bytes;
-        _pcvSelectedImageName = photo.fileName;
-        _pcvResultData = null;
-        _pcvTinggiCm = null;
-        _pcvPanjangPx = null;
-        _pcvSkalaEfektif = null;
-        _pcvAnnotatedImageBase64 = null;
-        _pcvErrorMessage = null;
-        _pcvMessage = null;
-      });
-
-      CustomSnackbar.success(
-        context,
-        'Snapshot kamera berhasil diambil (${(photo.bytes.lengthInBytes / 1024).toStringAsFixed(1)} KB).',
-        title: 'Foto Kamera Siap',
-      );
-    } catch (e) {
-      debugPrint('[PCV] _captureCameraPcvImage error: $e');
-      if (mounted) {
-        CustomSnackbar.warning(
-          context,
-          'Kamera lokal tidak dapat diakses ($e). Silakan gunakan mode "File Lokal" atau "Link URL".',
-          title: 'Kamera Tidak Tersedia',
-        );
-      }
-    }
-  }
-
-  /// 4. Muat citra sampel klinis bawaan
-  Future<void> _loadSampleLocalPcvImage() async {
-    try {
-      final byteData = await rootBundle.load(
-        'assets/images/anc_home_visit_evidence.png',
-      );
-      final bytes = byteData.buffer.asUint8List();
-      setState(() {
-        _pcvSelectedImageBytes = bytes;
-        _pcvSelectedImageName = 'anc_home_visit_evidence.png (Sampel Klinis)';
-        _pcvResultData = null;
-        _pcvTinggiCm = null;
-        _pcvPanjangPx = null;
-        _pcvSkalaEfektif = null;
-        _pcvAnnotatedImageBase64 = null;
-        _pcvErrorMessage = null;
-        _pcvMessage = null;
-      });
-      if (mounted) {
-        CustomSnackbar.info(
-          context,
-          'Foto sampel klinis balita berhasil dimuat (${(bytes.lengthInBytes / 1024).toStringAsFixed(1)} KB). Klik "Ukur Tinggi Badan" untuk memproses.',
-          title: 'Sampel Dimuat',
-        );
-      }
-    } catch (e) {
-      debugPrint('[PCV] _loadSampleLocalPcvImage error: $e');
-      if (mounted) {
-        CustomSnackbar.error(
-          context,
-          'Gagal memuat sampel bawaan: $e',
-          title: 'Gagal Memuat',
-        );
-      }
-    }
-  }
-
-  /// 4b. Muat citra sampel Boneka uji validasi (Ground Truth: 47.2 cm, 519.0 px)
-  Future<void> _loadBonekaSampleImage() async {
-    try {
-      final byteData = await rootBundle.load('assets/images/boneka_sample.jpg');
-      final bytes = byteData.buffer.asUint8List();
-      setState(() {
-        _pcvSelectedImageBytes = bytes;
-        _pcvSelectedImageName = 'Boneka.jpg (Ground Truth 47.2 cm, 519.0 px)';
-        _pcvSelectedScale = 11.00;
-        _pcvCustomScaleController.text = '11.00';
-        _pcvUseRoi = false;
-        _pcvResultData = null;
-        _pcvTinggiCm = null;
-        _pcvPanjangPx = null;
-        _pcvSkalaEfektif = null;
-        _pcvAnnotatedImageBase64 = null;
-        _pcvErrorMessage = null;
-        _pcvMessage = null;
-      });
-      if (mounted) {
-        CustomSnackbar.info(
-          context,
-          'Sampel Boneka.jpg berhasil dimuat. Skala kalibrasi 11.00 px/cm aktif. Klik "Ukur Tinggi Badan" untuk memproses.',
-          title: 'Sampel Boneka Siap',
-        );
-      }
-    } catch (e) {
-      debugPrint('[PCV] _loadBonekaSampleImage error: $e');
-      if (mounted) {
-        CustomSnackbar.error(
-          context,
-          'Gagal memuat sampel boneka: $e',
-          title: 'Gagal Memuat',
-        );
-      }
-    }
-  }
-
-  /// 5. Kirim citra ke API https://pcvmapotechs5.vercel.app/measure
-  Future<void> _measurePcvHeight() async {
-    if (_pcvSelectedImageBytes == null) {
-      CustomSnackbar.warning(
-        context,
-        'Pilih atau unggah foto balita terlebih dahulu.',
-        title: 'Foto Belum Ada',
-      );
-      return;
-    }
-
-    setState(() {
-      _isMeasuringPcv = true;
-      _pcvProgress = 0.08;
-      _pcvErrorMessage = null;
-      _pcvMessage = null;
-    });
-
-    _pcvProgressTimer?.cancel();
-    _pcvProgressTimer = Timer.periodic(const Duration(milliseconds: 140), (
-      timer,
-    ) {
-      if (_pcvProgress < 0.90) {
-        setState(() => _pcvProgress += 0.05);
-      }
-    });
-
-    try {
-      final base64Str = base64Encode(_pcvSelectedImageBytes!);
-      final res = await VitaScaleApiService.ukurTinggiObjek(
-        base64Image: base64Str,
-        skala: _pcvSelectedScale,
-        useRoi: _pcvUseRoi,
-        useK1: _pcvUseK1,
-        preset: _pcvSelectedScale == 11.0 ? 'boneka' : null,
-      );
-
-      _pcvProgressTimer?.cancel();
-
-      if (res['status'] == 'ok' || res.containsKey('tinggi_cm')) {
-        final tinggi = (res['tinggi_cm'] as num).toDouble();
-        final px = (res['panjang_px'] as num?)?.toDouble();
-        final skala = (res['skala_efektif'] as num?)?.toDouble() ?? 9.09;
-        final annotated = res['annotated_image'] as String?;
-        final msg = res['message'] as String? ?? 'Pengukuran berhasil';
-
-        setState(() {
-          _isMeasuringPcv = false;
-          _pcvProgress = 1.0;
-          _pcvResultData = res;
-          _pcvTinggiCm = tinggi;
-          _pcvPanjangPx = px;
-          _pcvSkalaEfektif = skala;
-          _pcvAnnotatedImageBase64 = annotated;
-          _pcvMessage = msg;
-          _pcvShowAnnotated = true;
-
-          // Isi otomatis ke kontroler Tinggi Badan
-          _heightController.text = tinggi.toStringAsFixed(1);
-
-          // Tentukan PB vs TB sesuai usia anak di Langkah 1
-          _measurementMethod = _ageMonths < 24 ? 'PB' : 'TB';
-
-          // Reset hasil klasifikasi agar user memperbarui
-          _smartGrowthResult = null;
-          _reasoningResult = null;
-        });
-
-        if (mounted) {
-          CustomSnackbar.success(
-            context,
-            'Panjang/Tinggi terdeteksi: ${tinggi.toStringAsFixed(1)} cm ($px px). Otomatis diisikan ke Formulir Antropometri.',
-            title: 'PCV Berhasil',
-          );
-        }
-      } else {
-        final errMsg =
-            res['message'] ?? 'Gagal memproses citra pada OpenCV server.';
-        setState(() {
-          _isMeasuringPcv = false;
-          _pcvProgress = 0.0;
-          _pcvErrorMessage = errMsg;
-        });
-        if (mounted) {
-          CustomSnackbar.error(context, errMsg, title: 'PCV Gagal');
-        }
-      }
-    } catch (e) {
-      _pcvProgressTimer?.cancel();
-      setState(() {
-        _isMeasuringPcv = false;
-        _pcvProgress = 0.0;
-        _pcvErrorMessage = 'Terjadi kesalahan saat memproses citra: $e';
-      });
-      if (mounted) {
-        CustomSnackbar.error(context, 'Kesalahan: $e', title: 'Gagal Mengukur');
-      }
-    }
-  }
-
-  /// 6. Parse annotated image base64
-  Uint8List? _getAnnotatedBytes(String raw) {
-    try {
-      String clean = raw.trim();
-      if (clean.contains(',')) {
-        clean = clean.split(',').last;
-      }
-      return base64Decode(clean);
-    } catch (e) {
-      debugPrint('[PCV] _getAnnotatedBytes error: $e');
-      return null;
-    }
-  }
-
-  // ===========================================================================
-  // WIDGET: STUDIO INPUT CITRA & PENGUKURAN TINGGI BADAN (PCV API)
-  // ===========================================================================
-  Widget _buildPcvImageStudioCard(
-    Color cardBg,
-    Color border,
-    Color text,
-    Color sub,
-    Color themeAccent,
-    bool isDark,
-    bool isMobile,
-  ) {
-    return CustomCard(
-      color: cardBg,
-      borderColor: border,
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Header Card Studio PCV
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1ABC9C).withValues(alpha: 0.12),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.camera_enhance_rounded,
-                  size: 20,
-                  color: Color(0xFF1ABC9C),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Studio Pengukuran Tinggi Badan via Citra Foto (PCV AI)',
-                      style: GoogleFonts.outfit(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: text,
-                      ),
-                    ),
-                    Text(
-                      'Pilih sumber foto balita (File Lokal, Link URL, atau Kamera). OpenCV akan menghitung panjang badan dan mengisi formulir antropometri secara otomatis.',
-                      style: GoogleFonts.outfit(fontSize: 10.5, color: sub),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-
-          const Divider(height: 24),
-
-          // Pilihan Mode Sumber Citra: 3 Tab Mode (File Lokal, Link URL, Kamera)
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E2130) : const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: border),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _buildPcvModeTabBtn(
-                    index: 0,
-                    icon: Icons.folder_open_rounded,
-                    label: 'File Lokal',
-                    sublabel: 'PNG/JPG',
-                    isDark: isDark,
-                    text: text,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: _buildPcvModeTabBtn(
-                    index: 1,
-                    icon: Icons.link_rounded,
-                    label: 'Link / URL',
-                    sublabel: 'Web Image',
-                    isDark: isDark,
-                    text: text,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: _buildPcvModeTabBtn(
-                    index: 2,
-                    icon: Icons.photo_camera_rounded,
-                    label: 'Kamera',
-                    sublabel: 'Snapshot',
-                    isDark: isDark,
-                    text: text,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // Konten Berdasarkan Mode yang Dipilih
-          if (_pcvInputMode == 0) ...[
-            // Mode 0: File Lokal
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: isDark
-                    ? const Color(0xFF161924)
-                    : const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: border),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: [
-                      CustomButton(
-                        text: 'Pilih Foto dari Perangkat',
-                        icon: Icons.file_upload_outlined,
-                        onPressed: _pickLocalPcvImage,
-                      ),
-                      CustomButton(
-                        text: '🧸 Sampel Boneka (Ground Truth 47.2 cm)',
-                        icon: Icons.smart_toy_rounded,
-                        isSecondary: true,
-                        onPressed: _loadBonekaSampleImage,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Pilih file foto bayi/balita di atas papan ukur stadiometer (format .jpg, .png, .jpeg, .webp).',
-                    style: GoogleFonts.outfit(fontSize: 10, color: sub),
-                  ),
-                ],
-              ),
-            ),
-          ] else if (_pcvInputMode == 1) ...[
-            // Mode 1: Link URL
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: isDark
-                    ? const Color(0xFF161924)
-                    : const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: border),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: CustomTextField(
-                          label: 'Link / URL Gambar Balita',
-                          hintText: 'https://example.com/foto_balita.jpg',
-                          controller: _pcvUrlController,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Padding(
-                        padding: const EdgeInsets.only(top: 24),
-                        child: CustomButton(
-                          text: 'Muat dari URL',
-                          icon: Icons.cloud_download_rounded,
-                          onPressed: () =>
-                              _fetchPcvImageFromUrl(_pcvUrlController.text),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 6,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      Text(
-                        'Preset Cepat:',
-                        style: GoogleFonts.outfit(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: sub,
-                        ),
-                      ),
-                      InkWell(
-                        onTap: () {
-                          _loadBonekaSampleImage();
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(
-                              0xFFE67E22,
-                            ).withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                              color: const Color(
-                                0xFFE67E22,
-                              ).withValues(alpha: 0.3),
-                            ),
-                          ),
-                          child: Text(
-                            '🧸 Sampel Boneka (47.2 cm)',
-                            style: GoogleFonts.outfit(
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFFE67E22),
-                            ),
-                          ),
-                        ),
-                      ),
-                      InkWell(
-                        onTap: () {
-                          _pcvUrlController.text =
-                              'https://images.unsplash.com/photo-1519689680058-324335c77eba?w=800';
-                          _fetchPcvImageFromUrl(_pcvUrlController.text);
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(
-                              0xFF3498DB,
-                            ).withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                              color: const Color(
-                                0xFF3498DB,
-                              ).withValues(alpha: 0.3),
-                            ),
-                          ),
-                          child: Text(
-                            '🔗 Demo Bayi Online (Unsplash)',
-                            style: GoogleFonts.outfit(
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFF3498DB),
-                            ),
-                          ),
-                        ),
-                      ),
-                      InkWell(
-                        onTap: () {
-                          _loadSampleLocalPcvImage();
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(
-                              0xFF1ABC9C,
-                            ).withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                              color: const Color(
-                                0xFF1ABC9C,
-                              ).withValues(alpha: 0.3),
-                            ),
-                          ),
-                          child: Text(
-                            '🔗 Sampel Validasi PCV (72 cm)',
-                            style: GoogleFonts.outfit(
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFF1ABC9C),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ] else ...[
-            // Mode 2: Kamera
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: isDark
-                    ? const Color(0xFF161924)
-                    : const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: border),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: [
-                      CustomButton(
-                        text: 'Buka Kamera / Ambil Snapshot',
-                        icon: Icons.photo_camera_rounded,
-                        onPressed: _captureCameraPcvImage,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Ambil foto bayi tidur telentang lurus di atas infantometer dengan kamera/webcam.',
-                    style: GoogleFonts.outfit(fontSize: 10, color: sub),
-                  ),
-                ],
-              ),
-            ),
-          ],
-
-          // Loading Progress Bar saat mengunduh gambar dari internet
-          if (_isLoadingPcvImage) ...[
-            const SizedBox(height: 14),
-            CustomProgressBar(
-              value: _pcvProgress,
-              label: 'Mengunduh citra dari link web...',
-              sublabel: '${(_pcvProgress * 100).toInt()}%',
-              primaryColor: const Color(0xFF3498DB),
-              height: 6,
-            ),
-          ],
-
-          // Preview Citra yang Dipilih
-          if (_pcvSelectedImageBytes != null) ...[
-            const SizedBox(height: 16),
-            Container(
-              decoration: BoxDecoration(
-                color: isDark
-                    ? const Color(0xFF12141D)
-                    : const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: border),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Top Toolbar Preview Citra
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
-                    ),
-                    color: isDark
-                        ? const Color(0xFF1E2130)
-                        : const Color(0xFFEEF2F6),
-                    child: Row(
-                      children: [
-                        Icon(
-                          _pcvShowAnnotated && _pcvAnnotatedImageBase64 != null
-                              ? Icons.auto_awesome_rounded
-                              : Icons.image_rounded,
-                          size: 16,
-                          color: const Color(0xFF1ABC9C),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            '${_pcvSelectedImageName ?? "Citra Balita"} (${(_pcvSelectedImageBytes!.lengthInBytes / 1024).toStringAsFixed(1)} KB)',
-                            style: GoogleFonts.outfit(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: text,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        if (_pcvAnnotatedImageBase64 != null) ...[
-                          InkWell(
-                            onTap: () => setState(
-                              () => _pcvShowAnnotated = !_pcvShowAnnotated,
-                            ),
-                            borderRadius: BorderRadius.circular(6),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: _pcvShowAnnotated
-                                    ? const Color(0xFF1ABC9C)
-                                    : Colors.transparent,
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(
-                                  color: const Color(0xFF1ABC9C),
-                                ),
-                              ),
-                              child: Text(
-                                _pcvShowAnnotated
-                                    ? '🎯 Deteksi OpenCV'
-                                    : '📸 Citra Asli',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 9.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: _pcvShowAnnotated
-                                      ? Colors.white
-                                      : const Color(0xFF1ABC9C),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                        ],
-                        InkWell(
-                          onTap: () => setState(() {
-                            _pcvSelectedImageBytes = null;
-                            _pcvSelectedImageName = null;
-                            _pcvResultData = null;
-                            _pcvTinggiCm = null;
-                            _pcvPanjangPx = null;
-                            _pcvAnnotatedImageBase64 = null;
-                            _pcvErrorMessage = null;
-                            _pcvMessage = null;
-                          }),
-                          borderRadius: BorderRadius.circular(6),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(
-                                0xFFE74C3C,
-                              ).withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: const Color(
-                                  0xFFE74C3C,
-                                ).withValues(alpha: 0.4),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.close_rounded,
-                                  size: 12,
-                                  color: Color(0xFFE74C3C),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Hapus',
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 9.5,
-                                    fontWeight: FontWeight.bold,
-                                    color: const Color(0xFFE74C3C),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Area Gambar Citra
-                  Container(
-                    height: 280,
-                    width: double.infinity,
-                    color: Colors.black,
-                    alignment: Alignment.center,
-                    child: Builder(
-                      builder: (context) {
-                        if (_pcvShowAnnotated &&
-                            _pcvAnnotatedImageBase64 != null) {
-                          final annotatedBytes = _getAnnotatedBytes(
-                            _pcvAnnotatedImageBase64!,
-                          );
-                          if (annotatedBytes != null) {
-                            return Image.memory(
-                              annotatedBytes,
-                              fit: BoxFit.contain,
-                            );
-                          }
-                        }
-                        return Image.memory(
-                          _pcvSelectedImageBytes!,
-                          fit: BoxFit.contain,
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 14),
-
-            // Konfigurasi Kalibrasi Skala & ROI Pengukuran
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: isDark
-                    ? const Color(0xFF161924)
-                    : const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: border),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.tune_rounded,
-                        size: 16,
-                        color: Color(0xFF1ABC9C),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Pengaturan Kalibrasi Skala & Area ROI',
-                        style: GoogleFonts.outfit(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: text,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      // Preset 11.00 px/cm
-                      ChoiceChip(
-                        label: Text(
-                          '🧸 11.00 px/cm (Boneka & Infantometer Standar)',
-                          style: GoogleFonts.outfit(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w600,
-                            color: (_pcvSelectedScale - 11.0).abs() < 0.01
-                                ? const Color(0xFF1ABC9C)
-                                : text,
-                          ),
-                        ),
-                        selected: (_pcvSelectedScale - 11.0).abs() < 0.01,
-                        selectedColor: const Color(
-                          0xFF1ABC9C,
-                        ).withValues(alpha: 0.18),
-                        backgroundColor: isDark
-                            ? const Color(0xFF1E2130)
-                            : Colors.white,
-                        side: BorderSide(
-                          color: (_pcvSelectedScale - 11.0).abs() < 0.01
-                              ? const Color(0xFF1ABC9C)
-                              : border,
-                        ),
-                        onSelected: (val) {
-                          if (val) {
-                            setState(() {
-                              _pcvSelectedScale = 11.00;
-                              _pcvCustomScaleController.text = '11.00';
-                            });
-                          }
-                        },
-                      ),
-                      // Preset 9.09 px/cm
-                      ChoiceChip(
-                        label: Text(
-                          '📐 9.09 px/cm (Stadiometer H=170cm)',
-                          style: GoogleFonts.outfit(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w600,
-                            color: (_pcvSelectedScale - 9.09).abs() < 0.01
-                                ? const Color(0xFF1ABC9C)
-                                : text,
-                          ),
-                        ),
-                        selected: (_pcvSelectedScale - 9.09).abs() < 0.01,
-                        selectedColor: const Color(
-                          0xFF1ABC9C,
-                        ).withValues(alpha: 0.18),
-                        backgroundColor: isDark
-                            ? const Color(0xFF1E2130)
-                            : Colors.white,
-                        side: BorderSide(
-                          color: (_pcvSelectedScale - 9.09).abs() < 0.01
-                              ? const Color(0xFF1ABC9C)
-                              : border,
-                        ),
-                        onSelected: (val) {
-                          if (val) {
-                            setState(() {
-                              _pcvSelectedScale = 9.09;
-                              _pcvCustomScaleController.text = '9.09';
-                            });
-                          }
-                        },
-                      ),
-                      // Toggle ROI Full Frame vs Crop
-                      FilterChip(
-                        avatar: Icon(
-                          !_pcvUseRoi
-                              ? Icons.fullscreen_rounded
-                              : Icons.crop_rounded,
-                          size: 14,
-                          color: !_pcvUseRoi
-                              ? const Color(0xFF2ECC71)
-                              : const Color(0xFFF39C12),
-                        ),
-                        label: Text(
-                          !_pcvUseRoi
-                              ? 'Mode: Full Frame (Kaki & Kepala Utuh)'
-                              : 'Mode: Crop ROI Kuning',
-                          style: GoogleFonts.outfit(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w600,
-                            color: text,
-                          ),
-                        ),
-                        selected: !_pcvUseRoi,
-                        selectedColor: const Color(
-                          0xFF2ECC71,
-                        ).withValues(alpha: 0.18),
-                        backgroundColor: isDark
-                            ? const Color(0xFF1E2130)
-                            : Colors.white,
-                        side: BorderSide(
-                          color: !_pcvUseRoi ? const Color(0xFF2ECC71) : border,
-                        ),
-                        onSelected: (val) {
-                          setState(() {
-                            _pcvUseRoi = !val;
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 14),
-
-            // Tombol Eksekusi Pengukuran
-            CustomButton(
-              text: _isMeasuringPcv
-                  ? 'Sedang Memproses OpenCV 7-Tahap...'
-                  : '🚀 Ukur Tinggi Badan via PCV API (https://pcvmapotechs5.vercel.app)',
-              icon: Icons.straighten_rounded,
-              onPressed: _isMeasuringPcv ? null : _measurePcvHeight,
-              width: double.infinity,
-            ),
-          ],
-
-          // Progress Bar Pengukuran PCV (Rule.md Section 8)
-          if (_isMeasuringPcv) ...[
-            const SizedBox(height: 14),
-            Builder(
-              builder: (context) {
-                String stageText = 'Mengunggah citra ke cloud serverless...';
-                if (_pcvProgress > 0.3) {
-                  stageText =
-                      'Tahap 1-2: Grayscale & Segmentasi Biner (Otsu)...';
-                }
-                if (_pcvProgress > 0.6) {
-                  stageText =
-                      'Tahap 3-5: Morfologi Elips & Kontur minAreaRect...';
-                }
-                if (_pcvProgress > 0.85) {
-                  stageText =
-                      'Tahap 6-7: Kalkulasi Skala ${_pcvSelectedScale.toStringAsFixed(2)} px/cm & Anotasi Garis Hijau...';
-                }
-
-                return CustomProgressBar(
-                  value: _pcvProgress,
-                  label: stageText,
-                  sublabel: '${(_pcvProgress * 100).toInt()}%',
-                  primaryColor: const Color(0xFF1ABC9C),
-                  height: 8,
-                );
-              },
-            ),
-          ],
-
-          // Pesan Error jika terjadi kegagalan
-          if (_pcvErrorMessage != null) ...[
-            const SizedBox(height: 14),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE74C3C).withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: const Color(0xFFE74C3C).withValues(alpha: 0.35),
-                ),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.error_outline_rounded,
-                    color: Color(0xFFE74C3C),
-                    size: 18,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      _pcvErrorMessage!,
-                      style: GoogleFonts.outfit(
-                        fontSize: 11,
-                        color: const Color(0xFFE74C3C),
-                      ),
-                    ),
-                  ),
-                  InkWell(
-                    onTap: _measurePcvHeight,
-                    child: Text(
-                      'Coba Lagi',
-                      style: GoogleFonts.outfit(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.bold,
-                        color: const Color(0xFFE74C3C),
-                        decoration: TextDecoration.underline,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-
-          // Hasil Pengukuran Sukses PCV
-          if (_pcvResultData != null && _pcvTinggiCm != null) ...[
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1ABC9C).withValues(alpha: 0.07),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: const Color(0xFF1ABC9C).withValues(alpha: 0.4),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF1ABC9C),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.check_rounded,
-                          size: 16,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Pengukuran Panjang/Tinggi Badan Berhasil!',
-                              style: GoogleFonts.outfit(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w800,
-                                color: text,
-                              ),
-                            ),
-                            Text(
-                              _pcvMessage ??
-                                  'Data telah disinkronkan otomatis ke Formulir Antropometri di bawah.',
-                              style: GoogleFonts.outfit(
-                                fontSize: 10,
-                                color: sub,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: isDark
-                                ? const Color(0xFF1A1D27)
-                                : Colors.white,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: border),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Tinggi / Panjang Badan',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 9.5,
-                                  color: sub,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                '${_pcvTinggiCm!.toStringAsFixed(1)} cm',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w900,
-                                  color: const Color(0xFF1ABC9C),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: isDark
-                                ? const Color(0xFF1A1D27)
-                                : Colors.white,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: border),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Metode Standar KIA',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 9.5,
-                                  color: sub,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                _measurementMethod == 'PB'
-                                    ? 'PB Telentang'
-                                    : 'TB Berdiri',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w800,
-                                  color: const Color(0xFF3498DB),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: isDark
-                                ? const Color(0xFF1A1D27)
-                                : Colors.white,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: border),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Panjang Piksel Kontur',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 9.5,
-                                  color: sub,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                '${_pcvPanjangPx?.toStringAsFixed(1) ?? "-"} px',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w800,
-                                  color: text,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: isDark
-                                ? const Color(0xFF1A1D27)
-                                : Colors.white,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: border),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Skala Kalibrasi',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 9.5,
-                                  color: sub,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                '${_pcvSkalaEfektif?.toStringAsFixed(2) ?? "9.09"} px/cm',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w800,
-                                  color: text,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  // ===========================================================================
-  // WIDGET HELPER: TOMBOL TAB SUMBER CITRA PCV
-  // ===========================================================================
-  Widget _buildPcvModeTabBtn({
-    required int index,
-    required IconData icon,
-    required String label,
-    required String sublabel,
-    required bool isDark,
-    required Color text,
-  }) {
-    final isSelected = _pcvInputMode == index;
-    return InkWell(
-      onTap: () => setState(() => _pcvInputMode = index),
-      borderRadius: BorderRadius.circular(8),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF1ABC9C) : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 16,
-              color: isSelected ? Colors.white : Colors.grey,
-            ),
-            const SizedBox(width: 6),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  label,
-                  style: GoogleFonts.outfit(
-                    fontSize: 11,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                    color: isSelected ? Colors.white : text,
-                  ),
-                ),
-                Text(
-                  sublabel,
-                  style: GoogleFonts.outfit(
-                    fontSize: 8.5,
-                    color: isSelected
-                        ? Colors.white.withValues(alpha: 0.85)
-                        : Colors.grey,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }

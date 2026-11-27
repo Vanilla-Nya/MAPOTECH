@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 /// ============================================================================
 /// KONFIGURASI SERVER FASTAPI & CLOUD VITASCALE
@@ -40,11 +41,11 @@ class InputSmartGrowthBalita {
   });
 
   Map<String, dynamic> toJson() => {
-        'JK': jk,
-        'Usia_Bulan': usiaBulan,
-        'Berat': berat,
-        'Tinggi': tinggi,
-      };
+    'JK': jk,
+    'Usia_Bulan': usiaBulan,
+    'Berat': berat,
+    'Tinggi': tinggi,
+  };
 }
 
 class HasilSmartGrowthBalita {
@@ -73,19 +74,23 @@ class HasilSmartGrowthBalita {
   factory HasilSmartGrowthBalita.fromJson(Map<String, dynamic> json) {
     return HasilSmartGrowthBalita(
       kategoriGiziBbtb: json['kategori_gizi_bbtb']?.toString() ?? 'Normal',
-      kategoriStuntingTbu: json['kategori_stunting_tbu']?.toString() ?? 'Normal',
+      kategoriStuntingTbu:
+          json['kategori_stunting_tbu']?.toString() ?? 'Normal',
       confidenceBbtb: (json['confidence_bbtb'] as num?)?.toDouble() ?? 0.0,
       confidenceTbu: (json['confidence_tbu'] as num?)?.toDouble() ?? 0.0,
-      probabilitasBbtb: (json['probabilitas_bbtb'] as Map<String, dynamic>?)?.map(
+      probabilitasBbtb:
+          (json['probabilitas_bbtb'] as Map<String, dynamic>?)?.map(
             (k, v) => MapEntry(k, (v as num).toDouble()),
           ) ??
           {},
-      probabilitasTbu: (json['probabilitas_tbu'] as Map<String, dynamic>?)?.map(
+      probabilitasTbu:
+          (json['probabilitas_tbu'] as Map<String, dynamic>?)?.map(
             (k, v) => MapEntry(k, (v as num).toDouble()),
           ) ??
           {},
       isStunting: json['is_stunting'] as bool? ?? false,
-      isGiziBurukAtauKurang: json['is_gizi_buruk_atau_kurang'] as bool? ?? false,
+      isGiziBurukAtauKurang:
+          json['is_gizi_buruk_atau_kurang'] as bool? ?? false,
       inputDiproses: (json['input_diproses'] as Map<String, dynamic>?) ?? {},
     );
   }
@@ -137,24 +142,24 @@ class InputPrediksiLongitudinal {
   });
 
   Map<String, dynamic> toJson() => {
-        'Berat_Prev': beratPrev,
-        'Tinggi_Prev': tinggiPrev,
-        'ZS_TBU_Prev': zsTbuPrev,
-        'ZS_BBTB_Prev': zsBbtbPrev,
-        'JK': jk,
-        'Usia_Bulan_Curr': usiaBulanCurr,
-        'Berat_Curr': beratCurr,
-        'Tinggi_Curr': tinggiCurr,
-        'LiLA_Curr': lilaCurr,
-        'ZS_TBU_Curr': zsTbuCurr,
-        'ZS_BBTB_Curr': zsBbtbCurr,
-        'Naik_BB_Curr': naikBbCurr,
-        if (deltaBb != null) 'Delta_BB': deltaBb,
-        if (deltaTb != null) 'Delta_TB': deltaTb,
-        if (deltaDays != null) 'Delta_Days': deltaDays,
-        if (deltaZsTbu != null) 'Delta_ZS_TBU': deltaZsTbu,
-        if (deltaZsBbtb != null) 'Delta_ZS_BBTB': deltaZsBbtb,
-      };
+    'Berat_Prev': beratPrev,
+    'Tinggi_Prev': tinggiPrev,
+    'ZS_TBU_Prev': zsTbuPrev,
+    'ZS_BBTB_Prev': zsBbtbPrev,
+    'JK': jk,
+    'Usia_Bulan_Curr': usiaBulanCurr,
+    'Berat_Curr': beratCurr,
+    'Tinggi_Curr': tinggiCurr,
+    'LiLA_Curr': lilaCurr,
+    'ZS_TBU_Curr': zsTbuCurr,
+    'ZS_BBTB_Curr': zsBbtbCurr,
+    'Naik_BB_Curr': naikBbCurr,
+    if (deltaBb != null) 'Delta_BB': deltaBb,
+    if (deltaTb != null) 'Delta_TB': deltaTb,
+    if (deltaDays != null) 'Delta_Days': deltaDays,
+    if (deltaZsTbu != null) 'Delta_ZS_TBU': deltaZsTbu,
+    if (deltaZsBbtb != null) 'Delta_ZS_BBTB': deltaZsBbtb,
+  };
 }
 
 class HasilPrediksiLongitudinal {
@@ -182,13 +187,16 @@ class HasilPrediksiLongitudinal {
 
   factory HasilPrediksiLongitudinal.fromJson(Map<String, dynamic> json) {
     return HasilPrediksiLongitudinal(
-      probabilitasStunting: (json['probabilitas_stunting'] as num?)?.toDouble() ?? 0.0,
-      probabilitasGiziBuruk: (json['probabilitas_gizi_buruk'] as num?)?.toDouble() ?? 0.0,
+      probabilitasStunting:
+          (json['probabilitas_stunting'] as num?)?.toDouble() ?? 0.0,
+      probabilitasGiziBuruk:
+          (json['probabilitas_gizi_buruk'] as num?)?.toDouble() ?? 0.0,
       risikoStunting: json['risiko_stunting'] as bool? ?? false,
       risikoGiziBuruk: json['risiko_gizi_buruk'] as bool? ?? false,
       statusStunting: json['status_stunting']?.toString() ?? 'Normal',
       statusGizi: json['status_gizi']?.toString() ?? 'Gizi Normal',
-      confidenceStunting: (json['confidence_stunting'] as num?)?.toDouble() ?? 0.0,
+      confidenceStunting:
+          (json['confidence_stunting'] as num?)?.toDouble() ?? 0.0,
       confidenceGizi: (json['confidence_gizi'] as num?)?.toDouble() ?? 0.0,
       inputDiproses: (json['input_diproses'] as Map<String, dynamic>?) ?? {},
     );
@@ -204,15 +212,27 @@ class VitaScaleApiService {
   /// Cek kesehatan server backend FastAPI dan kesiapan model MLP
   static Future<Map<String, dynamic>> checkHealth() async {
     try {
-      final uri = Uri.parse('${VitaScaleApiConfig.baseUrl}${VitaScaleApiConfig.healthEndpoint}');
-      final response = await _client.get(uri).timeout(const Duration(seconds: 5));
+      final uri = Uri.parse(
+        '${VitaScaleApiConfig.baseUrl}${VitaScaleApiConfig.healthEndpoint}',
+      );
+      final response = await _client
+          .get(uri)
+          .timeout(const Duration(seconds: 5));
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         final isOnline = data['status'] == 'ok' || data['status'] == 'online';
-        final hasStunting = data['model_stunting'] == true ||
-            (data['model'] is List && (data['model'] as List).any((m) => m.toString().contains('Stunting')));
-        final hasGizi = data['model_gizi'] == true ||
-            (data['model'] is List && (data['model'] as List).any((m) => m.toString().contains('Gizi')));
+        final hasStunting =
+            data['model_stunting'] == true ||
+            (data['model'] is List &&
+                (data['model'] as List).any(
+                  (m) => m.toString().contains('Stunting'),
+                ));
+        final hasGizi =
+            data['model_gizi'] == true ||
+            (data['model'] is List &&
+                (data['model'] as List).any(
+                  (m) => m.toString().contains('Gizi'),
+                ));
 
         return {
           'isOnline': isOnline,
@@ -230,7 +250,8 @@ class VitaScaleApiService {
       debugPrint('[VitaScaleApi] Health check error: $e');
       return {
         'isOnline': false,
-        'message': 'Gagal menghubungi server di ${VitaScaleApiConfig.baseUrl}. Pastikan koneksi internet aktif.',
+        'message':
+            'Gagal menghubungi server di ${VitaScaleApiConfig.baseUrl}. Pastikan koneksi internet aktif.',
       };
     }
   }
@@ -241,24 +262,32 @@ class VitaScaleApiService {
   ) async {
     // 1. Coba endpoint split Vercel (/prediksi/gizi & /prediksi/stunting) secara paralel
     try {
-      final giziUri = Uri.parse('${VitaScaleApiConfig.baseUrl}${VitaScaleApiConfig.giziEndpoint}');
-      final stuntingUri = Uri.parse('${VitaScaleApiConfig.baseUrl}${VitaScaleApiConfig.stuntingEndpoint}');
+      final giziUri = Uri.parse(
+        '${VitaScaleApiConfig.baseUrl}${VitaScaleApiConfig.giziEndpoint}',
+      );
+      final stuntingUri = Uri.parse(
+        '${VitaScaleApiConfig.baseUrl}${VitaScaleApiConfig.stuntingEndpoint}',
+      );
 
       final responses = await Future.wait([
-        _client.post(
-          giziUri,
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode(input.toJson()),
-        ).timeout(const Duration(seconds: 12)),
-        _client.post(
-          stuntingUri,
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'JK': input.jk,
-            'Usia_Bulan': input.usiaBulan,
-            'Tinggi': input.tinggi,
-          }),
-        ).timeout(const Duration(seconds: 12)),
+        _client
+            .post(
+              giziUri,
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode(input.toJson()),
+            )
+            .timeout(const Duration(seconds: 12)),
+        _client
+            .post(
+              stuntingUri,
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({
+                'JK': input.jk,
+                'Usia_Bulan': input.usiaBulan,
+                'Tinggi': input.tinggi,
+              }),
+            )
+            .timeout(const Duration(seconds: 12)),
       ]);
 
       final giziRes = responses[0];
@@ -266,16 +295,19 @@ class VitaScaleApiService {
 
       if (giziRes.statusCode == 200 && stuntingRes.statusCode == 200) {
         final giziData = jsonDecode(giziRes.body) as Map<String, dynamic>;
-        final stuntingData = jsonDecode(stuntingRes.body) as Map<String, dynamic>;
+        final stuntingData =
+            jsonDecode(stuntingRes.body) as Map<String, dynamic>;
 
         final katGizi = giziData['prediksi']?.toString() ?? 'Normal';
         final katStunting = stuntingData['prediksi']?.toString() ?? 'Normal';
 
-        final skorGizi = (giziData['skor_model'] as Map<String, dynamic>?)?.map(
+        final skorGizi =
+            (giziData['skor_model'] as Map<String, dynamic>?)?.map(
               (k, v) => MapEntry(k, (v as num).toDouble()),
             ) ??
             {};
-        final skorStunting = (stuntingData['skor_model'] as Map<String, dynamic>?)?.map(
+        final skorStunting =
+            (stuntingData['skor_model'] as Map<String, dynamic>?)?.map(
               (k, v) => MapEntry(k, (v as num).toDouble()),
             ) ??
             {};
@@ -291,11 +323,13 @@ class VitaScaleApiService {
         if (skorStunting.containsKey(katStunting)) {
           confStunting = (skorStunting[katStunting] ?? 0.0) * 100;
         } else if (skorStunting.isNotEmpty) {
-          confStunting = skorStunting.values.reduce((a, b) => a > b ? a : b) * 100;
+          confStunting =
+              skorStunting.values.reduce((a, b) => a > b ? a : b) * 100;
         }
 
         final isStunting = katStunting.toLowerCase().contains('pendek');
-        final isGiziBuruk = katGizi.toLowerCase().contains('kurang') ||
+        final isGiziBuruk =
+            katGizi.toLowerCase().contains('kurang') ||
             katGizi.toLowerCase().contains('buruk');
 
         return HasilSmartGrowthBalita(
@@ -311,11 +345,15 @@ class VitaScaleApiService {
         );
       }
     } catch (e) {
-      debugPrint('[VitaScaleApi] Vercel split endpoints error: $e. Mencoba fallback ke unified endpoint...');
+      debugPrint(
+        '[VitaScaleApi] Vercel split endpoints error: $e. Mencoba fallback ke unified endpoint...',
+      );
     }
 
     // 2. Fallback ke endpoint unified /prediksi/smart-growth bila server menggunakan single endpoint
-    final uri = Uri.parse('${VitaScaleApiConfig.baseUrl}${VitaScaleApiConfig.smartGrowthEndpoint}');
+    final uri = Uri.parse(
+      '${VitaScaleApiConfig.baseUrl}${VitaScaleApiConfig.smartGrowthEndpoint}',
+    );
 
     try {
       final response = await _client
@@ -331,7 +369,11 @@ class VitaScaleApiService {
         return HasilSmartGrowthBalita.fromJson(json);
       } else {
         final error = jsonDecode(response.body);
-        throw Exception(error['detail'] ?? error['error'] ?? 'Prediksi gagal dengan kode ${response.statusCode}');
+        throw Exception(
+          error['detail'] ??
+              error['error'] ??
+              'Prediksi gagal dengan kode ${response.statusCode}',
+        );
       }
     } catch (e) {
       debugPrint('[VitaScaleApi] prediksiSmartGrowth fallback error: $e');
@@ -343,7 +385,9 @@ class VitaScaleApiService {
   static Future<HasilPrediksiLongitudinal> prediksiLongitudinal(
     InputPrediksiLongitudinal input,
   ) async {
-    final uri = Uri.parse('${VitaScaleApiConfig.baseUrl}${VitaScaleApiConfig.longitudinalEndpoint}');
+    final uri = Uri.parse(
+      '${VitaScaleApiConfig.baseUrl}${VitaScaleApiConfig.longitudinalEndpoint}',
+    );
 
     try {
       final response = await _client
@@ -359,12 +403,54 @@ class VitaScaleApiService {
         return HasilPrediksiLongitudinal.fromJson(json);
       } else {
         final error = jsonDecode(response.body);
-        throw Exception(error['detail'] ?? 'Prediksi longitudinal gagal dengan kode ${response.statusCode}');
+        throw Exception(
+          error['detail'] ??
+              'Prediksi longitudinal gagal dengan kode ${response.statusCode}',
+        );
       }
     } catch (e) {
       debugPrint('[VitaScaleApi] prediksiLongitudinal error: $e');
       rethrow;
     }
+  }
+
+  /// Sends an already cropped frame with its calibrated pixel scale.
+  static Future<Map<String, dynamic>> measureCalibratedPhoto({
+    required Uint8List jpeg,
+    required double pixelsPerCm,
+  }) async {
+    final base = VitaScaleApiConfig.pcvBaseUrl.isNotEmpty
+        ? VitaScaleApiConfig.pcvBaseUrl
+        : VitaScaleApiConfig.baseUrl;
+    final uri = Uri.parse(
+      '$base${VitaScaleApiConfig.measureEndpoint}',
+    ).replace(queryParameters: {'skala': pixelsPerCm.toString()});
+    final request = http.MultipartRequest('POST', uri)
+      ..files.add(
+        http.MultipartFile.fromBytes(
+          'image',
+          jpeg,
+          filename: 'capture.jpg',
+          contentType: MediaType('image', 'jpeg'),
+        ),
+      );
+    final response = await _client
+        .send(request)
+        .then(http.Response.fromStream)
+        .timeout(const Duration(seconds: 30));
+    if (response.statusCode == 415 || response.statusCode == 422) {
+      // Compatibility with the JSON contract used by the existing cloud API.
+      return ukurTinggiObjek(
+        base64Image: base64Encode(jpeg),
+        skala: pixelsPerCm,
+        useRoi: false,
+        useK1: false,
+      );
+    }
+    if (response.statusCode != 200) {
+      throw StateError('PCV API returned HTTP ${response.statusCode}');
+    }
+    return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
   /// ============================================================================
@@ -415,7 +501,10 @@ class VitaScaleApiService {
         final err = jsonDecode(response.body) as Map<String, dynamic>?;
         return {
           'status': 'error',
-          'message': err?['error'] ?? err?['message'] ?? 'Gagal memproses gambar (HTTP ${response.statusCode})',
+          'message':
+              err?['error'] ??
+              err?['message'] ??
+              'Gagal memproses gambar (HTTP ${response.statusCode})',
         };
       }
     } catch (e) {
@@ -427,4 +516,3 @@ class VitaScaleApiService {
     }
   }
 }
-
