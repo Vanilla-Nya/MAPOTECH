@@ -305,7 +305,12 @@ class _LoginModalContentState extends State<_LoginModalContent> {
             } else if (dbRole == 'apotek' ||
                 dbRole == 'asisten_apotek') {
               mappedRole = 'apotek';
-            } else if (dbRole == 'puskesmas') {
+            } else if (dbRole == 'puskesmas' ||
+                dbRole == 'pekerja_puskesmas' ||
+                dbRole == 'staf_puskesmas' ||
+                dbRole == 'puskesmas_staff' ||
+                dbRole == 'asisten_puskesmas' ||
+                dbRole == 'pekerja') {
               mappedRole = 'puskesmas';
             } else if (dbRole == 'ponkesdes') {
               mappedRole = 'ponkesdes';

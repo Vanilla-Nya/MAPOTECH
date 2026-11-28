@@ -124,7 +124,10 @@ class LandingPageState {
   }
 
   String? get activePuskesmasId {
-    return loggedInUser?['id'] as String?;
+    return (loggedInUser?['owner_id'] ??
+            loggedInUser?['puskesmas_id'] ??
+            loggedInUser?['id'])
+        as String?;
   }
 
   String? get activePonkesdesId {

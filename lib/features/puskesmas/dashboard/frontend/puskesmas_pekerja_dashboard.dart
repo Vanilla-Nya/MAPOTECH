@@ -32,11 +32,13 @@ class _PuskesmasPekerjaDashboardState extends ConsumerState<PuskesmasPekerjaDash
   }
 
   Future<void> _loadPuskesmasLocation() async {
-    final user = ref.read(landingPageProvider).loggedInUser;
-    if (user != null && user['id'] != null) {
-      final userId = user['id'].toString();
+    final state = ref.read(landingPageProvider);
+    final user = state.loggedInUser;
+    final facilityId =
+        state.activePuskesmasId ?? user?['id']?.toString();
+    if (user != null && facilityId != null && facilityId.isNotEmpty) {
       try {
-        final detail = await SupabaseService().fetchPuskesmasDetail(userId);
+        final detail = await SupabaseService().fetchPuskesmasDetail(facilityId);
         if (detail != null) {
           final prov = detail['province']?.toString() ?? user['province']?.toString();
           final reg = detail['district']?.toString() ?? user['district']?.toString();
