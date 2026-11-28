@@ -9,16 +9,25 @@ import 'package:bcrypt/bcrypt.dart';
 import 'package:mapotech/shared/letter_models.dart';
 
 class SupabaseService {
+  static String? _readEnv(String key) {
+    try {
+      if (dotenv.isInitialized) {
+        return dotenv.env[key];
+      }
+    } catch (_) {}
+    return null;
+  }
+
   static String get _baseUrl {
     final url =
-        dotenv.env['SUPABASE_URL'] ??
+        _readEnv('SUPABASE_URL') ??
         'https://abdburxhqqwsobmzuwmz.supabase.co';
     final cleanUrl = url.endsWith('/') ? url.substring(0, url.length - 1) : url;
     return '$cleanUrl/rest/v1';
   }
 
   static String get _anonKey =>
-      dotenv.env['SUPABASE_ANON_KEY'] ??
+      _readEnv('SUPABASE_ANON_KEY') ??
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFiZGJ1cnhocXF3c29ibXp1d216Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0OTMyNjYsImV4cCI6MjA5MjA2OTI2Nn0.mB3qIJAHjtWe5UKxE9Oj-RNLQCbQKFYHUZBLaF4nQwk';
 
   /// Lightweight connectivity probe against the Supabase REST endpoint.

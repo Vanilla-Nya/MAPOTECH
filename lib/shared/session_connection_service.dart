@@ -254,12 +254,7 @@ final sessionConnectionProvider =
     StateNotifierProvider<SessionConnectionNotifier, SessionConnectionState>((
       ref,
     ) {
-      // UI preview mode: starts logged-in sessions with the disconnect notification
-      // visible first so the UI can be inspected immediately; set to false to restore
-      // normal live-probe initial behavior.
-      final notifier = SessionConnectionNotifier(
-        previewDisconnectedOnStart: true,
-      );
+      final notifier = SessionConnectionNotifier();
       final isLoggedIn = ref.read(landingPageProvider).isLoggedIn;
       notifier.setMonitoringActive(isLoggedIn);
 

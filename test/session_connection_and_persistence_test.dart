@@ -291,7 +291,7 @@ void main() {
     );
 
     testWidgets(
-      'default sessionConnectionProvider starts with disconnect notification visible first for UI inspection and reconnects on tap',
+      'default sessionConnectionProvider stays silent while connected and only notifies when disconnected',
       (WidgetTester tester) async {
         await tester.binding.setSurfaceSize(const Size(1280, 800));
         addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -322,10 +322,10 @@ void main() {
         await tester.pump(const Duration(milliseconds: 300));
 
         expect(find.byType(DashboardShell), findsOneWidget);
-        expect(find.byType(SessionConnectionBanner), findsOneWidget);
-        expect(find.text('You Are Disconnected'), findsOneWidget);
-        expect(find.text('You are disconnected'), findsOneWidget);
-        expect(find.text('Disconnected • Reconnect'), findsOneWidget);
+        expect(find.byType(SessionConnectionBanner), findsNothing);
+        expect(find.text('You Are Disconnected'), findsNothing);
+        expect(find.text('You are disconnected'), findsNothing);
+        expect(find.text('Disconnected • Reconnect'), findsNothing);
       },
     );
   });
