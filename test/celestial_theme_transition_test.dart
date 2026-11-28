@@ -370,20 +370,30 @@ void main() {
       expect(CelestialThemeCoordinator.instance.isTransitioning.value, isFalse);
       expect(find.byType(BackdropFilter), findsNothing);
 
-      // 3. REV -> Light (circular reveal + Sun already at top) interrupted by Dark.
+      // 3. REV -> Light (vertical descent, Sun + drifting daylight clouds) through completion.
       await tester.tap(find.byIcon(Icons.sunny));
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(const Duration(milliseconds: 500));
       expect(container.read(landingPageProvider).appearance, 'light');
       expect(CelestialThemeCoordinator.instance.isTransitioning.value, isTrue);
 
+      await tester.pump(const Duration(milliseconds: 1700));
+      expect(CelestialThemeCoordinator.instance.isTransitioning.value, isFalse);
+
+      // 4. Light -> Dark interrupted mid-flight back to Light (tests Dark -> Light clouds + rapid switch).
       await tester.tap(find.byIcon(Icons.nightlight_round));
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 450));
       expect(container.read(landingPageProvider).appearance, 'dark');
       expect(CelestialThemeCoordinator.instance.isTransitioning.value, isTrue);
 
-      await tester.pump(const Duration(milliseconds: 2150));
+      await tester.tap(find.byIcon(Icons.sunny));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 550));
+      expect(container.read(landingPageProvider).appearance, 'light');
+      expect(CelestialThemeCoordinator.instance.isTransitioning.value, isTrue);
+
+      await tester.pump(const Duration(milliseconds: 1650));
       expect(CelestialThemeCoordinator.instance.isTransitioning.value, isFalse);
     });
   });

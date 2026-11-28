@@ -915,231 +915,188 @@ class _VitaScaleChildHistoryPageState extends ConsumerState<VitaScaleChildHistor
                           const SizedBox(height: 18),
 
                           // Responsive Table of Visits
-                          SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: ConstrainedBox(
-                              constraints: BoxConstraints(
-                                minWidth: isMobile ? 700 : 980,
-                              ),
-                              child: Table(
-                                columnWidths: const {
-                                  0: FlexColumnWidth(1.6), // Kunjungan
-                                  1: FlexColumnWidth(1.2), // Tanggal
-                                  2: FlexColumnWidth(1.0), // Usia
-                                  3: FlexColumnWidth(1.1), // BB
-                                  4: FlexColumnWidth(1.3), // TB / PB
-                                  5: FlexColumnWidth(1.6), // Status Gizi (BB/TB)
-                                  6: FlexColumnWidth(1.8), // Status Stunting (TB/U)
-                                  7: FlexColumnWidth(1.0), // Aksi
-                                },
-                                defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-                                children: [
-                                  // Table Header Row
-                                  TableRow(
-                                    decoration: BoxDecoration(
-                                      color: isDark ? const Color(0xFF1E2130) : const Color(0xFFF1F5F9),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
+                          LayoutBuilder(
+                            builder: (context, constraints) {
+                              final minTableWidth = isMobile ? 640.0 : 860.0;
+                              final tableWidth = constraints.maxWidth > minTableWidth
+                                  ? constraints.maxWidth
+                                  : minTableWidth;
+                              return SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: SizedBox(
+                                  width: tableWidth,
+                                  child: Table(
+                                    columnWidths: const {
+                                      0: FlexColumnWidth(1.8), // Kunjungan
+                                      1: FlexColumnWidth(1.15), // Tanggal
+                                      2: FlexColumnWidth(1.0), // Usia
+                                      3: FlexColumnWidth(1.05), // BB
+                                      4: FlexColumnWidth(1.25), // TB / PB
+                                      5: FlexColumnWidth(1.65), // Status Gizi (BB/TB)
+                                      6: FlexColumnWidth(1.9), // Status Stunting (TB/U)
+                                    },
+                                    defaultVerticalAlignment: TableCellVerticalAlignment.middle,
                                     children: [
-                                      _buildTh('Kunjungan'),
-                                      _buildTh('Tanggal'),
-                                      _buildTh('Usia'),
-                                      _buildTh('Berat (BB)'),
-                                      _buildTh('Tinggi/PB'),
-                                      _buildTh('Gizi (BB/TB)'),
-                                      _buildTh('Stunting (TB/U)'),
-                                      _buildTh('Detail'),
-                                    ],
-                                  ),
-                                  // Spacer row
-                                  const TableRow(
-                                    children: [
-                                      SizedBox(height: 8),
-                                      SizedBox(height: 8),
-                                      SizedBox(height: 8),
-                                      SizedBox(height: 8),
-                                      SizedBox(height: 8),
-                                      SizedBox(height: 8),
-                                      SizedBox(height: 8),
-                                      SizedBox(height: 8),
-                                    ],
-                                  ),
-                                  // Table Data Rows (Clickable!)
-                                  ..._visits.map((visit) {
-                                    final isLatest = visit == _visits.first;
-                                    return TableRow(
-                                      decoration: BoxDecoration(
-                                        color: isLatest
-                                            ? const Color(0xFF1ABC9C).withValues(alpha: 0.05)
-                                            : (isDark ? const Color(0xFF181B26) : Colors.white),
-                                        borderRadius: BorderRadius.circular(10),
-                                        border: Border.all(
-                                          color: isLatest
-                                              ? const Color(0xFF1ABC9C).withValues(alpha: 0.3)
-                                              : borderColor,
+                                      // Table Header Row
+                                      TableRow(
+                                        decoration: BoxDecoration(
+                                          color: isDark ? const Color(0xFF1E2130) : const Color(0xFFF1F5F9),
+                                          borderRadius: BorderRadius.circular(12),
                                         ),
+                                        children: [
+                                          _buildTh('Kunjungan'),
+                                          _buildTh('Tanggal'),
+                                          _buildTh('Usia'),
+                                          _buildTh('Berat (BB)'),
+                                          _buildTh('Tinggi/PB'),
+                                          _buildTh('Gizi (BB/TB)'),
+                                          _buildTh('Stunting (TB/U)'),
+                                        ],
                                       ),
-                                      children: [
-                                        // Kunjungan
-                                        _buildTableCell(
-                                          InkWell(
-                                            onTap: () => _showVisitDetailModal(visit),
-                                            child: Padding(
-                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                                              child: Row(
-                                                children: [
-                                                  Container(
-                                                    width: 8,
-                                                    height: 8,
-                                                    decoration: BoxDecoration(
-                                                      color: isLatest ? const Color(0xFF1ABC9C) : Colors.grey,
-                                                      shape: BoxShape.circle,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(width: 8),
-                                                  Flexible(
-                                                    child: Text(
-                                                      visit.visitNumber,
-                                                      style: GoogleFonts.outfit(
-                                                        fontSize: 11.5,
-                                                        fontWeight: FontWeight.bold,
-                                                        color: textColor,
-                                                      ),
-                                                      overflow: TextOverflow.ellipsis,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
+                                      // Spacer row
+                                      const TableRow(
+                                        children: [
+                                          SizedBox(height: 8),
+                                          SizedBox(height: 8),
+                                          SizedBox(height: 8),
+                                          SizedBox(height: 8),
+                                          SizedBox(height: 8),
+                                          SizedBox(height: 8),
+                                          SizedBox(height: 8),
+                                        ],
+                                      ),
+                                      // Table Data Rows (Clickable!)
+                                      ..._visits.map((visit) {
+                                        final isLatest = visit == _visits.first;
+                                        void onRowTap() => _showVisitDetailModal(visit);
+                                        return TableRow(
+                                          decoration: BoxDecoration(
+                                            color: isLatest
+                                                ? const Color(0xFF1ABC9C).withValues(alpha: 0.05)
+                                                : (isDark ? const Color(0xFF181B26) : Colors.white),
+                                            borderRadius: BorderRadius.circular(10),
+                                            border: Border.all(
+                                              color: isLatest
+                                                  ? const Color(0xFF1ABC9C).withValues(alpha: 0.3)
+                                                  : borderColor,
                                             ),
                                           ),
-                                        ),
-                                        // Tanggal
-                                        _buildTableCell(
-                                          InkWell(
-                                            onTap: () => _showVisitDetailModal(visit),
-                                            child: Padding(
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-                                              child: Text(
-                                                _formatDate(visit.visitDate, shortMonth: true),
-                                                style: GoogleFonts.outfit(fontSize: 11, color: textColor),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                        // Usia
-                                        _buildTableCell(
-                                          InkWell(
-                                            onTap: () => _showVisitDetailModal(visit),
-                                            child: Padding(
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-                                              child: Text(
-                                                visit.monthAgeLabel,
-                                                style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                        // BB
-                                        _buildTableCell(
-                                          InkWell(
-                                            onTap: () => _showVisitDetailModal(visit),
-                                            child: Padding(
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-                                              child: Text(
-                                                '${visit.weightKg} kg',
-                                                style: GoogleFonts.outfit(
-                                                  fontSize: 11.5,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: const Color(0xFF3498DB),
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                        // TB / PB
-                                        _buildTableCell(
-                                          InkWell(
-                                            onTap: () => _showVisitDetailModal(visit),
-                                            child: Padding(
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-                                              child: Text(
-                                                '${visit.heightCm} cm (${visit.mode})',
-                                                style: GoogleFonts.outfit(
-                                                  fontSize: 11.5,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: const Color(0xFFE67E22),
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                        // Status Gizi
-                                        _buildTableCell(
-                                          InkWell(
-                                            onTap: () => _showVisitDetailModal(visit),
-                                            child: Padding(
-                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-                                              child: StatusBadge(
-                                                label: visit.statusGizi,
-                                                color: visit.statusGiziColor,
-                                                fontSize: 9,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                        // Status Stunting
-                                        _buildTableCell(
-                                          InkWell(
-                                            onTap: () => _showVisitDetailModal(visit),
-                                            child: Padding(
-                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-                                              child: StatusBadge(
-                                                label: visit.statusStunting,
-                                                color: visit.statusStuntingColor,
-                                                fontSize: 9,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                        // Tombol Detail
-                                        _buildTableCell(
-                                          Padding(
-                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-                                            child: InkWell(
-                                              onTap: () => _showVisitDetailModal(visit),
-                                              borderRadius: BorderRadius.circular(8),
-                                              child: Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                                                decoration: BoxDecoration(
-                                                  color: const Color(0xFF1ABC9C).withValues(alpha: 0.12),
-                                                  borderRadius: BorderRadius.circular(8),
-                                                  border: Border.all(color: const Color(0xFF1ABC9C).withValues(alpha: 0.3)),
-                                                ),
+                                          children: [
+                                            // Kunjungan
+                                            _buildTableCell(
+                                              Padding(
+                                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
                                                 child: Row(
-                                                  mainAxisSize: MainAxisSize.min,
                                                   children: [
-                                                    const Icon(Icons.remove_red_eye_rounded, size: 13, color: Color(0xFF1ABC9C)),
-                                                    const SizedBox(width: 4),
-                                                    Text(
-                                                      'Lihat',
-                                                      style: GoogleFonts.outfit(
-                                                        fontSize: 10,
-                                                        fontWeight: FontWeight.bold,
-                                                        color: const Color(0xFF1ABC9C),
+                                                    Container(
+                                                      width: 8,
+                                                      height: 8,
+                                                      decoration: BoxDecoration(
+                                                        color: isLatest ? const Color(0xFF1ABC9C) : Colors.grey,
+                                                        shape: BoxShape.circle,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Flexible(
+                                                      child: Text(
+                                                        visit.visitNumber,
+                                                        style: GoogleFonts.outfit(
+                                                          fontSize: 11.5,
+                                                          fontWeight: FontWeight.bold,
+                                                          color: textColor,
+                                                        ),
+                                                        overflow: TextOverflow.ellipsis,
                                                       ),
                                                     ),
                                                   ],
                                                 ),
                                               ),
+                                              onTap: onRowTap,
                                             ),
-                                          ),
-                                        ),
-                                      ],
-                                    );
-                                  }),
-                                ],
-                              ),
-                            ),
+                                            // Tanggal
+                                            _buildTableCell(
+                                              Padding(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                                                child: Text(
+                                                  _formatDate(visit.visitDate, shortMonth: true),
+                                                  style: GoogleFonts.outfit(fontSize: 11, color: textColor),
+                                                ),
+                                              ),
+                                              onTap: onRowTap,
+                                            ),
+                                            // Usia
+                                            _buildTableCell(
+                                              Padding(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                                                child: Text(
+                                                  visit.monthAgeLabel,
+                                                  style: GoogleFonts.outfit(fontSize: 11, color: subtitleColor),
+                                                ),
+                                              ),
+                                              onTap: onRowTap,
+                                            ),
+                                            // BB
+                                            _buildTableCell(
+                                              Padding(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                                                child: Text(
+                                                  '${visit.weightKg} kg',
+                                                  style: GoogleFonts.outfit(
+                                                    fontSize: 11.5,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: const Color(0xFF3498DB),
+                                                  ),
+                                                ),
+                                              ),
+                                              onTap: onRowTap,
+                                            ),
+                                            // TB / PB
+                                            _buildTableCell(
+                                              Padding(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                                                child: Text(
+                                                  '${visit.heightCm} cm (${visit.mode})',
+                                                  style: GoogleFonts.outfit(
+                                                    fontSize: 11.5,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: const Color(0xFFE67E22),
+                                                  ),
+                                                ),
+                                              ),
+                                              onTap: onRowTap,
+                                            ),
+                                            // Status Gizi
+                                            _buildTableCell(
+                                              Padding(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                                                child: StatusBadge(
+                                                  label: visit.statusGizi,
+                                                  color: visit.statusGiziColor,
+                                                  fontSize: 9,
+                                                ),
+                                              ),
+                                              onTap: onRowTap,
+                                            ),
+                                            // Status Stunting
+                                            _buildTableCell(
+                                              Padding(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                                                child: StatusBadge(
+                                                  label: visit.statusStunting,
+                                                  color: visit.statusStuntingColor,
+                                                  fontSize: 9,
+                                                ),
+                                              ),
+                                              onTap: onRowTap,
+                                            ),
+                                          ],
+                                        );
+                                      }),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
                           ),
                         ],
                       ),
@@ -1304,10 +1261,15 @@ class _VitaScaleChildHistoryPageState extends ConsumerState<VitaScaleChildHistor
     );
   }
 
-  Widget _buildTableCell(Widget child) {
+  Widget _buildTableCell(Widget child, {VoidCallback? onTap}) {
     return TableCell(
       verticalAlignment: TableCellVerticalAlignment.middle,
-      child: child,
+      child: onTap != null
+          ? InkWell(
+              onTap: onTap,
+              child: child,
+            )
+          : child,
     );
   }
 }

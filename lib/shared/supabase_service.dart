@@ -1728,12 +1728,13 @@ class SupabaseService {
       final medicinesRes = await client
           .schema('private_doctor')
           .from('medicine_ecounter')
-          .select('quantity, id_detail_medicine')
+          .select('quantity, dosage_instructions, notes, id_detail_medicine')
           .eq('id_clinical_encounters', encounterId);
 
       for (final medRow in medicinesRes) {
         final qty =
             double.tryParse(medRow['quantity']?.toString() ?? '0') ?? 0.0;
+        final dosage = medRow['dosage_instructions']?.toString().trim();
         final detailMedId = medRow['id_detail_medicine'];
         if (detailMedId != null) {
           final dmRes = await client
@@ -1760,7 +1761,9 @@ class SupabaseService {
             medicinesList.add({
               'name': medicineName,
               'quantity': qty.toInt(),
-              'rules': 'Sesuai petunjuk',
+              'rules': (dosage != null && dosage.isNotEmpty)
+                  ? dosage
+                  : 'Sesuai petunjuk',
             });
           }
         }
@@ -1847,6 +1850,181 @@ class SupabaseService {
       }
     } catch (_) {}
     return null;
+  }
+
+  /// Fetch a user record by exact NIK (excluding sensitive fields).
+  Future<Map<String, dynamic>?> fetchUserByNik(String nik) async {
+    final cleanNik = nik.trim();
+    if (cleanNik.isEmpty || cleanNik == '-') return null;
+    try {
+      final users = await _get(
+        'user?select=id,name,nik,gender,birth_place,birth_date,address,phone_number,email,avatar_url,role&nik=eq.${Uri.encodeComponent(cleanNik)}&limit=1',
+        schema: 'public',
+      );
+      if (users.isNotEmpty) {
+        return Map<String, dynamic>.from(users.first as Map);
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Fetch `user_detail_patient` row for a patient user ID.
+  Future<Map<String, dynamic>?> fetchPatientDetailById(String userId) async {
+    final cleanId = userId.trim();
+    if (cleanId.isEmpty) return null;
+    try {
+      final details = await _get(
+        'user_detail_patient?select=*&id=eq.${Uri.encodeComponent(cleanId)}&limit=1',
+        schema: 'public',
+      );
+      if (details.isNotEmpty) {
+        return Map<String, dynamic>.from(details.first as Map);
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Returns the host `patient_id` if [memberUserId] is registered under someone else's family.
+  Future<String?> fetchFamilyHostUserId(String memberUserId) async {
+    final cleanId = memberUserId.trim();
+    if (cleanId.isEmpty) return null;
+    try {
+      final rows = await client
+          .from('patient_family_members')
+          .select('patient_id')
+          .eq('member_user_id', cleanId)
+          .limit(1);
+      if (rows.isNotEmpty) {
+        final hostId = rows.first['patient_id']?.toString().trim();
+        if (hostId != null && hostId.isNotEmpty && hostId != cleanId) {
+          return hostId;
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Batch fetch doctor display names and clinic names (`nama_faskes`).
+  Future<Map<String, Map<String, String>>> fetchDoctorDetailsMap(
+    List<String> doctorIds,
+  ) async {
+    final uniqueIds = doctorIds
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toSet()
+        .toList();
+    if (uniqueIds.isEmpty) return {};
+
+    final Map<String, Map<String, String>> result = {};
+    try {
+      final usersRes = await client
+          .from('user')
+          .select('id, name')
+          .inFilter('id', uniqueIds);
+      for (final row in (usersRes as List)) {
+        final id = row['id']?.toString() ?? '';
+        if (id.isEmpty) continue;
+        result[id] = {
+          'name': row['name']?.toString().trim() ?? 'Dokter',
+          'facility': '',
+        };
+      }
+    } catch (e) {
+      debugPrint('Error batch fetching doctor users: $e');
+    }
+
+    try {
+      final detailsRes = await client
+          .from('user_detail_doctor')
+          .select('id, nama_faskes, profession')
+          .inFilter('id', uniqueIds);
+      for (final row in (detailsRes as List)) {
+        final id = row['id']?.toString() ?? '';
+        if (id.isEmpty) continue;
+        final existing = result.putIfAbsent(id, () => {'name': 'Dokter', 'facility': ''});
+        final faskes = row['nama_faskes']?.toString().trim() ?? '';
+        final prof = row['profession']?.toString().trim() ?? '';
+        existing['facility'] = faskes.isNotEmpty ? faskes : prof;
+      }
+    } catch (e) {
+      debugPrint('Error batch fetching doctor details: $e');
+    }
+
+    return result;
+  }
+
+  /// Batch fetch vital signs keyed by `id_clinical_ecounter`.
+  Future<Map<String, Map<String, dynamic>>> fetchVitalsForEncounters(
+    List<String> encounterIds,
+  ) async {
+    if (encounterIds.isEmpty) return {};
+    try {
+      final res = await client
+          .schema('private_doctor')
+          .from('vital_signs')
+          .select('*')
+          .inFilter('id_clinical_ecounter', encounterIds);
+      final Map<String, Map<String, dynamic>> out = {};
+      for (final row in (res as List)) {
+        final map = Map<String, dynamic>.from(row as Map);
+        final eid = map['id_clinical_ecounter']?.toString() ?? '';
+        if (eid.isNotEmpty) out[eid] = map;
+      }
+      return out;
+    } catch (e) {
+      debugPrint('Error batch fetching vitals: $e');
+      return {};
+    }
+  }
+
+  /// Batch fetch anamnesis records keyed by `id_clinical_ecounter`.
+  Future<Map<String, Map<String, dynamic>>> fetchAnamnesisForEncounters(
+    List<String> encounterIds,
+  ) async {
+    if (encounterIds.isEmpty) return {};
+    try {
+      final res = await client
+          .schema('private_doctor')
+          .from('anamnesis_ecounter')
+          .select('*')
+          .inFilter('id_clinical_ecounter', encounterIds);
+      final Map<String, Map<String, dynamic>> out = {};
+      for (final row in (res as List)) {
+        final map = Map<String, dynamic>.from(row as Map);
+        final eid = map['id_clinical_ecounter']?.toString() ?? '';
+        if (eid.isNotEmpty) out[eid] = map;
+      }
+      return out;
+    } catch (e) {
+      debugPrint('Error batch fetching anamnesis: $e');
+      return {};
+    }
+  }
+
+  /// Batch fetch ICD-10 diagnoses grouped by `id_clinical_ecounters`.
+  Future<Map<String, List<Map<String, dynamic>>>> fetchDiagnosesForEncounters(
+    List<String> encounterIds,
+  ) async {
+    if (encounterIds.isEmpty) return {};
+    try {
+      final res = await client
+          .schema('private_doctor')
+          .from('icdx_ecounter')
+          .select('*')
+          .inFilter('id_clinical_ecounters', encounterIds);
+      final Map<String, List<Map<String, dynamic>>> out = {};
+      for (final row in (res as List)) {
+        final map = Map<String, dynamic>.from(row as Map);
+        final eid = map['id_clinical_ecounters']?.toString() ?? '';
+        if (eid.isNotEmpty) {
+          out.putIfAbsent(eid, () => []).add(map);
+        }
+      }
+      return out;
+    } catch (e) {
+      debugPrint('Error batch fetching diagnoses: $e');
+      return {};
+    }
   }
 
   // Fetch all users with patient role

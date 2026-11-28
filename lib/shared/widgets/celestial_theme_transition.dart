@@ -1415,6 +1415,19 @@ class _CelestialTransitionPainter extends CustomPainter {
             tint: const Color(0xFFE2E8F0),
           );
         }
+      } else if (toAppearance == 'light') {
+        final cloudAlpha =
+            Curves.easeOut.transform((progress / 0.35).clamp(0.0, 1.0)) *
+                fadeOut *
+                0.92;
+        if (cloudAlpha > 0.01) {
+          _paintDaylightClouds(
+            canvas,
+            skyBounds,
+            opacity: cloudAlpha,
+            phase: progress,
+          );
+        }
       }
 
       final poses = CelestialOrbitGeometry.transitionPoses(
@@ -1492,26 +1505,82 @@ class _CelestialTransitionPainter extends CustomPainter {
     final arriveRamp = Curves.easeOut.transform(
       (progress / CelestialOrbitGeometry.arrivalProgress).clamp(0.0, 1.0),
     );
+    final pivot = CelestialOrbitGeometry.discPivot(skyBounds, size);
+    final pivotRadius = _farthestCornerDistance(pivot, size) * 1.15;
+    final p = revealProgress.clamp(0.0, 1.0);
+
+    // Clip incoming sky atmosphere (stars for dark, clouds for light) to the
+    // newly rotated half `[-pi*p, 0]`, and receding atmosphere to `[-pi, -pi*p]`.
     if (toAppearance == 'dark') {
       final starAlpha = arriveRamp * fadeOut * 0.85;
-      if (starAlpha > 0.01) {
-        _paintStarfield(
+      if (starAlpha > 0.01 && p > 0.01) {
+        _clipDayNightHalf(
           canvas,
-          skyBounds,
-          opacity: starAlpha,
-          phase: progress * 0.5,
-          tint: const Color(0xFFE2E8F0),
+          size: size,
+          pivot: pivot,
+          radius: pivotRadius,
+          progress: p,
+          isIncomingHalf: true,
+          paint: () => _paintStarfield(
+            canvas,
+            skyBounds,
+            opacity: starAlpha,
+            phase: progress * 0.5,
+            tint: const Color(0xFFE2E8F0),
+          ),
         );
       }
-    } else if (fromAppearance == 'dark') {
-      final starFadeOut = (1.0 - arriveRamp) * 0.7;
-      if (starFadeOut > 0.01) {
-        _paintStarfield(
+      final recedingCloudAlpha = (1.0 - arriveRamp) * 0.72;
+      if (recedingCloudAlpha > 0.01 && p < 0.995) {
+        _clipDayNightHalf(
           canvas,
-          skyBounds,
-          opacity: starFadeOut,
-          phase: progress * 0.5,
-          tint: const Color(0xFFE2E8F0),
+          size: size,
+          pivot: pivot,
+          radius: pivotRadius,
+          progress: p,
+          isIncomingHalf: false,
+          paint: () => _paintDaylightClouds(
+            canvas,
+            skyBounds,
+            opacity: recedingCloudAlpha,
+            phase: progress,
+          ),
+        );
+      }
+    } else if (toAppearance == 'light') {
+      final cloudAlpha = arriveRamp * fadeOut * 0.92;
+      if (cloudAlpha > 0.01 && p > 0.01) {
+        _clipDayNightHalf(
+          canvas,
+          size: size,
+          pivot: pivot,
+          radius: pivotRadius,
+          progress: p,
+          isIncomingHalf: true,
+          paint: () => _paintDaylightClouds(
+            canvas,
+            skyBounds,
+            opacity: cloudAlpha,
+            phase: progress,
+          ),
+        );
+      }
+      final recedingStarAlpha = (1.0 - arriveRamp) * 0.7;
+      if (recedingStarAlpha > 0.01 && p < 0.995) {
+        _clipDayNightHalf(
+          canvas,
+          size: size,
+          pivot: pivot,
+          radius: pivotRadius,
+          progress: p,
+          isIncomingHalf: false,
+          paint: () => _paintStarfield(
+            canvas,
+            skyBounds,
+            opacity: recedingStarAlpha,
+            phase: progress * 0.5,
+            tint: const Color(0xFFE2E8F0),
+          ),
         );
       }
     }
@@ -1546,6 +1615,53 @@ class _CelestialTransitionPainter extends CustomPainter {
         drawTravelRipples: true,
       );
     }
+  }
+
+  void _clipDayNightHalf(
+    Canvas canvas, {
+    required Size size,
+    required Offset pivot,
+    required double radius,
+    required double progress,
+    required bool isIncomingHalf,
+    required VoidCallback paint,
+  }) {
+    if (progress >= 0.995) {
+      if (isIncomingHalf) paint();
+      return;
+    }
+    if (progress <= 0.005) {
+      if (!isIncomingHalf) paint();
+      return;
+    }
+
+    final Path clipPath;
+    if (isIncomingHalf) {
+      clipPath = Path()
+        ..moveTo(pivot.dx, pivot.dy)
+        ..arcTo(
+          Rect.fromCircle(center: pivot, radius: radius),
+          0.0,
+          -math.pi * progress,
+          false,
+        )
+        ..close();
+    } else {
+      clipPath = Path()
+        ..moveTo(pivot.dx, pivot.dy)
+        ..arcTo(
+          Rect.fromCircle(center: pivot, radius: radius),
+          -math.pi,
+          math.pi * (1.0 - progress),
+          false,
+        )
+        ..close();
+    }
+
+    canvas.save();
+    canvas.clipPath(clipPath);
+    paint();
+    canvas.restore();
   }
 
   Color _skyTransitionColor(String target) {
@@ -2264,6 +2380,193 @@ class _CelestialOrbRenderer {
       );
     }
   }
+}
+
+void _paintDaylightClouds(
+  Canvas canvas,
+  Rect bounds, {
+  required double opacity,
+  required double phase,
+}) {
+  if (opacity <= 0.01) return;
+
+  // Soft morning sky glow band across the upper sky so white clouds pop crisply
+  // even on Light mode's bright background.
+  final skyBandRect = Rect.fromLTWH(
+    bounds.left,
+    bounds.top,
+    bounds.width,
+    bounds.height * 0.34,
+  );
+  canvas.drawRect(
+    skyBandRect,
+    Paint()
+      ..shader = ui.Gradient.linear(
+        Offset(bounds.left, bounds.top),
+        Offset(bounds.left, bounds.top + bounds.height * 0.34),
+        [
+          const Color(0xFF7DD3FC).withValues(alpha: 0.16 * opacity),
+          const Color(0xFF48C9B0).withValues(alpha: 0.06 * opacity),
+          const Color(0xFF7DD3FC).withValues(alpha: 0.0),
+        ],
+        const [0.0, 0.55, 1.0],
+      ),
+  );
+
+  // Drifting sculpted clouds arranged cleanly around the upper sky (leaving
+  // center-top open for the Sun).
+  const cloudSpecs = <({
+    double xFrac,
+    double yFrac,
+    double scale,
+    double driftSpeed,
+  })>[
+    (xFrac: 0.14, yFrac: 0.11, scale: 1.05, driftSpeed: 1.0),
+    (xFrac: 0.30, yFrac: 0.21, scale: 0.82, driftSpeed: 1.35),
+    (xFrac: 0.69, yFrac: 0.11, scale: 1.00, driftSpeed: 1.1),
+    (xFrac: 0.86, yFrac: 0.20, scale: 0.88, driftSpeed: 0.9),
+    (xFrac: 0.20, yFrac: 0.29, scale: 0.72, driftSpeed: 1.2),
+  ];
+
+  final breeze = (phase - 0.25) * 44.0;
+  for (final spec in cloudSpecs) {
+    final center = Offset(
+      bounds.left + bounds.width * spec.xFrac + breeze * spec.driftSpeed,
+      bounds.top + bounds.height * spec.yFrac,
+    );
+    _paintSculptedCloud(
+      canvas,
+      center: center,
+      scale: spec.scale,
+      opacity: opacity,
+    );
+  }
+
+  // Subtle gliding distant sky birds near the upper clouds.
+  _paintSkyBird(
+    canvas,
+    center: Offset(
+      bounds.left + bounds.width * 0.37 + breeze * 1.4,
+      bounds.top + bounds.height * 0.14 - phase * 10.0,
+    ),
+    wingSpan: 13.0,
+    flapPhase: phase * 6 * math.pi,
+    color: const Color(0xFF0284C7).withValues(alpha: 0.52 * opacity),
+  );
+  _paintSkyBird(
+    canvas,
+    center: Offset(
+      bounds.left + bounds.width * 0.62 + breeze * 1.1,
+      bounds.top + bounds.height * 0.17 - phase * 8.0,
+    ),
+    wingSpan: 10.0,
+    flapPhase: phase * 6 * math.pi + 1.2,
+    color: const Color(0xFF0284C7).withValues(alpha: 0.45 * opacity),
+  );
+}
+
+void _paintSculptedCloud(
+  Canvas canvas, {
+  required Offset center,
+  required double scale,
+  required double opacity,
+}) {
+  final w = 74.0 * scale;
+  final h = 24.0 * scale;
+
+  final baseRect = RRect.fromRectAndRadius(
+    Rect.fromCenter(
+      center: center + Offset(0, h * 0.26),
+      width: w,
+      height: h * 0.78,
+    ),
+    Radius.circular(h * 0.39),
+  );
+  var cloudPath = Path()..addRRect(baseRect);
+
+  final puffs = <({Offset offset, double radius})>[
+    (offset: Offset(-w * 0.24, -h * 0.02), radius: 15.0 * scale),
+    (offset: Offset(0.0, -h * 0.26), radius: 19.5 * scale),
+    (offset: Offset(w * 0.23, -h * 0.06), radius: 14.0 * scale),
+  ];
+  for (final puff in puffs) {
+    cloudPath = Path.combine(
+      PathOperation.union,
+      cloudPath,
+      Path()
+        ..addOval(
+          Rect.fromCircle(center: center + puff.offset, radius: puff.radius),
+        ),
+    );
+  }
+
+  // Soft sky-blue drop shadow beneath the cloud.
+  canvas.save();
+  canvas.translate(0, 3.0 * scale);
+  canvas.drawPath(
+    cloudPath,
+    Paint()
+      ..color = const Color(0xFF93C5FD).withValues(alpha: 0.34 * opacity)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5.0),
+  );
+  canvas.restore();
+
+  // Luminous white-to-sky-mist gradient fill.
+  final bounds = cloudPath.getBounds();
+  canvas.drawPath(
+    cloudPath,
+    Paint()
+      ..shader = ui.Gradient.linear(
+        bounds.topCenter,
+        bounds.bottomCenter,
+        [
+          const Color(0xFFFFFFFF).withValues(alpha: 0.96 * opacity),
+          const Color(0xFFE0F2FE).withValues(alpha: 0.92 * opacity),
+        ],
+      ),
+  );
+
+  // Crisp subtle sky-blue rim outline so clouds read sharply on light backgrounds.
+  canvas.drawPath(
+    cloudPath,
+    Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2
+      ..color = const Color(0xFF7DD3FC).withValues(alpha: 0.55 * opacity),
+  );
+}
+
+void _paintSkyBird(
+  Canvas canvas, {
+  required Offset center,
+  required double wingSpan,
+  required double flapPhase,
+  required Color color,
+}) {
+  final lift = math.sin(flapPhase) * (wingSpan * 0.22);
+  final half = wingSpan * 0.5;
+  final path = Path()
+    ..moveTo(center.dx - half, center.dy - lift)
+    ..quadraticBezierTo(
+      center.dx - half * 0.45,
+      center.dy - wingSpan * 0.28,
+      center.dx,
+      center.dy,
+    )
+    ..quadraticBezierTo(
+      center.dx + half * 0.45,
+      center.dy - wingSpan * 0.28,
+      center.dx + half,
+      center.dy - lift,
+    );
+  canvas.drawPath(
+    path,
+    Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 1.6
+      ..color = color,
+  );
 }
 
 void _paintStarfield(
